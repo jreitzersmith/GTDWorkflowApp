@@ -1097,6 +1097,9 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
   const [showAssign, setShowAssign] = useState(false);
   const [assignTarget, setAssignTarget] = useState("__new__");
   const [newProjName, setNewProjName] = useState("");
+  const [editTitle, setEditTitle] = useState(task.text);
+  // Keep draft in sync if the task text is changed externally
+  useEffect(() => { setEditTitle(task.text); }, [task.text]);
   const highlight = pendingAction && task.bucket === "inbox";
   const parentProject = task.parentId ? (allTasks || []).find(t => t.id === task.parentId) : null;
   const indent = indentOverride !== undefined ? indentOverride : (isSubtask ? 28 : 0);
@@ -1129,6 +1132,15 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
 
   const toggleEffort = (e) => {
     onUpdateTask(task.id, { effort: taskEffort === e ? null : e });
+  };
+
+  const saveTitle = () => {
+    const trimmed = editTitle.trim();
+    if (trimmed && trimmed !== task.text) {
+      onUpdateTask(task.id, { text: trimmed });
+    } else {
+      setEditTitle(task.text); // revert empties / whitespace-only
+    }
   };
 
   const rootProjects = (allTasks || []).filter(t => t.bucket === "project" && !t.parentId && !t.done);
@@ -1270,6 +1282,35 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
           onClick={e => e.stopPropagation()}
           style={{ margin: `0 18px 8px ${18 + indent + 24}px`, padding: "10px 12px", background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, display: "flex", flexDirection: "column", gap: 10 }}
         >
+          {/* Title */}
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>Title</div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") saveTitle();
+                  if (e.key === "Escape") setEditTitle(task.text);
+                }}
+                style={{ flex: 1, background: COLORS.surface3, border: `1px solid ${editTitle !== task.text ? COLORS.project : COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 13, outline: "none", transition: "border-color 0.1s" }}
+              />
+              {editTitle !== task.text && (
+                <>
+                  <button
+                    onClick={saveTitle}
+                    disabled={!editTitle.trim()}
+                    style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.next}55`, background: "transparent", color: COLORS.next, fontFamily: "inherit", fontSize: 11, cursor: editTitle.trim() ? "pointer" : "not-allowed", opacity: editTitle.trim() ? 1 : 0.4 }}
+                  >Save</button>
+                  <button
+                    onClick={() => setEditTitle(task.text)}
+                    style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+                  >✕</button>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* Location */}
           <div>
             <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>Location</div>
