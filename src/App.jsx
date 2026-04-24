@@ -303,6 +303,7 @@ export default function GTDManager() {
   const [efforts, setEfforts] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_efforts") || "null") || DEFAULT_EFFORTS; } catch { return DEFAULT_EFFORTS; }
   });
+  const [tagDisplay,  setTagDisplay]  = useState(() => localStorage.getItem("gtd_tag_display") || "below");
   const [showSettings, setShowSettings] = useState(false);
   const [nextGroupBy, setNextGroupBy] = useState("none");
   const [projectParentId, setProjectParentId] = useState("__new__");
@@ -323,6 +324,7 @@ export default function GTDManager() {
   useEffect(() => { localStorage.setItem("gtd_local_model", localModel); }, [localModel]);
   useEffect(() => { localStorage.setItem("gtd_locations", JSON.stringify(locations)); }, [locations]);
   useEffect(() => { localStorage.setItem("gtd_efforts",   JSON.stringify(efforts));   }, [efforts]);
+  useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
 
   const getTaskContext = useCallback(() => {
@@ -800,6 +802,8 @@ export default function GTDManager() {
               onAddEffort={addEffort}
               onRenameEffort={renameEffort}
               onRemoveEffort={removeEffort}
+              tagDisplay={tagDisplay}
+              onSetTagDisplay={setTagDisplay}
               onClose={() => setShowSettings(false)}
             />
           ) : (
@@ -918,6 +922,7 @@ export default function GTDManager() {
                         locations,
                         efforts,
                         onAssignToProject: assignToProject,
+                        tagDisplay,
                       }}
                     />
                   </div>
@@ -937,7 +942,7 @@ export default function GTDManager() {
                       <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                         onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                         pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                        onAssignToProject={assignToProject} />
+                        onAssignToProject={assignToProject} tagDisplay={tagDisplay} />
                     ));
                   }
                   return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => {
@@ -950,7 +955,7 @@ export default function GTDManager() {
                           <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                             onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                             pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                            onAssignToProject={assignToProject} />
+                            onAssignToProject={assignToProject} tagDisplay={tagDisplay} />
                         ))}
                       </div>
                     );
@@ -960,7 +965,7 @@ export default function GTDManager() {
                     <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                       onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                       pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                      onAssignToProject={assignToProject} />
+                      onAssignToProject={assignToProject} tagDisplay={tagDisplay} />
                   ))
                 )}
               </div>
@@ -1086,7 +1091,7 @@ function Btn({ children, onClick, style = {} }) {
 
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, indentOverride }) {
+function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, tagDisplay, indentOverride }) {
   const [hover, setHover] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
@@ -1168,8 +1173,8 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
               <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, flexShrink: 0 }}>⏱ {projectEffortTotal}</span>
             )}
           </div>
-          {/* Metadata summary chips (collapsed) */}
-          {!expanded && hasMetadata && (
+          {/* Metadata summary chips — below-text mode */}
+          {tagDisplay !== "inline" && !expanded && hasMetadata && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
               {taskLocation.map(loc => (
                 <span key={loc} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.project, border: `1px solid ${COLORS.project}44` }}>{loc}</span>
@@ -1197,6 +1202,24 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
             </div>
           )}
         </div>
+
+        {/* Metadata chips — inline mode: sit between text and chevron */}
+        {tagDisplay === "inline" && !expanded && hasMetadata && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, flexShrink: 0, alignSelf: "center" }}>
+            {taskLocation.map(loc => (
+              <span key={loc} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.project, border: `1px solid ${COLORS.project}44`, whiteSpace: "nowrap" }}>{loc}</span>
+            ))}
+            {taskDueDate && (
+              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.waiting, border: `1px solid ${COLORS.waiting}44`, whiteSpace: "nowrap" }}>📅 {taskDueDate}</span>
+            )}
+            {taskPriority.map(p => (
+              <span key={p} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.inbox, border: `1px solid ${COLORS.inbox}44`, whiteSpace: "nowrap" }}>{p}</span>
+            ))}
+            {taskEffort && (
+              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, whiteSpace: "nowrap" }}>⏱ {taskEffort}</span>
+            )}
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center" }}>
           {/* Chevron — always visible if has metadata, else on hover */}
@@ -1555,7 +1578,7 @@ function ProviderOption({ label, icon, color, active, onClick }) {
   );
 }
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, onClose }) {
+function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, tagDisplay, onSetTagDisplay, onClose }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1569,10 +1592,43 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
         >✕ Close</button>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 32 }}>
-        <LocationManager locations={locations} tasks={tasks} onAdd={onAdd} onRename={onRename} onRemove={onRemove} />
+        <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
+        <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
+          <LocationManager locations={locations} tasks={tasks} onAdd={onAdd} onRename={onRename} onRemove={onRemove} />
+        </div>
         <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
           <EffortManager efforts={efforts} tasks={tasks} onAdd={onAddEffort} onRename={onRenameEffort} onRemove={onRemoveEffort} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function TagDisplaySetting({ value, onChange }) {
+  const opts = [
+    { key: "below",  label: "Below text",  desc: "Tags appear on a new line beneath the task name" },
+    { key: "inline", label: "Inline",       desc: "Tags sit between the task name and the chevron" },
+  ];
+  return (
+    <div style={{ maxWidth: 480 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Tag Display</div>
+      <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 14, lineHeight: 1.5 }}>
+        Controls where metadata tags (location, due date, priority, effort) appear on collapsed task rows.
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        {opts.map(opt => {
+          const active = value === opt.key;
+          return (
+            <button
+              key={opt.key}
+              onClick={() => onChange(opt.key)}
+              style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + "22" : COLORS.surface2, color: active ? COLORS.project : COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer", textAlign: "left", transition: "all 0.1s" }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: 3 }}>{opt.label}</div>
+              <div style={{ fontSize: 11, color: active ? COLORS.project + "cc" : COLORS.muted }}>{opt.desc}</div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
