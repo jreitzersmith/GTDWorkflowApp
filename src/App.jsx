@@ -109,6 +109,9 @@ export default function GTDManager() {
   const [provider, setProvider] = useState(() => localStorage.getItem("gtd_provider") || "claude");
   const [localModel, setLocalModel] = useState(() => localStorage.getItem("gtd_local_model") || "llama3.3:70b");
   const [availableModels, setAvailableModels] = useState([]);
+  const [locations, setLocations] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_locations") || "null") || ["Home", "Work", "Phone", "Computer"]; } catch { return ["Home", "Work", "Phone", "Computer"]; }
+  });
 
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
@@ -120,6 +123,7 @@ export default function GTDManager() {
 
   useEffect(() => { localStorage.setItem("gtd_provider", provider); }, [provider]);
   useEffect(() => { localStorage.setItem("gtd_local_model", localModel); }, [localModel]);
+  useEffect(() => { localStorage.setItem("gtd_locations", JSON.stringify(locations)); }, [locations]);
 
   const getTaskContext = useCallback(() => {
     const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe" };
@@ -254,19 +258,19 @@ export default function GTDManager() {
 
     // Create new tasks based on action type
     if (type === "next") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now() }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: null }, ...prev]);
     } else if (type === "project") {
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId] },
-        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId },
+        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: null },
+        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null },
         ...prev,
       ]);
     } else if (type === "someday") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now() }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: null }, ...prev]);
     } else if (type === "waiting") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now() }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: null }, ...prev]);
     }
     // type === "delete": just archive, no new task
 
@@ -309,14 +313,14 @@ export default function GTDManager() {
   const addTask = (bucket) => {
     const text = addText.trim();
     if (!text) return;
-    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now() }, ...prev]);
+    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now(), priority: [], location: [], dueDate: null }, ...prev]);
     setAddText("");
   };
 
   const addAndProcess = () => {
     const text = addText.trim();
     if (!text) return;
-    const task = { id: genId(), text, bucket: "inbox", done: false, created: Date.now() };
+    const task = { id: genId(), text, bucket: "inbox", done: false, created: Date.now(), priority: [], location: [], dueDate: null };
     setTasks(prev => [task, ...prev]);
     setAddText("");
     setCurrentBucket("inbox");
@@ -331,6 +335,9 @@ export default function GTDManager() {
 
   const deleteTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
   const completeTask = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox" } : t));
+  const updateTask = useCallback((id, changes) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
+  }, []);
 
   const bucketTasks = tasks.filter(t => t.bucket === currentBucket);
   const counts = Object.fromEntries(Object.keys(BUCKETS).map(k => [k, tasks.filter(t => t.bucket === k).length]));
@@ -407,12 +414,14 @@ export default function GTDManager() {
               bucketTasks.map(task => (
                 <div key={task.id}>
                   <TaskRow task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                    onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} />
+                    onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
+                    pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} />
                   {(task.childIds || []).map(childId => {
                     const child = tasks.find(t => t.id === childId);
                     return child ? (
                       <TaskRow key={childId} task={child} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                        onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} isSubtask />
+                        onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
+                        pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} isSubtask locations={locations} />
                     ) : null;
                   })}
                 </div>
@@ -420,7 +429,8 @@ export default function GTDManager() {
             ) : (
               bucketTasks.map(task => (
                 <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                  onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} />
+                  onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
+                  pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} />
               ))
             )}
           </div>
@@ -531,66 +541,176 @@ function Btn({ children, onClick, style = {} }) {
   );
 }
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, pendingAction, allTasks, onNavigate, isSubtask }) {
+const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
+
+function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations }) {
   const [hover, setHover] = useState(false);
-  const [showParentTip, setShowParentTip] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const highlight = pendingAction && task.bucket === "inbox";
   const parentProject = task.parentId ? (allTasks || []).find(t => t.id === task.parentId) : null;
   const indent = isSubtask ? 28 : 0;
 
+  const taskPriority = task.priority || [];
+  const taskLocation = task.location || [];
+  const taskDueDate = task.dueDate || "";
+
+  const togglePriority = (p) => {
+    const next = taskPriority.includes(p) ? taskPriority.filter(x => x !== p) : [...taskPriority, p];
+    onUpdateTask(task.id, { priority: next });
+  };
+
+  const toggleLocation = (loc) => {
+    const next = taskLocation.includes(loc) ? taskLocation.filter(x => x !== loc) : [...taskLocation, loc];
+    onUpdateTask(task.id, { location: next });
+  };
+
+  const hasMetadata = taskPriority.length > 0 || taskLocation.length > 0 || taskDueDate;
+
   return (
     <div
       onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => { setHover(false); setShowParentTip(false); }}
-      style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: highlight ? COLORS.inboxBg : (hover ? COLORS.surface2 : "transparent"), borderLeft: `3px solid ${highlight ? COLORS.inbox : isSubtask ? COLORS.project + "55" : "transparent"}`, opacity: task.done ? 0.4 : 1, transition: "all 0.12s" }}
+      onMouseLeave={() => setHover(false)}
+      style={{ borderLeft: `3px solid ${highlight ? COLORS.inbox : isSubtask ? COLORS.project + "55" : "transparent"}`, opacity: task.done ? 0.4 : 1, transition: "all 0.12s" }}
     >
-      {isSubtask && <span style={{ color: COLORS.project, fontSize: 10, marginTop: 3, flexShrink: 0 }}>↳</span>}
-      <div
-        onClick={() => onComplete(task.id)}
-        style={{ width: 15, height: 15, borderRadius: "50%", border: `1.5px solid ${task.done ? COLORS.next : COLORS.border2}`, background: task.done ? COLORS.next : "transparent", flexShrink: 0, marginTop: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#111", transition: "all 0.15s" }}
-      >
-        {task.done ? "✓" : ""}
-      </div>
+      {/* Main task row */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: highlight ? COLORS.inboxBg : (hover ? COLORS.surface2 : "transparent") }}>
+        {isSubtask && <span style={{ color: COLORS.project, fontSize: 10, marginTop: 3, flexShrink: 0 }}>↳</span>}
+        <div
+          onClick={() => onComplete(task.id)}
+          style={{ width: 15, height: 15, borderRadius: "50%", border: `1.5px solid ${task.done ? COLORS.next : COLORS.border2}`, background: task.done ? COLORS.next : "transparent", flexShrink: 0, marginTop: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#111", transition: "all 0.15s" }}
+        >
+          {task.done ? "✓" : ""}
+        </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, color: COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4 }}>{task.text}</div>
-        {/* Parent project link for Next Actions */}
-        {parentProject && currentBucket === "next" && hover && (
-          <div
-            onClick={() => onNavigate("project")}
-            style={{ marginTop: 3, fontSize: 11, color: COLORS.project, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, opacity: 0.85 }}
-            title="Go to project"
-          >
-            <span>↑</span>
-            <span style={{ textDecoration: "underline" }}>{parentProject.text}</span>
-          </div>
-        )}
-      </div>
-
-      {hover && (
-        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-          {currentBucket === "inbox" && (
-            <ActionBtn onClick={() => onAskAI(task)} color={COLORS.inbox}>✦ AI</ActionBtn>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, color: COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4 }}>{task.text}</div>
+          {/* Metadata summary chips (collapsed) */}
+          {!expanded && hasMetadata && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+              {taskLocation.map(loc => (
+                <span key={loc} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.project, border: `1px solid ${COLORS.project}44` }}>{loc}</span>
+              ))}
+              {taskDueDate && (
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.waiting, border: `1px solid ${COLORS.waiting}44` }}>📅 {taskDueDate}</span>
+              )}
+              {taskPriority.map(p => (
+                <span key={p} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.inbox, border: `1px solid ${COLORS.inbox}44` }}>{p}</span>
+              ))}
+            </div>
           )}
-          <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-            <ActionBtn onClick={() => setMoveMenu(moveMenu === task.id ? null : task.id)}>Move ▾</ActionBtn>
-            {moveMenu === task.id && (
-              <div style={{ position: "absolute", right: 0, top: "100%", background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 8, padding: 4, zIndex: 100, minWidth: 150, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
-                {Object.entries(BUCKETS).filter(([k]) => k !== currentBucket && k !== "done" && k !== "inboxHistory").map(([k, cfg]) => (
-                  <div
-                    key={k}
-                    onClick={() => onMove(task.id, k)}
-                    style={{ padding: "7px 10px", borderRadius: 5, fontSize: 12, cursor: "pointer", color: COLORS.text2, display: "flex", alignItems: "center", gap: 7 }}
-                    onMouseEnter={e => e.currentTarget.style.background = COLORS.surface2}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    <span style={{ color: cfg.color }}>●</span> {cfg.label}
+          {/* Parent project link for Next Actions */}
+          {parentProject && currentBucket === "next" && hover && (
+            <div
+              onClick={() => onNavigate("project")}
+              style={{ marginTop: 3, fontSize: 11, color: COLORS.project, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, opacity: 0.85 }}
+              title="Go to project"
+            >
+              <span>↑</span>
+              <span style={{ textDecoration: "underline" }}>{parentProject.text}</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center" }}>
+          {/* Chevron — always visible if has metadata, else on hover */}
+          {(hover || expanded || hasMetadata) && (
+            <button
+              onClick={e => { e.stopPropagation(); setExpanded(x => !x); }}
+              title="Task details"
+              style={{ padding: "2px 5px", borderRadius: 5, border: `1px solid ${expanded ? COLORS.border2 : COLORS.border}`, background: expanded ? COLORS.surface3 : "transparent", color: expanded ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", lineHeight: 1, transition: "all 0.1s" }}
+            >
+              {expanded ? "▾" : "›"}
+            </button>
+          )}
+          {hover && (
+            <>
+              {currentBucket === "inbox" && (
+                <ActionBtn onClick={() => onAskAI(task)} color={COLORS.inbox}>✦ AI</ActionBtn>
+              )}
+              <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+                <ActionBtn onClick={() => setMoveMenu(moveMenu === task.id ? null : task.id)}>Move ▾</ActionBtn>
+                {moveMenu === task.id && (
+                  <div style={{ position: "absolute", right: 0, top: "100%", background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 8, padding: 4, zIndex: 100, minWidth: 150, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+                    {Object.entries(BUCKETS).filter(([k]) => k !== currentBucket && k !== "done" && k !== "inboxHistory").map(([k, cfg]) => (
+                      <div
+                        key={k}
+                        onClick={() => onMove(task.id, k)}
+                        style={{ padding: "7px 10px", borderRadius: 5, fontSize: 12, cursor: "pointer", color: COLORS.text2, display: "flex", alignItems: "center", gap: 7 }}
+                        onMouseEnter={e => e.currentTarget.style.background = COLORS.surface2}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                      >
+                        <span style={{ color: cfg.color }}>●</span> {cfg.label}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
+              <ActionBtn onClick={() => onDelete(task.id)} color="#d45a5a">✕</ActionBtn>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded metadata panel */}
+      {expanded && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{ margin: `0 18px 8px ${18 + indent + 24}px`, padding: "10px 12px", background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, display: "flex", flexDirection: "column", gap: 10 }}
+        >
+          {/* Location */}
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>Location</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {(locations || []).map(loc => {
+                const active = taskLocation.includes(loc);
+                return (
+                  <button
+                    key={loc}
+                    onClick={() => toggleLocation(loc)}
+                    style={{ padding: "3px 9px", borderRadius: 10, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + "22" : "transparent", color: active ? COLORS.project : COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "all 0.1s" }}
+                  >
+                    {loc}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Due Date */}
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>Due Date</div>
+            <input
+              type="date"
+              value={taskDueDate}
+              onChange={e => onUpdateTask(task.id, { dueDate: e.target.value || null })}
+              style={{ background: COLORS.surface3, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
+            />
+            {taskDueDate && (
+              <button
+                onClick={() => onUpdateTask(task.id, { dueDate: null })}
+                style={{ marginLeft: 6, padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+              >✕</button>
             )}
           </div>
-          <ActionBtn onClick={() => onDelete(task.id)} color="#d45a5a">✕</ActionBtn>
+
+          {/* Priority */}
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>Priority</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {PRIORITIES.map(p => {
+                const active = taskPriority.includes(p);
+                return (
+                  <button
+                    key={p}
+                    onClick={() => togglePriority(p)}
+                    style={{ padding: "3px 9px", borderRadius: 10, border: `1px solid ${active ? COLORS.inbox : COLORS.border}`, background: active ? COLORS.inbox + "22" : "transparent", color: active ? COLORS.inbox : COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "all 0.1s" }}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>
