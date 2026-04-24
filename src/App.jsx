@@ -149,6 +149,7 @@ export default function GTDManager() {
   });
   const [showSettings, setShowSettings] = useState(false);
   const [nextGroupBy, setNextGroupBy] = useState("none");
+  const [projectParentId, setProjectParentId] = useState("__new__");
 
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
@@ -161,6 +162,7 @@ export default function GTDManager() {
   useEffect(() => { localStorage.setItem("gtd_provider", provider); }, [provider]);
   useEffect(() => { localStorage.setItem("gtd_local_model", localModel); }, [localModel]);
   useEffect(() => { localStorage.setItem("gtd_locations", JSON.stringify(locations)); }, [locations]);
+  useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
 
   const getTaskContext = useCallback(() => {
     const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe" };
@@ -364,6 +366,30 @@ export default function GTDManager() {
     askAIAboutTask(task);
   };
 
+  const addProjectTask = () => {
+    const text = addText.trim();
+    if (!text) return;
+    if (projectParentId === "__new__") {
+      // Create a new root project
+      setTasks(prev => [
+        { id: genId(), text, bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, childIds: [] },
+        ...prev,
+      ]);
+    } else {
+      // Add as next-action child of an existing project
+      const childId = genId();
+      setTasks(prev => [
+        ...prev.map(t =>
+          t.id === projectParentId
+            ? { ...t, childIds: [...(t.childIds || []), childId] }
+            : t
+        ),
+        { id: childId, text, bucket: "next", done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null },
+      ]);
+    }
+    setAddText("");
+  };
+
   const moveTask = (id, bucket) => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, bucket, done: bucket === "done" } : t));
     setMoveMenu(null);
@@ -493,17 +519,49 @@ export default function GTDManager() {
                 )}
               </div>
 
-              <div style={s.addRow}>
-                <input
-                  value={addText}
-                  onChange={e => setAddText(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && addTask()}
-                  placeholder="Add a task… (Enter to add)"
-                  style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" }}
-                />
-                <Btn onClick={() => addTask()} style={{ fontSize: 12 }}>+ Add</Btn>
-                <Btn onClick={addAndProcess} style={{ fontSize: 12, borderColor: COLORS.inbox, color: COLORS.inbox }}>+ Add & Ask AI</Btn>
-              </div>
+              {currentBucket === "project" ? (() => {
+                const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+                const selectedProject = rootProjects.find(t => t.id === projectParentId);
+                const placeholder = projectParentId === "__new__"
+                  ? "New project name… (Enter to add)"
+                  : `Subtask for "${selectedProject?.text ?? ""}"…`;
+                return (
+                  <div style={s.addRow}>
+                    <input
+                      value={addText}
+                      onChange={e => setAddText(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && addProjectTask()}
+                      placeholder={placeholder}
+                      style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" }}
+                    />
+                    <select
+                      value={projectParentId}
+                      onChange={e => setProjectParentId(e.target.value)}
+                      style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", fontFamily: "inherit", fontSize: 12, color: projectParentId === "__new__" ? COLORS.text2 : COLORS.project, outline: "none", cursor: "pointer", maxWidth: 180, colorScheme: "dark" }}
+                    >
+                      <option value="__new__">+ New project</option>
+                      {rootProjects.map(p => (
+                        <option key={p.id} value={p.id}>{p.text.length > 30 ? p.text.slice(0, 28) + "…" : p.text}</option>
+                      ))}
+                    </select>
+                    <Btn onClick={addProjectTask} style={{ fontSize: 12, borderColor: projectParentId === "__new__" ? COLORS.border : COLORS.project, color: projectParentId === "__new__" ? COLORS.text2 : COLORS.project }}>
+                      {projectParentId === "__new__" ? "+ Add Project" : "+ Add Task"}
+                    </Btn>
+                  </div>
+                );
+              })() : (
+                <div style={s.addRow}>
+                  <input
+                    value={addText}
+                    onChange={e => setAddText(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && addTask()}
+                    placeholder="Add a task… (Enter to add)"
+                    style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" }}
+                  />
+                  <Btn onClick={() => addTask()} style={{ fontSize: 12 }}>+ Add</Btn>
+                  <Btn onClick={addAndProcess} style={{ fontSize: 12, borderColor: COLORS.inbox, color: COLORS.inbox }}>+ Add & Ask AI</Btn>
+                </div>
+              )}
 
               <div style={s.taskList}>
                 {bucketTasks.length === 0 ? (
