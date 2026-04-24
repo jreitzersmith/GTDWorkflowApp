@@ -126,6 +126,80 @@ function groupByField(taskList, field) {
   return sorted;
 }
 
+// Returns children in display order.
+// parentId === null → root projects (bucket "project", no parentId), ordered by tasks array position.
+// otherwise → ordered by parent's childIds array.
+function getOrderedChildren(parentId, allTasks) {
+  if (parentId === null) {
+    return allTasks.filter(t => t.bucket === "project" && !t.parentId);
+  }
+  const parent = allTasks.find(t => t.id === parentId);
+  if (!parent) return [];
+  return (parent.childIds || []).map(id => allTasks.find(t => t.id === id)).filter(Boolean);
+}
+
+// Pure function: returns a new tasks array after moving dragId to targetId at position.
+// position: "before" | "inside" | "after"
+// Handles: reorder within level, reparent, promote to root, demote into project.
+function moveTaskInTree(allTasks, dragId, targetId, position) {
+  if (dragId === targetId) return allTasks;
+  const dragged = allTasks.find(t => t.id === dragId);
+  const target  = allTasks.find(t => t.id === targetId);
+  if (!dragged || !target) return allTasks;
+
+  // Guard: don't allow dropping inside own descendant (would create a cycle).
+  function isAncestorOf(ancestorId, nodeId, seen = new Set()) {
+    if (seen.has(nodeId)) return false;
+    seen.add(nodeId);
+    const node = allTasks.find(t => t.id === nodeId);
+    if (!node?.parentId) return false;
+    if (node.parentId === ancestorId) return true;
+    return isAncestorOf(ancestorId, node.parentId, seen);
+  }
+  if (isAncestorOf(dragId, targetId)) return allTasks;
+
+  const newParentId = position === "inside" ? targetId : (target.parentId || null);
+  const newBucket   = newParentId ? "next" : "project";
+
+  // 1. Remove dragged from its current parent's childIds.
+  let result = allTasks.map(t =>
+    t.childIds?.includes(dragId) ? { ...t, childIds: t.childIds.filter(id => id !== dragId) } : t
+  );
+
+  // 2. Update dragged task's parentId and bucket.
+  result = result.map(t => {
+    if (t.id !== dragId) return t;
+    if (newParentId) return { ...t, bucket: newBucket, parentId: newParentId };
+    const { parentId: _drop, ...rest } = t;           // promote to root → remove parentId
+    return { ...rest, bucket: newBucket };
+  });
+
+  // 3a. Inserting as child of newParentId → update parent's childIds.
+  if (newParentId) {
+    result = result.map(t => {
+      if (t.id !== newParentId) return t;
+      let ids = (t.childIds || []).filter(id => id !== dragId);
+      if (position === "inside") {
+        ids = [dragId, ...ids];                        // prepend as first child
+      } else {
+        const ref = ids.indexOf(targetId);
+        const at  = ref === -1 ? ids.length : (position === "before" ? ref : ref + 1);
+        ids.splice(at, 0, dragId);
+      }
+      return { ...t, childIds: ids };
+    });
+  } else {
+    // 3b. Root-level reorder: splice into the tasks array.
+    const draggedTask = result.find(t => t.id === dragId);
+    result = result.filter(t => t.id !== dragId);
+    const tIdx = result.findIndex(t => t.id === targetId);
+    const at   = tIdx === -1 ? 0 : (position === "before" ? tIdx : tIdx + 1);
+    result.splice(Math.max(0, at), 0, draggedTask);
+  }
+
+  return result;
+}
+
 export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
@@ -150,6 +224,8 @@ export default function GTDManager() {
   const [showSettings, setShowSettings] = useState(false);
   const [nextGroupBy, setNextGroupBy] = useState("none");
   const [projectParentId, setProjectParentId] = useState("__new__");
+  const [dragId,     setDragId]     = useState(null);
+  const [dropTarget, setDropTarget] = useState(null); // { id, position: "before"|"inside"|"after" }
 
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
@@ -418,6 +494,36 @@ export default function GTDManager() {
     })));
   }, []);
 
+  const handleProjectDragStart = useCallback((id) => {
+    setDragId(id);
+    setDropTarget(null);
+  }, []);
+
+  const handleProjectDragOver = useCallback((e, taskId) => {
+    if (taskId === dragId) return;                          // don't target self
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientY - rect.top) / rect.height;
+    const position = ratio < 0.33 ? "before" : ratio > 0.67 ? "after" : "inside";
+    setDropTarget(prev =>
+      prev?.id === taskId && prev?.position === position ? prev : { id: taskId, position }
+    );
+  }, [dragId]);
+
+  const handleProjectDragEnd = useCallback(() => {
+    setDragId(null);
+    setDropTarget(null);
+  }, []);
+
+  const handleProjectDrop = useCallback((targetId) => {
+    setDropTarget(prev => {
+      if (prev && dragId) {
+        setTasks(all => moveTaskInTree(all, dragId, targetId, prev.position));
+      }
+      return null;
+    });
+    setDragId(null);
+  }, [dragId]);
+
   const removeLocation = useCallback((name, replaceName) => {
     setLocations(prev => prev.filter(l => l !== name));
     setTasks(prev => prev.map(t => {
@@ -567,21 +673,36 @@ export default function GTDManager() {
                 {bucketTasks.length === 0 ? (
                   <EmptyState bucket={currentBucket} />
                 ) : currentBucket === "project" ? (
-                  bucketTasks.map(task => (
-                    <div key={task.id}>
-                      <TaskRow task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                        onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                        pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} />
-                      {(task.childIds || []).map(childId => {
-                        const child = tasks.find(t => t.id === childId);
-                        return child ? (
-                          <TaskRow key={childId} task={child} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                            onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                            pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} isSubtask locations={locations} />
-                        ) : null;
-                      })}
-                    </div>
-                  ))
+                  <div
+                    onDragLeave={e => {
+                      if (!e.currentTarget.contains(e.relatedTarget)) setDropTarget(null);
+                    }}
+                  >
+                    <ProjectTree
+                      parentId={null}
+                      depth={0}
+                      allTasks={tasks}
+                      dragId={dragId}
+                      dropTarget={dropTarget}
+                      onDragStart={handleProjectDragStart}
+                      onDragOver={handleProjectDragOver}
+                      onDragEnd={handleProjectDragEnd}
+                      onDrop={handleProjectDrop}
+                      rowProps={{
+                        currentBucket,
+                        moveMenu, setMoveMenu,
+                        onComplete: completeTask,
+                        onDelete: deleteTask,
+                        onMove: moveTask,
+                        onAskAI: askAIAboutTask,
+                        onUpdateTask: updateTask,
+                        pendingAction,
+                        allTasks: tasks,
+                        onNavigate: setCurrentBucket,
+                        locations,
+                      }}
+                    />
+                  </div>
                 ) : currentBucket === "next" ? (() => {
                   const visible = waterfallFilter(bucketTasks, tasks);
                   if (!visible.length) {
@@ -729,12 +850,12 @@ function Btn({ children, onClick, style = {} }) {
 
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations }) {
+function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, indentOverride }) {
   const [hover, setHover] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const highlight = pendingAction && task.bucket === "inbox";
   const parentProject = task.parentId ? (allTasks || []).find(t => t.id === task.parentId) : null;
-  const indent = isSubtask ? 28 : 0;
+  const indent = indentOverride !== undefined ? indentOverride : (isSubtask ? 28 : 0);
 
   const taskPriority = task.priority || [];
   const taskLocation = task.location || [];
@@ -761,6 +882,9 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
       {/* Main task row */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: highlight ? COLORS.inboxBg : (hover ? COLORS.surface2 : "transparent") }}>
         {isSubtask && <span style={{ color: COLORS.project, fontSize: 10, marginTop: 3, flexShrink: 0 }}>↳</span>}
+        {currentBucket === "project" && (
+          <span style={{ color: COLORS.muted, fontSize: 12, marginTop: 1, flexShrink: 0, cursor: "grab", userSelect: "none", opacity: hover ? 0.6 : 0, transition: "opacity 0.1s", lineHeight: 1 }}>⠿</span>
+        )}
         <div
           onClick={() => onComplete(task.id)}
           style={{ width: 15, height: 15, borderRadius: "50%", border: `1.5px solid ${task.done ? COLORS.next : COLORS.border2}`, background: task.done ? COLORS.next : "transparent", flexShrink: 0, marginTop: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#111", transition: "all 0.15s" }}
@@ -1207,6 +1331,73 @@ function LocationManager({ locations, tasks, onAdd, onRename, onRemove }) {
         >+ Add</button>
       </div>
     </div>
+  );
+}
+
+function DropLine({ depth }) {
+  return (
+    <div style={{ height: 2, background: COLORS.project, margin: `1px 18px 1px ${18 + depth * 22}px`, borderRadius: 2, pointerEvents: "none" }} />
+  );
+}
+
+function ProjectTree({ parentId, depth, allTasks, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop, rowProps }) {
+  if (depth > 5) return null;
+  const children = getOrderedChildren(parentId, allTasks);
+  if (!children.length) return null;
+
+  return (
+    <>
+      {children.map(task => {
+        const dt = dropTarget;
+        const isTarget   = dt?.id === task.id;
+        const isDragging = dragId === task.id;
+
+        return (
+          <div key={task.id}>
+            {isTarget && dt.position === "before" && <DropLine depth={depth} />}
+
+            <div
+              draggable
+              onDragStart={e => { e.stopPropagation(); onDragStart(task.id); }}
+              onDragOver={e => { e.preventDefault(); e.stopPropagation(); onDragOver(e, task.id); }}
+              onDragEnd={e => { e.stopPropagation(); onDragEnd(); }}
+              onDrop={e => { e.preventDefault(); e.stopPropagation(); onDrop(task.id); }}
+              style={{
+                opacity: isDragging ? 0.35 : 1,
+                outline: isTarget && dt.position === "inside" ? `2px solid ${COLORS.project}66` : "none",
+                outlineOffset: -1,
+                borderRadius: 4,
+                transition: "opacity 0.1s",
+              }}
+            >
+              <TaskRow
+                task={task}
+                isSubtask={depth > 0}
+                indentOverride={depth * 22}
+                {...rowProps}
+              />
+            </div>
+
+            {/* Recurse into children before showing the "after" indicator so the
+                drop line appears below all descendants, at the correct level. */}
+            <ProjectTree
+              parentId={task.id}
+              depth={depth + 1}
+              allTasks={allTasks}
+              dragId={dragId}
+              dropTarget={dropTarget}
+              onDragStart={onDragStart}
+              onDragOver={onDragOver}
+              onDragEnd={onDragEnd}
+              onDrop={onDrop}
+              rowProps={rowProps}
+            />
+
+            {isTarget && dt.position === "after" && <DropLine depth={depth} />}
+          </div>
+        );
+      })}
+    </>
   );
 }
 
