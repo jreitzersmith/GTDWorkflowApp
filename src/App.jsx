@@ -91,6 +91,41 @@ function extractAction(text) {
   };
 }
 
+// Waterfall: level-2 tasks (direct children of a project) always show in Next Actions.
+// Level 3+ tasks only show when their direct parent is done.
+function waterfallFilter(nextTasks, allTasks) {
+  return nextTasks.filter(task => {
+    if (!task.parentId) return true;
+    const parent = allTasks.find(t => t.id === task.parentId);
+    if (!parent) return true;
+    if (parent.bucket === "project") return true; // level 2 — always visible
+    return !!parent.done;                          // level 3+ — visible only when parent done
+  });
+}
+
+// Group a task list by a single metadata field.
+// Multi-value fields (location, priority) use the first value.
+// Tasks with no value for the field go into an "Ungrouped" bucket.
+function groupByField(taskList, field) {
+  const groups = {};
+  const ungrouped = [];
+  taskList.forEach(task => {
+    let keys = [];
+    if (field === "location") keys = task.location || [];
+    else if (field === "priority") keys = task.priority || [];
+    else if (field === "dueDate") keys = task.dueDate ? [task.dueDate] : [];
+    if (!keys.length) { ungrouped.push(task); return; }
+    const key = keys[0];
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(task);
+  });
+  const sorted = Object.entries(groups)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, items]) => ({ key, label: key, items }));
+  if (ungrouped.length) sorted.push({ key: "__ungrouped__", label: "Ungrouped", items: ungrouped });
+  return sorted;
+}
+
 export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
@@ -113,6 +148,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_locations") || "null") || ["Home", "Work", "Phone", "Computer"]; } catch { return ["Home", "Work", "Phone", "Computer"]; }
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [nextGroupBy, setNextGroupBy] = useState("none");
 
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
@@ -432,10 +468,29 @@ export default function GTDManager() {
           ) : (
             <>
               <div style={s.panelHeader}>
-                <div>
+                <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 300 }}>{BUCKETS[currentBucket].label}</div>
                   <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{BUCKETS[currentBucket].desc}</div>
                 </div>
+                {currentBucket === "next" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, color: COLORS.muted, marginRight: 2 }}>Group:</span>
+                    {[
+                      { key: "none",     label: "None" },
+                      { key: "location", label: "Location" },
+                      { key: "dueDate",  label: "Due Date" },
+                      { key: "priority", label: "Priority" },
+                    ].map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setNextGroupBy(opt.key)}
+                        style={{ padding: "3px 9px", borderRadius: 6, border: `1px solid ${nextGroupBy === opt.key ? COLORS.border2 : COLORS.border}`, background: nextGroupBy === opt.key ? COLORS.surface3 : "transparent", color: nextGroupBy === opt.key ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "all 0.1s" }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div style={s.addRow}>
@@ -469,7 +524,35 @@ export default function GTDManager() {
                       })}
                     </div>
                   ))
-                ) : (
+                ) : currentBucket === "next" ? (() => {
+                  const visible = waterfallFilter(bucketTasks, tasks);
+                  if (!visible.length) {
+                    return (
+                      <div style={{ padding: "28px 24px", textAlign: "center", color: COLORS.muted, fontSize: 12 }}>
+                        <div style={{ fontSize: 22, opacity: 0.3, marginBottom: 8 }}>○</div>
+                        <strong style={{ fontSize: 13, display: "block", marginBottom: 4 }}>All actions are waiting</strong>
+                        Complete parent tasks to unlock the next step.
+                      </div>
+                    );
+                  }
+                  if (nextGroupBy === "none") {
+                    return visible.map(task => (
+                      <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
+                        onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
+                        pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} />
+                    ));
+                  }
+                  return groupByField(visible, nextGroupBy).map(({ key, label, items }) => (
+                    <div key={key}>
+                      <GroupDivider label={label} count={items.length} isUngrouped={key === "__ungrouped__"} />
+                      {items.map(task => (
+                        <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
+                          onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
+                          pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} />
+                      ))}
+                    </div>
+                  ));
+                })() : (
                   bucketTasks.map(task => (
                     <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                       onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
@@ -1065,6 +1148,17 @@ function LocationManager({ locations, tasks, onAdd, onRename, onRemove }) {
           style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: newLocText.trim() ? "pointer" : "not-allowed", opacity: newLocText.trim() ? 1 : 0.4 }}
         >+ Add</button>
       </div>
+    </div>
+  );
+}
+
+function GroupDivider({ label, count, isUngrouped }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 18px 5px", borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: isUngrouped ? COLORS.muted : COLORS.text2, letterSpacing: "0.06em", textTransform: isUngrouped ? "none" : "uppercase" }}>
+        {isUngrouped ? "— Ungrouped" : label}
+      </span>
+      <span style={{ fontSize: 10, color: COLORS.muted, background: COLORS.surface3, padding: "1px 6px", borderRadius: 8 }}>{count}</span>
     </div>
   );
 }
