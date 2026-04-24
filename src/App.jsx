@@ -123,15 +123,32 @@ function waterfallFilter(nextTasks, allTasks) {
 
 // Group a task list by a single metadata field.
 // Multi-value fields (location, priority) use the first value.
-// Tasks with no value for the field go into an "Ungrouped" bucket.
-function groupByField(taskList, field) {
+// "project" walks up the parent chain to find the root project name.
+// Tasks with no value for the field go into a field-specific fallback bucket.
+function groupByField(taskList, field, allTasks = []) {
+  const ungroupedLabel = field === "project" ? "No Project" : "Ungrouped";
   const groups = {};
   const ungrouped = [];
   taskList.forEach(task => {
     let keys = [];
-    if (field === "location") keys = task.location || [];
-    else if (field === "priority") keys = task.priority || [];
-    else if (field === "dueDate") keys = task.dueDate ? [task.dueDate] : [];
+    if (field === "location") {
+      keys = task.location || [];
+    } else if (field === "priority") {
+      keys = task.priority || [];
+    } else if (field === "dueDate") {
+      keys = task.dueDate ? [task.dueDate] : [];
+    } else if (field === "project") {
+      // Walk up the parent chain to find the root project.
+      if (task.parentId) {
+        let cur = task;
+        while (cur.parentId) {
+          const parent = allTasks.find(t => t.id === cur.parentId);
+          if (!parent) break;
+          cur = parent;
+        }
+        if (cur.id !== task.id) keys = [cur.text];
+      }
+    }
     if (!keys.length) { ungrouped.push(task); return; }
     const key = keys[0];
     if (!groups[key]) groups[key] = [];
@@ -140,7 +157,7 @@ function groupByField(taskList, field) {
   const sorted = Object.entries(groups)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, items]) => ({ key, label: key, items }));
-  if (ungrouped.length) sorted.push({ key: "__ungrouped__", label: "Ungrouped", items: ungrouped });
+  if (ungrouped.length) sorted.push({ key: "__ungrouped__", label: ungroupedLabel, items: ungrouped });
   return sorted;
 }
 
@@ -730,6 +747,7 @@ export default function GTDManager() {
                     <span style={{ fontSize: 11, color: COLORS.muted, marginRight: 2 }}>Group:</span>
                     {[
                       { key: "none",     label: "None" },
+                      { key: "project",  label: "Project" },
                       { key: "location", label: "Location" },
                       { key: "dueDate",  label: "Due Date" },
                       { key: "priority", label: "Priority" },
@@ -842,7 +860,7 @@ export default function GTDManager() {
                         pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} />
                     ));
                   }
-                  return groupByField(visible, nextGroupBy).map(({ key, label, items }) => (
+                  return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => (
                     <div key={key}>
                       <GroupDivider label={label} count={items.length} isUngrouped={key === "__ungrouped__"} />
                       {items.map(task => (
@@ -1580,7 +1598,7 @@ function GroupDivider({ label, count, isUngrouped }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 18px 5px", borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
       <span style={{ fontSize: 11, fontWeight: 600, color: isUngrouped ? COLORS.muted : COLORS.text2, letterSpacing: "0.06em", textTransform: isUngrouped ? "none" : "uppercase" }}>
-        {isUngrouped ? "— Ungrouped" : label}
+        {isUngrouped ? `— ${label}` : label}
       </span>
       <span style={{ fontSize: 10, color: COLORS.muted, background: COLORS.surface3, padding: "1px 6px", borderRadius: 8 }}>{count}</span>
     </div>
