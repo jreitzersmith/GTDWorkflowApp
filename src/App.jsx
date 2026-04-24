@@ -639,6 +639,23 @@ export default function GTDManager() {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
   }, []);
 
+  // Assign a Next Action (no parentId) to an existing or new project
+  const assignToProject = useCallback((taskId, projectId, newProjectName) => {
+    if (newProjectName) {
+      const newProjId = genId();
+      setTasks(prev => [
+        ...prev.map(t => t.id === taskId ? { ...t, parentId: newProjId } : t),
+        { id: newProjId, text: newProjectName.trim(), bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, childIds: [taskId] },
+      ]);
+    } else if (projectId) {
+      setTasks(prev => prev.map(t => {
+        if (t.id === taskId)   return { ...t, parentId: projectId };
+        if (t.id === projectId) return { ...t, childIds: [...(t.childIds || []), taskId] };
+        return t;
+      }));
+    }
+  }, []);
+
   const addLocation = useCallback((name) => {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -894,6 +911,7 @@ export default function GTDManager() {
                         onNavigate: setCurrentBucket,
                         locations,
                         efforts,
+                        onAssignToProject: assignToProject,
                       }}
                     />
                   </div>
@@ -912,24 +930,31 @@ export default function GTDManager() {
                     return visible.map(task => (
                       <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                         onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                        pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts} />
+                        pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
+                        onAssignToProject={assignToProject} />
                     ));
                   }
-                  return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => (
-                    <div key={key}>
-                      <GroupDivider label={label} count={items.length} isUngrouped={key === "__ungrouped__"} />
-                      {items.map(task => (
-                        <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                          onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                          pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts} />
-                      ))}
-                    </div>
-                  ));
+                  return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => {
+                    const groupMin = items.reduce((sum, t) => sum + effortToMinutes(t.effort), 0);
+                    const groupEffortLabel = minutesToEffortLabel(groupMin);
+                    return (
+                      <div key={key}>
+                        <GroupDivider label={label} count={items.length} effortTotal={groupEffortLabel} isUngrouped={key === "__ungrouped__"} />
+                        {items.map(task => (
+                          <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
+                            onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
+                            pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
+                            onAssignToProject={assignToProject} />
+                        ))}
+                      </div>
+                    );
+                  });
                 })() : (
                   bucketTasks.map(task => (
                     <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                       onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                      pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts} />
+                      pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
+                      onAssignToProject={assignToProject} />
                   ))
                 )}
               </div>
@@ -1055,9 +1080,12 @@ function Btn({ children, onClick, style = {} }) {
 
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, indentOverride }) {
+function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, indentOverride }) {
   const [hover, setHover] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
+  const [assignTarget, setAssignTarget] = useState("__new__");
+  const [newProjName, setNewProjName] = useState("");
   const highlight = pendingAction && task.bucket === "inbox";
   const parentProject = task.parentId ? (allTasks || []).find(t => t.id === task.parentId) : null;
   const indent = indentOverride !== undefined ? indentOverride : (isSubtask ? 28 : 0);
@@ -1090,6 +1118,20 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
 
   const toggleEffort = (e) => {
     onUpdateTask(task.id, { effort: taskEffort === e ? null : e });
+  };
+
+  const rootProjects = (allTasks || []).filter(t => t.bucket === "project" && !t.parentId && !t.done);
+
+  const handleAssign = () => {
+    if (assignTarget === "__new__") {
+      if (!newProjName.trim()) return;
+      onAssignToProject && onAssignToProject(task.id, null, newProjName.trim());
+    } else {
+      onAssignToProject && onAssignToProject(task.id, assignTarget, null);
+    }
+    setShowAssign(false);
+    setNewProjName("");
+    setAssignTarget("__new__");
   };
 
   const hasMetadata = taskPriority.length > 0 || taskLocation.length > 0 || taskDueDate || !!taskEffort;
@@ -1165,6 +1207,9 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
             <>
               {currentBucket === "inbox" && (
                 <ActionBtn onClick={() => onAskAI(task)} color={COLORS.inbox}>✦ AI</ActionBtn>
+              )}
+              {currentBucket === "next" && !task.parentId && onAssignToProject && (
+                <ActionBtn onClick={() => setShowAssign(x => !x)} color={showAssign ? COLORS.project : undefined}>📁</ActionBtn>
               )}
               <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
                 <ActionBtn onClick={() => setMoveMenu(moveMenu === task.id ? null : task.id)}>Move ▾</ActionBtn>
@@ -1268,6 +1313,47 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign to project panel */}
+      {showAssign && currentBucket === "next" && !task.parentId && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{ margin: `0 18px 8px ${18 + indent + 24}px`, padding: "10px 12px", background: COLORS.surface2, border: `1px solid ${COLORS.project}44`, borderRadius: 8 }}
+        >
+          <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Assign to Project</div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <select
+              value={assignTarget}
+              onChange={e => setAssignTarget(e.target.value)}
+              style={{ flex: 1, minWidth: 140, background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: "5px 8px", color: assignTarget === "__new__" ? COLORS.text2 : COLORS.project, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
+            >
+              <option value="__new__">+ New project…</option>
+              {rootProjects.map(p => (
+                <option key={p.id} value={p.id}>{p.text.length > 40 ? p.text.slice(0, 38) + "…" : p.text}</option>
+              ))}
+            </select>
+            {assignTarget === "__new__" && (
+              <input
+                autoFocus
+                value={newProjName}
+                onChange={e => setNewProjName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleAssign(); if (e.key === "Escape") setShowAssign(false); }}
+                placeholder="Project name…"
+                style={{ flex: 1, minWidth: 120, background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: "5px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none" }}
+              />
+            )}
+            <button
+              onClick={handleAssign}
+              disabled={assignTarget === "__new__" && !newProjName.trim()}
+              style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: (assignTarget !== "__new__" || newProjName.trim()) ? "pointer" : "not-allowed", opacity: (assignTarget !== "__new__" || newProjName.trim()) ? 1 : 0.4 }}
+            >Assign</button>
+            <button
+              onClick={() => setShowAssign(false)}
+              style={{ padding: "5px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+            >Cancel</button>
           </div>
         </div>
       )}
@@ -1793,13 +1879,16 @@ function ProjectTree({ parentId, depth, allTasks, dragId, dropTarget, onDragStar
   );
 }
 
-function GroupDivider({ label, count, isUngrouped }) {
+function GroupDivider({ label, count, effortTotal, isUngrouped }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 18px 5px", borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
       <span style={{ fontSize: 11, fontWeight: 600, color: isUngrouped ? COLORS.muted : COLORS.text2, letterSpacing: "0.06em", textTransform: isUngrouped ? "none" : "uppercase" }}>
         {isUngrouped ? `— ${label}` : label}
       </span>
       <span style={{ fontSize: 10, color: COLORS.muted, background: COLORS.surface3, padding: "1px 6px", borderRadius: 8 }}>{count}</span>
+      {effortTotal && (
+        <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44` }}>⏱ {effortTotal}</span>
+      )}
     </div>
   );
 }
