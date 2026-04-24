@@ -13,12 +13,13 @@ const COLORS = {
 };
 
 const BUCKETS = {
-  inbox:   { label: "📥 Inbox",           desc: "Unprocessed — capture everything here first", color: COLORS.inbox },
-  next:    { label: "⚡ Next Actions",     desc: "Concrete physical actions to do this week",   color: COLORS.next },
-  project: { label: "📁 Projects",        desc: "Anything requiring more than one step",        color: COLORS.project },
-  waiting: { label: "⏳ Waiting For",     desc: "Delegated — ball in someone else's court",     color: COLORS.waiting },
-  someday: { label: "💭 Someday / Maybe", desc: "Ideas and aspirations, not commitments",       color: COLORS.someday },
-  done:    { label: "✅ Completed",        desc: "Finished tasks",                              color: COLORS.done },
+  inbox:        { label: "📥 Inbox",           desc: "Unprocessed — capture everything here first", color: COLORS.inbox },
+  next:         { label: "⚡ Next Actions",     desc: "Concrete physical actions to do this week",   color: COLORS.next },
+  project:      { label: "📁 Projects",        desc: "Anything requiring more than one step",        color: COLORS.project },
+  waiting:      { label: "⏳ Waiting For",     desc: "Delegated — ball in someone else's court",     color: COLORS.waiting },
+  someday:      { label: "💭 Someday / Maybe", desc: "Ideas and aspirations, not commitments",       color: COLORS.someday },
+  done:         { label: "✅ Completed",        desc: "Finished tasks",                              color: COLORS.done },
+  inboxHistory: { label: "📋 Inbox History",   desc: "Processed inbox items — archived for reference", color: COLORS.muted },
 };
 
 const COACH_MODES = {
@@ -30,13 +31,30 @@ const COACH_MODES = {
 
 const SYSTEM_PROMPTS = {
   chat: `You are a GTD (Getting Things Done) coach for a knowledge worker. You have access to their full task list (provided in each message). Help them stay organized, clarify tasks, define next actions, and maintain their GTD system. Be concise — under 100 words per response. When recommending a bucket move, be explicit: say "→ Move to Next Actions" or similar.`,
-  process: `You are a GTD inbox processor. For each inbox item the user gives you:
-1. Determine if it's actionable
-2. If yes: identify the very next physical action (verb + specific object)
-3. Assign it to exactly one bucket: Next Actions, Projects, Waiting For, or Someday/Maybe
-4. Be direct, under 70 words
-5. Always end with exactly this format on its own line: →MOVE:[bucket] where bucket is one of: next, project, waiting, someday
-Example ending: →MOVE:next`,
+  process: `You are a GTD inbox processor. For each inbox item given to you:
+
+1. Determine if it's actionable. If not actionable, end with: →ACTION:delete
+2. If actionable, decide: is this a SINGLE next action, or a multi-step PROJECT?
+   - If you need clarification to decide, ask ONE specific question. Do NOT include an →ACTION tag until clarified.
+3. Reword the action as a concrete physical action starting with a strong verb (e.g. "Call", "Draft", "Research", "Buy").
+4. End your response with EXACTLY one of these tags on its own line:
+
+Single next action:
+→ACTION:next|<Reworded action title>
+
+Multi-step project (requires planning or multiple steps):
+→ACTION:project|<Project name>|<First next action title>
+
+Someday / not urgent:
+→ACTION:someday|<Reworded title>
+
+Waiting on someone:
+→ACTION:waiting|<What you are waiting for>
+
+Not actionable / delete:
+→ACTION:delete
+
+Be concise — under 80 words before the tag. Never include the →ACTION tag mid-response.`,
   review: `You are running a GTD Weekly Review. Guide the user through 7 steps one at a time:
 1. Capture loose ends (anything physical not captured)
 2. Process inbox to zero
@@ -56,17 +74,21 @@ const OPENWEBUI_URL = (import.meta.env.VITE_OPENWEBUI_URL || "http://192.168.0.1
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 function formatBubble(text) {
-  const parts = text.split(/(→MOVE:\w+)/g);
+  const parts = text.split(/(→ACTION:[^\n]+)/g);
   return parts.map((part, i) => {
-    const moveMatch = part.match(/→MOVE:(\w+)/);
-    if (moveMatch) return null; // hidden from display
+    if (part.match(/→ACTION:/)) return null;
     return <span key={i} dangerouslySetInnerHTML={{ __html: part.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }} />;
   });
 }
 
-function extractMove(text) {
-  const m = text.match(/→MOVE:(\w+)/);
-  return m ? m[1] : null;
+function extractAction(text) {
+  const m = text.match(/→ACTION:(next|project|someday|waiting|delete)\|?([^|\n]*)?\|?([^\n]*)?/);
+  if (!m) return null;
+  return {
+    type: m[1],
+    title: (m[2] || "").trim(),
+    nextAction: (m[3] || "").trim(),
+  };
 }
 
 export default function GTDManager() {
@@ -81,7 +103,7 @@ export default function GTDManager() {
   const [chatInput, setChatInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [moveMenu, setMoveMenu] = useState(null);
-  const [pendingMove, setPendingMove] = useState(null); // { taskId, bucket }
+  const [pendingAction, setPendingAction] = useState(null); // { type, title, nextAction }
   const chatEndRef = useRef(null);
   const chatInputRef = useRef(null);
   const [provider, setProvider] = useState(() => localStorage.getItem("gtd_provider") || "claude");
@@ -140,13 +162,17 @@ export default function GTDManager() {
             "anthropic-dangerous-direct-browser-access": "true",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
+            model: "claude-sonnet-4-6",
             max_tokens: 1000,
             system: systemPrompt,
             messages: newHistory,
           }),
         });
         const data = await res.json();
+        console.log("[Claude API response]", data);
+        if (!res.ok || data.error) {
+          throw new Error(`Anthropic error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
+        }
         reply = data.content?.[0]?.text || "Sorry, something went wrong.";
       } else {
         const res = await fetch(`${OPENWEBUI_URL}/api/chat/completions`, {
@@ -164,6 +190,10 @@ export default function GTDManager() {
           }),
         });
         const data = await res.json();
+        console.log("[Open WebUI response]", data);
+        if (!res.ok || data.error) {
+          throw new Error(`Open WebUI error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
+        }
         reply = data.choices?.[0]?.message?.content || "Sorry, something went wrong.";
       }
 
@@ -171,14 +201,13 @@ export default function GTDManager() {
       setChatHistory(updatedHistory);
       setMessages(prev => [...prev, { role: "assistant", text: reply }]);
 
-      const move = extractMove(reply);
-      if (move) setPendingMove({ bucket: move });
+      const action = extractAction(reply);
+      if (action) setPendingAction(action);
 
       return reply;
     } catch (e) {
-      const err = provider === "claude"
-        ? "Connection error — check your Anthropic API key."
-        : `Connection error — check that Open WebUI is running at ${OPENWEBUI_URL}.`;
+      console.error("[callAI error]", e);
+      const err = `Error: ${e.message}`;
       setMessages(prev => [...prev, { role: "assistant", text: err }]);
     } finally {
       setLoading(false);
@@ -196,19 +225,71 @@ export default function GTDManager() {
   const switchCoachMode = useCallback((mode, introMsg) => {
     setCoachMode(mode);
     setChatHistory([]);
-    setPendingMove(null);
+    setPendingAction(null);
     setMessages([{ role: "assistant", text: introMsg }]);
   }, []);
 
-  const startProcessInbox = () => {
+  const processNextInboxItem = useCallback(async (task) => {
+    setPendingAction(null);
+    setChatHistory([]);
+    const prompt = `Process this GTD inbox item: "${task.text}"`;
+    setMessages(prev => [...prev, { role: "user", text: `Processing: **"${task.text}"**` }]);
+    await callAI(prompt, "process", []);
+  }, [callAI]);
+
+  const handleConfirmMove = useCallback(() => {
+    if (!pendingAction) return;
+    const { type, title, nextAction } = pendingAction;
+
+    const inboxItems = tasks.filter(t => t.bucket === "inbox");
+    const current = inboxItems[0];
+    const nextItem = inboxItems[1];
+
+    if (!current) return;
+
+    // Archive the original inbox item
+    setTasks(prev => prev.map(t =>
+      t.id === current.id ? { ...t, bucket: "inboxHistory" } : t
+    ));
+
+    // Create new tasks based on action type
+    if (type === "next") {
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now() }, ...prev]);
+    } else if (type === "project") {
+      const projectId = genId();
+      const actionId = genId();
+      setTasks(prev => [
+        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId] },
+        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId },
+        ...prev,
+      ]);
+    } else if (type === "someday") {
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now() }, ...prev]);
+    } else if (type === "waiting") {
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now() }, ...prev]);
+    }
+    // type === "delete": just archive, no new task
+
+    setPendingAction(null);
+
+    // Auto-continue to next inbox item
+    if (nextItem) {
+      setTimeout(() => processNextInboxItem(nextItem), 300);
+    } else {
+      setMessages(prev => [...prev, { role: "assistant", text: "🎉 **Inbox is clear!** Every item has been processed. Well done." }]);
+    }
+  }, [pendingAction, tasks, processNextInboxItem]);
+
+  const startProcessInbox = useCallback(async () => {
     setCurrentBucket("inbox");
     const inbox = tasks.filter(t => t.bucket === "inbox");
     if (inbox.length === 0) {
       switchCoachMode("process", "Your inbox is empty — nothing to process! Add some tasks first or do a Brain Dump.");
       return;
     }
-    switchCoachMode("process", `You have **${inbox.length} item${inbox.length > 1 ? "s" : ""}** in your inbox. Let's go through them.\n\nFirst: **"${inbox[0].text}"**\n\nIs this actionable? What's the very next physical step?`);
-  };
+    switchCoachMode("process", `You have **${inbox.length} item${inbox.length > 1 ? "s" : ""}** in your inbox. Processing them one by one…`);
+    setTimeout(() => processNextInboxItem(inbox[0]), 100);
+  }, [tasks, switchCoachMode, processNextInboxItem]);
 
   const startWeeklyReview = () => {
     const total = tasks.filter(t => t.bucket !== "done").length;
@@ -219,10 +300,11 @@ export default function GTDManager() {
     switchCoachMode("dump", "Let's surface everything in your head and get it into your inbox.\n\n**Starting with work:** What professional tasks, deadlines, or commitments have been on your mind that aren't written down anywhere?");
   };
 
-  const askAIAboutTask = (task) => {
-    switchCoachMode("process", `Let's clarify: **"${task.text}"**\n\nIs this actionable right now? If yes — what's the very next physical action you'd take?`);
-    chatInputRef.current?.focus();
-  };
+  const askAIAboutTask = useCallback(async (task) => {
+    setCurrentBucket("inbox");
+    switchCoachMode("process", `Let's clarify: **"${task.text}"**`);
+    setTimeout(() => processNextInboxItem(task), 100);
+  }, [switchCoachMode, processNextInboxItem]);
 
   const addTask = (bucket) => {
     const text = addText.trim();
@@ -244,7 +326,7 @@ export default function GTDManager() {
   const moveTask = (id, bucket) => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, bucket, done: bucket === "done" } : t));
     setMoveMenu(null);
-    setPendingMove(null);
+    setPendingAction(null);
   };
 
   const deleteTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
@@ -321,20 +403,24 @@ export default function GTDManager() {
           <div style={s.taskList}>
             {bucketTasks.length === 0 ? (
               <EmptyState bucket={currentBucket} />
+            ) : currentBucket === "project" ? (
+              bucketTasks.map(task => (
+                <div key={task.id}>
+                  <TaskRow task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
+                    onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} />
+                  {(task.childIds || []).map(childId => {
+                    const child = tasks.find(t => t.id === childId);
+                    return child ? (
+                      <TaskRow key={childId} task={child} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
+                        onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} isSubtask />
+                    ) : null;
+                  })}
+                </div>
+              ))
             ) : (
               bucketTasks.map(task => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  currentBucket={currentBucket}
-                  moveMenu={moveMenu}
-                  setMoveMenu={setMoveMenu}
-                  onComplete={completeTask}
-                  onDelete={deleteTask}
-                  onMove={moveTask}
-                  onAskAI={askAIAboutTask}
-                  pendingMove={pendingMove}
-                />
+                <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
+                  onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} />
               ))
             )}
           </div>
@@ -372,13 +458,11 @@ export default function GTDManager() {
               <ChatBubble key={i} msg={msg} />
             ))}
             {loading && <TypingIndicator />}
-            {pendingMove && (
-              <PendingMoveBar
-                bucket={pendingMove.bucket}
-                inboxTask={tasks.find(t => t.bucket === "inbox")}
-                onMove={(taskId) => moveTask(taskId, pendingMove.bucket)}
-                onDismiss={() => setPendingMove(null)}
-                tasks={tasks}
+            {pendingAction && (
+              <PendingActionBar
+                action={pendingAction}
+                onConfirm={handleConfirmMove}
+                onDismiss={() => setPendingAction(null)}
               />
             )}
             <div ref={chatEndRef} />
@@ -447,16 +531,20 @@ function Btn({ children, onClick, style = {} }) {
   );
 }
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, pendingMove }) {
+function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, pendingAction, allTasks, onNavigate, isSubtask }) {
   const [hover, setHover] = useState(false);
-  const highlight = pendingMove && task.bucket === "inbox";
+  const [showParentTip, setShowParentTip] = useState(false);
+  const highlight = pendingAction && task.bucket === "inbox";
+  const parentProject = task.parentId ? (allTasks || []).find(t => t.id === task.parentId) : null;
+  const indent = isSubtask ? 28 : 0;
 
   return (
     <div
       onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "8px 18px", background: highlight ? COLORS.inboxBg : (hover ? COLORS.surface2 : "transparent"), borderLeft: `3px solid ${highlight ? COLORS.inbox : "transparent"}`, opacity: task.done ? 0.4 : 1, transition: "all 0.12s" }}
+      onMouseLeave={() => { setHover(false); setShowParentTip(false); }}
+      style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: highlight ? COLORS.inboxBg : (hover ? COLORS.surface2 : "transparent"), borderLeft: `3px solid ${highlight ? COLORS.inbox : isSubtask ? COLORS.project + "55" : "transparent"}`, opacity: task.done ? 0.4 : 1, transition: "all 0.12s" }}
     >
+      {isSubtask && <span style={{ color: COLORS.project, fontSize: 10, marginTop: 3, flexShrink: 0 }}>↳</span>}
       <div
         onClick={() => onComplete(task.id)}
         style={{ width: 15, height: 15, borderRadius: "50%", border: `1.5px solid ${task.done ? COLORS.next : COLORS.border2}`, background: task.done ? COLORS.next : "transparent", flexShrink: 0, marginTop: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#111", transition: "all 0.15s" }}
@@ -464,8 +552,19 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
         {task.done ? "✓" : ""}
       </div>
 
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13.5, color: COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4 }}>{task.text}</div>
+        {/* Parent project link for Next Actions */}
+        {parentProject && currentBucket === "next" && hover && (
+          <div
+            onClick={() => onNavigate("project")}
+            style={{ marginTop: 3, fontSize: 11, color: COLORS.project, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, opacity: 0.85 }}
+            title="Go to project"
+          >
+            <span>↑</span>
+            <span style={{ textDecoration: "underline" }}>{parentProject.text}</span>
+          </div>
+        )}
       </div>
 
       {hover && (
@@ -477,7 +576,7 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
             <ActionBtn onClick={() => setMoveMenu(moveMenu === task.id ? null : task.id)}>Move ▾</ActionBtn>
             {moveMenu === task.id && (
               <div style={{ position: "absolute", right: 0, top: "100%", background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 8, padding: 4, zIndex: 100, minWidth: 150, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
-                {Object.entries(BUCKETS).filter(([k]) => k !== currentBucket && k !== "done").map(([k, cfg]) => (
+                {Object.entries(BUCKETS).filter(([k]) => k !== currentBucket && k !== "done" && k !== "inboxHistory").map(([k, cfg]) => (
                   <div
                     key={k}
                     onClick={() => onMove(task.id, k)}
@@ -540,24 +639,40 @@ function TypingIndicator() {
   );
 }
 
-function PendingMoveBar({ bucket, tasks, onMove, onDismiss }) {
-  const inboxTasks = tasks.filter(t => t.bucket === "inbox");
-  if (inboxTasks.length === 0) return null;
-  const task = inboxTasks[0];
-  const cfg = BUCKETS[bucket];
-  if (!cfg) return null;
+function PendingActionBar({ action, onConfirm, onDismiss }) {
+  if (!action) return null;
+  const { type, title, nextAction } = action;
+
+  const configs = {
+    next:    { color: COLORS.next,    label: "Next Actions", confirmText: "Create ✓" },
+    project: { color: COLORS.project, label: "Project + Next Action", confirmText: "Create ✓" },
+    someday: { color: COLORS.someday, label: "Someday / Maybe", confirmText: "Move ✓" },
+    waiting: { color: COLORS.waiting, label: "Waiting For", confirmText: "Move ✓" },
+    delete:  { color: COLORS.muted,   label: "Archive (not actionable)", confirmText: "Archive ✓" },
+  };
+  const cfg = configs[type] || configs.next;
 
   return (
-    <div style={{ background: COLORS.surface3, border: `1px solid ${cfg.color}44`, borderRadius: 9, padding: "9px 12px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      <span style={{ fontSize: 12, color: COLORS.text2, flex: 1 }}>
-        Move <strong style={{ color: COLORS.text }}>"{task.text}"</strong> → <span style={{ color: cfg.color }}>{cfg.label}</span>?
-      </span>
-      <button onClick={() => onMove(task.id)} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${cfg.color}`, background: "transparent", color: cfg.color, fontFamily: "inherit", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
-        Move ✓
-      </button>
-      <button onClick={onDismiss} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>
-        Skip
-      </button>
+    <div style={{ background: COLORS.surface3, border: `1px solid ${cfg.color}44`, borderRadius: 9, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
+      <div style={{ fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>→ {cfg.label}</div>
+      {type === "project" ? (
+        <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
+          <div><span style={{ color: COLORS.muted }}>Project: </span><strong style={{ color: COLORS.text }}>{title}</strong></div>
+          <div><span style={{ color: COLORS.muted }}>Next action: </span><strong style={{ color: COLORS.next }}>{nextAction}</strong></div>
+        </div>
+      ) : type !== "delete" ? (
+        <div style={{ fontSize: 12, color: COLORS.text2 }}>
+          <strong style={{ color: cfg.color }}>{title}</strong>
+        </div>
+      ) : null}
+      <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={onConfirm} style={{ padding: "4px 14px", borderRadius: 6, border: `1px solid ${cfg.color}`, background: "transparent", color: cfg.color, fontFamily: "inherit", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
+          {cfg.confirmText}
+        </button>
+        <button onClick={onDismiss} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>
+          Skip
+        </button>
+      </div>
     </div>
   );
 }
