@@ -9,6 +9,7 @@ const COLORS = {
   project: "#5a8fd4", projectBg: "#181e2a",
   waiting: "#d4845a", waitingBg: "#2a1e14",
   someday: "#9a8ad4", somedayBg: "#1e1a2a",
+  effort: "#6ec6a8", effortBg: "#152520",
   done: "#5a5c58",
 };
 
@@ -161,6 +162,31 @@ function groupByField(taskList, field, allTasks = []) {
   return sorted;
 }
 
+// Converts a human effort string (e.g. "2 hours", "3 days") to minutes.
+// Returns 0 for unrecognised strings so sums degrade gracefully.
+function effortToMinutes(str) {
+  if (!str) return 0;
+  const s = str.toLowerCase().trim();
+  const num = parseFloat(s);
+  if (isNaN(num) || num <= 0) return 0;
+  if (s.includes("month")) return Math.round(num * 9600); // ~4 w × 5 d × 8 h
+  if (s.includes("week"))  return Math.round(num * 2400); // 5 d × 8 h
+  if (s.includes("day"))   return Math.round(num * 480);  // 8 h
+  if (s.includes("hour"))  return Math.round(num * 60);
+  if (s.includes("min"))   return Math.round(num);
+  return 0;
+}
+
+// Converts a minutes total back to a compact human label (e.g. 150 → "2.5h").
+function minutesToEffortLabel(minutes) {
+  if (!minutes || minutes <= 0) return null;
+  if (minutes < 60)   return `${minutes}m`;
+  if (minutes < 480)  return `${+((minutes / 60).toFixed(1))}h`;
+  if (minutes < 2400) return `${+((minutes / 480).toFixed(1))}d`;
+  if (minutes < 9600) return `${+((minutes / 2400).toFixed(1))}w`;
+  return `${+((minutes / 9600).toFixed(1))}mo`;
+}
+
 // Parses the →SUGGESTIONS: block from a projectReview AI reply.
 // Returns an array of suggestion strings, empty if none or block absent.
 function extractSuggestions(text) {
@@ -267,6 +293,11 @@ export default function GTDManager() {
   const [locations, setLocations] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_locations") || "null") || ["Home", "Work", "Phone", "Computer"]; } catch { return ["Home", "Work", "Phone", "Computer"]; }
   });
+
+  const DEFAULT_EFFORTS = ["2 min", "5 min", "10 min", "30 min", "1 hour", "2 hours", "6 hours", "1 day", "3 days", "1 week", "1 month"];
+  const [efforts, setEfforts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_efforts") || "null") || DEFAULT_EFFORTS; } catch { return DEFAULT_EFFORTS; }
+  });
   const [showSettings, setShowSettings] = useState(false);
   const [nextGroupBy, setNextGroupBy] = useState("none");
   const [projectParentId, setProjectParentId] = useState("__new__");
@@ -286,6 +317,7 @@ export default function GTDManager() {
   useEffect(() => { localStorage.setItem("gtd_provider", provider); }, [provider]);
   useEffect(() => { localStorage.setItem("gtd_local_model", localModel); }, [localModel]);
   useEffect(() => { localStorage.setItem("gtd_locations", JSON.stringify(locations)); }, [locations]);
+  useEffect(() => { localStorage.setItem("gtd_efforts",   JSON.stringify(efforts));   }, [efforts]);
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
 
   const getTaskContext = useCallback(() => {
@@ -421,19 +453,19 @@ export default function GTDManager() {
 
     // Create new tasks based on action type
     if (type === "next") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null }, ...prev]);
     } else if (type === "project") {
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: null },
-        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null },
+        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: null, effort: null },
+        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null },
         ...prev,
       ]);
     } else if (type === "someday") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null }, ...prev]);
     } else if (type === "waiting") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null }, ...prev]);
     }
     // type === "delete": just archive, no new task
 
@@ -557,14 +589,14 @@ export default function GTDManager() {
   const addTask = (bucket) => {
     const text = addText.trim();
     if (!text) return;
-    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now(), priority: [], location: [], dueDate: null }, ...prev]);
+    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null }, ...prev]);
     setAddText("");
   };
 
   const addAndProcess = () => {
     const text = addText.trim();
     if (!text) return;
-    const task = { id: genId(), text, bucket: "inbox", done: false, created: Date.now(), priority: [], location: [], dueDate: null };
+    const task = { id: genId(), text, bucket: "inbox", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null };
     setTasks(prev => [task, ...prev]);
     setAddText("");
     setCurrentBucket("inbox");
@@ -577,7 +609,7 @@ export default function GTDManager() {
     if (projectParentId === "__new__") {
       // Create a new root project
       setTasks(prev => [
-        { id: genId(), text, bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, childIds: [] },
+        { id: genId(), text, bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, childIds: [] },
         ...prev,
       ]);
     } else {
@@ -589,7 +621,7 @@ export default function GTDManager() {
             ? { ...t, childIds: [...(t.childIds || []), childId] }
             : t
         ),
-        { id: childId, text, bucket: "next", done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null },
+        { id: childId, text, bucket: "next", done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null, effort: null },
       ]);
     }
     setAddText("");
@@ -664,6 +696,24 @@ export default function GTDManager() {
     }));
   }, []);
 
+  const addEffort = useCallback((name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setEfforts(prev => prev.includes(trimmed) ? prev : [...prev, trimmed]);
+  }, []);
+
+  const renameEffort = useCallback((oldName, newName) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    setEfforts(prev => prev.map(e => e === oldName ? trimmed : e));
+    setTasks(prev => prev.map(t => ({ ...t, effort: t.effort === oldName ? trimmed : t.effort })));
+  }, []);
+
+  const removeEffort = useCallback((name) => {
+    setEfforts(prev => prev.filter(e => e !== name));
+    setTasks(prev => prev.map(t => ({ ...t, effort: t.effort === name ? null : t.effort })));
+  }, []);
+
   const bucketTasks = tasks.filter(t => t.bucket === currentBucket);
   const counts = Object.fromEntries(Object.keys(BUCKETS).map(k => [k, tasks.filter(t => t.bucket === k).length]));
 
@@ -724,6 +774,10 @@ export default function GTDManager() {
               onAdd={addLocation}
               onRename={renameLocation}
               onRemove={removeLocation}
+              efforts={efforts}
+              onAddEffort={addEffort}
+              onRenameEffort={renameEffort}
+              onRemoveEffort={removeEffort}
               onClose={() => setShowSettings(false)}
             />
           ) : (
@@ -839,6 +893,7 @@ export default function GTDManager() {
                         allTasks: tasks,
                         onNavigate: setCurrentBucket,
                         locations,
+                        efforts,
                       }}
                     />
                   </div>
@@ -857,7 +912,7 @@ export default function GTDManager() {
                     return visible.map(task => (
                       <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                         onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                        pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} />
+                        pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts} />
                     ));
                   }
                   return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => (
@@ -866,7 +921,7 @@ export default function GTDManager() {
                       {items.map(task => (
                         <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                           onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                          pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} />
+                          pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts} />
                       ))}
                     </div>
                   ));
@@ -874,7 +929,7 @@ export default function GTDManager() {
                   bucketTasks.map(task => (
                     <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                       onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                      pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} />
+                      pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts} />
                   ))
                 )}
               </div>
@@ -1000,7 +1055,7 @@ function Btn({ children, onClick, style = {} }) {
 
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, indentOverride }) {
+function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, indentOverride }) {
   const [hover, setHover] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const highlight = pendingAction && task.bucket === "inbox";
@@ -1010,6 +1065,18 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
   const taskPriority = task.priority || [];
   const taskLocation = task.location || [];
   const taskDueDate = task.dueDate || "";
+  const taskEffort   = task.effort   || null;
+
+  // Computed effort total for project-bucket rows (sum of direct subtask efforts).
+  const projectEffortTotal = (() => {
+    if (task.bucket !== "project" || currentBucket !== "project") return null;
+    const children = (task.childIds || [])
+      .map(id => (allTasks || []).find(t => t.id === id))
+      .filter(Boolean);
+    if (!children.length) return null;
+    const totalMin = children.reduce((sum, c) => sum + effortToMinutes(c.effort), 0);
+    return minutesToEffortLabel(totalMin);
+  })();
 
   const togglePriority = (p) => {
     const next = taskPriority.includes(p) ? taskPriority.filter(x => x !== p) : [...taskPriority, p];
@@ -1021,7 +1088,11 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
     onUpdateTask(task.id, { location: next });
   };
 
-  const hasMetadata = taskPriority.length > 0 || taskLocation.length > 0 || taskDueDate;
+  const toggleEffort = (e) => {
+    onUpdateTask(task.id, { effort: taskEffort === e ? null : e });
+  };
+
+  const hasMetadata = taskPriority.length > 0 || taskLocation.length > 0 || taskDueDate || !!taskEffort;
 
   return (
     <div
@@ -1043,7 +1114,12 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, color: COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4 }}>{task.text}</div>
+          <div style={{ fontSize: 13.5, color: COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+            <span>{task.text}</span>
+            {projectEffortTotal && (
+              <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, flexShrink: 0 }}>⏱ {projectEffortTotal}</span>
+            )}
+          </div>
           {/* Metadata summary chips (collapsed) */}
           {!expanded && hasMetadata && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
@@ -1056,6 +1132,9 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
               {taskPriority.map(p => (
                 <span key={p} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.inbox, border: `1px solid ${COLORS.inbox}44` }}>{p}</span>
               ))}
+              {taskEffort && (
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44` }}>⏱ {taskEffort}</span>
+              )}
             </div>
           )}
           {/* Parent project link for Next Actions */}
@@ -1166,6 +1245,25 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
                     style={{ padding: "3px 9px", borderRadius: 10, border: `1px solid ${active ? COLORS.inbox : COLORS.border}`, background: active ? COLORS.inbox + "22" : "transparent", color: active ? COLORS.inbox : COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "all 0.1s" }}
                   >
                     {p}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Effort */}
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>Effort</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {(efforts || []).map(e => {
+                const active = taskEffort === e;
+                return (
+                  <button
+                    key={e}
+                    onClick={() => toggleEffort(e)}
+                    style={{ padding: "3px 9px", borderRadius: 10, border: `1px solid ${active ? COLORS.effort : COLORS.border}`, background: active ? COLORS.effort + "22" : "transparent", color: active ? COLORS.effort : COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "all 0.1s" }}
+                  >
+                    {e}
                   </button>
                 );
               })}
@@ -1365,7 +1463,7 @@ function ProviderOption({ label, icon, color, active, onClick }) {
   );
 }
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, onClose }) {
+function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, onClose }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1378,8 +1476,11 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, onClose })
           style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
         >✕ Close</button>
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 32 }}>
         <LocationManager locations={locations} tasks={tasks} onAdd={onAdd} onRename={onRename} onRemove={onRemove} />
+        <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
+          <EffortManager efforts={efforts} tasks={tasks} onAdd={onAddEffort} onRename={onRenameEffort} onRemove={onRemoveEffort} />
+        </div>
       </div>
     </div>
   );
@@ -1521,6 +1622,104 @@ function LocationManager({ locations, tasks, onAdd, onRename, onRemove }) {
           onClick={handleAdd}
           disabled={!newLocText.trim()}
           style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: newLocText.trim() ? "pointer" : "not-allowed", opacity: newLocText.trim() ? 1 : 0.4 }}
+        >+ Add</button>
+      </div>
+    </div>
+  );
+}
+
+function EffortManager({ efforts, tasks, onAdd, onRename, onRemove }) {
+  const [newText, setNewText] = useState("");
+  const [editingIdx, setEditingIdx] = useState(null);
+  const [editText, setEditText] = useState("");
+
+  const usedByCount = (name) => tasks.filter(t => t.effort === name).length;
+
+  const handleAdd = () => {
+    const trimmed = newText.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setNewText("");
+  };
+
+  const startEdit = (idx) => {
+    setEditingIdx(idx);
+    setEditText(efforts[idx]);
+  };
+
+  const confirmEdit = () => {
+    if (editingIdx !== null) {
+      onRename(efforts[editingIdx], editText);
+      setEditingIdx(null);
+      setEditText("");
+    }
+  };
+
+  const handleRemove = (name) => {
+    if (window.confirm(`Remove "${name}"? It will be cleared from any tasks that use it.`)) {
+      onRemove(name);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: 480 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Effort Levels</div>
+      <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 16, lineHeight: 1.5 }}>
+        Effort estimates for tasks. Changes cascade to all existing tasks. Values are parsed for project totals (e.g. "2 hours", "1 day").
+      </div>
+
+      {/* Effort list */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+        {(efforts || []).map((eff, idx) => {
+          const count = usedByCount(eff);
+          const isEditing = editingIdx === idx;
+
+          return (
+            <div key={eff} style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px" }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.effort, flexShrink: 0 }} />
+                {isEditing ? (
+                  <input
+                    autoFocus
+                    value={editText}
+                    onChange={e => setEditText(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditingIdx(null); }}
+                    style={{ flex: 1, background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 5, padding: "3px 7px", color: COLORS.text, fontFamily: "inherit", fontSize: 13, outline: "none" }}
+                  />
+                ) : (
+                  <span style={{ flex: 1, fontSize: 13, color: COLORS.text }}>{eff}</span>
+                )}
+                <span style={{ fontSize: 11, color: COLORS.muted, flexShrink: 0 }}>{count} task{count !== 1 ? "s" : ""}</span>
+                {isEditing ? (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={confirmEdit} style={{ padding: "3px 9px", borderRadius: 5, border: `1px solid ${COLORS.next}55`, background: "transparent", color: COLORS.next, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>Save</button>
+                    <button onClick={() => setEditingIdx(null)} style={{ padding: "3px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => startEdit(idx)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
+                    <button onClick={() => handleRemove(eff)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid #d45a5a44`, background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add new effort */}
+      <div style={{ display: "flex", gap: 6 }}>
+        <input
+          value={newText}
+          onChange={e => setNewText(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleAdd()}
+          placeholder="New effort level… (e.g. 4 hours)"
+          style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" }}
+        />
+        <button
+          onClick={handleAdd}
+          disabled={!newText.trim()}
+          style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.effort}`, background: "transparent", color: COLORS.effort, fontFamily: "inherit", fontSize: 12, cursor: newText.trim() ? "pointer" : "not-allowed", opacity: newText.trim() ? 1 : 0.4 }}
         >+ Add</button>
       </div>
     </div>
