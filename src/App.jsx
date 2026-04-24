@@ -51,6 +51,8 @@ Work tasks → Emails to send → People to follow up with → Projects falling 
 For each response say "Got it — add that to your inbox." then immediately ask about the next area. Under 50 words each. After all areas, give a summary and encourage them to process their inbox.`,
 };
 
+const OPENWEBUI_URL = (import.meta.env.VITE_OPENWEBUI_URL || "http://192.168.0.102:3000").replace(/\/$/, "");
+
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 function formatBubble(text) {
@@ -82,6 +84,9 @@ export default function GTDManager() {
   const [pendingMove, setPendingMove] = useState(null); // { taskId, bucket }
   const chatEndRef = useRef(null);
   const chatInputRef = useRef(null);
+  const [provider, setProvider] = useState(() => localStorage.getItem("gtd_provider") || "claude");
+  const [localModel, setLocalModel] = useState(() => localStorage.getItem("gtd_local_model") || "llama3.3:70b");
+  const [availableModels, setAvailableModels] = useState([]);
 
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
@@ -91,6 +96,9 @@ export default function GTDManager() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => { localStorage.setItem("gtd_provider", provider); }, [provider]);
+  useEffect(() => { localStorage.setItem("gtd_local_model", localModel); }, [localModel]);
+
   const getTaskContext = useCallback(() => {
     const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe" };
     return Object.entries(bucketNames).map(([k, label]) => {
@@ -99,53 +107,91 @@ export default function GTDManager() {
     }).join("\n");
   }, [tasks]);
 
-  const callClaude = useCallback(async (userMsg, mode, history) => {
+  const fetchModels = useCallback(async () => {
+    try {
+      const res = await fetch(`${OPENWEBUI_URL}/api/models`, {
+        headers: { "Authorization": `Bearer ${import.meta.env.VITE_OPENWEBUI_API_KEY}` },
+      });
+      const data = await res.json();
+      const models = (data.data || []).map(m => m.id).filter(Boolean);
+      if (models.length) setAvailableModels(models);
+    } catch { /* Open WebUI not reachable — fail silently */ }
+  }, []);
+
+  useEffect(() => {
+    if (provider === "local") fetchModels();
+  }, [provider, fetchModels]);
+
+  const callAI = useCallback(async (userMsg, mode, history) => {
     const systemPrompt = SYSTEM_PROMPTS[mode] + "\n\n[Current Task List]\n" + getTaskContext();
     const newHistory = [...history, { role: "user", content: userMsg }];
 
     setLoading(true);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: newHistory,
-        }),
-      });
-      const data = await res.json();
-      const reply = data.content?.[0]?.text || "Sorry, something went wrong.";
+      let reply;
+
+      if (provider === "claude") {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1000,
+            system: systemPrompt,
+            messages: newHistory,
+          }),
+        });
+        const data = await res.json();
+        reply = data.content?.[0]?.text || "Sorry, something went wrong.";
+      } else {
+        const res = await fetch(`${OPENWEBUI_URL}/api/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_OPENWEBUI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: localModel,
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...newHistory,
+            ],
+          }),
+        });
+        const data = await res.json();
+        reply = data.choices?.[0]?.message?.content || "Sorry, something went wrong.";
+      }
+
       const updatedHistory = [...newHistory, { role: "assistant", content: reply }];
       setChatHistory(updatedHistory);
       setMessages(prev => [...prev, { role: "assistant", text: reply }]);
 
-      // check for move suggestion
       const move = extractMove(reply);
       if (move) setPendingMove({ bucket: move });
 
       return reply;
     } catch (e) {
-      const err = "Connection error — please try again.";
+      const err = provider === "claude"
+        ? "Connection error — check your Anthropic API key."
+        : `Connection error — check that Open WebUI is running at ${OPENWEBUI_URL}.`;
       setMessages(prev => [...prev, { role: "assistant", text: err }]);
     } finally {
       setLoading(false);
     }
-  }, [getTaskContext]);
+  }, [getTaskContext, provider, localModel]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
     if (!text || loading) return;
     setChatInput("");
     setMessages(prev => [...prev, { role: "user", text }]);
-    await callClaude(text, coachMode, chatHistory);
-  }, [chatInput, loading, coachMode, chatHistory, callClaude]);
+    await callAI(text, coachMode, chatHistory);
+  }, [chatInput, loading, coachMode, chatHistory, callAI]);
 
   const switchCoachMode = useCallback((mode, introMsg) => {
     setCoachMode(mode);
@@ -297,7 +343,12 @@ export default function GTDManager() {
         {/* COACH PANEL */}
         <div style={s.coachPanel}>
           <div style={s.coachHeader}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.06em", textTransform: "uppercase", flex: 1 }}>🤖 AI Coach</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.06em", textTransform: "uppercase" }}>🤖 AI Coach</span>
+          <ProviderSelector
+            provider={provider} setProvider={setProvider}
+            localModel={localModel} setLocalModel={setLocalModel}
+            availableModels={availableModels} fetchModels={fetchModels}
+          />
             <div style={{ display: "flex", gap: 4 }}>
               {Object.entries(COACH_MODES).map(([key, cfg]) => (
                 <button
@@ -507,6 +558,71 @@ function PendingMoveBar({ bucket, tasks, onMove, onDismiss }) {
       <button onClick={onDismiss} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>
         Skip
       </button>
+    </div>
+  );
+}
+
+function ProviderSelector({ provider, setProvider, localModel, setLocalModel, availableModels, fetchModels }) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [open]);
+
+  const handleOpen = (e) => {
+    e.stopPropagation();
+    if (!open) fetchModels();
+    setOpen(o => !o);
+  };
+
+  const activeLabel = provider === "claude" ? "Claude" : localModel;
+  const activeColor = provider === "claude" ? COLORS.inbox : COLORS.next;
+
+  return (
+    <div style={{ position: "relative", flex: 1, display: "flex", justifyContent: "center" }} onClick={e => e.stopPropagation()}>
+      <button
+        onClick={handleOpen}
+        style={{ padding: "3px 10px", borderRadius: 6, border: `1px solid ${activeColor}55`, background: COLORS.surface2, color: activeColor, fontFamily: "inherit", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}
+      >
+        <span>{provider === "claude" ? "✦" : "◈"}</span>
+        <span>{activeLabel}</span>
+        <span style={{ opacity: 0.5, fontSize: 9 }}>▾</span>
+      </button>
+
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 9, padding: 4, zIndex: 200, minWidth: 200, boxShadow: "0 8px 28px rgba(0,0,0,0.55)" }}>
+          <div style={{ padding: "4px 8px 3px", fontSize: 10, color: COLORS.muted, letterSpacing: "0.07em", textTransform: "uppercase" }}>Claude API</div>
+          <ProviderOption label="Claude Sonnet" icon="✦" color={COLORS.inbox} active={provider === "claude"}
+            onClick={() => { setProvider("claude"); setOpen(false); }} />
+
+          <div style={{ margin: "4px 0", borderTop: `1px solid ${COLORS.border}` }} />
+          <div style={{ padding: "4px 8px 3px", fontSize: 10, color: COLORS.muted, letterSpacing: "0.07em", textTransform: "uppercase" }}>Open WebUI</div>
+
+          {availableModels.length === 0
+            ? <div style={{ padding: "6px 10px", fontSize: 11, color: COLORS.muted, fontStyle: "italic" }}>Fetching models…</div>
+            : availableModels.map(m => (
+              <ProviderOption key={m} label={m} icon="◈" color={COLORS.next} active={provider === "local" && localModel === m}
+                onClick={() => { setProvider("local"); setLocalModel(m); setOpen(false); }} />
+            ))
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProviderOption({ label, icon, color, active, onClick }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ padding: "6px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer", background: active || hover ? COLORS.surface2 : "transparent", color: active ? color : COLORS.text2, display: "flex", alignItems: "center", gap: 7, transition: "background 0.1s" }}
+    >
+      <span style={{ color: active ? color : COLORS.muted }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {active && <span style={{ color, fontSize: 9 }}>●</span>}
     </div>
   );
 }
