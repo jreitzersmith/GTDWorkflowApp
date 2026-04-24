@@ -127,7 +127,7 @@ function waterfallFilter(nextTasks, allTasks) {
 // "project" walks up the parent chain to find the root project name.
 // Tasks with no value for the field go into a field-specific fallback bucket.
 function groupByField(taskList, field, allTasks = []) {
-  const ungroupedLabel = field === "project" ? "No Project" : "Ungrouped";
+  const ungroupedLabel = field === "project" ? "No Project" : field === "effort" ? "No Effort" : "Ungrouped";
   const groups = {};
   const ungrouped = [];
   taskList.forEach(task => {
@@ -138,6 +138,8 @@ function groupByField(taskList, field, allTasks = []) {
       keys = task.priority || [];
     } else if (field === "dueDate") {
       keys = task.dueDate ? [task.dueDate] : [];
+    } else if (field === "effort") {
+      keys = task.effort ? [task.effort] : [];
     } else if (field === "project") {
       // Walk up the parent chain to find the root project.
       if (task.parentId) {
@@ -155,8 +157,11 @@ function groupByField(taskList, field, allTasks = []) {
     if (!groups[key]) groups[key] = [];
     groups[key].push(task);
   });
+  // Sort effort groups by duration (shortest first); everything else alphabetically.
   const sorted = Object.entries(groups)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => field === "effort"
+      ? effortToMinutes(a) - effortToMinutes(b)
+      : a.localeCompare(b))
     .map(([key, items]) => ({ key, label: key, items }));
   if (ungrouped.length) sorted.push({ key: "__ungrouped__", label: ungroupedLabel, items: ungrouped });
   return sorted;
@@ -822,6 +827,7 @@ export default function GTDManager() {
                       { key: "location", label: "Location" },
                       { key: "dueDate",  label: "Due Date" },
                       { key: "priority", label: "Priority" },
+                      { key: "effort",   label: "Effort" },
                     ].map(opt => (
                       <button
                         key={opt.key}
