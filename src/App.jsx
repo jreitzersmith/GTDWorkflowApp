@@ -23,10 +23,11 @@ const BUCKETS = {
 };
 
 const COACH_MODES = {
-  chat:    { label: "Chat",        icon: "💬" },
-  process: { label: "Process",     icon: "📥" },
-  review:  { label: "Review",      icon: "📋" },
-  dump:    { label: "Brain Dump",  icon: "🧠" },
+  chat:          { label: "Chat",           icon: "💬" },
+  process:       { label: "Process",        icon: "📥" },
+  review:        { label: "Review",         icon: "📋" },
+  dump:          { label: "Brain Dump",     icon: "🧠" },
+  projectReview: { label: "Project Review", icon: "🔍" },
 };
 
 const SYSTEM_PROMPTS = {
@@ -64,6 +65,23 @@ Be concise — under 80 words before the tag. Never include the →ACTION tag mi
 6. Review Someday/Maybe — anything ready to activate?
 7. New ideas or goals to add?
 Ask one step at a time. Acknowledge their answer, then move on. Under 90 words each.`,
+  projectReview: `You are reviewing a GTD project to identify missing next actions.
+
+Given a project name, its current subtasks, and any metadata, you will:
+1. Write 2-3 sentences assessing the project's current state and momentum.
+2. Identify 2-4 specific, concrete next actions that appear to be missing or would unblock progress.
+
+End your response with EXACTLY this block — nothing after it:
+→SUGGESTIONS:
+1. [First missing action — start with a strong verb: Call, Draft, Research, Schedule, etc.]
+2. [Second missing action]
+(add up to 4 total if needed)
+
+If the project is fully on track with no missing actions, write:
+→SUGGESTIONS:
+(none)
+
+Be concise. Under 80 words before the suggestions block.`,
   dump: `You are a GTD brain dump coach. Surface open loops by asking about one life area at a time:
 Work tasks → Emails to send → People to follow up with → Projects falling behind → Personal errands → Home tasks → Health commitments → Finances → Learning goals → Anything nagging you
 For each response say "Got it — add that to your inbox." then immediately ask about the next area. Under 50 words each. After all areas, give a summary and encourage them to process their inbox.`,
@@ -124,6 +142,17 @@ function groupByField(taskList, field) {
     .map(([key, items]) => ({ key, label: key, items }));
   if (ungrouped.length) sorted.push({ key: "__ungrouped__", label: "Ungrouped", items: ungrouped });
   return sorted;
+}
+
+// Parses the →SUGGESTIONS: block from a projectReview AI reply.
+// Returns an array of suggestion strings, empty if none or block absent.
+function extractSuggestions(text) {
+  const m = text.match(/→SUGGESTIONS:\n([\s\S]*?)$/);
+  if (!m) return [];
+  return m[1]
+    .split('\n')
+    .map(l => l.replace(/^\d+\.\s*/, '').trim())
+    .filter(l => l && l !== "(none)");
 }
 
 // Returns children in display order.
@@ -224,8 +253,10 @@ export default function GTDManager() {
   const [showSettings, setShowSettings] = useState(false);
   const [nextGroupBy, setNextGroupBy] = useState("none");
   const [projectParentId, setProjectParentId] = useState("__new__");
-  const [dragId,     setDragId]     = useState(null);
-  const [dropTarget, setDropTarget] = useState(null); // { id, position: "before"|"inside"|"after" }
+  const [dragId,             setDragId]             = useState(null);
+  const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
+  const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
+  const [reviewSuggestions,  setReviewSuggestions]  = useState([]);   // [{ text, checked }]
 
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
@@ -419,6 +450,87 @@ export default function GTDManager() {
     switchCoachMode("dump", "Let's surface everything in your head and get it into your inbox.\n\n**Starting with work:** What professional tasks, deadlines, or commitments have been on your mind that aren't written down anywhere?");
   };
 
+  const reviewProject = useCallback(async (project, idx, total) => {
+    setCurrentBucket("project");
+    const children = getOrderedChildren(project.id, tasks);
+    const subtaskLines = children.length
+      ? children.map(t => `- ${t.text}${t.done ? " ✓" : ""}`).join("\n")
+      : "(none yet)";
+    const meta = [
+      project.dueDate                        ? `Due: ${project.dueDate}`                         : null,
+      (project.priority || []).length        ? `Priority: ${project.priority.join(", ")}`         : null,
+      (project.location || []).length        ? `Location: ${project.location.join(", ")}`         : null,
+    ].filter(Boolean).join(" | ") || "No metadata set";
+
+    const prompt =
+      `Project ${idx + 1} of ${total}: "${project.text}"\n` +
+      `Metadata: ${meta}\n` +
+      `Current subtasks:\n${subtaskLines}`;
+
+    setMessages(prev => [...prev, { role: "user", text: `🔍 Reviewing **"${project.text}"** (${idx + 1} of ${total})` }]);
+    const reply = await callAI(prompt, "projectReview", []);
+    if (reply) {
+      const suggestions = extractSuggestions(reply);
+      setReviewSuggestions(suggestions.map(text => ({ text, checked: true })));
+      setReviewProjectIdx(idx);
+    }
+  }, [tasks, callAI]);
+
+  const startProjectReview = useCallback(async () => {
+    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    if (!rootProjects.length) {
+      switchCoachMode("chat", "You have no active projects to review. Add some projects first, then come back!");
+      return;
+    }
+    setCoachMode("projectReview");
+    setChatHistory([]);
+    setPendingAction(null);
+    setReviewProjectIdx(0);
+    setReviewSuggestions([]);
+    setMessages([{
+      role: "assistant",
+      text: `Let's review your projects. You have **${rootProjects.length} active project${rootProjects.length !== 1 ? "s" : ""}**. I'll go through each one and suggest any missing next actions.\n\nStarting with the first project…`,
+    }]);
+    setTimeout(() => reviewProject(rootProjects[0], 0, rootProjects.length), 100);
+  }, [tasks, reviewProject, switchCoachMode]);
+
+  const advanceProjectReview = useCallback(() => {
+    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const project = rootProjects[reviewProjectIdx];
+
+    // Add checked suggestions as subtasks of the current project
+    if (project) {
+      const selected = reviewSuggestions.filter(s => s.checked);
+      if (selected.length) {
+        const newSubtasks = selected.map(s => ({
+          id: genId(), text: s.text, bucket: "next", done: false,
+          created: Date.now(), parentId: project.id,
+          priority: [], location: [], dueDate: null,
+        }));
+        const newIds = newSubtasks.map(t => t.id);
+        setTasks(prev => [
+          ...prev.map(t =>
+            t.id === project.id ? { ...t, childIds: [...(t.childIds || []), ...newIds] } : t
+          ),
+          ...newSubtasks,
+        ]);
+      }
+    }
+
+    setReviewSuggestions([]);
+    const nextIdx = reviewProjectIdx + 1;
+
+    if (nextIdx >= rootProjects.length) {
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        text: `🎉 **All ${rootProjects.length} project${rootProjects.length !== 1 ? "s" : ""} reviewed!** Your project list is up to date. Switch to Next Actions to see what's ready to work on.`,
+      }]);
+      setCoachMode("chat");
+    } else {
+      reviewProject(rootProjects[nextIdx], nextIdx, rootProjects.length);
+    }
+  }, [reviewProjectIdx, reviewSuggestions, tasks, reviewProject]);
+
   const askAIAboutTask = useCallback(async (task) => {
     setCurrentBucket("inbox");
     switchCoachMode("process", `Let's clarify: **"${task.text}"**`);
@@ -604,6 +716,15 @@ export default function GTDManager() {
                   <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 300 }}>{BUCKETS[currentBucket].label}</div>
                   <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{BUCKETS[currentBucket].desc}</div>
                 </div>
+                {currentBucket === "project" && (
+                  <button
+                    onClick={startProjectReview}
+                    disabled={loading}
+                    style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${COLORS.project}55`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.5 : 1, flexShrink: 0, display: "flex", alignItems: "center", gap: 5 }}
+                  >
+                    🔍 Review Projects
+                  </button>
+                )}
                 {currentBucket === "next" && (
                   <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
                     <span style={{ fontSize: 11, color: COLORS.muted, marginRight: 2 }}>Group:</span>
@@ -780,6 +901,17 @@ export default function GTDManager() {
                 action={pendingAction}
                 onConfirm={handleConfirmMove}
                 onDismiss={() => setPendingAction(null)}
+              />
+            )}
+            {coachMode === "projectReview" && reviewSuggestions.length > 0 && (
+              <ProjectReviewBar
+                suggestions={reviewSuggestions}
+                onToggle={idx => setReviewSuggestions(prev =>
+                  prev.map((s, i) => i === idx ? { ...s, checked: !s.checked } : s)
+                )}
+                onNext={advanceProjectReview}
+                projectIdx={reviewProjectIdx}
+                totalProjects={tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done).length}
               />
             )}
             <div ref={chatEndRef} />
@@ -1102,6 +1234,49 @@ function PendingActionBar({ action, onConfirm, onDismiss }) {
         <button onClick={onDismiss} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>
           Skip
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ProjectReviewBar({ suggestions, onToggle, onNext, projectIdx, totalProjects }) {
+  const selectedCount = suggestions.filter(s => s.checked).length;
+  const isLast = projectIdx + 1 >= totalProjects;
+
+  const nextLabel = isLast
+    ? (selectedCount > 0 ? `Add ${selectedCount} & Finish ✓` : "Finish Review ✓")
+    : (selectedCount > 0 ? `Add ${selectedCount} & Next →` : "Skip →");
+
+  return (
+    <div style={{ background: COLORS.surface3, border: `1px solid ${COLORS.project}44`, borderRadius: 9, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        → Suggested next actions — check to add
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {suggestions.map((s, idx) => (
+          <label key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={s.checked}
+              onChange={() => onToggle(idx)}
+              style={{ marginTop: 2, accentColor: COLORS.project, flexShrink: 0 }}
+            />
+            <span style={{ fontSize: 12, color: s.checked ? COLORS.text : COLORS.muted, textDecoration: s.checked ? "none" : "line-through", lineHeight: 1.45 }}>
+              {s.text}
+            </span>
+          </label>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <button
+          onClick={onNext}
+          style={{ padding: "4px 14px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+        >
+          {nextLabel}
+        </button>
+        <span style={{ fontSize: 11, color: COLORS.muted }}>
+          Project {projectIdx + 1} of {totalProjects}
+        </span>
       </div>
     </div>
   );
