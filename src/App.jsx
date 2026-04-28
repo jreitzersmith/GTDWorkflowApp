@@ -695,6 +695,37 @@ export default function GTDManager() {
     }
   }, [tasks, callAI]);
 
+  const updateTask = useCallback((id, changes) => {
+    setTasks(prev => {
+      // Fast path: no deferUntil change — simple single-task update
+      if (!("deferUntil" in changes)) {
+        return prev.map(t => t.id === id ? { ...t, ...changes } : t);
+      }
+      // Collect all descendant IDs recursively via childIds
+      const getDescendants = (taskId) => {
+        const task = prev.find(t => t.id === taskId);
+        if (!task || !task.childIds?.length) return [];
+        return task.childIds.flatMap(cid => [cid, ...getDescendants(cid)]);
+      };
+      const target = prev.find(t => t.id === id);
+      if (!target) return prev.map(t => t.id === id ? { ...t, ...changes } : t);
+      const oldDefer = target.deferUntil;
+      const newDefer = changes.deferUntil ?? null;
+      const descendants = new Set(getDescendants(id));
+      return prev.map(t => {
+        if (t.id === id) return { ...t, ...changes };
+        if (!descendants.has(t.id)) return t;
+        if (newDefer !== null) {
+          // Setting: cascade new date to all descendants
+          return { ...t, deferUntil: newDefer };
+        } else {
+          // Clearing: only clear descendants that shared the old value
+          return t.deferUntil === oldDefer ? { ...t, deferUntil: null } : t;
+        }
+      });
+    });
+  }, []);
+
   const advanceMetadataReview = useCallback(() => {
     // Apply all accepted metadata suggestions
     metadataSuggestions
@@ -804,37 +835,6 @@ export default function GTDManager() {
 
   const deleteTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
   const completeTask = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox" } : t));
-  const updateTask = useCallback((id, changes) => {
-    setTasks(prev => {
-      // Fast path: no deferUntil change — simple single-task update
-      if (!("deferUntil" in changes)) {
-        return prev.map(t => t.id === id ? { ...t, ...changes } : t);
-      }
-      // Collect all descendant IDs recursively via childIds
-      const getDescendants = (taskId) => {
-        const task = prev.find(t => t.id === taskId);
-        if (!task || !task.childIds?.length) return [];
-        return task.childIds.flatMap(cid => [cid, ...getDescendants(cid)]);
-      };
-      const target = prev.find(t => t.id === id);
-      if (!target) return prev.map(t => t.id === id ? { ...t, ...changes } : t);
-      const oldDefer = target.deferUntil;
-      const newDefer = changes.deferUntil ?? null;
-      const descendants = new Set(getDescendants(id));
-      return prev.map(t => {
-        if (t.id === id) return { ...t, ...changes };
-        if (!descendants.has(t.id)) return t;
-        if (newDefer !== null) {
-          // Setting: cascade new date to all descendants
-          return { ...t, deferUntil: newDefer };
-        } else {
-          // Clearing: only clear descendants that shared the old value
-          return t.deferUntil === oldDefer ? { ...t, deferUntil: null } : t;
-        }
-      });
-    });
-  }, []);
-
   // Assign a Next Action (no parentId) to an existing or new project
   const assignToProject = useCallback((taskId, projectId, newProjectName) => {
     if (newProjectName) {
