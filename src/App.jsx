@@ -41,21 +41,14 @@ const SYSTEM_PROMPTS = {
 2. If actionable, decide: is this a SINGLE next action, or a multi-step PROJECT?
    - If you need clarification to decide, ask ONE specific question. Do NOT include an →ACTION tag until clarified.
 3. Reword the action as a concrete physical action starting with a strong verb (e.g. "Call", "Draft", "Research", "Buy").
-4. End your response with EXACTLY one of these tags on its own line:
+4. Briefly ask (one line): Does this have a due date? And should it be deferred — hidden until a future date when it becomes relevant?
+   If you can confidently infer dates from context (e.g. "for Christmas" → due ~Dec 25, defer ~Oct 1), include them directly without asking.
+5. End your response with EXACTLY one tag. Optionally append |due:YYYY-MM-DD and/or |defer:YYYY-MM-DD:
 
-Single next action:
-→ACTION:next|<Reworded action title>
-
-Multi-step project (requires planning or multiple steps):
-→ACTION:project|<Project name>|<First next action title>
-
-Someday / not urgent:
-→ACTION:someday|<Reworded title>
-
-Waiting on someone:
+→ACTION:next|<Reworded title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD]
+→ACTION:project|<Project name>|<First next action>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD]
+→ACTION:someday|<Reworded title>[|defer:YYYY-MM-DD]
 →ACTION:waiting|<What you are waiting for>
-
-Not actionable / delete:
 →ACTION:delete
 
 Be concise — under 80 words before the tag. Never include the →ACTION tag mid-response.`,
@@ -120,12 +113,17 @@ function formatBubble(text) {
 }
 
 function extractAction(text) {
-  const m = text.match(/→ACTION:(next|project|someday|waiting|delete)\|?([^|\n]*)?\|?([^\n]*)?/);
+  const m = text.match(/→ACTION:(next|project|someday|waiting|delete)\|?([^|\n]*)?\|?([^|\n]*)?((?:\|[^\n]*)*)?/);
   if (!m) return null;
+  const extras = m[4] || "";
+  const dueMatch = extras.match(/\|due:(\d{4}-\d{2}-\d{2})/);
+  const deferMatch = extras.match(/\|defer:(\d{4}-\d{2}-\d{2})/);
   return {
     type: m[1],
     title: (m[2] || "").trim(),
     nextAction: (m[3] || "").trim(),
+    dueDate: dueMatch ? dueMatch[1] : null,
+    deferUntil: deferMatch ? deferMatch[1] : null,
   };
 }
 
@@ -480,7 +478,7 @@ export default function GTDManager() {
 
   const handleConfirmMove = useCallback(() => {
     if (!pendingAction) return;
-    const { type, title, nextAction } = pendingAction;
+    const { type, title, nextAction, dueDate: aiDue, deferUntil: aiDefer } = pendingAction;
 
     const inboxItems = tasks.filter(t => t.bucket === "inbox");
     const current = inboxItems[0];
@@ -493,21 +491,21 @@ export default function GTDManager() {
       t.id === current.id ? { ...t, bucket: "inboxHistory" } : t
     ));
 
-    // Create new tasks based on action type
+    // Create new tasks based on action type, applying any AI-suggested dates
     if (type === "next") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null }, ...prev]);
     } else if (type === "project") {
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: null, effort: null, deferUntil: null },
-        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, deferUntil: null },
+        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null },
+        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, deferUntil: aiDefer || null },
         ...prev,
       ]);
     } else if (type === "someday") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null }, ...prev]);
     } else if (type === "waiting") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null }, ...prev]);
     }
     // type === "delete": just archive, no new task
 
@@ -678,7 +676,34 @@ export default function GTDManager() {
   const deleteTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
   const completeTask = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox" } : t));
   const updateTask = useCallback((id, changes) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
+    setTasks(prev => {
+      // Fast path: no deferUntil change — simple single-task update
+      if (!("deferUntil" in changes)) {
+        return prev.map(t => t.id === id ? { ...t, ...changes } : t);
+      }
+      // Collect all descendant IDs recursively via childIds
+      const getDescendants = (taskId) => {
+        const task = prev.find(t => t.id === taskId);
+        if (!task || !task.childIds?.length) return [];
+        return task.childIds.flatMap(cid => [cid, ...getDescendants(cid)]);
+      };
+      const target = prev.find(t => t.id === id);
+      if (!target) return prev.map(t => t.id === id ? { ...t, ...changes } : t);
+      const oldDefer = target.deferUntil;
+      const newDefer = changes.deferUntil ?? null;
+      const descendants = new Set(getDescendants(id));
+      return prev.map(t => {
+        if (t.id === id) return { ...t, ...changes };
+        if (!descendants.has(t.id)) return t;
+        if (newDefer !== null) {
+          // Setting: cascade new date to all descendants
+          return { ...t, deferUntil: newDefer };
+        } else {
+          // Clearing: only clear descendants that shared the old value
+          return t.deferUntil === oldDefer ? { ...t, deferUntil: null } : t;
+        }
+      });
+    });
   }, []);
 
   // Assign a Next Action (no parentId) to an existing or new project
@@ -773,6 +798,28 @@ export default function GTDManager() {
     setTasks(prev => prev.map(t => ({ ...t, effort: t.effort === name ? null : t.effort })));
   }, []);
 
+  const handleExport = useCallback(() => {
+    const data = { version: 1, exportedAt: new Date().toISOString(), tasks, locations, efforts };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gtd-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [tasks, locations, efforts]);
+
+  const handleImport = useCallback((data) => {
+    if (!data || !Array.isArray(data.tasks)) {
+      alert("Invalid backup file — expected a tasks array.");
+      return;
+    }
+    if (!window.confirm(`Import ${data.tasks.length} tasks? This will replace all current tasks.`)) return;
+    setTasks(data.tasks);
+    if (Array.isArray(data.locations)) setLocations(data.locations);
+    if (Array.isArray(data.efforts)) setEfforts(data.efforts);
+  }, []);
+
   // "scheduled" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
   const bucketTasks = currentBucket === "scheduled"
     ? tasks.filter(t => isDeferred(t) && !t.done).sort((a, b) => (a.deferUntil > b.deferUntil ? 1 : -1))
@@ -855,6 +902,8 @@ export default function GTDManager() {
               onRemoveEffort={removeEffort}
               tagDisplay={tagDisplay}
               onSetTagDisplay={setTagDisplay}
+              onExport={handleExport}
+              onImport={handleImport}
               onClose={() => setShowSettings(false)}
             />
           ) : (
@@ -1753,7 +1802,25 @@ function ProviderOption({ label, icon, color, active, onClick }) {
   );
 }
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, tagDisplay, onSetTagDisplay, onClose }) {
+function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, tagDisplay, onSetTagDisplay, onExport, onImport, onClose }) {
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        onImport(data);
+      } catch {
+        alert("Could not parse backup file — make sure it's a valid GTD JSON export.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1773,6 +1840,23 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
         </div>
         <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
           <EffortManager efforts={efforts} tasks={tasks} onAdd={onAddEffort} onRename={onRenameEffort} onRemove={onRemoveEffort} />
+        </div>
+        <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Backup &amp; Restore</div>
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 14, lineHeight: 1.5 }}>
+            Export all tasks, locations, and effort labels to a JSON file. Import restores from a previous export.
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={onExport}
+              style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+            >⬇ Export backup</button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+            >⬆ Import backup</button>
+            <input ref={fileInputRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={handleFileChange} />
+          </div>
         </div>
       </div>
     </div>
