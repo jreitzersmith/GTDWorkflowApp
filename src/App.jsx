@@ -78,6 +78,24 @@ If the project is fully on track with no missing actions, write:
 (none)
 
 Be concise. Under 80 words before the suggestions block.`,
+  projectMetadata: `You are a GTD metadata coach reviewing a project's tasks for completeness.
+
+For each task listed (with its ID), examine these three fields:
+- effort: a time estimate (e.g. 15m, 30m, 1h, 2h, 1d) — suggest for any task that is clearly missing one
+- due: a deadline in YYYY-MM-DD format — suggest ONLY when the task or project context strongly implies a time constraint
+- defer: a hide-until date in YYYY-MM-DD format — suggest ONLY when the task is clearly not actionable until a future date
+
+End your response with EXACTLY this block — nothing after it:
+→METADATA:
+<taskId>|effort:30m
+<taskId>|due:2026-06-01|defer:2026-05-15
+(one line per task that needs changes; include only fields that need a value; omit tasks that are already complete)
+
+If all tasks already have adequate metadata, write:
+→METADATA:
+(none)
+
+Be concise. Under 60 words before the metadata block. Today's date is provided in the task list context.`,
   dump: `You are a GTD brain dump coach. Surface open loops by asking about one life area at a time:
 Work tasks → Emails to send → People to follow up with → Projects falling behind → Personal errands → Home tasks → Health commitments → Finances → Learning goals → Anything nagging you
 For each response say "Got it — add that to your inbox." then immediately ask about the next area. Under 50 words each. After all areas, give a summary and encourage them to process their inbox.`,
@@ -222,6 +240,30 @@ function extractSuggestions(text) {
     .filter(l => l && l !== "(none)" && l !== "(none).");
 }
 
+// Parses the →METADATA: / ->METADATA: block from a projectMetadata AI reply.
+// Returns an array of { taskId, fields: { effort?, dueDate?, deferUntil? } }.
+function extractMetadata(text) {
+  const normalised = text.replace(/\r\n/g, "\n").replace(/->/g, "→");
+  const m = normalised.match(/→METADATA:\n([\s\S]*)$/);
+  if (!m) return [];
+  return m[1]
+    .split("\n")
+    .map(l => l.trim())
+    .filter(l => l && l !== "(none)" && l !== "(none)." && l.includes("|"))
+    .map(l => {
+      const [taskId, ...pairs] = l.split("|");
+      const fields = {};
+      pairs.forEach(p => {
+        const [k, v] = p.split(":").map(s => s.trim());
+        if (k === "effort")  fields.effort    = v;
+        if (k === "due")     fields.dueDate   = v;
+        if (k === "defer")   fields.deferUntil = v;
+      });
+      return { taskId: taskId.trim(), fields };
+    })
+    .filter(r => r.taskId && Object.keys(r.fields).length > 0);
+}
+
 // Returns children in display order.
 // parentId === null → root projects (bucket "project", no parentId), ordered by tasks array position.
 // otherwise → ordered by parent's childIds array.
@@ -331,6 +373,8 @@ export default function GTDManager() {
   const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
   const [reviewSuggestions,  setReviewSuggestions]  = useState([]);   // [{ text, checked }]
   const [reviewReady,        setReviewReady]        = useState(false); // true after AI responds for current project
+  const [reviewMode,         setReviewMode]         = useState(null);  // null | "tasks" | "metadata"
+  const [metadataSuggestions,setMetadataSuggestions] = useState([]);  // [{ taskId, taskText, fields: {effort?,dueDate?,deferUntil?}, overrides: {...}, accepted: bool }]
 
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
@@ -542,6 +586,7 @@ export default function GTDManager() {
     switchCoachMode("dump", "Let's surface everything in your head and get it into your inbox.\n\n**Starting with work:** What professional tasks, deadlines, or commitments have been on your mind that aren't written down anywhere?");
   };
 
+  // ── Mode A: Task-completeness review ────────────────────────────────────
   const reviewProject = useCallback(async (project, idx, total) => {
     setCurrentBucket("project");
     const children = getOrderedChildren(project.id, tasks);
@@ -570,30 +615,11 @@ export default function GTDManager() {
     }
   }, [tasks, callAI]);
 
-  const startProjectReview = useCallback(async () => {
-    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
-    if (!rootProjects.length) {
-      switchCoachMode("chat", "You have no active projects to review. Add some projects first, then come back!");
-      return;
-    }
-    setCoachMode("projectReview");
-    setChatHistory([]);
-    setPendingAction(null);
-    setReviewProjectIdx(0);
-    setReviewSuggestions([]);
-    setReviewReady(false);
-    setMessages([{
-      role: "assistant",
-      text: `Let's review your projects. You have **${rootProjects.length} active project${rootProjects.length !== 1 ? "s" : ""}**. I'll go through each one and suggest any missing next actions.\n\nStarting with the first project…`,
-    }]);
-    setTimeout(() => reviewProject(rootProjects[0], 0, rootProjects.length), 100);
-  }, [tasks, reviewProject, switchCoachMode]);
-
   const advanceProjectReview = useCallback(() => {
     const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
     const project = rootProjects[reviewProjectIdx];
 
-    // Add checked suggestions as subtasks of the current project
+    // Add checked suggestions as new subtasks of the current project
     if (project) {
       const selected = reviewSuggestions.filter(s => s.checked);
       if (selected.length) {
@@ -613,6 +639,7 @@ export default function GTDManager() {
     }
 
     setReviewSuggestions([]);
+    setReviewReady(false);
     const nextIdx = reviewProjectIdx + 1;
 
     if (nextIdx >= rootProjects.length) {
@@ -625,6 +652,102 @@ export default function GTDManager() {
       reviewProject(rootProjects[nextIdx], nextIdx, rootProjects.length);
     }
   }, [reviewProjectIdx, reviewSuggestions, tasks, reviewProject]);
+
+  // ── Mode B: Metadata-quality review ─────────────────────────────────────
+  const reviewProjectMetadata = useCallback(async (project, idx, total) => {
+    setCurrentBucket("project");
+    const children = getOrderedChildren(project.id, tasks);
+    const activeTasks = children.filter(t => !t.done);
+    const taskLines = activeTasks.length
+      ? activeTasks.map(t => {
+          const meta = [
+            `effort:${t.effort || "none"}`,
+            `due:${t.dueDate || "none"}`,
+            `defer:${t.deferUntil || "none"}`,
+          ].join(", ");
+          return `- [${t.id}] ${t.text} (${meta})`;
+        }).join("\n")
+      : "(no active subtasks)";
+
+    const prompt =
+      `Project ${idx + 1} of ${total}: "${project.text}"\n` +
+      `Today: ${todayStr()}\n` +
+      `Active subtasks:\n${taskLines}`;
+
+    setMessages(prev => [...prev, { role: "user", text: `🏷 Reviewing metadata for **"${project.text}"** (${idx + 1} of ${total})` }]);
+    setReviewReady(false);
+    const reply = await callAI(prompt, "projectMetadata", []);
+    if (reply) {
+      const parsed = extractMetadata(reply);
+      const suggestions = parsed.map(({ taskId, fields }) => {
+        const task = tasks.find(t => t.id === taskId);
+        return {
+          taskId,
+          taskText: task ? task.text : taskId,
+          fields,                  // original AI suggestion
+          overrides: { ...fields }, // user-editable copy shown in bar
+          accepted: true,
+        };
+      });
+      setMetadataSuggestions(suggestions);
+      setReviewProjectIdx(idx);
+      setReviewReady(true);
+    }
+  }, [tasks, callAI]);
+
+  const advanceMetadataReview = useCallback(() => {
+    // Apply all accepted metadata suggestions
+    metadataSuggestions
+      .filter(s => s.accepted)
+      .forEach(s => updateTask(s.taskId, s.overrides));
+
+    setMetadataSuggestions([]);
+    setReviewReady(false);
+    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const nextIdx = reviewProjectIdx + 1;
+
+    if (nextIdx >= rootProjects.length) {
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        text: `🎉 **All ${rootProjects.length} project${rootProjects.length !== 1 ? "s" : ""} reviewed!** Metadata has been updated across your projects.`,
+      }]);
+      setCoachMode("chat");
+    } else {
+      reviewProjectMetadata(rootProjects[nextIdx], nextIdx, rootProjects.length);
+    }
+  }, [reviewProjectIdx, metadataSuggestions, tasks, reviewProjectMetadata, updateTask]);
+
+  // ── Entry point + mode selection ────────────────────────────────────────
+  const startProjectReview = useCallback(() => {
+    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    if (!rootProjects.length) {
+      switchCoachMode("chat", "You have no active projects to review. Add some projects first, then come back!");
+      return;
+    }
+    setCoachMode("projectReview");
+    setChatHistory([]);
+    setPendingAction(null);
+    setReviewProjectIdx(0);
+    setReviewSuggestions([]);
+    setMetadataSuggestions([]);
+    setReviewReady(false);
+    setReviewMode(null);
+    setMessages([{
+      role: "assistant",
+      text: `Let's review your **${rootProjects.length} active project${rootProjects.length !== 1 ? "s" : ""}**. What should we focus on?`,
+    }]);
+    // ReviewModeBar renders now; actual review starts after mode selection
+  }, [tasks, switchCoachMode]);
+
+  const selectReviewMode = useCallback((mode) => {
+    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    setReviewMode(mode);
+    if (mode === "tasks") {
+      reviewProject(rootProjects[0], 0, rootProjects.length);
+    } else {
+      reviewProjectMetadata(rootProjects[0], 0, rootProjects.length);
+    }
+  }, [tasks, reviewProject, reviewProjectMetadata]);
 
   const askAIAboutTask = useCallback(async (task) => {
     setCurrentBucket("inbox");
@@ -1122,7 +1245,7 @@ export default function GTDManager() {
                     if (key === "process") startProcessInbox();
                     else if (key === "review") startWeeklyReview();
                     else if (key === "dump") startBrainDump();
-                    else if (key === "projectReview") startProjectReview();
+                    else if (key === "projectReview") startProjectReview();  // mode picked in ReviewModeBar
                     else switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.");
                   }}
                   style={{ padding: "3px 9px", borderRadius: 6, border: `1px solid ${coachMode === key ? COLORS.border2 : COLORS.border}`, background: coachMode === key ? COLORS.surface3 : "transparent", color: coachMode === key ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
@@ -1145,13 +1268,30 @@ export default function GTDManager() {
                 onDismiss={() => setPendingAction(null)}
               />
             )}
-            {coachMode === "projectReview" && reviewReady && (
+            {coachMode === "projectReview" && reviewMode === null && !loading && (
+              <ReviewModeBar onSelect={selectReviewMode} />
+            )}
+            {coachMode === "projectReview" && reviewMode === "tasks" && reviewReady && (
               <ProjectReviewBar
                 suggestions={reviewSuggestions}
                 onToggle={idx => setReviewSuggestions(prev =>
                   prev.map((s, i) => i === idx ? { ...s, checked: !s.checked } : s)
                 )}
                 onNext={advanceProjectReview}
+                projectIdx={reviewProjectIdx}
+                totalProjects={tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done).length}
+              />
+            )}
+            {coachMode === "projectReview" && reviewMode === "metadata" && reviewReady && (
+              <MetadataReviewBar
+                suggestions={metadataSuggestions}
+                onToggleAccepted={idx => setMetadataSuggestions(prev =>
+                  prev.map((s, i) => i === idx ? { ...s, accepted: !s.accepted } : s)
+                )}
+                onChangeOverride={(idx, field, value) => setMetadataSuggestions(prev =>
+                  prev.map((s, i) => i === idx ? { ...s, overrides: { ...s.overrides, [field]: value } } : s)
+                )}
+                onNext={advanceMetadataReview}
                 projectIdx={reviewProjectIdx}
                 totalProjects={tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done).length}
               />
@@ -1696,6 +1836,99 @@ function PendingActionBar({ action, onConfirm, onDismiss }) {
         <button onClick={onDismiss} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>
           Skip
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ReviewModeBar({ onSelect }) {
+  return (
+    <div style={{ background: COLORS.surface3, border: `1px solid ${COLORS.project}44`, borderRadius: 9, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        Choose review focus
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={() => onSelect("tasks")}
+          style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: `1px solid ${COLORS.next}55`, background: COLORS.nextBg, color: COLORS.next, fontFamily: "inherit", fontSize: 12, cursor: "pointer", textAlign: "left", lineHeight: 1.4 }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 3 }}>📋 Task completeness</div>
+          <div style={{ fontSize: 11, color: COLORS.text2 }}>Find missing next actions for each project</div>
+        </button>
+        <button
+          onClick={() => onSelect("metadata")}
+          style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: `1px solid ${COLORS.project}55`, background: COLORS.projectBg, color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: "pointer", textAlign: "left", lineHeight: 1.4 }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 3 }}>🏷 Metadata quality</div>
+          <div style={{ fontSize: 11, color: COLORS.text2 }}>Fill in effort, due dates, and defer dates</div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MetadataReviewBar({ suggestions, onToggleAccepted, onChangeOverride, onNext, projectIdx, totalProjects }) {
+  const isEmpty = suggestions.length === 0;
+  const isLast  = projectIdx + 1 >= totalProjects;
+  const acceptedCount = suggestions.filter(s => s.accepted).length;
+
+  const nextLabel = isLast
+    ? (acceptedCount > 0 ? `Apply ${acceptedCount} & Finish ✓` : "Finish Review ✓")
+    : (acceptedCount > 0 ? `Apply ${acceptedCount} & Next →` : "Next →");
+
+  const FIELD_LABELS = { effort: "Effort", dueDate: "Due", deferUntil: "Defer until" };
+
+  return (
+    <div style={{ background: COLORS.surface3, border: `1px solid ${COLORS.project}44`, borderRadius: 9, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        {isEmpty ? "✓ Metadata looks good" : "🏷 Metadata suggestions — edit values if needed"}
+      </div>
+
+      {isEmpty ? (
+        <div style={{ fontSize: 12, color: COLORS.muted }}>All tasks already have adequate metadata — nothing to add.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {suggestions.map((s, idx) => (
+            <div key={s.taskId} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "7px 9px", borderRadius: 7, background: s.accepted ? COLORS.surface2 : COLORS.surface, border: `1px solid ${s.accepted ? COLORS.border2 : COLORS.border}`, opacity: s.accepted ? 1 : 0.5 }}>
+              {/* Task row header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <input
+                  type="checkbox"
+                  checked={s.accepted}
+                  onChange={() => onToggleAccepted(idx)}
+                  style={{ accentColor: COLORS.project, flexShrink: 0 }}
+                />
+                <span style={{ fontSize: 12, color: COLORS.text, fontWeight: 500, lineHeight: 1.35 }}>{s.taskText}</span>
+              </div>
+              {/* Field chips */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, paddingLeft: 22 }}>
+                {Object.entries(s.overrides).map(([field, value]) => (
+                  <div key={field} style={{ display: "flex", alignItems: "center", gap: 4, background: COLORS.surface3, borderRadius: 5, padding: "2px 6px", border: `1px solid ${COLORS.border2}` }}>
+                    <span style={{ fontSize: 10, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{FIELD_LABELS[field] || field}</span>
+                    <input
+                      value={value || ""}
+                      onChange={e => onChangeOverride(idx, field, e.target.value)}
+                      disabled={!s.accepted}
+                      style={{ width: field === "effort" ? 52 : 96, fontSize: 11, background: "transparent", border: "none", color: COLORS.text, fontFamily: "inherit", outline: "none", padding: 0 }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <button
+          onClick={onNext}
+          style={{ padding: "4px 14px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+        >
+          {nextLabel}
+        </button>
+        <span style={{ fontSize: 11, color: COLORS.muted }}>
+          Project {projectIdx + 1} of {totalProjects}
+        </span>
       </div>
     </div>
   );
