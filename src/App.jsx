@@ -10,6 +10,7 @@ const COLORS = {
   waiting: "#d4845a", waitingBg: "#2a1e14",
   someday: "#9a8ad4", somedayBg: "#1e1a2a",
   effort: "#6ec6a8", effortBg: "#152520",
+  scheduled: "#c87ee0", scheduledBg: "#1e1428",
   done: "#5a5c58",
 };
 
@@ -19,6 +20,7 @@ const BUCKETS = {
   project:      { label: "📁 Projects",        desc: "Anything requiring more than one step",        color: COLORS.project },
   waiting:      { label: "⏳ Waiting For",     desc: "Delegated — ball in someone else's court",     color: COLORS.waiting },
   someday:      { label: "💭 Someday / Maybe", desc: "Ideas and aspirations, not commitments",       color: COLORS.someday },
+  scheduled:    { label: "⏰ Scheduled",        desc: "Deferred tasks waiting for their wake date",  color: COLORS.scheduled },
   done:         { label: "✅ Completed",        desc: "Finished tasks",                              color: COLORS.done },
   inboxHistory: { label: "📋 Inbox History",   desc: "Processed inbox items — archived for reference", color: COLORS.muted },
 };
@@ -91,6 +93,23 @@ For each response say "Got it — add that to your inbox." then immediately ask 
 const OPENWEBUI_URL = (import.meta.env.VITE_OPENWEBUI_URL || "http://192.168.0.102:3000").replace(/\/$/, "");
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// Returns today as "YYYY-MM-DD" in local time (for deferred-date comparisons).
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// A task is "active-deferred" when its deferUntil date is strictly after today.
+function isDeferred(task) { return !!(task.deferUntil && task.deferUntil > todayStr()); }
+
+// Returns a YYYY-MM-DD string that is (months/weeks) before the given base date string.
+function subtractFromDate(base, { months = 0, weeks = 0 }) {
+  const d = new Date(base + "T00:00:00");
+  d.setMonth(d.getMonth() - months);
+  d.setDate(d.getDate() - weeks * 7);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function formatBubble(text) {
   const parts = text.split(/(→ACTION:[^\n]+)/g);
@@ -327,6 +346,22 @@ export default function GTDManager() {
   useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
 
+  // Auto-surface: on mount, move any standalone deferred tasks whose wake date has passed into Inbox.
+  // Only moves tasks with no parentId (project subtasks stay in place; their deferUntil just stops hiding them).
+  useEffect(() => {
+    const today = todayStr();
+    setTasks(prev => {
+      const wokeIds = new Set(
+        prev.filter(t =>
+          t.deferUntil && t.deferUntil <= today && !t.done && !t.parentId &&
+          t.bucket !== "inbox" && t.bucket !== "done" && t.bucket !== "inboxHistory"
+        ).map(t => t.id)
+      );
+      if (!wokeIds.size) return prev;
+      return prev.map(t => wokeIds.has(t.id) ? { ...t, bucket: "inbox", deferUntil: null } : t);
+    });
+  }, []); // run once on mount
+
   const getTaskContext = useCallback(() => {
     const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe" };
     return Object.entries(bucketNames).map(([k, label]) => {
@@ -460,19 +495,19 @@ export default function GTDManager() {
 
     // Create new tasks based on action type
     if (type === "next") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null }, ...prev]);
     } else if (type === "project") {
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: null, effort: null },
-        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null },
+        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: null, effort: null, deferUntil: null },
+        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, deferUntil: null },
         ...prev,
       ]);
     } else if (type === "someday") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null }, ...prev]);
     } else if (type === "waiting") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null }, ...prev]);
     }
     // type === "delete": just archive, no new task
 
@@ -561,7 +596,7 @@ export default function GTDManager() {
         const newSubtasks = selected.map(s => ({
           id: genId(), text: s.text, bucket: "next", done: false,
           created: Date.now(), parentId: project.id,
-          priority: [], location: [], dueDate: null,
+          priority: [], location: [], dueDate: null, effort: null, deferUntil: null,
         }));
         const newIds = newSubtasks.map(t => t.id);
         setTasks(prev => [
@@ -596,14 +631,14 @@ export default function GTDManager() {
   const addTask = (bucket) => {
     const text = addText.trim();
     if (!text) return;
-    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null }, ...prev]);
+    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null }, ...prev]);
     setAddText("");
   };
 
   const addAndProcess = () => {
     const text = addText.trim();
     if (!text) return;
-    const task = { id: genId(), text, bucket: "inbox", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null };
+    const task = { id: genId(), text, bucket: "inbox", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null };
     setTasks(prev => [task, ...prev]);
     setAddText("");
     setCurrentBucket("inbox");
@@ -616,7 +651,7 @@ export default function GTDManager() {
     if (projectParentId === "__new__") {
       // Create a new root project
       setTasks(prev => [
-        { id: genId(), text, bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, childIds: [] },
+        { id: genId(), text, bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, childIds: [] },
         ...prev,
       ]);
     } else {
@@ -628,7 +663,7 @@ export default function GTDManager() {
             ? { ...t, childIds: [...(t.childIds || []), childId] }
             : t
         ),
-        { id: childId, text, bucket: "next", done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null, effort: null },
+        { id: childId, text, bucket: "next", done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null, effort: null, deferUntil: null },
       ]);
     }
     setAddText("");
@@ -652,7 +687,7 @@ export default function GTDManager() {
       const newProjId = genId();
       setTasks(prev => [
         ...prev.map(t => t.id === taskId ? { ...t, parentId: newProjId } : t),
-        { id: newProjId, text: newProjectName.trim(), bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, childIds: [taskId] },
+        { id: newProjId, text: newProjectName.trim(), bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, childIds: [taskId] },
       ]);
     } else if (projectId) {
       setTasks(prev => prev.map(t => {
@@ -738,8 +773,24 @@ export default function GTDManager() {
     setTasks(prev => prev.map(t => ({ ...t, effort: t.effort === name ? null : t.effort })));
   }, []);
 
-  const bucketTasks = tasks.filter(t => t.bucket === currentBucket);
-  const counts = Object.fromEntries(Object.keys(BUCKETS).map(k => [k, tasks.filter(t => t.bucket === k).length]));
+  // "scheduled" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
+  const bucketTasks = currentBucket === "scheduled"
+    ? tasks.filter(t => isDeferred(t) && !t.done).sort((a, b) => (a.deferUntil > b.deferUntil ? 1 : -1))
+    : tasks.filter(t => t.bucket === currentBucket);
+  const counts = Object.fromEntries(Object.keys(BUCKETS).map(k =>
+    k === "scheduled"
+      ? [k, tasks.filter(t => isDeferred(t) && !t.done).length]
+      : [k, tasks.filter(t => t.bucket === k).length]
+  ));
+
+  // Fuzzy dupe check: warn if what the user is typing resembles a deferred task.
+  const deferredDupeWarning = (() => {
+    const text = addText.toLowerCase().trim();
+    if (text.length < 4) return null;
+    const words = text.split(/\s+/).filter(w => w.length > 3);
+    if (!words.length) return null;
+    return tasks.find(t => isDeferred(t) && !t.done && words.some(w => t.text.toLowerCase().includes(w))) || null;
+  })();
 
   const s = {
     app: { display: "flex", height: "100vh", background: COLORS.bg, color: COLORS.text, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif", fontSize: 14, overflow: "hidden" },
@@ -845,7 +896,7 @@ export default function GTDManager() {
                 )}
               </div>
 
-              {currentBucket === "project" ? (() => {
+              {currentBucket === "scheduled" ? null : currentBucket === "project" ? (() => {
                 const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
                 const selectedProject = rootProjects.find(t => t.id === projectParentId);
                 const placeholder = projectParentId === "__new__"
@@ -876,17 +927,26 @@ export default function GTDManager() {
                   </div>
                 );
               })() : (
-                <div style={s.addRow}>
-                  <input
-                    value={addText}
-                    onChange={e => setAddText(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && addTask()}
-                    placeholder="Add a task… (Enter to add)"
-                    style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" }}
-                  />
-                  <Btn onClick={() => addTask()} style={{ fontSize: 12 }}>+ Add</Btn>
-                  <Btn onClick={addAndProcess} style={{ fontSize: 12, borderColor: COLORS.inbox, color: COLORS.inbox }}>+ Add & Ask AI</Btn>
-                </div>
+                <>
+                  <div style={s.addRow}>
+                    <input
+                      value={addText}
+                      onChange={e => setAddText(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && addTask()}
+                      placeholder="Add a task… (Enter to add)"
+                      style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" }}
+                    />
+                    <Btn onClick={() => addTask()} style={{ fontSize: 12 }}>+ Add</Btn>
+                    <Btn onClick={addAndProcess} style={{ fontSize: 12, borderColor: COLORS.inbox, color: COLORS.inbox }}>+ Add & Ask AI</Btn>
+                  </div>
+                  {deferredDupeWarning && (
+                    <div style={{ padding: "3px 16px 6px", fontSize: 11, color: COLORS.scheduled, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>⏰</span>
+                      <span>Similar scheduled task: <strong>"{deferredDupeWarning.text}"</strong> (wakes {deferredDupeWarning.deferUntil})</span>
+                      <button onClick={() => setCurrentBucket("scheduled")} style={{ background: "none", border: "none", color: COLORS.scheduled, cursor: "pointer", fontFamily: "inherit", fontSize: 11, padding: "0 2px", textDecoration: "underline" }}>View it</button>
+                    </div>
+                  )}
+                </>
               )}
 
               <div style={s.taskList}>
@@ -927,7 +987,8 @@ export default function GTDManager() {
                     />
                   </div>
                 ) : currentBucket === "next" ? (() => {
-                  const visible = waterfallFilter(bucketTasks, tasks);
+                  // Deferred tasks are hidden from Next Actions; they live in the Scheduled view.
+                  const visible = waterfallFilter(bucketTasks, tasks).filter(t => !isDeferred(t));
                   if (!visible.length) {
                     return (
                       <div style={{ padding: "28px 24px", textAlign: "center", color: COLORS.muted, fontSize: 12 }}>
@@ -960,7 +1021,23 @@ export default function GTDManager() {
                       </div>
                     );
                   });
-                })() : (
+                })() : currentBucket === "scheduled" ? (
+                  bucketTasks.length === 0 ? (
+                    <EmptyState bucket="scheduled" />
+                  ) : (
+                    <div>
+                      <div style={{ padding: "6px 18px 4px", fontSize: 11, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
+                        Sorted by wake date — earliest first. Tasks move to Inbox automatically when their date arrives.
+                      </div>
+                      {bucketTasks.map(task => (
+                        <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
+                          onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
+                          pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
+                          onAssignToProject={assignToProject} tagDisplay={tagDisplay} />
+                      ))}
+                    </div>
+                  )
+                ) : (
                   bucketTasks.map(task => (
                     <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                       onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
@@ -1106,8 +1183,9 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
 
   const taskPriority = task.priority || [];
   const taskLocation = task.location || [];
-  const taskDueDate = task.dueDate || "";
+  const taskDueDate  = task.dueDate  || "";
   const taskEffort   = task.effort   || null;
+  const deferred     = isDeferred(task);
 
   // Computed effort total for project-bucket rows (sum of direct subtask efforts).
   const projectEffortTotal = (() => {
@@ -1157,13 +1235,13 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
     setAssignTarget("__new__");
   };
 
-  const hasMetadata = taskPriority.length > 0 || taskLocation.length > 0 || taskDueDate || !!taskEffort;
+  const hasMetadata = taskPriority.length > 0 || taskLocation.length > 0 || taskDueDate || !!taskEffort || !!task.deferUntil;
 
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ borderLeft: `3px solid ${highlight ? COLORS.inbox : isSubtask ? COLORS.project + "55" : "transparent"}`, opacity: task.done ? 0.4 : 1, transition: "all 0.12s" }}
+      style={{ borderLeft: `3px solid ${highlight ? COLORS.inbox : isSubtask ? COLORS.project + "55" : "transparent"}`, opacity: task.done ? 0.4 : (deferred && currentBucket === "project") ? 0.55 : 1, transition: "all 0.12s" }}
     >
       {/* Main task row */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: highlight ? COLORS.inboxBg : (hover ? COLORS.surface2 : "transparent") }}>
@@ -1184,6 +1262,9 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
             {projectEffortTotal && (
               <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, flexShrink: 0 }}>⏱ {projectEffortTotal}</span>
             )}
+            {deferred && currentBucket === "project" && (
+              <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.scheduledBg, color: COLORS.scheduled, border: `1px solid ${COLORS.scheduled}44`, flexShrink: 0 }}>⏰ {task.deferUntil}</span>
+            )}
           </div>
           {/* Metadata summary chips — below-text mode */}
           {tagDisplay !== "inline" && !expanded && hasMetadata && (
@@ -1199,6 +1280,9 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
               ))}
               {taskEffort && (
                 <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44` }}>⏱ {taskEffort}</span>
+              )}
+              {task.deferUntil && (
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.scheduledBg, color: COLORS.scheduled, border: `1px solid ${COLORS.scheduled}44` }}>⏰ {task.deferUntil}</span>
               )}
             </div>
           )}
@@ -1229,6 +1313,9 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
             ))}
             {taskEffort && (
               <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, whiteSpace: "nowrap" }}>⏱ {taskEffort}</span>
+            )}
+            {task.deferUntil && (
+              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.scheduledBg, color: COLORS.scheduled, border: `1px solid ${COLORS.scheduled}44`, whiteSpace: "nowrap" }}>⏰ {task.deferUntil}</span>
             )}
           </div>
         )}
@@ -1344,6 +1431,53 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
                 onClick={() => onUpdateTask(task.id, { dueDate: null })}
                 style={{ marginLeft: 6, padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
               >✕</button>
+            )}
+          </div>
+
+          {/* Defer Until */}
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>Defer Until</div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <input
+                type="date"
+                value={task.deferUntil || ""}
+                onChange={e => onUpdateTask(task.id, { deferUntil: e.target.value || null })}
+                style={{ background: COLORS.surface3, border: `1px solid ${task.deferUntil ? COLORS.scheduled : COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
+              />
+              {task.deferUntil && (
+                <button
+                  onClick={() => onUpdateTask(task.id, { deferUntil: null })}
+                  style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+                >✕ Clear</button>
+              )}
+            </div>
+            {/* Quick-pick offsets — only shown when a due date is also set */}
+            {taskDueDate && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 7, alignItems: "center" }}>
+                <span style={{ fontSize: 10, color: COLORS.muted }}>Before due date:</span>
+                {[
+                  { label: "1 wk",  months: 0, weeks: 1 },
+                  { label: "2 wks", months: 0, weeks: 2 },
+                  { label: "1 mo",  months: 1, weeks: 0 },
+                  { label: "2 mo",  months: 2, weeks: 0 },
+                  { label: "3 mo",  months: 3, weeks: 0 },
+                ].map(({ label, months, weeks }) => {
+                  const d = subtractFromDate(taskDueDate, { months, weeks });
+                  const active = task.deferUntil === d;
+                  return (
+                    <button
+                      key={label}
+                      onClick={() => onUpdateTask(task.id, { deferUntil: active ? null : d })}
+                      style={{ padding: "2px 8px", borderRadius: 8, border: `1px solid ${active ? COLORS.scheduled : COLORS.border}`, background: active ? COLORS.scheduled + "22" : "transparent", color: active ? COLORS.scheduled : COLORS.text2, fontFamily: "inherit", fontSize: 10, cursor: "pointer", transition: "all 0.1s" }}
+                    >{label}</button>
+                  );
+                })}
+              </div>
+            )}
+            {deferred && (
+              <div style={{ marginTop: 5, fontSize: 11, color: COLORS.scheduled, opacity: 0.85 }}>
+                ⏰ Hidden from active views until {task.deferUntil}
+              </div>
             )}
           </div>
 
@@ -1998,12 +2132,13 @@ function GroupDivider({ label, count, effortTotal, isUngrouped }) {
 
 function EmptyState({ bucket }) {
   const msgs = {
-    inbox:   ["Your inbox is clear", "Add tasks above, or use Brain Dump to surface open loops."],
-    next:    ["No next actions", "Process your inbox and move concrete actions here."],
-    project: ["No projects", "Multi-step goals go here."],
-    waiting: ["Nothing waiting", "Track delegated items here."],
-    someday: ["No someday items", "Capture future ideas without committing to them."],
-    done:    ["Nothing completed yet", "Complete tasks and they'll appear here."],
+    inbox:     ["Your inbox is clear", "Add tasks above, or use Brain Dump to surface open loops."],
+    next:      ["No next actions", "Process your inbox and move concrete actions here."],
+    project:   ["No projects", "Multi-step goals go here."],
+    waiting:   ["Nothing waiting", "Track delegated items here."],
+    someday:   ["No someday items", "Capture future ideas without committing to them."],
+    scheduled: ["No scheduled tasks", "Open any task's chevron → set a 'Defer Until' date to hide it until you need it."],
+    done:      ["Nothing completed yet", "Complete tasks and they'll appear here."],
   };
   const [title, sub] = msgs[bucket] || ["Empty", ""];
   return (
