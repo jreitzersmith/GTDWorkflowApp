@@ -209,15 +209,17 @@ function minutesToEffortLabel(minutes) {
   return `${+((minutes / 9600).toFixed(1))}mo`;
 }
 
-// Parses the →SUGGESTIONS: block from a projectReview AI reply.
+// Parses the →SUGGESTIONS: / ->SUGGESTIONS: block from a projectReview AI reply.
 // Returns an array of suggestion strings, empty if none or block absent.
 function extractSuggestions(text) {
-  const m = text.match(/→SUGGESTIONS:\n([\s\S]*?)$/);
+  // Accept both → (U+2192) and -> prefixes; normalise \r\n → \n
+  const normalised = text.replace(/\r\n/g, "\n").replace(/->/g, "→");
+  const m = normalised.match(/→SUGGESTIONS:\n([\s\S]*)$/);
   if (!m) return [];
   return m[1]
-    .split('\n')
-    .map(l => l.replace(/^\d+\.\s*/, '').trim())
-    .filter(l => l && l !== "(none)");
+    .split("\n")
+    .map(l => l.replace(/^\d+\.\s*|-\s*/, "").trim())
+    .filter(l => l && l !== "(none)" && l !== "(none).");
 }
 
 // Returns children in display order.
@@ -328,6 +330,7 @@ export default function GTDManager() {
   const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
   const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
   const [reviewSuggestions,  setReviewSuggestions]  = useState([]);   // [{ text, checked }]
+  const [reviewReady,        setReviewReady]        = useState(false); // true after AI responds for current project
 
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
@@ -557,11 +560,13 @@ export default function GTDManager() {
       `Current subtasks:\n${subtaskLines}`;
 
     setMessages(prev => [...prev, { role: "user", text: `🔍 Reviewing **"${project.text}"** (${idx + 1} of ${total})` }]);
+    setReviewReady(false);
     const reply = await callAI(prompt, "projectReview", []);
     if (reply) {
       const suggestions = extractSuggestions(reply);
       setReviewSuggestions(suggestions.map(text => ({ text, checked: true })));
       setReviewProjectIdx(idx);
+      setReviewReady(true);
     }
   }, [tasks, callAI]);
 
@@ -576,6 +581,7 @@ export default function GTDManager() {
     setPendingAction(null);
     setReviewProjectIdx(0);
     setReviewSuggestions([]);
+    setReviewReady(false);
     setMessages([{
       role: "assistant",
       text: `Let's review your projects. You have **${rootProjects.length} active project${rootProjects.length !== 1 ? "s" : ""}**. I'll go through each one and suggest any missing next actions.\n\nStarting with the first project…`,
@@ -1116,6 +1122,7 @@ export default function GTDManager() {
                     if (key === "process") startProcessInbox();
                     else if (key === "review") startWeeklyReview();
                     else if (key === "dump") startBrainDump();
+                    else if (key === "projectReview") startProjectReview();
                     else switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.");
                   }}
                   style={{ padding: "3px 9px", borderRadius: 6, border: `1px solid ${coachMode === key ? COLORS.border2 : COLORS.border}`, background: coachMode === key ? COLORS.surface3 : "transparent", color: coachMode === key ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
@@ -1138,7 +1145,7 @@ export default function GTDManager() {
                 onDismiss={() => setPendingAction(null)}
               />
             )}
-            {coachMode === "projectReview" && reviewSuggestions.length > 0 && (
+            {coachMode === "projectReview" && reviewReady && (
               <ProjectReviewBar
                 suggestions={reviewSuggestions}
                 onToggle={idx => setReviewSuggestions(prev =>
@@ -1696,32 +1703,37 @@ function PendingActionBar({ action, onConfirm, onDismiss }) {
 
 function ProjectReviewBar({ suggestions, onToggle, onNext, projectIdx, totalProjects }) {
   const selectedCount = suggestions.filter(s => s.checked).length;
+  const isEmpty = suggestions.length === 0;
   const isLast = projectIdx + 1 >= totalProjects;
 
   const nextLabel = isLast
     ? (selectedCount > 0 ? `Add ${selectedCount} & Finish ✓` : "Finish Review ✓")
-    : (selectedCount > 0 ? `Add ${selectedCount} & Next →` : "Skip →");
+    : (selectedCount > 0 ? `Add ${selectedCount} & Next →` : "Next →");
 
   return (
     <div style={{ background: COLORS.surface3, border: `1px solid ${COLORS.project}44`, borderRadius: 9, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-        → Suggested next actions — check to add
+        {isEmpty ? "✓ Project looks good" : "→ Suggested next actions — check to add"}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {suggestions.map((s, idx) => (
-          <label key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={s.checked}
-              onChange={() => onToggle(idx)}
-              style={{ marginTop: 2, accentColor: COLORS.project, flexShrink: 0 }}
-            />
-            <span style={{ fontSize: 12, color: s.checked ? COLORS.text : COLORS.muted, textDecoration: s.checked ? "none" : "line-through", lineHeight: 1.45 }}>
-              {s.text}
-            </span>
-          </label>
-        ))}
-      </div>
+      {isEmpty ? (
+        <div style={{ fontSize: 12, color: COLORS.muted }}>No missing actions identified — this project is on track.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {suggestions.map((s, idx) => (
+            <label key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={s.checked}
+                onChange={() => onToggle(idx)}
+                style={{ marginTop: 2, accentColor: COLORS.project, flexShrink: 0 }}
+              />
+              <span style={{ fontSize: 12, color: s.checked ? COLORS.text : COLORS.muted, textDecoration: s.checked ? "none" : "line-through", lineHeight: 1.45 }}>
+                {s.text}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         <button
           onClick={onNext}
