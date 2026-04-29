@@ -1112,19 +1112,6 @@ export default function GTDManager() {
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                     <button
                       onClick={() => {
-                        // Collapse all root projects to "next level" view: collapse every direct child.
-                        const next = new Set();
-                        tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done)
-                          .forEach(p => (p.childIds || []).forEach(cid => next.add(cid)));
-                        setCollapsedNodes(next);
-                      }}
-                      title="Collapse all projects to top-level tasks"
-                      style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
-                    >
-                      ⊖ Collapse All
-                    </button>
-                    <button
-                      onClick={() => {
                         // Projects only: add every root project's own ID so its children are hidden.
                         const next = new Set();
                         tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done)
@@ -1135,6 +1122,19 @@ export default function GTDManager() {
                       style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
                     >
                       ≡ Projects Only
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Collapse all root projects to "next level" view: collapse every direct child.
+                        const next = new Set();
+                        tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done)
+                          .forEach(p => (p.childIds || []).forEach(cid => next.add(cid)));
+                        setCollapsedNodes(next);
+                      }}
+                      title="Collapse all projects to top-level tasks"
+                      style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+                    >
+                      ⊖ Collapse All
                     </button>
                     <button
                       onClick={() => setCollapsedNodes(new Set())}
