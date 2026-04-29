@@ -10,7 +10,7 @@ const COLORS = {
   waiting: "#d4845a", waitingBg: "#2a1e14",
   someday: "#9a8ad4", somedayBg: "#1e1a2a",
   effort: "#6ec6a8", effortBg: "#152520",
-  scheduled: "#c87ee0", scheduledBg: "#1e1428",
+  deferred: "#c87ee0", deferredBg: "#1e1428",
   done: "#5a5c58",
 };
 
@@ -20,7 +20,7 @@ const BUCKETS = {
   project:      { label: "📁 Projects",        desc: "Anything requiring more than one step",        color: COLORS.project },
   waiting:      { label: "⏳ Waiting For",     desc: "Delegated — ball in someone else's court",     color: COLORS.waiting },
   someday:      { label: "💭 Someday / Maybe", desc: "Ideas and aspirations, not commitments",       color: COLORS.someday },
-  scheduled:    { label: "⏰ Deferred",          desc: "Deferred tasks waiting for their wake date",  color: COLORS.scheduled },
+  deferred:     { label: "⏰ Deferred",          desc: "Deferred tasks waiting for their wake date",  color: COLORS.deferred },
   done:         { label: "✅ Completed",        desc: "Finished tasks",                              color: COLORS.done },
   inboxHistory: { label: "📋 Inbox History",   desc: "Processed inbox items — archived for reference", color: COLORS.muted },
 };
@@ -1015,12 +1015,12 @@ export default function GTDManager() {
     if (Array.isArray(data.efforts)) setEfforts(data.efforts);
   }, []);
 
-  // "scheduled" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
-  const bucketTasks = currentBucket === "scheduled"
+  // "deferred" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
+  const bucketTasks = currentBucket === "deferred"
     ? tasks.filter(t => isDeferred(t) && !t.done).sort((a, b) => (a.deferUntil > b.deferUntil ? 1 : -1))
     : tasks.filter(t => t.bucket === currentBucket);
   const counts = Object.fromEntries(Object.keys(BUCKETS).map(k =>
-    k === "scheduled"
+    k === "deferred"
       ? [k, tasks.filter(t => isDeferred(t) && !t.done).length]
       : [k, tasks.filter(t => t.bucket === k).length]
   ));
@@ -1175,7 +1175,7 @@ export default function GTDManager() {
                 )}
               </div>
 
-              {currentBucket === "scheduled" ? null : currentBucket === "project" ? (() => {
+              {currentBucket === "deferred" ? null : currentBucket === "project" ? (() => {
                 const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
                 const selectedProject = rootProjects.find(t => t.id === projectParentId);
                 const placeholder = projectParentId === "__new__"
@@ -1219,10 +1219,10 @@ export default function GTDManager() {
                     <Btn onClick={addAndProcess} style={{ fontSize: 12, borderColor: COLORS.inbox, color: COLORS.inbox }}>+ Add & Ask AI</Btn>
                   </div>
                   {deferredDupeWarning && (
-                    <div style={{ padding: "3px 16px 6px", fontSize: 11, color: COLORS.scheduled, display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ padding: "3px 16px 6px", fontSize: 11, color: COLORS.deferred, display: "flex", alignItems: "center", gap: 6 }}>
                       <span>⏰</span>
                       <span>Similar deferred task: <strong>"{deferredDupeWarning.text}"</strong> (wakes {deferredDupeWarning.deferUntil})</span>
-                      <button onClick={() => setCurrentBucket("scheduled")} style={{ background: "none", border: "none", color: COLORS.scheduled, cursor: "pointer", fontFamily: "inherit", fontSize: 11, padding: "0 2px", textDecoration: "underline" }}>View it</button>
+                      <button onClick={() => setCurrentBucket("deferred")} style={{ background: "none", border: "none", color: COLORS.deferred, cursor: "pointer", fontFamily: "inherit", fontSize: 11, padding: "0 2px", textDecoration: "underline" }}>View it</button>
                     </div>
                   )}
                 </>
@@ -1304,9 +1304,9 @@ export default function GTDManager() {
                       </div>
                     );
                   });
-                })() : currentBucket === "scheduled" ? (
+                })() : currentBucket === "deferred" ? (
                   bucketTasks.length === 0 ? (
-                    <EmptyState bucket="scheduled" />
+                    <EmptyState bucket="deferred" />
                   ) : (
                     <div>
                       <div style={{ padding: "6px 18px 4px", fontSize: 11, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
@@ -1620,7 +1620,7 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
               <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, flexShrink: 0 }}>⏱ {projectEffortTotal}</span>
             )}
             {deferred && currentBucket === "project" && (
-              <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.scheduledBg, color: COLORS.scheduled, border: `1px solid ${COLORS.scheduled}44`, flexShrink: 0 }}>⏰ {task.deferUntil}</span>
+              <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44`, flexShrink: 0 }}>⏰ {task.deferUntil}</span>
             )}
           </div>
           {/* Metadata summary chips — below-text mode */}
@@ -1639,7 +1639,7 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
                 <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44` }}>⏱ {taskEffort}</span>
               )}
               {task.deferUntil && (
-                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.scheduledBg, color: COLORS.scheduled, border: `1px solid ${COLORS.scheduled}44` }}>⏰ {task.deferUntil}</span>
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44` }}>⏰ {task.deferUntil}</span>
               )}
             </div>
           )}
@@ -1672,7 +1672,7 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
               <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, whiteSpace: "nowrap" }}>⏱ {taskEffort}</span>
             )}
             {task.deferUntil && (
-              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.scheduledBg, color: COLORS.scheduled, border: `1px solid ${COLORS.scheduled}44`, whiteSpace: "nowrap" }}>⏰ {task.deferUntil}</span>
+              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44`, whiteSpace: "nowrap" }}>⏰ {task.deferUntil}</span>
             )}
           </div>
         )}
@@ -1799,7 +1799,7 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
                 type="date"
                 value={task.deferUntil || ""}
                 onChange={e => onUpdateTask(task.id, { deferUntil: e.target.value || null })}
-                style={{ background: COLORS.surface3, border: `1px solid ${task.deferUntil ? COLORS.scheduled : COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
+                style={{ background: COLORS.surface3, border: `1px solid ${task.deferUntil ? COLORS.deferred : COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
               />
               {task.deferUntil && (
                 <button
@@ -1825,14 +1825,14 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
                     <button
                       key={label}
                       onClick={() => onUpdateTask(task.id, { deferUntil: active ? null : d })}
-                      style={{ padding: "2px 8px", borderRadius: 8, border: `1px solid ${active ? COLORS.scheduled : COLORS.border}`, background: active ? COLORS.scheduled + "22" : "transparent", color: active ? COLORS.scheduled : COLORS.text2, fontFamily: "inherit", fontSize: 10, cursor: "pointer", transition: "all 0.1s" }}
+                      style={{ padding: "2px 8px", borderRadius: 8, border: `1px solid ${active ? COLORS.deferred : COLORS.border}`, background: active ? COLORS.deferred + "22" : "transparent", color: active ? COLORS.deferred : COLORS.text2, fontFamily: "inherit", fontSize: 10, cursor: "pointer", transition: "all 0.1s" }}
                     >{label}</button>
                   );
                 })}
               </div>
             )}
             {deferred && (
-              <div style={{ marginTop: 5, fontSize: 11, color: COLORS.scheduled, opacity: 0.85 }}>
+              <div style={{ marginTop: 5, fontSize: 11, color: COLORS.deferred, opacity: 0.85 }}>
                 ⏰ Hidden from active views until {task.deferUntil}
               </div>
             )}
@@ -2629,7 +2629,7 @@ function EmptyState({ bucket }) {
     project:   ["No projects", "Multi-step goals go here."],
     waiting:   ["Nothing waiting", "Track delegated items here."],
     someday:   ["No someday items", "Capture future ideas without committing to them."],
-    scheduled: ["No deferred tasks", "Open any task's chevron → set a 'Defer Until' date to hide it until you need it."],
+    deferred:  ["No deferred tasks", "Open any task's chevron → set a 'Defer Until' date to hide it until you need it."],
     done:      ["Nothing completed yet", "Complete tasks and they'll appear here."],
   };
   const [title, sub] = msgs[bucket] || ["Empty", ""];
