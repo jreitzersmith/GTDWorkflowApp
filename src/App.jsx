@@ -202,18 +202,26 @@ function groupByField(taskList, field, allTasks = []) {
   return sorted;
 }
 
-// Converts a human effort string (e.g. "2 hours", "3 days") to minutes.
+// Converts a human effort string (e.g. "2 hours", "3 days", "30m", "1h") to minutes.
+// Handles both long-form ("30 min", "2 hours") and compact abbreviations ("30m", "2h", "1d", "1w", "1mo").
 // Returns 0 for unrecognised strings so sums degrade gracefully.
 function effortToMinutes(str) {
   if (!str) return 0;
   const s = str.toLowerCase().trim();
   const num = parseFloat(s);
   if (isNaN(num) || num <= 0) return 0;
+  // Long-form checks first (order matters: "month" before "m", "week" before "w", etc.)
   if (s.includes("month")) return Math.round(num * 9600); // ~4 w × 5 d × 8 h
   if (s.includes("week"))  return Math.round(num * 2400); // 5 d × 8 h
   if (s.includes("day"))   return Math.round(num * 480);  // 8 h
   if (s.includes("hour"))  return Math.round(num * 60);
   if (s.includes("min"))   return Math.round(num);
+  // Compact abbreviations (e.g. "30m", "1h", "2d", "1w", "1mo")
+  if (/^\d+(\.\d+)?mo$/.test(s)) return Math.round(num * 9600);
+  if (/^\d+(\.\d+)?w$/.test(s))  return Math.round(num * 2400);
+  if (/^\d+(\.\d+)?d$/.test(s))  return Math.round(num * 480);
+  if (/^\d+(\.\d+)?h$/.test(s))  return Math.round(num * 60);
+  if (/^\d+(\.\d+)?m$/.test(s))  return Math.round(num);
   return 0;
 }
 
@@ -225,6 +233,20 @@ function minutesToEffortLabel(minutes) {
   if (minutes < 2400) return `${+((minutes / 480).toFixed(1))}d`;
   if (minutes < 9600) return `${+((minutes / 2400).toFixed(1))}w`;
   return `${+((minutes / 9600).toFixed(1))}mo`;
+}
+
+// Recursively sums the effort of a task and all its descendants (via childIds).
+// Used to compute the total effort shown on top-level project rows.
+function sumDescendantEffort(taskId, allTasks, visited = new Set()) {
+  if (visited.has(taskId)) return 0; // guard against cycles
+  visited.add(taskId);
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task) return 0;
+  const own = effortToMinutes(task.effort);
+  const childTotal = (task.childIds || []).reduce(
+    (sum, cid) => sum + sumDescendantEffort(cid, allTasks, visited), 0
+  );
+  return own + childTotal;
 }
 
 // Parses the →SUGGESTIONS: / ->SUGGESTIONS: block from a projectReview AI reply.
@@ -368,6 +390,8 @@ export default function GTDManager() {
   const [showSettings, setShowSettings] = useState(false);
   const [nextGroupBy, setNextGroupBy] = useState("none");
   const [projectParentId, setProjectParentId] = useState("__new__");
+  // Set of task IDs whose children are currently hidden in the Projects view.
+  const [collapsedNodes, setCollapsedNodes] = useState(new Set());
   const [dragId,             setDragId]             = useState(null);
   const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
   const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
@@ -835,6 +859,30 @@ export default function GTDManager() {
 
   const deleteTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
   const completeTask = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox" } : t));
+  // Toggle collapse for a single node (subtask level: hides its children).
+  const toggleCollapse = useCallback((id) => {
+    setCollapsedNodes(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Toggle collapse for an array of child IDs (project level: fold/unfold to next level).
+  // If all children are already collapsed, expands them; otherwise collapses all.
+  const toggleCollapseLevel = useCallback((childIds) => {
+    setCollapsedNodes(prev => {
+      const allCollapsed = childIds.length > 0 && childIds.every(id => prev.has(id));
+      const next = new Set(prev);
+      if (allCollapsed) {
+        childIds.forEach(id => next.delete(id));
+      } else {
+        childIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  }, []);
+
   // Assign a Next Action (no parentId) to an existing or new project
   const assignToProject = useCallback((taskId, projectId, newProjectName) => {
     if (newProjectName) {
@@ -1043,13 +1091,35 @@ export default function GTDManager() {
                   <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{BUCKETS[currentBucket].desc}</div>
                 </div>
                 {currentBucket === "project" && (
-                  <button
-                    onClick={startProjectReview}
-                    disabled={loading}
-                    style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${COLORS.project}55`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.5 : 1, flexShrink: 0, display: "flex", alignItems: "center", gap: 5 }}
-                  >
-                    🔍 Review Projects
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <button
+                      onClick={() => {
+                        // Collapse all root projects to "next level" view: collapse every direct child.
+                        const next = new Set();
+                        tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done)
+                          .forEach(p => (p.childIds || []).forEach(cid => next.add(cid)));
+                        setCollapsedNodes(next);
+                      }}
+                      title="Collapse all projects to top-level tasks"
+                      style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+                    >
+                      ⊖ Collapse All
+                    </button>
+                    <button
+                      onClick={() => setCollapsedNodes(new Set())}
+                      title="Expand all projects fully"
+                      style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+                    >
+                      ⊕ Expand All
+                    </button>
+                    <button
+                      onClick={startProjectReview}
+                      disabled={loading}
+                      style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${COLORS.project}55`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.5 : 1, flexShrink: 0, display: "flex", alignItems: "center", gap: 5 }}
+                    >
+                      🔍 Review Projects
+                    </button>
+                  </div>
                 )}
                 {currentBucket === "next" && (
                   <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
@@ -1161,6 +1231,9 @@ export default function GTDManager() {
                         efforts,
                         onAssignToProject: assignToProject,
                         tagDisplay,
+                        collapsedNodes,
+                        onToggleCollapse: toggleCollapse,
+                        onToggleCollapseLevel: toggleCollapseLevel,
                       }}
                     />
                   </div>
@@ -1186,7 +1259,8 @@ export default function GTDManager() {
                   }
                   return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => {
                     const groupMin = items.reduce((sum, t) => sum + effortToMinutes(t.effort), 0);
-                    const groupEffortLabel = minutesToEffortLabel(groupMin);
+                    // Always show the effort chip for every group — use "0m" when no tasks have effort set.
+                    const groupEffortLabel = minutesToEffortLabel(groupMin) || "0m";
                     return (
                       <div key={key}>
                         <GroupDivider label={label} count={items.length} effortTotal={groupEffortLabel} isUngrouped={key === "__ungrouped__"} />
@@ -1364,7 +1438,7 @@ function Btn({ children, onClick, style = {} }) {
 
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, tagDisplay, indentOverride }) {
+function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, tagDisplay, indentOverride, depth = 0, collapsedNodes, onToggleCollapse, onToggleCollapseLevel }) {
   const [hover, setHover] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
@@ -1383,14 +1457,33 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
   const taskEffort   = task.effort   || null;
   const deferred     = isDeferred(task);
 
-  // Computed effort total for project-bucket rows (sum of direct subtask efforts).
+  // Collapse toggle — only relevant in the project view for tasks that have children.
+  const childIds = task.childIds || [];
+  const hasChildren = currentBucket === "project" && childIds.length > 0;
+  // Root projects (depth=0): collapsed when ALL direct children are in collapsedNodes.
+  // Subtasks (depth>0): collapsed when the task's own ID is in collapsedNodes.
+  const isCollapsed = hasChildren && (
+    depth === 0
+      ? childIds.every(cid => collapsedNodes?.has(cid))
+      : !!(collapsedNodes?.has(task.id))
+  );
+  const handleCollapseToggle = (e) => {
+    e.stopPropagation();
+    if (!hasChildren) return;
+    if (depth === 0) {
+      onToggleCollapseLevel?.(childIds);
+    } else {
+      onToggleCollapse?.(task.id);
+    }
+  };
+
+  // Computed effort total for project-bucket rows (recursive sum across all descendants).
   const projectEffortTotal = (() => {
     if (task.bucket !== "project" || currentBucket !== "project") return null;
-    const children = (task.childIds || [])
-      .map(id => (allTasks || []).find(t => t.id === id))
-      .filter(Boolean);
-    if (!children.length) return null;
-    const totalMin = children.reduce((sum, c) => sum + effortToMinutes(c.effort), 0);
+    if (!(task.childIds || []).length) return null;
+    const totalMin = (task.childIds || []).reduce(
+      (sum, cid) => sum + sumDescendantEffort(cid, allTasks || []), 0
+    );
     return minutesToEffortLabel(totalMin);
   })();
 
@@ -1444,6 +1537,20 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
         {isSubtask && <span style={{ color: COLORS.project, fontSize: 10, marginTop: 3, flexShrink: 0 }}>↳</span>}
         {currentBucket === "project" && (
           <span style={{ color: COLORS.muted, fontSize: 12, marginTop: 1, flexShrink: 0, cursor: "grab", userSelect: "none", opacity: hover ? 0.6 : 0, transition: "opacity 0.1s", lineHeight: 1 }}>⠿</span>
+        )}
+        {/* Collapse / expand toggle — shown only for tasks with children in the project view */}
+        {hasChildren && (
+          <button
+            onClick={handleCollapseToggle}
+            title={isCollapsed ? "Expand" : "Collapse"}
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: COLORS.project, fontSize: 11, flexShrink: 0, marginTop: 2, lineHeight: 1, opacity: hover ? 1 : 0.45, transition: "opacity 0.1s", width: 14, textAlign: "center" }}
+          >
+            {isCollapsed ? "▸" : "▾"}
+          </button>
+        )}
+        {/* Spacer to keep alignment for rows without children */}
+        {!hasChildren && currentBucket === "project" && (
+          <span style={{ width: 14, flexShrink: 0 }} />
         )}
         <div
           onClick={() => onComplete(task.id)}
@@ -2418,24 +2525,26 @@ function ProjectTree({ parentId, depth, allTasks, dragId, dropTarget, onDragStar
                 task={task}
                 isSubtask={depth > 0}
                 indentOverride={depth * 22}
+                depth={depth}
                 {...rowProps}
               />
             </div>
 
-            {/* Recurse into children before showing the "after" indicator so the
-                drop line appears below all descendants, at the correct level. */}
-            <ProjectTree
-              parentId={task.id}
-              depth={depth + 1}
-              allTasks={allTasks}
-              dragId={dragId}
-              dropTarget={dropTarget}
-              onDragStart={onDragStart}
-              onDragOver={onDragOver}
-              onDragEnd={onDragEnd}
-              onDrop={onDrop}
-              rowProps={rowProps}
-            />
+            {/* Recurse into children — skipped when this node is collapsed. */}
+            {!rowProps.collapsedNodes?.has(task.id) && (
+              <ProjectTree
+                parentId={task.id}
+                depth={depth + 1}
+                allTasks={allTasks}
+                dragId={dragId}
+                dropTarget={dropTarget}
+                onDragStart={onDragStart}
+                onDragOver={onDragOver}
+                onDragEnd={onDragEnd}
+                onDrop={onDrop}
+                rowProps={rowProps}
+              />
+            )}
 
             {isTarget && dt.position === "after" && <DropLine depth={depth} />}
           </div>
