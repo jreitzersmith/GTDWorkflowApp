@@ -754,7 +754,7 @@ export default function GTDManager() {
     } finally {
       setLoading(false);
     }
-  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, updateTask]);
+  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
