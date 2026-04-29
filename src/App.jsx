@@ -579,6 +579,7 @@ export default function GTDManager() {
   // ID of the task whose detail panel is currently open (null = closed).
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [actualEffortPrompt, setActualEffortPrompt] = useState(null); // { taskId, taskText, estimatedEffort }
+  const [pendingRollup, setPendingRollup] = useState(null);           // { taskId, taskText, notes, rootProjectId, rootProjectText }
   const [dragId,             setDragId]             = useState(null);
   const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
   const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
@@ -1091,19 +1092,77 @@ export default function GTDManager() {
 
   const deleteTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
 
+  // Walk up parentId chain to find the root ancestor (the top-level project task).
+  const findRootProject = useCallback((parentId) => {
+    const visited = new Set();
+    let current = tasks.find(t => t.id === parentId);
+    while (current && current.parentId && !visited.has(current.id)) {
+      visited.add(current.id);
+      current = tasks.find(t => t.id === current.parentId);
+    }
+    return current || null;
+  }, [tasks]);
+
   const completeTask = useCallback((id) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
-    // When marking done: if task has an effort estimate but no actual effort recorded, show prompt
-    if (!task.done && task.effort && !task.actualEffort) {
-      setActualEffortPrompt({ taskId: id, taskText: task.text, estimatedEffort: task.effort });
-      return;
+
+    // When marking DONE (not un-doing):
+    if (!task.done) {
+      // 1. Roll-up prompt: subtask with notes gets a chance to append to root project
+      if (task.notes && task.parentId) {
+        const root = findRootProject(task.parentId);
+        if (root) {
+          setPendingRollup({ taskId: id, taskText: task.text, notes: task.notes, rootProjectId: root.id, rootProjectText: root.text });
+          return;
+        }
+      }
+      // 2. Effort prompt: task has estimate but no recorded actual time
+      if (task.effort && !task.actualEffort) {
+        setActualEffortPrompt({ taskId: id, taskText: task.text, estimatedEffort: task.effort });
+        return;
+      }
     }
+
     setTasks(prev => prev.map(t => t.id === id
       ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox", ...(t.done ? { actualEffort: null } : {}) }
       : t
     ));
+  }, [tasks, findRootProject]);
+
+  // After roll-up decision, check if effort prompt is also needed, then complete the task.
+  const finishComplete = useCallback((taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task && task.effort && !task.actualEffort) {
+      setActualEffortPrompt({ taskId, taskText: task.text, estimatedEffort: task.effort });
+    } else {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, done: true, bucket: "done" } : t));
+    }
   }, [tasks]);
+
+  const handleRollupConfirm = useCallback(() => {
+    if (!pendingRollup) return;
+    const { taskId, taskText, notes, rootProjectId } = pendingRollup;
+    // Build the stamped block and append to root project notes
+    const d = new Date();
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const dateLabel = `${months[d.getMonth()]} ${d.getDate()}`;
+    const stamp = `\u2713 ${taskText} (${dateLabel}):\n${notes}`;
+    setTasks(prev => prev.map(t => {
+      if (t.id !== rootProjectId) return t;
+      const existing = t.notes ? t.notes.trim() : "";
+      return { ...t, notes: existing ? `${existing}\n\n---\n${stamp}` : stamp };
+    }));
+    setPendingRollup(null);
+    finishComplete(taskId);
+  }, [pendingRollup, finishComplete]);
+
+  const handleRollupSkip = useCallback(() => {
+    if (!pendingRollup) return;
+    const { taskId } = pendingRollup;
+    setPendingRollup(null);
+    finishComplete(taskId);
+  }, [pendingRollup, finishComplete]);
 
   const handleActualEffortSave = useCallback((actualEffort) => {
     if (!actualEffortPrompt) return;
@@ -1797,6 +1856,17 @@ export default function GTDManager() {
         })()}
       </div>{/* end main */}
 
+      {/* Note roll-up prompt — shown when completing a subtask that has notes */}
+      {pendingRollup && (
+        <NoteRollupPrompt
+          taskText={pendingRollup.taskText}
+          notes={pendingRollup.notes}
+          rootProjectText={pendingRollup.rootProjectText}
+          onConfirm={handleRollupConfirm}
+          onSkip={handleRollupSkip}
+        />
+      )}
+
       {/* Actual effort prompt — modal overlay shown when completing a task with an estimate */}
       {actualEffortPrompt && (
         <ActualEffortPrompt
@@ -2401,6 +2471,38 @@ function PendingActionBar({ action, onConfirm, onDismiss }) {
         <button onClick={onDismiss} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>
           Skip
         </button>
+      </div>
+    </div>
+  );
+}
+
+function NoteRollupPrompt({ taskText, notes, rootProjectText, onConfirm, onSkip }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
+      <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border2}`, borderRadius: 12, padding: "22px 26px", maxWidth: 400, width: "90%", display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.project }}>📋 Roll up notes?</div>
+        <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.6 }}>
+          <span style={{ color: COLORS.text, fontWeight: 500 }}>&#8220;{taskText}&#8221;</span> has notes.
+          Add them to the project <span style={{ color: COLORS.text, fontWeight: 500 }}>&#8220;{rootProjectText}&#8221;</span>?
+        </div>
+        <div style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "9px 11px", fontSize: 12, color: COLORS.text2, lineHeight: 1.6, maxHeight: 120, overflowY: "auto", whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
+          {notes}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            autoFocus
+            onClick={onConfirm}
+            style={{ flex: 1, padding: "8px 14px", borderRadius: 7, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 13, cursor: "pointer", fontWeight: 600 }}
+          >
+            Add to project notes
+          </button>
+          <button
+            onClick={onSkip}
+            style={{ padding: "8px 14px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+          >
+            Skip
+          </button>
+        </div>
       </div>
     </div>
   );
