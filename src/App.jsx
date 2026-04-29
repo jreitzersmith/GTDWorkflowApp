@@ -1106,6 +1106,19 @@ export default function GTDManager() {
                       ⊖ Collapse All
                     </button>
                     <button
+                      onClick={() => {
+                        // Projects only: add every root project's own ID so its children are hidden.
+                        const next = new Set();
+                        tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done)
+                          .forEach(p => next.add(p.id));
+                        setCollapsedNodes(next);
+                      }}
+                      title="Show project names only"
+                      style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+                    >
+                      ≡ Projects Only
+                    </button>
+                    <button
                       onClick={() => setCollapsedNodes(new Set())}
                       title="Expand all projects fully"
                       style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
@@ -1460,18 +1473,25 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
   // Collapse toggle — only relevant in the project view for tasks that have children.
   const childIds = task.childIds || [];
   const hasChildren = currentBucket === "project" && childIds.length > 0;
-  // Root projects (depth=0): collapsed when ALL direct children are in collapsedNodes.
+  // Root projects (depth=0): collapsed when the project's own ID is in collapsedNodes
+  // ("projects only" mode) OR when all direct children are collapsed ("next level" mode).
   // Subtasks (depth>0): collapsed when the task's own ID is in collapsedNodes.
   const isCollapsed = hasChildren && (
     depth === 0
-      ? childIds.every(cid => collapsedNodes?.has(cid))
+      ? !!(collapsedNodes?.has(task.id)) || childIds.every(cid => collapsedNodes?.has(cid))
       : !!(collapsedNodes?.has(task.id))
   );
   const handleCollapseToggle = (e) => {
     e.stopPropagation();
     if (!hasChildren) return;
     if (depth === 0) {
-      onToggleCollapseLevel?.(childIds);
+      if (collapsedNodes?.has(task.id)) {
+        // "Projects only" state — clicking expands fully (removes the project's own ID).
+        onToggleCollapse?.(task.id);
+      } else {
+        // Expanded or "next level" state — toggle direct children.
+        onToggleCollapseLevel?.(childIds);
+      }
     } else {
       onToggleCollapse?.(task.id);
     }
