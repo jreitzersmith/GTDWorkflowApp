@@ -904,6 +904,45 @@ export default function GTDManager() {
     });
   }, []);
 
+  // Move a task to a different project, or make it standalone (newProjectId === null).
+  // Handles: removing from old parent's childIds, adding to new parent's childIds,
+  // and guards against circular references (can't assign a task to one of its own descendants).
+  const reassignProject = useCallback((taskId, newProjectId) => {
+    setTasks(prev => {
+      const task = prev.find(t => t.id === taskId);
+      if (!task) return prev;
+      const oldProjectId = task.parentId || null;
+      if (oldProjectId === newProjectId) return prev; // no-op
+
+      // Guard: prevent circular reference — don't allow assigning to a descendant.
+      if (newProjectId) {
+        function isDescendant(ancestorId, nodeId, seen = new Set()) {
+          if (seen.has(nodeId) || !nodeId) return false;
+          seen.add(nodeId);
+          const node = prev.find(t => t.id === nodeId);
+          if (!node) return false;
+          return (node.childIds || []).some(cid => cid === ancestorId || isDescendant(ancestorId, cid, seen));
+        }
+        if (isDescendant(taskId, newProjectId)) return prev;
+      }
+
+      return prev.map(t => {
+        // Update the task itself
+        if (t.id === taskId) return { ...t, parentId: newProjectId || null };
+        // Remove from old parent's childIds
+        if (oldProjectId && t.id === oldProjectId) {
+          return { ...t, childIds: (t.childIds || []).filter(id => id !== taskId) };
+        }
+        // Add to new parent's childIds (avoid duplicates)
+        if (newProjectId && t.id === newProjectId) {
+          const existing = t.childIds || [];
+          return existing.includes(taskId) ? t : { ...t, childIds: [...existing, taskId] };
+        }
+        return t;
+      });
+    });
+  }, []);
+
   // Assign a Next Action (no parentId) to an existing or new project
   const assignToProject = useCallback((taskId, projectId, newProjectName) => {
     if (newProjectName) {
@@ -1448,6 +1487,7 @@ export default function GTDManager() {
               onUpdate={(id, changes) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t))}
               onComplete={(id) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, done: true, bucket: "done" } : t)); setSelectedTaskId(null); }}
               onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
+              onReassignProject={reassignProject}
               onClose={() => setSelectedTaskId(null)}
               style={s.detailPanel}
             />
@@ -2684,7 +2724,7 @@ function EmptyState({ bucket }) {
 // ---------------------------------------------------------------------------
 // TaskDetailPanel — side panel showing full task detail + notes editor
 // ---------------------------------------------------------------------------
-function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onComplete, onDelete, onClose, style }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onComplete, onDelete, onReassignProject, onClose, style }) {
   const [titleDraft, setTitleDraft] = useState(task.text);
   const [notesDraft, setNotesDraft] = useState(task.notes || "");
 
@@ -2713,6 +2753,20 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
   const parentProject = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
   const bucketColor = BUCKETS[task.bucket]?.color || COLORS.muted;
   const bucketLabel = BUCKETS[task.bucket]?.label || task.bucket;
+
+  // Build the list of projects the task can be assigned to.
+  // Excludes: the task itself, and any of its descendants (would create a cycle).
+  const getDescendantIds = (taskId, tasks, seen = new Set()) => {
+    if (seen.has(taskId)) return seen;
+    seen.add(taskId);
+    const t = tasks.find(x => x.id === taskId);
+    (t?.childIds || []).forEach(cid => getDescendantIds(cid, tasks, seen));
+    return seen;
+  };
+  const excludedIds = getDescendantIds(task.id, allTasks);
+  const eligibleProjects = allTasks.filter(
+    t => t.bucket === "project" && !excludedIds.has(t.id)
+  );
 
   const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
   const fieldInput = { width: "100%", background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", boxSizing: "border-box" };
@@ -2766,13 +2820,20 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
 
-          {/* Parent project */}
-          {parentProject && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Project</span>
-              <span style={{ color: COLORS.project }}>{parentProject.text}</span>
-            </div>
-          )}
+          {/* Parent project — dropdown allows moving to another project or going standalone */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Project</span>
+            <select
+              value={task.parentId || ""}
+              onChange={e => onReassignProject(task.id, e.target.value || null)}
+              style={{ ...fieldInput, flex: 1, fontSize: 12, color: task.parentId ? COLORS.project : COLORS.muted }}
+            >
+              <option value="">— Standalone</option>
+              {eligibleProjects.map(p => (
+                <option key={p.id} value={p.id}>{p.text}</option>
+              ))}
+            </select>
+          </div>
 
           {/* Due date */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
@@ -2802,17 +2863,17 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             <select
               value={task.effort || ""}
               onChange={e => onUpdate(task.id, { effort: e.target.value || null })}
-              style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
+              style={{ ...fieldInput, width: 'auto', fontSize: 12, padding: '3px 6px' }}
             >
-              <option value="">—</option>
+              <option value=''>—</option>
               {(efforts || []).map(e => <option key={e} value={e}>{e}</option>)}
             </select>
           </div>
 
           {/* Location */}
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12 }}>
             <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, paddingTop: 2 }}>Location</span>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {(locations || []).map(loc => {
                 const active = (task.location || []).includes(loc);
                 return (
@@ -2822,7 +2883,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
                       const cur = task.location || [];
                       onUpdate(task.id, { location: active ? cur.filter(l => l !== loc) : [...cur, loc] });
                     }}
-                    style={{ padding: "2px 8px", borderRadius: 10, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + "22" : "transparent", color: active ? COLORS.project : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+                    style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + '22' : 'transparent', color: active ? COLORS.project : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
                   >{loc}</button>
                 );
               })}
@@ -2838,7 +2899,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             onChange={e => onUpdate(task.id, { bucket: e.target.value })}
             style={{ ...fieldInput, fontSize: 12 }}
           >
-            {Object.entries(BUCKETS).filter(([k]) => k !== "inboxHistory").map(([key, cfg]) => (
+            {Object.entries(BUCKETS).filter(([k]) => k !== 'inboxHistory').map(([key, cfg]) => (
               <option key={key} value={key}>{cfg.label}</option>
             ))}
           </select>
@@ -2846,14 +2907,14 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
       </div>
 
       {/* Footer actions */}
-      <div style={{ display: "flex", gap: 8, padding: "10px 14px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
         <button
           onClick={() => onComplete(task.id)}
-          style={{ flex: 1, padding: "6px 0", borderRadius: 7, border: `1px solid ${COLORS.next}`, background: "transparent", color: COLORS.next, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+          style={{ flex: 1, padding: '6px 0', borderRadius: 7, border: `1px solid ${COLORS.next}`, background: 'transparent', color: COLORS.next, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}
         >✓ Complete</button>
         <button
           onClick={() => { if (window.confirm(`Delete "${task.text}"?`)) onDelete(task.id); }}
-          style={{ flex: 1, padding: "6px 0", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+          style={{ flex: 1, padding: '6px 0', borderRadius: 7, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}
         >🗑 Delete</button>
       </div>
     </div>
