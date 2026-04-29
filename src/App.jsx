@@ -249,6 +249,24 @@ function sumDescendantEffort(taskId, allTasks, visited = new Set()) {
   return own + childTotal;
 }
 
+// Recursively counts all descendant tasks (via childIds).
+// Returns { total, incomplete } so callers can display either or both.
+function countDescendants(taskId, allTasks, visited = new Set()) {
+  if (visited.has(taskId)) return { total: 0, incomplete: 0 };
+  visited.add(taskId);
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task) return { total: 0, incomplete: 0 };
+  const own = { total: 1, incomplete: task.done ? 0 : 1 };
+  const childTotals = (task.childIds || []).reduce(
+    (acc, cid) => {
+      const c = countDescendants(cid, allTasks, visited);
+      return { total: acc.total + c.total, incomplete: acc.incomplete + c.incomplete };
+    },
+    { total: 0, incomplete: 0 }
+  );
+  return { total: own.total + childTotals.total, incomplete: own.incomplete + childTotals.incomplete };
+}
+
 // Parses the →SUGGESTIONS: / ->SUGGESTIONS: block from a projectReview AI reply.
 // Returns an array of suggestion strings, empty if none or block absent.
 function extractSuggestions(text) {
@@ -1507,6 +1525,17 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
     return minutesToEffortLabel(totalMin);
   })();
 
+  // Descendant task counts — shown as "incomplete / total" badge on rows with children.
+  const descendantCounts = hasChildren
+    ? (task.childIds || []).reduce(
+        (acc, cid) => {
+          const c = countDescendants(cid, allTasks || []);
+          return { total: acc.total + c.total, incomplete: acc.incomplete + c.incomplete };
+        },
+        { total: 0, incomplete: 0 }
+      )
+    : null;
+
   const togglePriority = (p) => {
     const next = taskPriority.includes(p) ? taskPriority.filter(x => x !== p) : [...taskPriority, p];
     onUpdateTask(task.id, { priority: next });
@@ -1582,6 +1611,11 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13.5, color: COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
             <span>{task.text}</span>
+            {descendantCounts && (
+              <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.surface3, color: COLORS.text2, border: `1px solid ${COLORS.border}`, flexShrink: 0, whiteSpace: "nowrap" }}>
+                ↓ {descendantCounts.incomplete} / {descendantCounts.total}
+              </span>
+            )}
             {projectEffortTotal && (
               <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, flexShrink: 0 }}>⏱ {projectEffortTotal}</span>
             )}
