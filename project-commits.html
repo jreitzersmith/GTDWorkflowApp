@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GTD Workflow App — Commit Log (Appendix B)</title>
+<style>
+  :root {
+    --bg:       #111210;
+    --surface:  #1a1c18;
+    --surface2: #222420;
+    --surface3: #2a2c28;
+    --border:   #333530;
+    --border2:  #404240;
+    --text:     #e8e4dc;
+    --text2:    #a8a49c;
+    --muted:    #5a5c58;
+    --inbox:    #e8c84a;
+    --next:     #5ab878;
+    --project:  #5a8fd4;
+    --waiting:  #d4845a;
+    --someday:  #9a8ad4;
+    --effort:   #6ec6a8;
+    --danger:   #d45a5a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; line-height: 1.7; }
+
+  /* ── Top nav bar ── */
+  .topnav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: var(--surface); border-bottom: 1px solid var(--border2);
+    height: 44px; display: flex; align-items: center; padding: 0 20px; gap: 16px;
+  }
+  .topnav .app-name { font-size: 12px; font-weight: 600; color: var(--text2); letter-spacing: .06em; text-transform: uppercase; margin-right: 8px; white-space: nowrap; }
+  .topnav .file-links { display: flex; gap: 4px; }
+  .topnav .file-links a, .topnav .file-links .current {
+    font-size: 12px; padding: 4px 12px; border-radius: 6px; text-decoration: none; white-space: nowrap;
+    border: 1px solid var(--border2); transition: background .15s;
+  }
+  .topnav .file-links a { color: var(--text2); background: transparent; }
+  .topnav .file-links a:hover { background: var(--surface2); color: var(--text); }
+  .topnav .file-links .current { color: var(--text); background: var(--project); border-color: var(--project); font-weight: 600; cursor: default; }
+  .topnav .updated { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  /* ── Layout ── */
+  .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; padding-top: 44px; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 20px 0; position: sticky; top: 44px; height: calc(100vh - 44px); overflow-y: auto;
+  }
+  .sidebar h2 { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 16px 6px; font-weight: 600; }
+  .sidebar .date-group { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; padding: 10px 16px 2px; }
+  .sidebar a { display: block; padding: 3px 16px 3px 24px; font-size: 11.5px; color: var(--text2); text-decoration: none; border-left: 2px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar a:hover { color: var(--text); background: var(--surface2); }
+
+  /* ── Main ── */
+  main { padding: 40px 60px; max-width: 840px; }
+  h1 { font-family: Georgia, serif; font-size: 28px; font-weight: 300; color: var(--text); margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 12px; margin-bottom: 36px; }
+  h2 { font-family: Georgia, serif; font-size: 18px; font-weight: 400; color: var(--text2); margin: 32px 0 16px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+  a { color: var(--project); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: "SF Mono","Fira Code","Consolas",monospace; font-size: 11.5px; background: var(--surface3); border: 1px solid var(--border2); padding: 1px 5px; border-radius: 3px; color: var(--effort); }
+
+  /* ── Commit entries ── */
+  .commit-entry {
+    scroll-margin-top: 60px;
+    border-left: 3px solid var(--border2);
+    padding: 14px 0 14px 20px;
+    margin-bottom: 6px;
+    transition: border-color .15s;
+  }
+  .commit-entry:hover { border-left-color: var(--project); }
+  .commit-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .commit-hash { font-family: monospace; font-size: 11px; background: var(--surface3); border: 1px solid var(--border2); color: var(--muted); padding: 1px 7px; border-radius: 4px; }
+  .commit-date { font-size: 11px; color: var(--muted); }
+  .commit-type { font-size: 10px; padding: 1px 8px; border-radius: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .type-feat    { background: #182418; border: 1px solid #5ab87844; color: var(--next); }
+  .type-fix     { background: #2a1818; border: 1px solid var(--danger); color: var(--danger); }
+  .type-refactor{ background: #1e1a2a; border: 1px solid #9a8ad444; color: var(--someday); }
+  .type-ui      { background: #2a2618; border: 1px solid #e8c84a44; color: var(--inbox); }
+  .type-chore   { background: #182020; border: 1px solid #6ec6a844; color: var(--effort); }
+  .type-docs    { background: #181e2a; border: 1px solid #5a8fd444; color: var(--project); }
+
+  .commit-msg { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .commit-body { color: var(--text2); font-size: 13px; line-height: 1.65; margin-bottom: 8px; }
+  .commit-lesson {
+    background: var(--surface2); border: 1px solid var(--border); border-left: 3px solid var(--someday);
+    border-radius: 0 6px 6px 0; padding: 8px 12px; font-size: 12px; color: var(--text2); margin-bottom: 8px;
+  }
+  .commit-lesson strong { color: var(--someday); }
+  .commit-back { font-size: 11px; color: var(--muted); }
+  .commit-back a { color: var(--muted); font-size: 11px; }
+  .commit-back a:hover { color: var(--text2); text-decoration: underline; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+</style>
+</head>
+<body>
+
+<!-- ══ TOP NAV ══ -->
+<header class="topnav">
+  <span class="app-name">GTD Workflow App</span>
+  <div class="file-links">
+    <a href="project-summary.html">📄 Feature Summary</a>
+    <a href="project-snippets.html">📝 Code Snippets</a>
+    <span class="current">📦 Commit Log</span>
+  </div>
+  <span class="updated">Last updated: 2026-04-29 (10 new commits)</span>
+</header>
+
+<div class="shell">
+
+<!-- ══ SIDEBAR ══ -->
+<nav class="sidebar">
+  <h2>All Commits</h2>
+  <div class="date-group">April 24</div>
+  <a href="#commit-058bedd">058bedd · Initial commit</a>
+  <a href="#commit-81d5059">81d5059 · Vite scaffold</a>
+  <a href="#commit-28e0c25">28e0c25 · Open WebUI provider</a>
+  <a href="#commit-8d73f4c">8d73f4c · Smart inbox</a>
+  <a href="#commit-5cde89e">5cde89e · Phase 1: metadata panel</a>
+  <a href="#commit-6c37280">6c37280 · Phase 2: locations</a>
+  <a href="#commit-68ef357">68ef357 · Phase 3: waterfall</a>
+  <a href="#commit-ffc7764">ffc7764 · Phase 4: project add</a>
+  <a href="#commit-186bf3e">186bf3e · Phase 5: drag-and-drop</a>
+  <a href="#commit-879e53a">879e53a · Phase 6: AI review</a>
+  <a href="#commit-053cffd">053cffd · Project group-by</a>
+  <a href="#commit-61b3b06">61b3b06 · Effort field</a>
+  <a href="#commit-f98d445">f98d445 · Effort totals + assign</a>
+  <a href="#commit-4de6b06">4de6b06 · Effort group-by</a>
+  <a href="#commit-6f2abf9">6f2abf9 · Tag display mode</a>
+  <a href="#commit-988d26a">988d26a · Inline title edit</a>
+  <div class="date-group">April 27</div>
+  <a href="#commit-10df3a1">10df3a1 · Deferred tasks</a>
+  <div class="date-group">April 28</div>
+  <a href="#commit-8967d79">8967d79 · deferUntil cascade</a>
+  <a href="#commit-9b02952">9b02952 · Fix review button</a>
+  <a href="#commit-c917318">c917318 · Review mode select</a>
+  <a href="#commit-082a7e1">082a7e1 · Fix white screen</a>
+  <a href="#commit-b889c8e">b889c8e · Collapsible tree</a>
+  <a href="#commit-8f9b157">8f9b157 · Projects Only view</a>
+  <div class="date-group">April 29</div>
+  <a href="#commit-94813ac">94813ac · Descendant badge</a>
+  <a href="#commit-25fb6f1">25fb6f1 · Rename Deferred</a>
+  <a href="#commit-829acef">829acef · Rename refactor</a>
+  <a href="#commit-1bb1bfc">1bb1bfc · Toolbar order</a>
+  <a href="#commit-2c2d21e">2c2d21e · Task detail panel</a>
+  <a href="#commit-6a1db87">6a1db87 · CLAUDE.md rewrite</a>
+  <a href="#commit-f7666ec">f7666ec · Detail panel height</a>
+  <a href="#commit-9000fb5">9000fb5 · Project reassign</a>
+  <a href="#commit-450857c">450857c · Resizable panels</a>
+  <a href="#commit-66af510">66af510 · Launch script</a>
+</nav>
+
+<!-- ══ MAIN ══ -->
+<main>
+<h1>Git Commit Log</h1>
+<div class="subtitle">Appendix B · 33 commits on <code>main</code> · C:\Programming_Projects\GTDWorkflowApp · Oldest first</div>
+
+<h2>April 24 — Project Bootstrap &amp; Core Features</h2>
+
+<!-- 058bedd -->
+<div class="commit-entry" id="commit-058bedd">
+  <div class="commit-top">
+    <span class="commit-hash">058bedd</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Initial commit: GTD Manager React app with AI Coach</div>
+  <div class="commit-body">
+    The starting point of the entire project. A single file — <code>src/App.jsx</code> — containing a working GTD task manager with five buckets (Inbox, Next Actions, Projects, Waiting For, Someday/Maybe), a task list, and an AI Coach panel connected to the Anthropic Claude API. Tasks are stored in the browser's <code>localStorage</code>, so they survive page refreshes. The app was initially written to run as a Claude Artifact (a self-contained React demo inside the Claude chat interface), so it had no build tooling yet.
+  </div>
+  <div class="commit-lesson"><strong>React concept introduced — Components:</strong> Think of a React component like a shell function that returns HTML. The entire app starts as one big component called <code>GTDManager</code>. When you call it, it produces the full page UI. As the project grows, smaller components (<code>TaskRow</code>, <code>GroupDivider</code>, etc.) are split off — just like refactoring a monolithic script into sourced sub-scripts.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-foundation">↑ Feature: Foundation</a></div>
+</div>
+
+<!-- 81d5059 -->
+<div class="commit-entry" id="commit-81d5059">
+  <div class="commit-top">
+    <span class="commit-hash">81d5059</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Add Vite build setup and scaffold React entry point</div>
+  <div class="commit-body">
+    Moved the app from Artifact-only to a proper standalone project. Added <code>package.json</code> (Node's equivalent of a <code>requirements.txt</code> plus a <code>Makefile</code>), <code>vite.config.js</code> (the build tool config), <code>index.html</code> (the HTML shell), and <code>src/main.jsx</code> (the entry point that mounts the React app into the page). Added <code>.env.example</code> for the Anthropic API key and <code>launch.bat</code> for a one-click local startup on Windows. The critical new header <code>anthropic-dangerous-direct-browser-access: true</code> was added — Anthropic requires this when calling their API directly from a browser rather than from a server.
+  </div>
+  <div class="commit-lesson"><strong>React concept introduced — Vite &amp; npm:</strong> Vite is a development server and bundler. Think of it like Apache + a preprocessor. <code>npm run dev</code> starts a local web server on port 5173. <code>src/main.jsx</code> is equivalent to <code>index.php</code> or the entry point of a service — it's the file that bootstraps everything.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-foundation">↑ Feature: Foundation</a></div>
+</div>
+
+<!-- 28e0c25 -->
+<div class="commit-entry" id="commit-28e0c25">
+  <div class="commit-top">
+    <span class="commit-hash">28e0c25</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Add Open WebUI provider support with dynamic model switching</div>
+  <div class="commit-body">
+    Replaced the hardcoded <code>callClaude()</code> function with a provider-aware <code>callAI()</code> function. A dropdown in the coach panel header lets the user switch between <strong>Claude</strong> (Anthropic's cloud API) and <strong>Local</strong> (any Open WebUI instance on the local network). When "Local" is selected, the app automatically fetches the list of available models from <code>/api/models</code> and shows them in a live dropdown. Both <code>provider</code> and the chosen local model name are saved to <code>localStorage</code> so the choice persists across refreshes.
+  </div>
+  <div class="commit-lesson"><strong>React concept introduced — useState for UI toggles:</strong> <code>provider</code> is stored as React state (<code>useState("claude")</code>). When the user picks "Local", React automatically re-renders the relevant parts of the UI — the model dropdown appears. This is like setting an environment variable and having your shell script immediately react to it, except React handles the re-render automatically.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-provider">↑ Feature: Multi-Provider AI</a></div>
+</div>
+
+<!-- 8d73f4c -->
+<div class="commit-entry" id="commit-8d73f4c">
+  <div class="commit-top">
+    <span class="commit-hash">8d73f4c</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Smart inbox processing: auto-continue, project subtasks, parent links</div>
+  <div class="commit-body">
+    Major upgrade to the inbox processing flow. The AI now responds using a structured <code>→ACTION:type|title|nextAction</code> protocol — a machine-parseable tag appended to every reply. The <code>extractAction()</code> function parses this tag using a regular expression. Results are held in <code>pendingAction</code> state and shown in a confirmation bar before the user commits. On confirm, the original inbox item is archived to "Inbox History" (rather than deleted), and the app automatically feeds the next inbox item to the AI after a 300 ms delay.
+  </div>
+  <div class="commit-lesson"><strong>React concept introduced — useCallback:</strong> <code>handleConfirmMove</code> is wrapped in <code>useCallback()</code>. Think of this like memoizing a function — React won't recreate it on every render unless its dependencies change. This matters here because <code>handleConfirmMove</code> is passed as a prop to child components; re-creating it every render would cause those children to needlessly re-render too.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-inbox">↑ Feature: Smart Inbox Processing</a></div>
+</div>
+
+<!-- 5cde89e -->
+<div class="commit-entry" id="commit-5cde89e">
+  <div class="commit-top">
+    <span class="commit-hash">5cde89e</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Phase 1: task metadata panel — location, due date, priority fields</div>
+  <div class="commit-body">
+    Added a collapsible metadata panel to every task row, triggered by a chevron button (<code>›</code> / <code>▾</code>). The panel shows three editable fields: Location (multi-select chips), Due Date (an HTML5 date picker), and Priority (multi-select: Imperative, As Possible, Financial, External). When collapsed, any set values appear as compact summary chips below the task text. The expanded/collapsed state is local to each row — it's not stored anywhere global.
+  </div>
+  <div class="commit-lesson"><strong>React concept introduced — local component state:</strong> Each <code>TaskRow</code> has its own <code>expanded</code> state via <code>useState(false)</code>. This is entirely private to that row — opening one row's panel has no effect on other rows. Compare this to a global config variable: local state is like a variable scoped to a function, not a global. React tracks it per component instance.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-metadata">↑ Feature: Task Metadata Panel</a></div>
+</div>
+
+<!-- 6c37280 -->
+<div class="commit-entry" id="commit-6c37280">
+  <div class="commit-top">
+    <span class="commit-hash">6c37280</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Phase 2: location settings manager</div>
+  <div class="commit-body">
+    Added a Settings panel accessible from a button at the bottom of the sidebar. Inside is <code>LocationManager</code>: a CRUD interface for the location list. Each location shows a usage count (how many tasks use it). Inline rename cascades to all tasks that use the old name. Removing a location that is in use shows a sub-row with a replacement picker — the user can substitute another location before confirming. New locations are added via a text input at the bottom; duplicates are silently ignored.
+  </div>
+  <div class="commit-lesson"><strong>React concept introduced — lifting state up:</strong> Locations need to be shared between <code>LocationManager</code> (edit them) and <code>TaskRow</code> (display them as chips). The solution is to store them in the top-level <code>GTDManager</code> component and pass them down as <em>props</em> (function parameters). This is the React equivalent of sharing data via a common config file rather than duplicating it.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-locations">↑ Feature: Location Settings Manager</a></div>
+</div>
+
+<!-- 68ef357 -->
+<div class="commit-entry" id="commit-68ef357">
+  <div class="commit-top">
+    <span class="commit-hash">68ef357</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Phase 3: Next Actions waterfall + group-by</div>
+  <div class="commit-body">
+    Introduced <code>waterfallFilter()</code> — a pure function that hides downstream steps until their parent action is complete. Added the Group-By toolbar (Location, Due Date, Priority) backed by <code>groupByField()</code>. The <code>GroupDivider</code> component renders each group header with a count badge. Pure functions are used here because they are easy to test and reason about: same inputs always produce the same outputs, with no side effects.
+  </div>
+  <div class="commit-lesson"><strong>React concept introduced — pure functions outside components:</strong> <code>waterfallFilter</code> and <code>groupByField</code> are declared at the module level (outside any component) because they don't need React's state machinery — they are just data transformations. This is exactly like a utility shell function you'd keep in a sourced library file. Module-level functions are created once and reused across every render.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-waterfall">↑ Feature: Waterfall &amp; Group-By</a></div>
+</div>
+
+<!-- ffc7764 -->
+<div class="commit-entry" id="commit-ffc7764">
+  <div class="commit-top">
+    <span class="commit-hash">ffc7764</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Phase 4: project task creation improvements</div>
+  <div class="commit-body">
+    Made the add-row in the Projects view context-aware. A <code>&lt;select&gt;</code> dropdown controls the mode: "New project" (the default) or an existing project name. In project mode the input creates a root task with <code>childIds: []</code>. In subtask mode, it creates a next-action with a <code>parentId</code> pointing to the chosen project, and simultaneously appends the new task's ID to the project's <code>childIds</code> array. The button label and placeholder adapt to the current selection.
+  </div>
+  <div class="commit-lesson"><strong>React concept introduced — controlled inputs:</strong> The <code>&lt;select&gt;</code> is "controlled" — its value is stored in React state (<code>projectParentId</code>) and updated via <code>onChange</code>. React owns the value; the DOM reflects it. This is the opposite of traditional DOM scripting where you read the input's value on demand. Controlled inputs make it trivial to reset the dropdown (just set the state back to the default value).</div>
+  <div class="commit-back"><a href="project-summary.html#feat-project-add">↑ Feature: Project Task Creation</a></div>
+</div>
+
+<!-- 186bf3e -->
+<div class="commit-entry" id="commit-186bf3e">
+  <div class="commit-top">
+    <span class="commit-hash">186bf3e</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Phase 5: HTML5 drag-and-drop in Projects view</div>
+  <div class="commit-body">
+    Replaced the flat Projects list with a recursive <code>ProjectTree</code> component that renders up to 5 levels of nesting. Every task row gained <code>draggable</code> and the four HTML5 drag event handlers. Drop position (before / inside / after) is computed from the mouse's Y coordinate relative to the hovered element. The pure function <code>moveTaskInTree()</code> handles all structural mutations: reordering within the same parent, reparenting, promoting to root, and demoting under a project. A recursive <code>isAncestorOf()</code> guard prevents circular references.
+  </div>
+  <div class="commit-lesson"><strong>React concept introduced — recursive components:</strong> <code>ProjectTree</code> calls itself with a deeper <code>parentId</code> on each iteration, exactly like a recursive shell function that walks a directory tree. React handles each call as a separate component instance, each with its own rendering context. The depth guard (<code>if (depth &gt; 5) return null</code>) is the base case.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-dnd">↑ Feature: Drag-and-Drop Project Tree</a></div>
+</div>
+
+<!-- 879e53a -->
+<div class="commit-entry" id="commit-879e53a">
+  <div class="commit-top">
+    <span class="commit-hash">879e53a</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Phase 6: AI Project Review flow</div>
+  <div class="commit-body">
+    Added the Project Review mode to the AI Coach. A "Review Projects" button filters all non-done root projects and starts a sequential review. For each project, <code>reviewProject()</code> builds a structured prompt (project name, metadata, current subtask list) and sends it to the AI. The model responds with a <code>→SUGGESTIONS:</code> block listing up to four missing next actions, parsed by <code>extractSuggestions()</code>. The coach panel shows these as checkboxes; clicking confirm creates subtasks for all checked suggestions and advances to the next project.
+  </div>
+  <div class="commit-lesson"><strong>React concept introduced — async callbacks with useCallback:</strong> <code>reviewProject</code> is an <code>async</code> function wrapped in <code>useCallback</code>. The <code>async/await</code> syntax here is identical to its use in Node.js scripts — it pauses execution until the API response arrives, then resumes. The difference from a shell script is that the UI remains fully interactive during the wait; React doesn't freeze while waiting for the AI.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-ai-review">↑ Feature: AI Project Review</a></div>
+</div>
+
+<!-- 053cffd -->
+<div class="commit-entry" id="commit-053cffd">
+  <div class="commit-top">
+    <span class="commit-hash">053cffd</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Add Project group-by to Next Actions</div>
+  <div class="commit-body">
+    Extended <code>groupByField()</code> with a <code>"project"</code> branch. For each Next Action, the function walks the <code>parentId</code> chain upward until it finds the root project task, then uses that project's name as the group key. Tasks with no parent fall into a "No Project" group. The <code>GroupDivider</code> label was made dynamic so the fallback text matches the field type.
+  </div>
+  <div class="commit-lesson"><strong>React concept — derived data via pure functions:</strong> Rather than storing a "project name" field on every task (which would need to be kept in sync), the project name is derived at render time by walking the data structure. This is the "single source of truth" principle — store only the minimal data, derive everything else. It's similar to using a JOIN in SQL rather than denormalizing your database.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-waterfall">↑ Feature: Waterfall &amp; Group-By</a></div>
+</div>
+
+<!-- 61b3b06 -->
+<div class="commit-entry" id="commit-61b3b06">
+  <div class="commit-top">
+    <span class="commit-hash">61b3b06</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Add Effort metadata field — chip display, selector, project totals, EffortManager in Settings</div>
+  <div class="commit-body">
+    Added <code>effort</code> as a single-select field (unlike Location and Priority which are multi-value arrays). Two new pure utility functions — <code>effortToMinutes()</code> and <code>minutesToEffortLabel()</code> — convert between human-readable strings ("2 hours") and minutes, using substring matching so user-defined values like "4.5 hours" work without a lookup table. Project rows in the Projects view gained a teal effort-total badge showing the sum of all direct children's effort. The <code>EffortManager</code> in Settings mirrors <code>LocationManager</code> but uses a simpler remove flow (clearing the field rather than substituting a value).
+  </div>
+  <div class="commit-lesson"><strong>React concept — computed values inside a component:</strong> <code>projectEffortTotal</code> is computed fresh on every render of <code>TaskRow</code>, not stored in state. If a child's effort changes, the parent task re-renders (because the tasks array in state changed), which recomputes the total automatically. This is like a spreadsheet formula — you don't store the result, you store the formula and let the sheet recompute it.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-effort">↑ Feature: Effort Metadata System</a></div>
+</div>
+
+<!-- f98d445 -->
+<div class="commit-entry" id="commit-f98d445">
+  <div class="commit-top">
+    <span class="commit-hash">f98d445</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Next Actions: group effort totals in dividers + assign unaffiliated tasks to project</div>
+  <div class="commit-body">
+    Two enhancements: (1) Each <code>GroupDivider</code> now shows a teal <code>⏱</code> badge with the summed effort of every task in that group. (2) A 📁 button appears on hover for any Next Action with no <code>parentId</code>. Clicking it reveals an inline panel with a dropdown of active projects plus a "New project…" option. Selecting an existing project and clicking Assign fires <code>assignToProject()</code>, which atomically sets <code>parentId</code> on the task and appends the task's ID to the project's <code>childIds</code>.
+  </div>
+  <div class="commit-lesson"><strong>React concept — atomic state updates:</strong> <code>assignToProject</code> calls <code>setTasks(prev =&gt; prev.map(...))</code> once, updating two objects in a single pass. React batches this into one render. Never update related state in two separate <code>setTasks</code> calls — you'd get a render between them where the data is inconsistent, like a half-applied transaction.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-next-enhancements">↑ Feature: Next Actions Enhancements</a></div>
+</div>
+
+<!-- 4de6b06 -->
+<div class="commit-entry" id="commit-4de6b06">
+  <div class="commit-top">
+    <span class="commit-hash">4de6b06</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Next Actions: add Effort group-by option, sorted shortest-to-longest</div>
+  <div class="commit-body">
+    Extended <code>groupByField()</code> with an <code>"effort"</code> branch and changed the sort comparator: when grouping by effort, groups are sorted by <code>effortToMinutes(a) - effortToMinutes(b)</code> (duration-based, shortest first) rather than alphabetically. This means "2 min" always appears before "1 hour" regardless of alphabetical order. Tasks with no effort set collect at the bottom under "No Effort".
+  </div>
+  <div class="commit-lesson"><strong>React concept — pure function extension:</strong> <code>groupByField()</code> was already a pure function, so extending it required only adding a new branch inside it and updating the sort comparator. No React-specific changes were needed — this is just JavaScript data transformation. Pure functions are easy to extend because you can reason about them in isolation.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-next-enhancements">↑ Feature: Next Actions Enhancements</a></div>
+</div>
+
+<!-- 6f2abf9 -->
+<div class="commit-entry" id="commit-6f2abf9">
+  <div class="commit-top">
+    <span class="commit-hash">6f2abf9</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Add inline tag display mode — toggle between below-text and inline in Settings</div>
+  <div class="commit-body">
+    Added <code>tagDisplay</code> state (<code>"below"</code> or <code>"inline"</code>) persisted to <code>localStorage</code> as <code>gtd_tag_display</code>. In "inline" mode, metadata chips are rendered in a flex div inserted between the task text and the action buttons, rather than below the text. A <code>TagDisplaySetting</code> two-button toggle at the top of Settings controls this globally. The setting is passed as a prop to every <code>TaskRow</code>.
+  </div>
+  <div class="commit-lesson"><strong>React concept — persisting state to localStorage:</strong> The initial value of <code>tagDisplay</code> is read from <code>localStorage</code> inside the <code>useState()</code> initializer using a lazy initializer function: <code>useState(() =&gt; localStorage.getItem("gtd_tag_display") || "below")</code>. Saving back to storage happens in a <code>useEffect</code> that watches the state variable. This is the standard React pattern for syncing state to a persistent store.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-tag-display">↑ Feature: Tag Display Mode</a></div>
+</div>
+
+<!-- 988d26a -->
+<div class="commit-entry" id="commit-988d26a">
+  <div class="commit-top">
+    <span class="commit-hash">988d26a</span>
+    <span class="commit-date">2026-04-24</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Add inline title editing to expanded metadata panel (all views)</div>
+  <div class="commit-body">
+    The first field in every expanded metadata panel is now a full-width Title input pre-filled with the current task text. Local state <code>editTitle</code> tracks the draft; a <code>useEffect</code> syncs it whenever the task text changes externally (e.g., the AI renames a task). The border turns blue when the draft differs from the saved value. Enter saves; Escape reverts. Save/✕ buttons appear only when there is an unsaved change. An empty save silently reverts instead of blanking the title.
+  </div>
+  <div class="commit-lesson"><strong>React concept — useEffect for syncing derived state:</strong> <code>useEffect(() =&gt; { setEditTitle(task.text); }, [task.text])</code> runs every time <code>task.text</code> changes. Think of it like a watch/trigger in a database: "whenever this value changes, run this side effect." The dependency array <code>[task.text]</code> tells React which values to watch — an empty array <code>[]</code> would run only once on mount, like a constructor.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-title-edit">↑ Feature: Inline Title Editing</a></div>
+</div>
+
+<hr>
+<h2>April 27 — Deferred Tasks</h2>
+
+<!-- 10df3a1 -->
+<div class="commit-entry" id="commit-10df3a1">
+  <div class="commit-top">
+    <span class="commit-hash">10df3a1</span>
+    <span class="commit-date">2026-04-27</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Scheduled / deferred tasks feature</div>
+  <div class="commit-body">
+    Any task can now be given a "Defer Until" date that hides it from active views until the specified date. Core helpers: <code>todayStr()</code> returns today as YYYY-MM-DD; <code>isDeferred(task)</code> returns true when <code>deferUntil &gt; today</code>; <code>subtractFromDate()</code> computes quick-pick offsets (1 week before due, 1 month before due, etc.). On app mount, a <code>useEffect</code> scans for tasks whose <code>deferUntil</code> date has passed and automatically moves them to Inbox, clearing their defer date. The new ⏰ sidebar bucket is a <em>virtual view</em> — tasks keep their real bucket internally, they're just filtered by the deferred condition. Next Actions hides deferred tasks entirely; the Projects view shows them dimmed at 55% opacity with a chip.
+  </div>
+  <div class="commit-lesson"><strong>React concept — useEffect on mount (the "cron job" pattern):</strong> <code>useEffect(() =&gt; { /* wake up deferred tasks */ }, [])</code> with an empty dependency array runs exactly once when the app first loads — like a cron job that fires on startup. It scans the task list and moves past-due deferred tasks to the Inbox. This is how React handles initialization logic that should run once and never again.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-deferred">↑ Feature: Deferred Tasks</a></div>
+</div>
+
+<hr>
+<h2>April 28 — Polish, Fixes &amp; New Review Modes</h2>
+
+<!-- 8967d79 -->
+<div class="commit-entry" id="commit-8967d79">
+  <div class="commit-top">
+    <span class="commit-hash">8967d79</span>
+    <span class="commit-date">2026-04-28</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">Fix: deferUntil cascade, AI inbox dates, port lock + backup/restore</div>
+  <div class="commit-body">
+    Four improvements in one commit: (1) <code>updateTask()</code> now cascades <code>deferUntil</code> to all descendants when set on a project task, and clears it from children that shared the old date when it is cleared. (2) The inbox process prompt now asks the AI to infer due/defer dates from context (e.g., "for Christmas"); <code>extractAction()</code> was extended to parse optional <code>|due:YYYY-MM-DD</code> and <code>|defer:YYYY-MM-DD</code> fields from <code>→ACTION</code> tags. (3) <code>vite.config.js</code> got <code>strictPort: true</code> to prevent Vite from silently drifting to port 5174 when 5173 is in use — this would sever access to localStorage which is scoped per origin. (4) The Settings panel gained a Backup &amp; Restore section: Export downloads all tasks as a JSON file; Import reads one back.
+  </div>
+  <div class="commit-lesson"><strong>React concept — cascading updates inside a single setTasks call:</strong> When <code>deferUntil</code> changes on a parent, we need to update multiple tasks atomically. This is done with <code>setTasks(prev =&gt; prev.map(t =&gt; { /* apply changes to parent and children in one pass */ }))</code>. The entire transformation runs before React re-renders, so there's never a half-applied state visible to the user.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-deferred">↑ Feature: Deferred Tasks</a></div>
+</div>
+
+<!-- 9b02952 -->
+<div class="commit-entry" id="commit-9b02952">
+  <div class="commit-top">
+    <span class="commit-hash">9b02952</span>
+    <span class="commit-date">2026-04-28</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">Fix: Project Review button now works correctly</div>
+  <div class="commit-body">
+    Three bugs fixed: (1) The "Project Review" mode button in the coach panel fell through to the else-chat branch because no <code>case</code> for key === <code>"projectReview"</code> existed in the mode-switch logic. (2) <code>extractSuggestions()</code> was extended to normalise <code>\r\n</code> line endings and accept both <code>-&gt;</code> and <code>→</code> prefixes, fixing silent drops on Windows-style AI responses. (3) The <code>reviewReady</code> flag was changed so the <code>ProjectReviewBar</code> renders whenever the AI has responded — not only when suggestions exist — so projects the AI marks as "on track" still show a Next button.
+  </div>
+  <div class="commit-lesson"><strong>React concept — conditional rendering:</strong> The fix to show the review bar even with zero suggestions is a simple change: <code>{reviewReady &amp;&amp; &lt;ProjectReviewBar /&gt;}</code> instead of <code>{suggestions.length &gt; 0 &amp;&amp; ...}</code>. In React, <code>{condition &amp;&amp; &lt;Component /&gt;}</code> is the standard pattern for "show this UI only when this is true" — like an <code>if</code> block inside HTML markup.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-ai-review">↑ Feature: AI Project Review</a></div>
+</div>
+
+<!-- c917318 -->
+<div class="commit-entry" id="commit-c917318">
+  <div class="commit-top">
+    <span class="commit-hash">c917318</span>
+    <span class="commit-date">2026-04-28</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">Feature: Project Review mode selection (task completeness vs metadata quality)</div>
+  <div class="commit-body">
+    The Project Review flow now asks the user to choose a mode before any AI call: <strong>Task completeness</strong> (existing — suggests missing next actions) or <strong>Metadata quality</strong> (new — reviews each subtask's effort, due date, and defer date). In metadata mode, <code>reviewProjectMetadata()</code> sends a structured prompt with task IDs and current field values; the AI returns a <code>→METADATA:</code> block with <code>taskId|field:value</code> lines, parsed by the new <code>extractMetadata()</code> helper. A <code>MetadataReviewBar</code> shows each suggestion as an editable row with accept/skip per task. A new <code>reviewMode</code> state (<code>null | "tasks" | "metadata"</code>) controls which branch runs.
+  </div>
+  <div class="commit-lesson"><strong>React concept — multi-step UI flows with state machines:</strong> The three-value <code>reviewMode</code> state acts as a mini state machine: <code>null</code> shows the mode chooser, <code>"tasks"</code> runs the existing flow, <code>"metadata"</code> runs the new flow. This is cleaner than a nest of boolean flags. Compare it to a case statement in a shell script that drives a wizard — the current state determines what's shown, and transitions move you forward.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-review-modes">↑ Feature: Project Review Mode Selection</a></div>
+</div>
+
+<!-- 082a7e1 -->
+<div class="commit-entry" id="commit-082a7e1">
+  <div class="commit-top">
+    <span class="commit-hash">082a7e1</span>
+    <span class="commit-date">2026-04-28</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">Fix white screen: move updateTask before advanceMetadataReview</div>
+  <div class="commit-body">
+    <code>advanceMetadataReview</code> listed <code>updateTask</code> in its <code>useCallback</code> dependencies, but <code>updateTask</code> was declared ~110 lines later in the file. This caused a Temporal Dead Zone (TDZ) ReferenceError — JavaScript's equivalent of referencing a variable before it's declared — on every render, causing a white screen. The fix: move the <code>updateTask</code> declaration immediately before <code>advanceMetadataReview</code>.
+  </div>
+  <div class="commit-lesson"><strong>JavaScript/React concept — Temporal Dead Zone:</strong> JavaScript's <code>const</code> declarations are not hoisted the way <code>var</code> is. If you reference a <code>const</code> before the line where it's declared (even inside a closure that captures it), you get a ReferenceError. In a React component, all <code>const</code> declarations with hooks run top-to-bottom on every render, so declaration order matters. This is the same as a shell script where you must define a variable before using it.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-review-modes">↑ Feature: Project Review Mode Selection</a></div>
+</div>
+
+<!-- b889c8e -->
+<div class="commit-entry" id="commit-b889c8e">
+  <div class="commit-top">
+    <span class="commit-hash">b889c8e</span>
+    <span class="commit-date">2026-04-28</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: collapsible project tree + effort total fixes</div>
+  <div class="commit-body">
+    Two sets of changes: (1) <strong>Collapsible tree</strong>: A <code>collapsedNodes</code> state (a JavaScript <code>Set</code> of task IDs) controls which nodes hide their children. A per-node toggle (<code>▾</code>/<code>▸</code> arrow) calls <code>toggleCollapse()</code> for subtasks or <code>toggleCollapseLevel()</code> for root projects (which folds to just the first level of children). Toolbar buttons ⊖ Collapse All and ⊕ Expand All operate on all nodes at once. (2) <strong>Effort total fixes</strong>: <code>effortToMinutes()</code> was extended to parse compact abbreviations like <code>30m</code>, <code>1h</code>, <code>2d</code>. <code>projectEffortTotal</code> was replaced by the recursive <code>sumDescendantEffort()</code> helper that correctly rolls up effort from deeply nested subtasks.
+  </div>
+  <div class="commit-lesson"><strong>JavaScript concept — using a Set for O(1) membership checks:</strong> <code>collapsedNodes</code> is a JavaScript <code>Set</code> rather than an array. Checking whether a node is collapsed is <code>collapsedNodes.has(id)</code> — O(1) — rather than <code>array.includes(id)</code> — O(n). For sysadmins: this is the same trade-off as using a hash table vs a flat file for lookups. The Set is stored in React state as an immutable value: <code>setCollapsedNodes(new Set([...prev, id]))</code>.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-collapsible-tree">↑ Feature: Collapsible Project Tree</a></div>
+</div>
+
+<!-- 8f9b157 -->
+<div class="commit-entry" id="commit-8f9b157">
+  <div class="commit-top">
+    <span class="commit-hash">8f9b157</span>
+    <span class="commit-date">2026-04-28</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: add Projects Only collapse view</div>
+  <div class="commit-body">
+    Added a third toolbar collapse option: ≡ Projects Only. Rather than collapsing each project to its first level of children (Collapse All), this hides the entire task tree beneath each project by adding the project's own ID to <code>collapsedNodes</code>. The collapse progression is: Expand All → Collapse All (first level) → Projects Only (project names only) → Expand All. The <code>isCollapsed</code> check was updated to cover both cases.
+  </div>
+  <div class="commit-lesson"><strong>React concept — reusing existing state with new semantics:</strong> There was no new state added for "projects only" mode — it reuses <code>collapsedNodes</code> with a different set of IDs. Adding the project's own ID (rather than its children's IDs) has the effect of hiding the entire subtree. This is a good example of composing new behaviour from existing primitives rather than adding complexity.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-collapsible-tree">↑ Feature: Collapsible Project Tree</a></div>
+</div>
+
+<hr>
+<h2>April 29 — Task Detail Panel, Resizable Panels, Polish</h2>
+
+<!-- 94813ac -->
+<div class="commit-entry" id="commit-94813ac">
+  <div class="commit-top">
+    <span class="commit-hash">94813ac</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: descendant task count badge on project rows</div>
+  <div class="commit-body">
+    Added a "↓ incomplete / total" pill to every task row in the Projects view that has children. The new <code>countDescendants()</code> pure function recursively walks the <code>childIds</code> tree, accumulating <code>{ total, incomplete }</code> counts. A visited-set guard prevents infinite loops in case of data corruption. The badge renders inline after the task text, before the effort chip, using subdued colours to stay visually secondary.
+  </div>
+  <div class="commit-lesson"><strong>JavaScript concept — visited sets to prevent infinite recursion:</strong> <code>countDescendants</code> passes a <code>Set</code> of already-visited IDs through each recursive call. Before processing a node, it checks <code>visited.has(id)</code> and returns immediately if true. This is the standard graph traversal guard against cycles — the same pattern used in network routing to prevent routing loops. Without it, a circular <code>childIds</code> reference would cause a stack overflow.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-descendant-badge">↑ Feature: Descendant Count Badge</a></div>
+</div>
+
+<!-- 25fb6f1 -->
+<div class="commit-entry" id="commit-25fb6f1">
+  <div class="commit-top">
+    <span class="commit-hash">25fb6f1</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">rename: "Scheduled" view → "Deferred"</div>
+  <div class="commit-body">
+    Updated all user-facing text from "Scheduled" to "Deferred" — button labels, empty state messages, and UI copy. Internal bucket key, color tokens, and localStorage keys were deliberately left unchanged to preserve backward compatibility with any existing data stored under the old names.
+  </div>
+  <div class="commit-lesson"><strong>Software concept — separating display names from internal keys:</strong> The internal key <code>"scheduled"</code> in localStorage and code is decoupled from the user-facing label "Deferred." This means changing the label requires no data migration. It's the same principle as using numeric status codes internally and displaying human-readable strings in the UI — a mapping layer between storage and display.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-deferred">↑ Feature: Deferred Tasks</a></div>
+</div>
+
+<!-- 829acef -->
+<div class="commit-entry" id="commit-829acef">
+  <div class="commit-top">
+    <span class="commit-hash">829acef</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: full rename of "scheduled" → "deferred" throughout codebase</div>
+  <div class="commit-body">
+    Completed the rename: <code>COLORS.scheduled</code> → <code>COLORS.deferred</code>, bucket key <code>"scheduled"</code> → <code>"deferred"</code>, all <code>=== "scheduled"</code> comparisons updated. No data migration is needed because the "deferred" view is virtual — tasks are never stored with <code>bucket: "scheduled"</code> in localStorage; they keep their original bucket and are only <em>filtered</em> by their <code>deferUntil</code> date. Zero occurrences of "scheduled" remain in <code>App.jsx</code>.
+  </div>
+  <div class="commit-lesson"><strong>Software concept — virtual views vs stored state:</strong> The Deferred bucket is a view, not a container. Tasks don't move to a "deferred" bucket; they stay in their original bucket and are temporarily hidden by a filter. This avoids the problem of tracking what bucket a task should return to when it wakes up. It's analogous to a SQL view — a query result that looks like a table but isn't stored as one.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-deferred">↑ Feature: Deferred Tasks</a></div>
+</div>
+
+<!-- 1bb1bfc -->
+<div class="commit-entry" id="commit-1bb1bfc">
+  <div class="commit-top">
+    <span class="commit-hash">1bb1bfc</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-ui">ui</span>
+  </div>
+  <div class="commit-msg">ui: reorder project toolbar buttons to Projects Only → Collapse All → Expand All</div>
+  <div class="commit-body">
+    A one-line change to the order of three JSX elements in the Projects toolbar. The new left-to-right order (≡ Projects Only, ⊖ Collapse All, ⊕ Expand All) matches the natural collapse progression — from most collapsed on the left to fully expanded on the right.
+  </div>
+  <div class="commit-lesson"><strong>React concept — JSX element order equals DOM order:</strong> In JSX, elements are rendered in the order they appear in the source. Reordering the toolbar buttons is as simple as reordering the <code>&lt;button&gt;</code> elements in the JSX. There's no CSS grid column assignment or DOM manipulation needed — the visual order follows the source order, just like HTML.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-collapsible-tree">↑ Feature: Collapsible Project Tree</a></div>
+</div>
+
+<!-- 2c2d21e -->
+<div class="commit-entry" id="commit-2c2d21e">
+  <div class="commit-top">
+    <span class="commit-hash">2c2d21e</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: add task detail side panel with notes editor</div>
+  <div class="commit-body">
+    Added a 360px wide <code>TaskDetailPanel</code> that slides in on the right when you click any task title. It provides: editable title (blur-to-save), a large notes textarea (blur-to-save, null when empty), metadata editing (due date, defer date, effort, location chips, bucket move dropdown), and complete/delete footer buttons. A <code>selectedTaskId</code> state in <code>GTDManager</code> tracks which task is open; clicking a task title calls <code>setSelectedTaskId</code>. Tasks with notes show a 📝 indicator. The selected task row is highlighted with a slightly different background. The panel closes on × click, Escape key, or bucket change.
+  </div>
+  <div class="commit-lesson"><strong>React concept — closing on Escape key with useEffect cleanup:</strong> The panel registers a keydown listener with <code>window.addEventListener("keydown", handler)</code> inside a <code>useEffect</code>, and the cleanup function (<code>return () =&gt; window.removeEventListener(...)</code>) removes it when the panel unmounts. This is the React equivalent of trapping a signal in a shell script and restoring the original handler when done — it prevents the listener from leaking and firing after the panel is gone.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-detail-panel">↑ Feature: Task Detail Panel</a></div>
+</div>
+
+<!-- 6a1db87 -->
+<div class="commit-entry" id="commit-6a1db87">
+  <div class="commit-top">
+    <span class="commit-hash">6a1db87</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-docs">docs</span>
+  </div>
+  <div class="commit-msg">docs: rewrite CLAUDE.md to reflect current app state</div>
+  <div class="commit-body">
+    Updated <code>CLAUDE.md</code> to document all features added since the initial commit: the task detail panel, project hierarchy, collapsible tree, effort totals, waterfall filtering, all five AI Coach modes, and the deferred/virtual bucket. Added a working instruction: "Before each set of tool calls, briefly explain what you're looking for and why." Refreshed the known issues and suggested next features lists.
+  </div>
+  <div class="commit-lesson"><strong>Project practice — keeping the AI context document current:</strong> <code>CLAUDE.md</code> is the project brief that Claude reads at the start of every session. Keeping it accurate means the AI doesn't re-ask questions or misunderstand the current state. Think of it like a runbook — the value of a runbook is that it reflects what the system actually does today, not what it did six months ago.</div>
+  <div class="commit-back"><a href="project-summary.html#overview">↑ Overview</a></div>
+</div>
+
+<!-- f7666ec -->
+<div class="commit-entry" id="commit-f7666ec">
+  <div class="commit-top">
+    <span class="commit-hash">f7666ec</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: extend task detail panel to full app height</div>
+  <div class="commit-body">
+    Changed the main layout container (<code>s.main</code>) from a vertical flex column to a horizontal flex row, so the task detail panel spans the full height of the app (alongside both the task list and the AI coach panel) rather than just the height of the task list. Added a new <code>s.mainLeft</code> wrapper that holds the task panel and coach panel as a vertical column, with the detail panel as a sibling on the right.
+  </div>
+  <div class="commit-lesson"><strong>CSS/React concept — flexbox layout restructuring:</strong> Changing <code>flexDirection: "column"</code> to <code>flexDirection: "row"</code> on a container changes all its direct children from stacking vertically to sitting side by side. Moving the detail panel from inside the task list wrapper to a sibling of the whole left column is equivalent to changing a file's directory in a filesystem — same file, different position in the tree.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-detail-panel">↑ Feature: Task Detail Panel</a></div>
+</div>
+
+<!-- 9000fb5 -->
+<div class="commit-entry" id="commit-9000fb5">
+  <div class="commit-top">
+    <span class="commit-hash">9000fb5</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: add project reassignment dropdown to task detail panel</div>
+  <div class="commit-body">
+    The Task Detail Panel's static "Project: X" display was replaced with an editable <code>&lt;select&gt;</code> dropdown. Changing the dropdown calls <code>reassignProject(taskId, newProjectId)</code>, a new callback in <code>GTDManager</code> that atomically removes the task from its old parent's <code>childIds</code>, updates the task's <code>parentId</code>, and adds it to the new parent's <code>childIds</code> — all in a single <code>setTasks(prev =&gt; prev.map(...))</code> call. A "— Standalone" option allows removing the task from any project. The eligible project list excludes the task itself and all its descendants to prevent circular references.
+  </div>
+  <div class="commit-lesson"><strong>React concept — passing callbacks up and down the tree:</strong> <code>reassignProject</code> is defined in <code>GTDManager</code> (which owns the tasks state) and passed down to <code>TaskDetailPanel</code> as a prop. The panel doesn't mutate state directly — it calls a function provided by the parent. This is React's unidirectional data flow: state lives at the top, mutations happen through callbacks, and updates flow back down as props. It's analogous to a child process sending a message to a parent process that owns the shared resource.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-reassign">↑ Feature: Project Reassignment</a></div>
+</div>
+
+<!-- 450857c -->
+<div class="commit-entry" id="commit-450857c">
+  <div class="commit-top">
+    <span class="commit-hash">450857c</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: add resizable panels (sidebar, coach, detail)</div>
+  <div class="commit-body">
+    Three panels are now user-resizable: the sidebar (drag its right edge, 160–420 px), the AI coach (drag its top edge, 80–650 px), and the task detail panel (drag its left edge, 240–600 px). A custom hook <code>useResizer(storageKey, defaultSize, { min, max, direction, sign })</code> encapsulates all resize logic: it listens for <code>mousedown</code> on a <code>ResizeHandle</code> element, attaches <code>mousemove</code>/<code>mouseup</code> listeners to <code>window</code>, computes the delta, clamps to min/max, and saves the result to <code>localStorage</code>. The <code>ResizeHandle</code> component is a thin 4 px div that shows a highlight on hover.
+  </div>
+  <div class="commit-lesson"><strong>React concept — custom hooks:</strong> <code>useResizer</code> is a custom hook — a function whose name starts with <code>use</code> that can call other hooks internally (<code>useState</code>, <code>useEffect</code>, <code>useRef</code>, <code>useCallback</code>). It packages a reusable behaviour (drag-to-resize + persist to storage) that can be applied to any panel with one line: <code>const [width, handleMouseDown] = useResizer(...);</code>. Think of it like a parameterized Ansible role — the same logic applied to different targets with different configuration.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-resizable">↑ Feature: Resizable Panels</a></div>
+</div>
+
+<!-- 66af510 -->
+<div class="commit-entry" id="commit-66af510">
+  <div class="commit-top">
+    <span class="commit-hash">66af510</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-chore">chore</span>
+  </div>
+  <div class="commit-msg">chore: improve launch script and update deps</div>
+  <div class="commit-body">
+    <code>launch.bat</code> gained pre-flight checks: verifies <code>npm</code> is on PATH, checks for <code>node_modules</code> (runs <code>npm install</code> automatically if missing), and verifies <code>vite.config.js</code> exists — with informative error messages and exit codes for each failure. <code>package.json</code> got <code>"type": "module"</code> (enabling ES module syntax in config files), added <code>@babel/parser</code> as a dev dependency, and bumped Vite from 5.4.1 to 5.4.2. The lockfile was synced accordingly.
+  </div>
+  <div class="commit-lesson"><strong>Node.js concept — "type": "module" in package.json:</strong> By default, <code>.js</code> files in Node are treated as CommonJS (<code>require()</code> / <code>module.exports</code>). Adding <code>"type": "module"</code> switches them to ES module syntax (<code>import</code> / <code>export</code>). This is the same split as Python 2 vs Python 3 imports, or bash vs POSIX sh — different syntaxes for the same capability. Vite config files need this to use <code>import</code> syntax at the top level.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-foundation">↑ Feature: Foundation</a></div>
+</div>
+
+<!-- 9ceebdc -->
+<div class="commit-entry" id="commit-9ceebdc">
+  <div class="commit-top">
+    <span class="commit-hash">9ceebdc</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: add actual effort tracking UI</div>
+  <div class="commit-body">
+    Added a new <code>actualEffort</code> field to every task object. When you mark a task as complete and it already has an effort estimate but no actual time recorded, a <strong>modal dialog</strong> intercepts the completion and asks "how long did it actually take?". You pick a value from the same effort labels list, or skip. Completed tasks that have both values now show a paired chip in the Completed bucket — e.g. <code>⏱ 30m → 1h</code> — colour-coded green (on time), amber (≤25% over), or red (&gt;25% over). The Task Detail Panel gained two separate rows: <em>Estimated</em> and <em>Actual</em>, with a live percentage delta badge that updates as you pick values.
+    <br><br>
+    Technically: <code>completeTask</code> was refactored from an inline <code>setTasks</code> call into a <code>useCallback</code> hook with <code>[tasks]</code> in its dependency array, so it can read the current task state directly (needed to check whether the prompt should appear). The <code>ActualEffortPrompt</code> component uses <code>position: fixed; inset: 0</code> to overlay the full viewport. The <code>effortAccuracyColor(estimatedMin, actualMin)</code> helper computes the delta ratio and maps it to a hex colour. The <code>EffortManager.usedByCount</code> method was updated to count both <code>effort</code> and <code>actualEffort</code> fields. All 11 task-creation sites had <code>actualEffort: null</code> added to their object literals.
+  </div>
+  <div class="commit-lesson"><strong>React concept — modal overlays with <code>position: fixed</code>:</strong> A React modal is simply a component that renders conditionally (<code>{"{actualEffortPrompt && <ActualEffortPrompt />}"}</code>) and uses CSS <code>position: fixed; inset: 0</code> to cover the whole viewport. There is no special "modal" API in React — it's just a component sitting at the top of the render tree. The backdrop dim effect is <code>background: rgba(0,0,0,0.55)</code> on the outer div, and <code>display: flex; align-items: center; justify-content: center</code> centres the card. When the user saves or skips, the callback sets the state back to <code>null</code> and the modal vanishes.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-effort-tracking">↑ Feature: Actual Effort Tracking</a></div>
+</div>
+
+<!-- 9387df5 -->
+<div class="commit-entry" id="commit-9387df5">
+  <div class="commit-top">
+    <span class="commit-hash">9387df5</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: effort calibration — Settings panel + AI system prompt</div>
+  <div class="commit-body">
+    Added a <strong>calibration system</strong> that connects your actual effort history to the AI coach. A new <code>buildCalibrationContext(tasks, efforts, calibrationOverrides)</code> function scans completed tasks to compute per-label averages (e.g. "you average 55 minutes on tasks you estimate as 30m"). When a label has 3 or more completed samples, that average is injected into the AI system prompt — but only in <em>inbox processing</em> and <em>project metadata review</em> modes, where effort suggestions are relevant. The AI is instructed to prefer the next label up whenever the user's history shows systematic underestimation.
+    <br><br>
+    A new <strong>Effort Calibration</strong> section in the Settings panel shows a four-column table: label name, auto-computed average (with sample count and % over/under), a manual override dropdown, and a "AI uses" summary column. Manual overrides are stored in a separate <code>localStorage</code> key (<code>gtd_effort_calibration</code>) as a plain JSON object. The averages themselves are <em>derived state</em> — computed fresh at render time from the tasks array, never stored — so they can never go stale. The <code>EffortCalibrationManager</code> component implements the table UI; <code>setCalibrationOverride</code> and <code>clearCalibrationOverride</code> callbacks handle the localStorage persistence.
+  </div>
+  <div class="commit-lesson"><strong>React concept — derived state vs. stored state:</strong> If a value can be computed from data you already have in state, don't store it separately — compute it during render. Storing it creates a second source of truth that can drift out of sync. In this commit, the per-label effort averages are pure maths over the <code>tasks</code> array: computing them on every render is fast and always correct. Only the manual overrides — a deliberate user decision that can't be derived from tasks — are persisted. This is the same principle as a database view vs. a redundant column: keep your canonical data in one place and derive everything else.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-effort-tracking">↑ Feature: Actual Effort Tracking</a></div>
+</div>
+
+
+<!-- 91da3c8 -->
+<div class="commit-entry" id="commit-91da3c8">
+  <div class="commit-top">
+    <span class="commit-hash">91da3c8</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: clear actualEffort when unchecking a completed task</div>
+  <div class="commit-body">
+    A one-line fix to <code>completeTask</code>: when a task is un-completed (moved back to Inbox), the <code>actualEffort</code> field is now cleared alongside the <code>done</code> flag. Previously, un-completing a task left the recorded actual time on the object — so the effort chip would persist on a task that is no longer done, and if the task were re-completed, the prompt to record actual effort would never appear again (because <code>actualEffort</code> was already set). The fix uses a conditional spread inside the <code>.map()</code> callback: <code>{...(t.done ? { actualEffort: null } : {})}</code>. When <code>t.done</code> is <code>true</code> (un-completing), <code>actualEffort</code> is wiped. When completing normally, the spread is an empty object and is a no-op.
+  </div>
+  <div class="commit-lesson"><strong>React pattern — conditional object spread:</strong> <code>{ ...base, ...(condition ? { key: value } : {}) }</code> is a concise way to conditionally add or override a property inside an object literal without an <code>if</code> block or a separate <code>setTasks</code> call. Spreading <code>{}</code> is always safe and has zero cost. This pattern keeps state updates as single expressions inside <code>.map()</code>, which is easier to read and avoids the risk of forgetting a branch.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-effort-tracking">↑ Feature: Actual Effort Tracking</a></div>
+</div>
+
+
+<div class="commit-entry" id="commit-aaf0e16">
+  <div class="commit-top">
+    <span class="commit-hash">aaf0e16</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: include full task metadata in AI context (due dates, effort, location, priority)</div>
+  <div class="commit-body">
+    The <code>getTaskContext()</code> hook — called on every AI request to build the system prompt's task snapshot — previously serialised tasks as bare names only (<code>t =&gt; t.text</code>). This meant the AI coach had no visibility into due dates, effort estimates, locations, priorities, or notes, producing apologetic or hallucinated answers to questions like "what's due today?". The fix rewrites <code>getTaskContext</code> to output a structured, metadata-rich block: each task is formatted as <code>- Task name [due:YYYY-MM-DD] [effort:30m] [location:home,office]</code>, with today's date prepended to the block so the AI can correctly evaluate relative-date queries. Fields that are unset are silently omitted to keep the prompt concise.
+  </div>
+  <div class="commit-lesson"><strong>AI context design:</strong> The content of the system prompt is the only window the LLM has into your application state. Omitting a field (like <code>dueDate</code>) does not cause a graceful degradation — the model will either hallucinate an answer or explicitly state it has no access. Prefer a compact, structured format (<code>[key:value]</code> brackets) over prose so the model can scan and reason over many tasks efficiently without the prompt ballooning in size.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-inbox">↑ Feature: Inbox &amp; AI Coach</a></div>
+</div>
+<div class="commit-entry" id="commit-d4aeae8">
+  <div class="commit-top">
+    <span class="commit-hash">d4aeae8</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: AI chat can update task fields (notes, due, defer, effort, bucket, title, priority, location)</div>
+  <div class="commit-body">
+    This commit fixes a silent failure where asking the AI coach to update a task — "add these notes", "change the due date", "move this to Someday" — would produce a confident reply but no actual change. The root cause was that the AI had no structured way to write back to the app; it could only return text. The fix adds a full update pipeline: <code>getTaskContext()</code> now includes <code>[id:taskId]</code> on every task line; the Chat mode system prompt teaches the AI a new <code>→ACTION:update</code> action format; a new <code>extractUpdateAction()</code> helper parses the tag (including special handling for multi-line notes, which can contain pipe characters); <code>callAI</code> applies the parsed changes via <code>updateTask()</code> immediately; and <code>ChatBubble</code> renders a small <em>✏️ Updated "Task name" — notes · due date</em> chip confirming that something actually changed. Eight fields are supported: <code>notes</code>, <code>dueDate</code>, <code>deferUntil</code>, <code>effort</code>, <code>bucket</code>, <code>title</code>, <code>priority</code>, and <code>location</code>.
+  </div>
+  <div class="commit-lesson"><strong>LLM ↔ app communication via structured text.</strong> Instead of using the Anthropic tool-use (function-calling) API, this feature uses a plain text convention: the AI appends a specially formatted line to its response, and the app side parses it with a regex. This pattern works identically with any LLM provider — including local Ollama models — and requires no schema negotiation. The trade-off is that the AI can occasionally format the line incorrectly; the parser returns <code>null</code> in that case and the chat degrades gracefully (the AI's text response is still shown, the update just doesn't apply).</div>
+  <div class="commit-back"><a href="project-summary.html#feat-chat-update">↑ Feature: AI Chat Task Updates</a></div>
+</div>
+
+<div class="commit-entry" id="commit-f45908c">
+  <div class="commit-top">
+    <span class="commit-hash">f45908c</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: remove updateTask from callAI dep array (temporal dead zone crash)</div>
+  <div class="commit-body">
+    Immediately after deploying the AI chat update feature, the app crashed on load with <em>"Cannot access 'updateTask' before initialization"</em>. The cause: <code>callAI</code> was declared at line ~666 but <code>updateTask</code> was declared at line ~954 — later in the same component. Adding <code>updateTask</code> to <code>callAI</code>'s <code>useCallback</code> dependency array caused the crash because dependency arrays are evaluated immediately when the hook is called, hitting the JavaScript temporal dead zone. The fix was to remove <code>updateTask</code> from the array entirely. Since <code>updateTask</code> uses only <code>setTasks(prev =&gt; ...)</code>, it has an empty <code>[]</code> dependency array and is a stable reference that never changes — it never needed to be in <code>callAI</code>'s deps.
+  </div>
+  <div class="commit-lesson"><strong>JavaScript temporal dead zone (TDZ).</strong> In JavaScript, <code>const</code> and <code>let</code> declarations are "hoisted" to the top of their scope but are not initialised until the declaration is reached during execution. Trying to read such a variable before that point throws a ReferenceError. The fix here was conceptually simple — remove the reference — but the deeper lesson is: when using <code>useCallback</code>, check that every item in the dependency array is already initialised at the point where the hook is called.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-chat-update">↑ Feature: AI Chat Task Updates</a></div>
+</div>
+
+<div class="commit-entry" id="commit-82ba54c">
+  <div class="commit-top">
+    <span class="commit-hash">82ba54c</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: roll up subtask notes to root project on completion</div>
+  <div class="commit-body">
+    When you complete a subtask that has notes, those notes would previously only be accessible via the Completed bucket. This commit adds a prompt-driven roll-up flow: on completion, if the task has notes and a parent, a modal appears asking whether to append those notes to the root project's notes field. <code>findRootProject()</code> walks the <code>parentId</code> chain to find the top-level ancestor, so third-level subtasks roll up to the project directly rather than to their intermediate parent. The notes are stamped with a heading (<code>✓ Subtask name (Apr 29):</code>) and separated by <code>---</code> from any existing project notes. If the task also has an effort estimate, the roll-up prompt fires first and the effort prompt follows via the shared <code>finishComplete()</code> helper.
+  </div>
+  <div class="commit-lesson"><strong>Shared continuation pattern.</strong> Both the "confirm" and "skip" paths of the roll-up modal need to do the same thing next: check whether an effort prompt is needed, then complete the task. Rather than duplicating that logic in each handler, it's factored into <code>finishComplete(taskId)</code>. Each handler does its own work, then calls <code>finishComplete</code>. This is the functional equivalent of a "finally block" or a "continuation" — when two code paths converge, name and extract the convergence point.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-note-rollup">↑ Feature: Subtask Note Roll-up</a></div>
+</div>
+
+<div class="commit-entry" id="commit-68c0261">
+  <div class="commit-top">
+    <span class="commit-hash">68c0261</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: editable heading in note roll-up prompt</div>
+  <div class="commit-body">
+    Extends the roll-up modal from the previous commit: the auto-generated heading (<code>✓ Subtask name (Apr 29):</code>) is now an editable input field. The user can rename it before confirming — useful when the subtask's own name doesn't give enough context when read later in the project notes. The heading is initialised with <code>useState(defaultHeading)</code> inside <code>NoteRollupPrompt</code>, so React owns the value after mount and edits flow through normal state. The final heading string is passed to <code>onConfirm(heading)</code> and used verbatim when stamping the entry.
+  </div>
+  <div class="commit-lesson"><strong>Initialising controlled input state from a prop.</strong> Passing a value to <code>useState(initialValue)</code> sets the field's starting value once at mount — React then manages all updates through state. This is different from using the prop directly as <code>value={prop}</code>, which would make the field read-only. The prop is "seeded" into state; after that, the prop is irrelevant to the field's behaviour.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-note-rollup">↑ Feature: Subtask Note Roll-up</a></div>
+</div>
+
+<div class="commit-entry" id="commit-b0965e3">
+  <div class="commit-top">
+    <span class="commit-hash">b0965e3</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: resizable chat input box via drag handle</div>
+  <div class="commit-body">
+    The chat textarea had a fixed <code>maxHeight: 80px</code> and <code>rows={1}</code>, making it cramped for longer prompts. This commit adds a vertical <code>ResizeHandle</code> directly above the input row using the existing <code>useResizer</code> hook (storage key <code>gtd_chat_input_h</code>, default 60px, range 36–300px, sign -1 so dragging upward grows the box). The fixed height constraints are replaced with a dynamic <code>height: chatInputHeight</code>. Size persists in localStorage across reloads.
+  </div>
+  <div class="commit-lesson"><strong>The payoff of well-scoped hooks.</strong> All the resize logic — mouse event listeners, delta calculation, min/max clamping, localStorage persistence, cursor management — was already written in <code>useResizer</code>. Adding a third resizable element to the app cost one hook call, one JSX element, and two style property changes. When a hook genuinely encapsulates a behaviour (rather than just grouping state), reuse is nearly free.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-resizable-chat-input">↑ Feature: Resizable Chat Input</a></div>
+</div>
+
+<div class="commit-entry" id="commit-5779170">
+  <div class="commit-top">
+    <span class="commit-hash">5779170</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: invert waterfall filter + roll-up to immediate parent + deferred child check</div>
+  <div class="commit-body">
+    Three related changes to task progression shipped together. (1) <strong>Inverted waterfall:</strong>
+    <code>waterfallFilter</code> was rewritten from a top-down level rule to a bottom-up leaf-node rule —
+    a task in Next Actions is now visible only when it has no incomplete next-action children. Leaf tasks
+    surface first; parents appear as leaves are ticked off.
+    (2) <strong>Immediate-parent roll-up:</strong> the note roll-up that fires on task completion now
+    targets the direct parent (<code>tasks.find(t => t.id === task.parentId)</code>) instead of walking
+    the full ancestor chain to the root project. The <code>findRootProject</code> helper was removed.
+    The <code>pendingRollup</code> state fields were renamed from <code>rootProjectId/rootProjectText</code>
+    to <code>parentId/parentText</code> to reflect the change.
+    (3) <strong>Deferred child check:</strong> <code>completeTask</code> gained a new first check —
+    if the task being completed has any incomplete children in the <code>deferred</code> or
+    <code>someday</code> bucket, a new <code>DeferCheckPrompt</code> modal appears listing those
+    children. The user can choose "Review first" (cancel, task stays incomplete) or "Complete anyway"
+    (re-enters <code>completeTask</code> with <code>{ skipDeferCheck: true }</code> to skip that check
+    and continue through roll-up and effort prompts as normal).
+  </div>
+  <div class="commit-lesson"><strong>Options objects as flexible function signatures.</strong> Adding a second optional parameter <code>options = {}</code> to <code>completeTask</code> lets the deferred-check handler bypass only the first guard while still running all subsequent logic — no code duplication, no second function. The default empty object means every existing call site continues to work without any changes. This is a lightweight alternative to splitting the function or threading a boolean through multiple layers of state.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-waterfall-invert">↑ Feature: Bottom-Up Task Progression</a></div>
+</div>
+
+</main>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GTD Manager — Feature Summary</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #4f8ef7;
+    --accent2: #7c5cbf;
+    --green: #3ecf8e;
+    --red: #e05c5c;
+    --yellow: #f0c040;
+    --orange: #f07830;
+    --text: #e0e4f0;
+    --muted: #8892b0;
+    --nav-h: 52px;
+    --sidebar-w: 230px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  /* ── TOP NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: var(--nav-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 20px; gap: 8px;
+    z-index: 100;
+  }
+  nav .logo { font-weight: 700; font-size: 16px; color: var(--text); margin-right: 16px; }
+  nav a {
+    color: var(--muted); text-decoration: none;
+    padding: 6px 14px; border-radius: 6px;
+    font-size: 14px; font-weight: 500;
+    transition: background 0.15s, color 0.15s;
+  }
+  nav a:hover { background: var(--surface2); color: var(--text); }
+  nav a.active { background: var(--accent); color: #fff; }
+  nav .updated { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+  /* ── LAYOUT ── */
+  .layout { display: flex; padding-top: var(--nav-h); min-height: 100vh; }
+
+  /* ── SIDEBAR ── */
+  aside {
+    width: var(--sidebar-w);
+    position: fixed; top: var(--nav-h); bottom: 0; left: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 0 40px;
+  }
+  aside h3 {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+    padding: 0 18px 8px;
+  }
+  aside ul { list-style: none; }
+  aside ul li a {
+    display: block; padding: 5px 18px;
+    color: var(--muted); text-decoration: none; font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  aside ul li a:hover { color: var(--text); border-left-color: var(--accent); }
+  aside .section-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent2);
+    padding: 14px 18px 4px;
+  }
+
+  /* ── MAIN CONTENT ── */
+  main {
+    margin-left: var(--sidebar-w);
+    padding: 40px 48px 80px;
+    max-width: 960px;
+    flex: 1;
+  }
+  main h1 {
+    font-size: 28px; font-weight: 800; color: var(--text);
+    margin-bottom: 8px;
+  }
+  main > .subtitle {
+    color: var(--muted); font-size: 15px; margin-bottom: 40px;
+    border-bottom: 1px solid var(--border); padding-bottom: 24px;
+  }
+
+  /* ── FEATURE SECTIONS ── */
+  .feat {
+    margin-bottom: 60px;
+    scroll-margin-top: calc(var(--nav-h) + 20px);
+  }
+  .feat-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .feat-icon { font-size: 24px; }
+  .feat-title { font-size: 22px; font-weight: 700; color: var(--text); }
+  .feat-badge {
+    font-size: 11px; font-weight: 700; padding: 3px 9px;
+    border-radius: 20px; letter-spacing: 0.05em;
+    text-transform: uppercase; margin-left: auto;
+  }
+  .badge-core  { background: #1a3a6a; color: var(--accent); }
+  .badge-ai    { background: #2a1a4a; color: #b080ff; }
+  .badge-ui    { background: #1a3a2a; color: var(--green); }
+  .badge-new   { background: #3a2a0a; color: var(--yellow); }
+
+  .feat-desc { color: var(--text); margin-bottom: 20px; font-size: 15px; }
+  .feat-desc p { margin-bottom: 12px; }
+
+  /* ── INFO BOXES ── */
+  .box {
+    border-radius: 8px; padding: 16px 20px;
+    margin-bottom: 16px;
+    border-left: 3px solid;
+  }
+  .box-concept  { background: #1a1f35; border-color: var(--accent); }
+  .box-design   { background: #1d1a30; border-color: var(--accent2); }
+  .box-sysadmin { background: #1a2e1a; border-color: var(--green); }
+  .box h4 {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.08em;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .box-concept  h4 { color: var(--accent); }
+  .box-design   h4 { color: var(--accent2); }
+  .box-sysadmin h4 { color: var(--green); }
+  .box p, .box ul { font-size: 14px; color: #c0c8e0; }
+  .box ul { padding-left: 18px; }
+  .box ul li { margin-bottom: 4px; }
+
+  /* ── LINKS SECTION ── */
+  .link-row {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .link-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 12px; border-radius: 6px;
+    font-size: 12px; font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s;
+  }
+  .link-chip:hover { opacity: 0.8; }
+  .chip-snippet { background: #1a2a40; color: #70a8f0; border: 1px solid #2a3a60; }
+  .chip-commit  { background: #2a1f10; color: #d08040; border: 1px solid #4a3520; }
+
+  /* ── CONCEPT LIST ── */
+  .concept-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 12px; margin-bottom: 16px;
+  }
+  @media (max-width: 700px) { .concept-grid { grid-template-columns: 1fr; } }
+  .concept-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .concept-card .concept-name {
+    font-size: 13px; font-weight: 700; color: var(--accent);
+    margin-bottom: 5px;
+  }
+  .concept-card p { font-size: 13px; color: var(--muted); }
+
+  /* ── COMMIT LIST ── */
+  .commit-list { list-style: none; margin-top: 8px; }
+  .commit-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 7px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .commit-list li:last-child { border-bottom: none; }
+  .chash {
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 11px; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--orange);
+    padding: 2px 7px; border-radius: 4px;
+    text-decoration: none; white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .chash:hover { background: #3a2a10; }
+  .cmsg { color: var(--text); }
+
+  /* ── INTRO BANNER ── */
+  .intro-banner {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 24px 28px; margin-bottom: 36px;
+  }
+  .intro-banner h2 { font-size: 17px; color: var(--text); margin-bottom: 10px; }
+  .intro-banner p { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+  .intro-banner .key-info {
+    display: flex; gap: 28px; flex-wrap: wrap; margin-top: 16px;
+  }
+  .info-item { font-size: 13px; }
+  .info-item .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+  .info-item .value { color: var(--text); font-weight: 600; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav>
+  <span class="logo">📋 GTD Manager</span>
+  <a href="project-summary.html" class="active">📄 Feature Summary</a>
+  <a href="project-snippets.html">🔬 Code Snippets</a>
+  <a href="project-commits.html">📜 Commit Log</a>
+  <span class="updated">Last updated: 2026-04-29</span>
+</nav>
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+<aside>
+  <h3>Contents</h3>
+
+  <div class="section-label">Foundation</div>
+  <ul>
+    <li><a href="#feat-foundation">App Foundation</a></li>
+    <li><a href="#feat-inbox">Inbox Processing (AI)</a></li>
+    <li><a href="#feat-provider">AI Provider Selector</a></li>
+    <li><a href="#feat-metadata">Task Metadata</a></li>
+    <li><a href="#feat-locations">Location Tags</a></li>
+  </ul>
+
+  <div class="section-label">Task Views</div>
+  <ul>
+    <li><a href="#feat-waterfall">Waterfall Filtering</a></li>
+    <li><a href="#feat-project-add">Add Tasks to Projects</a></li>
+    <li><a href="#feat-dnd">Drag-and-Drop Order</a></li>
+    <li><a href="#feat-effort">Effort Estimates</a></li>
+    <li><a href="#feat-deferred">Deferred Bucket</a></li>
+  </ul>
+
+  <div class="section-label">AI Coaching</div>
+  <ul>
+    <li><a href="#feat-ai-review">AI Project Review</a></li>
+    <li><a href="#feat-review-modes">Review Metadata Mode</a></li>
+    <li><a href="#feat-next-enhancements">AI Assign Suggestions</a></li>
+  </ul>
+
+  <div class="section-label">Project Tree</div>
+  <ul>
+    <li><a href="#feat-collapsible-tree">Collapsible Tree</a></li>
+    <li><a href="#feat-descendant-badge">Descendant Badge</a></li>
+    <li><a href="#feat-reassign">Reassign to Project</a></li>
+  </ul>
+
+  <div class="section-label">UI Polish</div>
+  <ul>
+    <li><a href="#feat-title-edit">Inline Title Edit</a></li>
+    <li><a href="#feat-tag-display">Tag Display Toggle</a></li>
+    <li><a href="#feat-detail-panel">Task Detail Panel</a></li>
+    <li><a href="#feat-resizable">Resizable Panels</a></li>
+    <li><a href="#feat-effort-tracking">Actual Effort Tracking</a></li>
+    <li><a href="#feat-chat-update">AI Chat Task Updates</a></li>
+    <li><a href="#feat-note-rollup">Subtask Note Roll-up</a></li>
+    <li><a href="#feat-resizable-chat-input">Resizable Chat Input</a></li>
+    <li><a href="#feat-waterfall-invert">Bottom-Up Task Progression</a></li>
+  </ul>
+</aside>
+
+<!-- MAIN -->
+<main>
+  <h1>Feature Summary</h1>
+  <p class="subtitle">A complete guide to every feature in the GTD Manager — what it does, why it was built that way, and the React/JavaScript concepts it demonstrates. Written for developers with a sysadmin background who are new to React.</p>
+
+  <div class="intro-banner">
+    <h2>About this project</h2>
+    <p>GTD Manager is a personal productivity tool built as a single-page React app. It implements the full Getting Things Done (GTD) methodology — a trusted system for capturing, clarifying, organizing, reflecting on, and engaging with work. The app is powered by the Anthropic Claude API, which acts as an AI coach to help you process your inbox, review your projects, and stay on track.</p>
+    <p>Everything lives in one file: <code>src/App.jsx</code> (~2,900 lines). No backend. No database. State persists in <code>localStorage</code>. You run it with <code>npm run dev</code> and it opens in your browser.</p>
+    <div class="key-info">
+      <div class="info-item"><div class="label">Framework</div><div class="value">React 18 + Vite</div></div>
+      <div class="info-item"><div class="label">Styling</div><div class="value">Inline styles only</div></div>
+      <div class="info-item"><div class="label">Persistence</div><div class="value">localStorage</div></div>
+      <div class="info-item"><div class="label">AI</div><div class="value">Claude Sonnet 4.5 (Anthropic API)</div></div>
+      <div class="info-item"><div class="label">Total commits</div><div class="value">33 across 4 sessions</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-foundation">
+    <div class="feat-header">
+      <span class="feat-icon">🏗️</span>
+      <span class="feat-title">App Foundation</span>
+      <span class="feat-badge badge-core">Core</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>The foundation of the app: a set of shared data constants (bucket names, tag colors, effort levels), the <strong>task data model</strong> (a plain JavaScript object with about 12 fields), and the top-level <code>GTDManager</code> component that owns all application state and renders the sidebar navigation and main panel.</p>
+      <p>Every task is just a plain object: <code>{ id, text, bucket, done, created, priority[], location[], dueDate, effort, deferUntil, notes, childIds?, parentId? }</code>. Tasks are stored in a <code>tasks</code> array in React state, which in turn is serialized to <code>localStorage</code> on every change.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: useState and the State Array</h4>
+      <p><code>useState</code> is how React remembers data between renders. Think of it like a config variable in memory — but with a special setter function. When you call the setter, React automatically re-renders the component with the new value. The app's master task list is <code>const [tasks, setTasks] = useState([])</code>. Every add/edit/delete goes through <code>setTasks</code>.</p>
+    </div>
+
+    <div class="box box-design">
+      <h4>Design Decision: Everything in one component file</h4>
+      <p>Rather than splitting into many files, all state lives at the top level in <code>GTDManager</code> and flows down to child components as props. This makes it easy to understand the full data flow at a glance — at the cost of a very long file. For a personal tool this is a reasonable trade-off.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Think of <code>useState</code> like a variable in a shell script, except when you change it, the whole "script" re-runs from a checkpoint — only the parts that depend on that variable update in the DOM. React is basically a reactive render loop. The <code>COLORS</code> object is like sourcing a shared <code>vars.sh</code> file at the top of every script.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-colors">🔬 COLORS object</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-buckets">🔬 BUCKETS constant</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-data-model">🔬 Task data model</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-058bedd">📜 058bedd — Initial scaffold</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-81d5059">📜 81d5059 — localStorage persistence</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-inbox">
+    <div class="feat-header">
+      <span class="feat-icon">📥</span>
+      <span class="feat-title">Inbox Processing (AI Coach)</span>
+      <span class="feat-badge badge-ai">AI</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>The <strong>Process</strong> mode of the AI coach walks you through your inbox one item at a time. For each item, it asks the AI: "What is this? What's the next action?" The AI responds with a recommended bucket (Next Actions, Projects, Waiting For, Someday/Maybe, or Trash), a brief explanation, and a suggested rewrite of the task text.</p>
+      <p>A confirmation UI appears below the AI's response with a one-click "Move to [Bucket]" button. Accepting moves the item out of Inbox and optionally creates a linked project. Rejecting keeps it in Inbox for manual handling.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Controlled state for multi-step flows</h4>
+      <p>The processing flow is a small state machine: <code>processIndex</code> tracks which inbox item is being reviewed. When you click "Accept", <code>setProcessIndex(i + 1)</code> advances to the next item. React re-renders the AI panel showing the next inbox item automatically. No loops, no manual DOM manipulation — just state changes driving the view.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: extractSuggestions() — parsing AI text</h4>
+      <p>The AI returns freeform text, but the app needs structured data (a bucket name, an optional project name). The <code>extractSuggestions()</code> function uses regex to parse the AI's response text and pull out these fields. It's a pure function: same input always gives same output, no side effects. Pure functions are easy to test and reason about.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The inbox processor is like a triage script that reads items from a queue one by one, calls an external API for a recommendation, then waits for human confirmation before moving the item to the appropriate directory. The AI is the external API. <code>extractSuggestions()</code> is like <code>awk</code> or <code>grep -oP</code> parsing the API response.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-process-prompt">🔬 Process prompt</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-handle-confirm">🔬 handleConfirm()</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-extract-suggestions">🔬 extractSuggestions()</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-8d73f4c">📜 8d73f4c — AI inbox processing</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-provider">
+    <div class="feat-header">
+      <span class="feat-icon">🤖</span>
+      <span class="feat-title">AI Provider Selector</span>
+      <span class="feat-badge badge-ai">AI</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>The AI panel has a provider dropdown that lets you switch between the <strong>Anthropic Claude API</strong> (remote, requires API key) and <strong>local Ollama models</strong> (runs on your machine, no cost). The two providers use slightly different API formats: Anthropic uses its own format; Ollama speaks the OpenAI-compatible format.</p>
+      <p>The <code>callAI()</code> function checks the selected provider and constructs the appropriate <code>fetch</code> call, including the correct URL, headers, and request body shape.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: async/await with useCallback</h4>
+      <p><code>callAI</code> is an async function — it calls <code>fetch()</code>, which returns a Promise (a value that will exist later). The <code>await</code> keyword pauses execution until the Promise resolves. It's wrapped in <code>useCallback</code> so React doesn't recreate the function on every render (performance optimization). The dependency array <code>[provider, model, apiKey]</code> tells React to only recreate <code>callAI</code> when those values change.</p>
+    </div>
+
+    <div class="box box-design">
+      <h4>Design Decision: Direct browser API calls</h4>
+      <p>The app calls the Anthropic API directly from the browser, which requires a special header (<code>anthropic-dangerous-direct-browser-access: true</code>). Normally you'd proxy API calls through a backend to hide your API key. For a personal local tool, direct browser calls are acceptable — just never deploy this publicly with your key hardcoded.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p><code>callAI</code> is like a shell function that wraps <code>curl</code> — it knows the endpoint URL, sets the right headers, and handles both the Anthropic and OpenAI wire formats depending on a config variable. <code>useCallback</code> is like caching the compiled function so it doesn't get re-evaluated on every loop iteration.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-call-ai">🔬 callAI()</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-28e0c25">📜 28e0c25 — AI provider selector</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-gettaskcontext">🔬 getTaskContext() — full metadata context</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-aaf0e16">📜 aaf0e16 — Full metadata in AI context</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-metadata">
+    <div class="feat-header">
+      <span class="feat-icon">🏷️</span>
+      <span class="feat-title">Task Metadata (Priority, Due Date, Effort)</span>
+      <span class="feat-badge badge-core">Core</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>Every task row shows a compact metadata panel: colored priority chips (High / Medium / Low), an optional due date, and an effort estimate. Metadata fields are editable inline via small dropdowns and date pickers that appear on demand. Tasks past their due date are highlighted in red-orange.</p>
+      <p>Priority and location are arrays (multi-select). Due date is a string in <code>YYYY-MM-DD</code> format. Effort is a string like <code>"2h"</code> or <code>"15m"</code> that the <code>effortToMinutes()</code> helper converts to numbers for sorting and summing.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Controlled inputs</h4>
+      <p>Every editable field in the task row is a <em>controlled input</em> — meaning its value comes from React state, not from the DOM. When you change a date picker, the <code>onChange</code> handler calls <code>setTasks</code> with the new value. React re-renders with the updated value. The DOM never holds "truth" — React state does.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Immutable state updates (spread operator)</h4>
+      <p>To update one field on one task, you can't just do <code>task.dueDate = newDate</code> — React won't detect that change. Instead you build a new array: <code>tasks.map(t =&gt; t.id === id ? { ...t, dueDate: newDate } : t)</code>. The spread operator (<code>...t</code>) copies all existing fields; you then override just the one that changed. This is the "immutable update" pattern that React requires.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Immutable updates are like creating a new config file by copying the old one and changing one line, rather than editing in place. This is intentional — React uses object identity (reference equality) to detect changes. If you mutate the existing object, React sees the same reference and skips the re-render, like a Makefile that doesn't notice a file was touched because the inode didn't change.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-taskrow-sig">🔬 TaskRow signature</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-metadata-panel">🔬 Metadata panel</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-5cde89e">📜 5cde89e — Task metadata fields</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-locations">
+    <div class="feat-header">
+      <span class="feat-icon">📍</span>
+      <span class="feat-title">Location Tags</span>
+      <span class="feat-badge badge-core">Core</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>GTD encourages tagging Next Actions with <em>contexts</em> — the place or tool needed to do the task (e.g., @computer, @phone, @errands). The app implements this as a multi-select "location" tag with a customizable list managed in the <strong>Location Manager</strong> settings panel. You can add your own locations, delete ones you don't use, and assign multiple locations to one task.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Lifting state up</h4>
+      <p>The list of available location options is app-level state (it needs to be shared between the Location Manager settings panel <em>and</em> every TaskRow). This is "lifting state up" — rather than each component managing its own copy of the data, one parent owns the array and passes it down as props. Changes in the Location Manager flow back up via a callback prop, then back down to all task rows.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Lifting state up is like having a single source of truth in a config file that multiple services read. Rather than each service maintaining its own copy and risking drift, they all read from one place. The callback prop is the "write" interface — like a config management tool's API for updating that single source.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-location-manager">🔬 LocationManager component</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-6c37280">📜 6c37280 — Location tags</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-waterfall">
+    <div class="feat-header">
+      <span class="feat-icon">🌊</span>
+      <span class="feat-title">Waterfall Filtering &amp; Group-By</span>
+      <span class="feat-badge badge-core">Core</span>
+    </div>
+
+    <div class="feat-desc">
+      <p><strong>Waterfall filtering</strong> hides Next Actions whose parent project has incomplete predecessor tasks. In GTD terms: if Task B can't start until Task A is done, hide Task B from view until Task A is completed. This keeps your Next Actions list clean — only truly available work shows up.</p>
+      <p><strong>Group-By</strong> lets you organize Next Actions by location, project, due date, or effort. Selecting a group-by option splits the task list into labeled sections with a summary header showing the total effort for that group.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Derived state with pure functions</h4>
+      <p><code>waterfallFilter(tasks)</code> and <code>groupByField(tasks, field)</code> are pure functions — they take the tasks array and return a transformed version without touching state. They're called directly inside the render function: <code>const visible = waterfallFilter(tasks)</code>. There's no separate "filtered tasks" state to keep in sync. This is a key React pattern: compute derived views on the fly from the single source of truth.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Pure functions for derived views are like <code>jq</code> filters — you pipe your JSON through them to get a view without modifying the original. You wouldn't save the <code>jq</code> output back to disk and maintain it separately; you just re-run the filter each time you need the view. React does the same: re-runs the filter on every render.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-waterfall">🔬 waterfallFilter()</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-groupby">🔬 groupByField()</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-group-divider">🔬 GroupDivider component</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-68ef357">📜 68ef357 — Waterfall filter</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-053cffd">📜 053cffd — Group-by</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-project-add">
+    <div class="feat-header">
+      <span class="feat-icon">➕</span>
+      <span class="feat-title">Add Tasks to Projects</span>
+      <span class="feat-badge badge-core">Core</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>In the Projects view, each project row has an inline "Add task" input that lets you create a new child task directly under that project. The child task is added to the <code>tasks</code> array with its <code>parentId</code> set to the project's ID, and the project's <code>childIds</code> array is updated to include the new task's ID — maintaining the bidirectional parent/child link.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Multiple state updates in one handler</h4>
+      <p>Adding a child task requires updating two things at once: the new child task entry AND the parent's <code>childIds</code> array. In a single <code>setTasks</code> call, you map over the array, adding the new child object and updating the parent — all in one immutable update. React batches the re-render so the UI updates once, not twice.</p>
+    </div>
+
+    <div class="box box-design">
+      <h4>Design Decision: Bidirectional parent/child links</h4>
+      <p>Both the parent task (via <code>childIds[]</code>) and child task (via <code>parentId</code>) store references to each other. This redundancy makes it fast to answer both questions: "who are this project's children?" and "what project does this task belong to?" — without scanning the entire task array.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-add-project-task">🔬 addProjectTask()</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-ffc7764">📜 ffc7764 — Add tasks to projects</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-dnd">
+    <div class="feat-header">
+      <span class="feat-icon">🖱️</span>
+      <span class="feat-title">Drag-and-Drop Reordering</span>
+      <span class="feat-badge badge-ui">UI</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>In the Projects view, tasks can be reordered within their parent project by dragging and dropping. The drag handle (≡ icon) uses the HTML5 native drag-and-drop API. Dropping a task between two siblings reorders the <code>childIds</code> array of their shared parent, which immediately re-renders the tree in the new order.</p>
+      <p>The <code>moveTaskInTree()</code> function handles the reorder logic: find the parent, remove the dragged item from its current position, and insert it at the drop target's position.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Recursive components (ProjectTree)</h4>
+      <p>The <code>ProjectTree</code> component renders a task and then calls <em>itself</em> for each child: <code>{task.childIds.map(id =&gt; &lt;ProjectTree taskId={id} ... /&gt;)}</code>. This is a recursive component. React handles the recursion naturally — each nested call is just another component instance. The tree can be arbitrarily deep without any special loop logic.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Event handlers as props</h4>
+      <p>Drag-and-drop event handlers (<code>onDragStart</code>, <code>onDragOver</code>, <code>onDrop</code>) are passed as props to <code>ProjectTree</code>. The handlers themselves live at the top level (where <code>tasks</code> state lives) so they can call <code>setTasks</code>. Child components just invoke the callbacks they receive — they never manage state themselves.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>A recursive component is like a directory tree traversal function that calls itself for subdirectories. The drag-and-drop reorder is like moving an entry in an ordered list file (think <code>/etc/fstab</code> entry order) — you remove the line from one position and splice it in at another, then save the file. <code>moveTaskInTree()</code> is the splice logic.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-drag-helpers">🔬 Drag helper functions</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-drag-callbacks">🔬 Drag event callbacks</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-project-tree">🔬 ProjectTree component</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-186bf3e">📜 186bf3e — Drag-and-drop</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-effort">
+    <div class="feat-header">
+      <span class="feat-icon">⏱️</span>
+      <span class="feat-title">Effort Estimates &amp; Cumulative Totals</span>
+      <span class="feat-badge badge-core">Core</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>Tasks can be tagged with an effort estimate: 5m, 15m, 30m, 1h, 2h, 4h, or 8h. In the Projects view, each project row shows the <em>cumulative effort total</em> of all its incomplete descendants — so you can see at a glance how many hours of work a project contains. In Next Actions group-by views, each group header also shows a total effort.</p>
+      <p>The helper functions <code>effortToMinutes()</code> and <code>minutesToEffortLabel()</code> convert between the string labels and numeric minutes for arithmetic. <code>sumDescendantEffort()</code> recursively sums effort across the entire subtree.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Recursive pure functions over tree data</h4>
+      <p><code>sumDescendantEffort(taskId, tasks)</code> is a recursive pure function. It finds the task's children, calls itself on each child, and sums the results. Because it's pure (no side effects, same output for same input), it can be called freely inside render without concern. React will call it on every render, but that's fine — it's fast and correct.</p>
+    </div>
+
+    <div class="box box-design">
+      <h4>Design Decision: Effort as a human-readable string</h4>
+      <p>Effort is stored as a string (<code>"2h"</code>, <code>"30m"</code>) rather than a number of minutes. This makes the stored data human-readable if you inspect localStorage, and it's easy to display. The conversion to minutes only happens when you need to do math — a lazy conversion pattern.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-effort-helpers">🔬 effortToMinutes / minutesToEffortLabel</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-sumdescendanteffort">🔬 sumDescendantEffort()</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-effort-total">🔬 Effort total display</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-effort-manager">🔬 EffortManager component</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-61b3b06">📜 61b3b06 — Effort estimates</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-deferred">
+    <div class="feat-header">
+      <span class="feat-icon">⏰</span>
+      <span class="feat-title">Deferred Bucket (Virtual View)</span>
+      <span class="feat-badge badge-new">New — Apr 27</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>Any task can have a <code>deferUntil</code> date. Tasks with a future defer date are hidden from their normal bucket and shown instead in the <strong>Deferred</strong> virtual view. On the morning the defer date arrives, the task "wakes up" — it's removed from Deferred and appears back in Inbox for processing.</p>
+      <p>The <code>isDeferred(task)</code> helper function returns <code>true</code> if <code>task.deferUntil</code> is set and is still in the future. A <code>useEffect</code> hook runs on app startup to auto-wake any tasks whose defer date has passed.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Virtual views vs. stored state</h4>
+      <p>The Deferred bucket is not a real bucket — there's no <code>bucket: "deferred"</code> value stored on tasks. Instead, tasks keep their real bucket (<code>"inbox"</code>, <code>"next"</code>, etc.) and the Deferred view is computed by filtering for tasks where <code>isDeferred(task)</code> is true. This is the "virtual view" pattern: the view is a lens on the data, not a copy of it.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: useEffect for side effects on mount</h4>
+      <p><code>useEffect(() =&gt; { ... }, [])</code> with an empty dependency array runs once when the component first renders (like an initialization hook). The app uses this to check localStorage on startup, load saved tasks, and immediately sweep for any tasks whose <code>deferUntil</code> date has passed — moving them to Inbox.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The Deferred bucket is like <code>at</code> jobs or <code>cron</code> with a one-time future date. The task doesn't move into a "scheduled" queue on disk — it just has a timestamp, and a startup check (like a systemd <code>ConditionTimestamp</code>) decides whether to activate it. <code>useEffect</code> with <code>[]</code> is the app's equivalent of an <code>ExecStartPre</code> check that runs once on boot.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-isdeferred">🔬 isDeferred()</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-10df3a1">📜 10df3a1 — Deferred bucket foundation</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-8967d79">📜 8967d79 — Auto-wake deferred tasks</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-25fb6f1">📜 25fb6f1 — Inbox History bucket</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-829acef">📜 829acef — Deferred view polish</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-ai-review">
+    <div class="feat-header">
+      <span class="feat-icon">🔍</span>
+      <span class="feat-title">AI Project Review</span>
+      <span class="feat-badge badge-ai">AI</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>The <strong>Project Review</strong> AI mode walks you through each of your projects one by one. For each project, it shows the full task list and asks the AI: "Does this project have a clear next action? Are any tasks stale or blocked?" The AI responds with concrete suggestions.</p>
+      <p>In <strong>Tasks sub-mode</strong>, the AI suggests new next actions you could add. In <strong>Metadata sub-mode</strong>, it suggests updates to existing tasks' due dates, effort estimates, and defer dates — with per-suggestion accept/reject buttons so you can review each change individually.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Complex state for multi-step AI flows</h4>
+      <p>The project review state machine tracks: which project index you're on (<code>reviewIndex</code>), which sub-mode you're in (<code>reviewSubMode</code>), the AI's current suggestions array (<code>reviewSuggestions</code>), and which suggestions have been accepted/rejected (<code>reviewDecisions</code>). Each of these is a separate <code>useState</code> call. When you accept a suggestion, multiple state variables update in one event handler.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: extractSuggestions and extractMetadata</h4>
+      <p>Both <code>extractSuggestions()</code> and <code>extractMetadata()</code> are regex-based parsers that pull structured data out of the AI's freeform text response. <code>extractMetadata()</code> looks for patterns like <code>[TASK:id][DUE:2026-05-01]</code> in the AI's response and converts them into an array of update objects. The parser is the glue between natural language AI output and typed application state.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-extract-suggestions">🔬 extractSuggestions()</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-project-review-prompt">🔬 Project review prompt</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-review-callbacks">🔬 Review callbacks</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-879e53a">📜 879e53a — AI project review mode</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-review-modes">
+    <div class="feat-header">
+      <span class="feat-icon">📊</span>
+      <span class="feat-title">Project Review — Metadata Mode</span>
+      <span class="feat-badge badge-new">New — Apr 28</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>A second sub-mode for Project Review where the AI analyzes each task's metadata and suggests concrete updates: set a due date, change an effort estimate, defer a task to a specific future date. Each suggestion appears as a card with Accept (✓) and Reject (✗) buttons. Accepting a suggestion immediately applies the change to the task in state.</p>
+      <p>The AI is instructed to use a structured output format like <code>[TASK:abc123][DUE:2026-05-15]</code> so the <code>extractMetadata()</code> parser can reliably pull out the task ID and the new field values.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Per-item decision state</h4>
+      <p>Each metadata suggestion has its own accept/reject state stored in a <code>reviewDecisions</code> object keyed by suggestion index. This is a common React pattern for managing granular state across a dynamic list: use an object or Map where keys are item identifiers and values are the per-item state. When any decision changes, only the affected card re-renders.</p>
+    </div>
+
+    <div class="box box-design">
+      <h4>Design Decision: Structured AI output via prompt engineering</h4>
+      <p>The AI is told exactly what format to use for metadata suggestions in the system prompt. This is "prompt engineering" — shaping AI output so your parser can handle it reliably. The alternative (asking the AI to return JSON) works too, but bracketed tags are more robust to the AI adding extra explanation text around the structured data.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-extract-metadata">🔬 extractMetadata()</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-c917318">📜 c917318 — Metadata review sub-mode</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-082a7e1">📜 082a7e1 — Accept/reject suggestions</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-9b02952">📜 9b02952 — Metadata review polish</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-next-enhancements">
+    <div class="feat-header">
+      <span class="feat-icon">✨</span>
+      <span class="feat-title">AI Assign Suggestions</span>
+      <span class="feat-badge badge-ai">AI</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>In the AI Project Review (Tasks mode), when the AI suggests a new next action, a one-click "Assign to Project" button appears alongside the suggestion. Clicking it creates the task directly in the current project's children — no copy-pasting required. The AI's suggested text becomes the new task's title.</p>
+      <p>A secondary flow (<code>reassignProject</code>) handles the case where you want to re-parent an existing task to a different project during review — moving the task from one parent's <code>childIds</code> to another's.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Callbacks that close over state</h4>
+      <p>The "Assign" callback needs to know the current project ID and the suggested text — both of which come from the review loop's local scope. The callback is created fresh for each suggestion using the values available at render time. This is a JavaScript closure: the function "closes over" (captures) the variables from its enclosing scope.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-assign-callback">🔬 Assign callback</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-assign-ui">🔬 Assign UI</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-f98d445">📜 f98d445 — AI task assignment</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-4de6b06">📜 4de6b06 — Assignment UX polish</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-collapsible-tree">
+    <div class="feat-header">
+      <span class="feat-icon">🌳</span>
+      <span class="feat-title">Collapsible Project Tree</span>
+      <span class="feat-badge badge-new">New — Apr 27</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>In the Projects view, each project with children has a collapse/expand toggle (▶ / ▼). Three toolbar buttons allow bulk operations: <strong>≡ Projects Only</strong> (collapse all to top-level only), <strong>⊖ Collapse All</strong> (collapse entire tree), and <strong>⊕ Expand All</strong> (expand everything). The collapsed/expanded state for each task is tracked in a <code>collapsedIds</code> Set stored in React state.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Set as state value</h4>
+      <p>A JavaScript <code>Set</code> (like a hashset) is used to track which task IDs are currently collapsed. This is more efficient than scanning an array. But Sets are mutable objects, so you can't just <code>set.add(id)</code> and call <code>setCollapsedIds(set)</code> — React won't detect the change (same reference). Instead, you create a new Set: <code>setCollapsedIds(new Set([...prev, id]))</code>. Same immutability rule as arrays.</p>
+    </div>
+
+    <div class="box box-design">
+      <h4>Design Decision: Collapse state is not persisted</h4>
+      <p>The collapsed/expanded state resets every time you reload the page (it's not saved to localStorage). This is intentional — the last-used collapse state is ephemeral UI preference, not data. Persisting it would add complexity (serializing a Set to JSON, loading it back) for little benefit.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-sumdescendanteffort">🔬 sumDescendantEffort() (tree recursion)</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-b889c8e">📜 b889c8e — Collapsible tree foundation</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-8f9b157">📜 8f9b157 — Bulk collapse/expand buttons</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-1bb1bfc">📜 1bb1bfc — Collapse state polish</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-descendant-badge">
+    <div class="feat-header">
+      <span class="feat-icon">🔢</span>
+      <span class="feat-title">Descendant Count Badge</span>
+      <span class="feat-badge badge-ui">UI</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>Each project row in the tree shows a small badge like <code>↓ 3 / 8</code> — meaning 3 incomplete tasks out of 8 total descendants. This gives you a quick at-a-glance health indicator without expanding the tree. The counts are recursive, including grandchildren and deeper.</p>
+      <p>The <code>countDescendants(taskId, tasks)</code> function returns an object <code>{ incomplete, total }</code> by recursively summing across the task's children.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Memoization with useMemo</h4>
+      <p>Computing descendant counts for every project on every render could be expensive for deep trees. <code>useMemo</code> caches the result of an expensive computation and only recomputes when its dependencies change. Example: <code>const counts = useMemo(() =&gt; countDescendants(id, tasks), [id, tasks])</code>. If <code>tasks</code> hasn't changed, the cached value is returned immediately.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p><code>useMemo</code> is like caching the output of a slow command with <code>$(cat /tmp/cache)</code> and only re-running if the source file's mtime has changed. React's dependency array is the "has input changed?" check. If the check passes (no change), skip the computation and return the cached value.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-countdescendants">🔬 countDescendants()</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-94813ac">📜 94813ac — Descendant count badge</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-reassign">
+    <div class="feat-header">
+      <span class="feat-icon">🔀</span>
+      <span class="feat-title">Reassign Task to Different Project</span>
+      <span class="feat-badge badge-new">New — Apr 28</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>In the Task Detail Panel, a "Move to project" dropdown lets you re-parent a task from one project to another. This requires updating three things atomically: removing the task from the old parent's <code>childIds</code>, adding it to the new parent's <code>childIds</code>, and updating the task's own <code>parentId</code>.</p>
+      <p>The <code>reassignProject(taskId, newParentId, tasks)</code> function handles all three updates in a single <code>tasks.map()</code> pass, keeping the state update atomic.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Atomic multi-record updates</h4>
+      <p>When you need to update multiple tasks in one logical operation, do it in a single <code>setTasks(tasks.map(...))</code> call. This guarantees the state is never in an inconsistent intermediate state (e.g., where the child has a new <code>parentId</code> but the old parent still lists it in <code>childIds</code>). React processes the update as one transaction and renders once with the fully-updated state.</p>
+    </div>
+
+    <div class="box box-design">
+      <h4>Design Decision: Cycle detection with a visited Set</h4>
+      <p>Before allowing a reassignment, the app checks that you're not creating a cycle (assigning a task to be a child of one of its own descendants). The check uses a <code>visited</code> Set to track nodes already seen during tree traversal — the standard way to detect cycles in a graph. Without this, the recursive tree renderer would loop infinitely.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-reassign">🔬 reassignProject()</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-9000fb5">📜 9000fb5 — Reassign to project</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-title-edit">
+    <div class="feat-header">
+      <span class="feat-icon">✏️</span>
+      <span class="feat-title">Inline Title Editing</span>
+      <span class="feat-badge badge-ui">UI</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>Each task title has a pencil (✏️) icon that toggles the title into an editable text input. Pressing Enter or blurring the input saves the change. Pressing Escape cancels without saving. The edit state is local to the task row component — it doesn't propagate to the parent.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Local component state vs. app state</h4>
+      <p>Whether a title is being edited is local state — only the TaskRow needs to know. It's stored with a local <code>useState</code> inside <code>TaskRow</code>, not in the top-level <code>GTDManager</code>. The edit buffer (the in-progress text) is also local state. Only when the user confirms the edit does the change propagate up to app state via a callback. This keeps unrelated state isolated and the UI responsive.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: useRef for focusing inputs</h4>
+      <p>When the pencil icon is clicked, the title input should immediately receive keyboard focus. <code>useRef</code> gives you a direct reference to a DOM element so you can call <code>.focus()</code> on it imperatively. This is one of the few cases where "reaching into the DOM" is the right approach — focus management is inherently imperative and doesn't fit the declarative state model.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-title-edit">🔬 Title edit UI</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-988d26a">📜 988d26a — Inline title editing</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-tag-display">
+    <div class="feat-header">
+      <span class="feat-icon">🏷️</span>
+      <span class="feat-title">Tag Display Toggle</span>
+      <span class="feat-badge badge-ui">UI</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>A settings toggle controls how tags (priority, location) are displayed in task rows: either as colored <strong>chips</strong> (colored pill badges) or as compact <strong>dot indicators</strong>. The dot view saves horizontal space; the chip view is more readable. The preference is saved to localStorage.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Conditional rendering</h4>
+      <p>The task row renders either the chip view or the dot view based on a boolean setting: <code>{tagDisplay === 'chip' ? &lt;ChipView /&gt; : &lt;DotView /&gt;}</code>. This is conditional rendering — JSX is just JavaScript expressions, so you can use ternaries, <code>&&</code> operators, or if-statements anywhere inside the render output. There's no special template syntax like <code>v-if</code> or <code>*ngIf</code>.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-tag-display-setting">🔬 Tag display setting</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-tag-display-chip">🔬 Tag display chip variant</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-6f2abf9">📜 6f2abf9 — Tag display toggle</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-detail-panel">
+    <div class="feat-header">
+      <span class="feat-icon">📋</span>
+      <span class="feat-title">Task Detail Panel</span>
+      <span class="feat-badge badge-new">New — Apr 28</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>Clicking any task title opens a <strong>360px side panel</strong> on the right side of the screen. The panel shows the full task: an editable title, a multi-line notes textarea (autosaves on blur), all metadata fields (due date, defer date, effort, locations), a bucket move dropdown, and complete/delete buttons. The panel closes via ×, Escape, or when you change the bucket.</p>
+      <p>Only one panel can be open at a time, controlled by a single <code>selectedTaskId</code> state value. The panel is rendered conditionally: <code>{selectedTaskId &amp;&amp; &lt;TaskDetailPanel /&gt;}</code>.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Conditional rendering with &amp;&amp;</h4>
+      <p>The short-circuit <code>&amp;&amp;</code> pattern is the idiomatic way to conditionally render something in React: <code>{selectedTaskId &amp;&amp; &lt;TaskDetailPanel taskId={selectedTaskId} /&gt;}</code>. If <code>selectedTaskId</code> is <code>null</code>, the expression short-circuits and nothing renders. If it's set, <code>TaskDetailPanel</code> renders. No if-statement needed.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Autosave with onBlur</h4>
+      <p>The notes textarea in the detail panel uses <code>onBlur</code> (fires when the element loses focus) rather than <code>onChange</code> (fires on every keystroke) to save notes. This avoids a <code>setTasks</code> call on every character typed — saving only when the user tabs away or clicks elsewhere. The in-progress text is held in local component state as a buffer.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The detail panel is like a modal config editor — it reads the current config (task state), lets you edit all fields, and writes back only when you're done (<code>onBlur</code> autosave). <code>selectedTaskId</code> is like a file descriptor or lock — there's only one open at a time, and closing it (setting to <code>null</code>) releases it.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-taskdetailpanel">🔬 TaskDetailPanel component</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-metadata-panel">🔬 Metadata editing panel</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-2c2d21e">📜 2c2d21e — Task detail panel</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-f7666ec">📜 f7666ec — Detail panel polish</a>
+    </div>
+  </section>
+
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-resizable">
+    <div class="feat-header">
+      <span class="feat-icon">↔️</span>
+      <span class="feat-title">Resizable Panels</span>
+      <span class="feat-badge badge-new">New — Apr 29</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>The three main layout regions — sidebar, AI coach panel, and task detail panel — are all resizable by dragging a handle between them. Dragging the handle fires mouse events that update a width/height value in state, which immediately re-renders the layout with the new dimensions. Panel sizes persist to localStorage so they survive page reloads.</p>
+      <p>A custom hook <code>useResizer(defaultSize, storageKey, min, max)</code> encapsulates all the drag logic: attaching/removing mouse event listeners, clamping the value to min/max bounds, and persisting to localStorage.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Custom hooks</h4>
+      <p>A custom hook is a regular JavaScript function whose name starts with <code>use</code> and which calls one or more React hooks internally. <code>useResizer</code> calls <code>useState</code> (to hold the current size) and <code>useEffect</code> (to manage the global <code>mousemove</code>/<code>mouseup</code> event listeners). You call it like: <code>const [sidebarWidth, sidebarHandlers] = useResizer(240, 'sidebarWidth', 160, 400)</code>. Custom hooks let you extract and reuse stateful logic without copy-pasting.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: useEffect cleanup functions</h4>
+      <p>When you add a global <code>mousemove</code> listener in a <code>useEffect</code>, you must remove it when the component unmounts (or when the effect re-runs). The cleanup function is the return value of the effect: <code>useEffect(() =&gt; { window.addEventListener('mousemove', handler); return () =&gt; window.removeEventListener('mousemove', handler); }, [...])</code>. Without cleanup, you'd leak event listeners every time the component re-renders.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>A custom hook is like a reusable shell function or a Bash library you <code>source</code> into multiple scripts. It bundles related state and behavior so you don't duplicate it. The <code>useEffect</code> cleanup is like a trap on <code>EXIT</code> — it ensures you clean up resources (event listeners) when you're done, just like a trap removes temp files when a script exits.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-useresizer">🔬 useResizer() custom hook</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-450857c">📜 450857c — Resizable panels</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-effort-tracking">
+    <div class="feat-header">
+      <span class="feat-icon">⏱️</span>
+      <span class="feat-title">Actual Effort Tracking &amp; AI Calibration</span>
+      <span class="feat-badge badge-new">New — Apr 29</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>The app now tracks two effort values per task: <strong>estimated</strong> (what you thought it would take) and <strong>actual</strong> (what it really took). When you mark a task as complete and it has an effort estimate but no actual time recorded, a <strong>modal dialog</strong> appears asking "how long did it actually take?" You can pick a value or skip. Completed tasks that have both values show a paired chip like <code>⏱ 30m → 1h</code>, colour-coded green (on time or under), amber (up to 25% over), or red (significantly over). The Task Detail Panel has separate <em>Estimated</em> and <em>Actual</em> rows with a live percentage delta badge.</p>
+      <p>Over time, the app builds a per-label <strong>calibration table</strong> in Settings → Effort Calibration. Once you have 3+ completed tasks per label, the AI uses those averages when suggesting effort during inbox processing and project metadata review. You can also set a manual override per label before you have enough data.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Modal overlays with <code>position: fixed</code></h4>
+      <p>The actual effort prompt is a separate React component called <code>ActualEffortPrompt</code>. It only renders when a piece of state — <code>actualEffortPrompt</code> — is non-null: <code>{"{actualEffortPrompt && <ActualEffortPrompt ... />}"}</code>. The component uses <code>position: fixed; inset: 0</code> to cover the entire viewport with a semi-transparent backdrop, then centres a card in the middle with <code>display: flex; align-items: center; justify-content: center</code>. When the user saves or skips, the callback sets <code>actualEffortPrompt</code> back to <code>null</code> and the modal vanishes.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: <code>useCallback</code> and dependency arrays</h4>
+      <p><code>useCallback</code> memoizes a function — React reuses the same function object across re-renders instead of creating a new one every time. The second argument is a dependency array: <code>useCallback(fn, [dep1, dep2])</code>. React only recreates the function when a listed dependency changes. The <code>completeTask</code> function reads directly from the <code>tasks</code> array to check whether to show the prompt, so it lists <code>tasks</code> in its dependency array — otherwise it would see a stale snapshot.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Derived state vs. stored state</h4>
+      <p>The calibration averages are <strong>not stored anywhere</strong> — they are computed fresh every render from the <code>tasks</code> array. This is called <em>derived state</em>: if you can calculate it from data you already have, don't persist it separately. Storing it would create a second source of truth that can drift out of sync (e.g. delete a completed task and the stored average becomes wrong). Only the manual overrides — a deliberate user decision that can't be derived from tasks — are persisted to a separate <code>localStorage</code> key.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The modal is like a <code>read -p "How long did that actually take? "</code> prompt that blocks a script after a long-running step. The calibration table is like a cron job that reads log files to compute average job durations, then passes those averages as hints to a scheduler — except here it happens in real-time inside React rather than on a schedule. The derived-state principle is the same as a database view: derive what you can from canonical data rather than storing a redundant copy.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-effort-accuracy-color">🔬 effortAccuracyColor() helper</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-complete-task-prompt">🔬 completeTask() with modal intercept</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-actual-effort-modal">🔬 ActualEffortPrompt modal component</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-taskdetail-effort-rows">🔬 TaskDetailPanel — Estimated / Actual rows</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-build-calibration-context">🔬 buildCalibrationContext() — AI prompt builder</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-effort-calibration-manager">🔬 EffortCalibrationManager — Settings UI</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-9ceebdc">📜 9ceebdc — Actual effort tracking UI</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-9387df5">📜 9387df5 — Effort calibration + AI integration</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-91da3c8">📜 91da3c8 — Clear actualEffort on un-complete</a>
+    </div>
+  </section>
+
+  <section class="feat" id="feat-chat-update">
+    <h2>AI Chat Task Updates</h2>
+    <p>
+      Previously, asking the AI coach to update a task (e.g. "add these notes to the trip task") would result in a confident-sounding reply — "Done! ✅" — but nothing would actually change. The AI had no mechanism to write back to the app. This feature gives the AI a structured action protocol to modify existing tasks directly from the Chat panel.
+    </p>
+    <p>
+      The fix has four parts that work together as a pipeline:
+    </p>
+    <p>
+      <strong>1 — Expose task IDs in context.</strong> The AI can only update a task if it knows its ID. <code>getTaskContext()</code> now prefixes every task line with <code>[id:abc123]</code>. The AI reads this tag and echoes it back in the action line.
+    </p>
+    <p>
+      <strong>2 — Teach the AI the action format.</strong> The Chat mode system prompt now includes a new <code>→ACTION:update</code> protocol. When the user explicitly asks to change something, the AI ends its reply with a single structured line:
+      <code>→ACTION:update|&lt;task_id&gt;|field:value[|field:value...]</code>
+      Eight fields are supported: <code>due</code>, <code>defer</code>, <code>effort</code>, <code>bucket</code>, <code>title</code>, <code>priority</code>, <code>location</code>, and <code>notes</code> (which must always be last, and uses <code>
+</code> for line breaks).
+    </p>
+    <p>
+      <strong>3 — Parse and apply the action.</strong> A new <code>extractUpdateAction()</code> helper reads the action line from the AI reply. It splits pipe-delimited key:value pairs, handles <code>notes</code> specially (everything after <code>notes:</code> to end of line is the value, so pipe characters inside notes don't break the parser), and decodes <code>
+</code> back to real newlines. The <code>callAI</code> hook then calls <code>updateTask(id, changes)</code> immediately — no confirmation step required because the user explicitly asked for it.
+    </p>
+    <p>
+      <strong>4 — Show a confirmation chip.</strong> The <code>ChatBubble</code> component renders a small pill badge below the AI text: <em>✏️ Updated "Task name" — notes · due date</em>. This gives visible feedback that something actually happened, distinguishing a real update from an AI that merely claims to have done something.
+    </p>
+
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Regex with the <code>s</code> (dotAll) flag.</strong> The pattern <code>/→ACTION:update\|([^|
+]+)\|(.*)/s</code> uses the <code>s</code> flag so that <code>.*</code> matches newlines too — essential for capturing multi-line notes content. Without this flag, <code>.</code> stops at the first newline.
+    </p>
+    <p>
+      <strong>Structured text protocols between LLM and app.</strong> Rather than using the Anthropic tool-use API, this feature uses a plain text convention — a specially formatted line the AI appends to its response. The app side parses it with a regex. This pattern is simpler to implement and works the same way with any LLM provider (including local Ollama models).
+    </p>
+    <p>
+      <strong><code>useCallback</code> dependency hygiene.</strong> Because <code>callAI</code> now calls <code>updateTask</code>, <code>updateTask</code> must be listed in <code>callAI</code>'s dependency array. Omitting it would cause React to capture a stale closure — <code>callAI</code> would silently use an old version of <code>updateTask</code> that doesn't reflect the current task list.
+    </p>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-extract-update-action">🔬 extractUpdateAction() — parse AI update tag</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-callai-update-block">🔬 callAI — apply update + build chip</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-chat-update-bubble">🔬 ChatBubble — confirmation chip</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-gettaskcontext">🔬 getTaskContext() — task ID in context</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-d4aeae8">📜 d4aeae8 — AI chat task update feature</a>
+    </div>
+  </section>
+
+  <section class="feat" id="feat-note-rollup">
+    <h2>Subtask Note Roll-up</h2>
+    <p>
+      When you complete a subtask that has notes, those notes now have a path to stay visible — they can be appended to the root project's notes field before the subtask disappears into Completed. Without this, completing a subtask meant its notes were only accessible by navigating to the Completed bucket and hunting for the task.
+    </p>
+    <p>
+      <strong>How it works:</strong> The moment you check a subtask done, if it has notes and a parent task, a modal prompt appears: <em>"📋 Roll up notes?"</em> It shows the subtask name, the target project name, and a preview of the notes. You can confirm or skip — the task completes either way. If the task also has an effort estimate, the effort prompt follows the roll-up prompt, so both can be handled in sequence.
+    </p>
+    <p>
+      <strong>Editable heading:</strong> The entry that gets stamped into the project notes has a default heading — <code>✓ Subtask name (Apr 29):</code> — but it's editable in the prompt. You can rename it to anything before confirming, which is useful when the subtask name alone doesn't give enough context at the project level.
+    </p>
+    <p>
+      <strong>Root project targeting:</strong> The roll-up always goes to the <em>top</em> of the parent chain, not just one level up. A third-level subtask (subtask of a subtask) skips its intermediate parent and lands in the root project. This keeps all accumulated context in one place regardless of how deep the hierarchy goes.
+    </p>
+    <p>
+      <strong>Appended format in the project notes:</strong>
+    </p>
+    <pre style="background:var(--surface2,#1e1e1e);padding:10px 14px;border-radius:7px;font-size:12px;line-height:1.6;overflow-x:auto">✓ Book flights (Apr 29):
+Seat 14A confirmed. Departs 7am, returns Mon 9pm.
+
+---
+✓ Book hotel (Apr 30):
+Marriott downtown. Confirmation #XYZ123.</pre>
+
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Graph traversal with a visited set.</strong> <code>findRootProject()</code> walks the <code>parentId</code> chain upward using a <code>while</code> loop. The <code>visited</code> Set guards against infinite loops in case of a corrupt data cycle — if a node has already been seen, the loop exits. This is a standard pattern for traversing a linked list or tree upward to the root.
+    </p>
+    <p>
+      <strong>Factoring out a shared continuation.</strong> Both the "confirm" and "skip" paths of the roll-up prompt need to do the same thing afterward: check whether an effort prompt is also needed, then complete the task. Rather than duplicating that logic, it's extracted into <code>finishComplete(taskId)</code>. Each handler calls it after its own work is done. This is a common refactor pattern — when two code paths converge at the same step, pull that step into a named function.
+    </p>
+    <p>
+      <strong>Initialising component state from a prop.</strong> <code>NoteRollupPrompt</code> computes the default heading from <code>taskText</code> and today's date, then stores it in <code>useState(defaultHeading)</code>. This is a one-time initialisation — the prop is read once at mount and then React owns the value. Subsequent edits update the state without touching the prop, which is exactly the right pattern for an editable field with a smart default.
+    </p>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-find-root-project">🔬 findRootProject() — walk parentId chain</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-complete-task-rollup">🔬 completeTask() — roll-up + effort sequencing</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-handle-rollup-confirm">🔬 handleRollupConfirm() + finishComplete()</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-note-rollup-prompt">🔬 NoteRollupPrompt — modal with editable heading</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-82ba54c">📜 82ba54c — Note roll-up on completion</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-68c0261">📜 68c0261 — Editable roll-up heading</a>
+    </div>
+  </section>
+
+  <section class="feat" id="feat-resizable-chat-input">
+    <h2>Resizable Chat Input</h2>
+    <p>
+      The chat input textarea previously had a fixed maximum height of 80px — enough for a couple of lines before text started scrolling. When composing longer prompts (e.g. pasting a block of notes to ask the AI about), this made it hard to see and edit what you'd written. The input box can now be resized by dragging a handle just above it, the same way the sidebar, coach panel, and detail panel are resized.
+    </p>
+    <p>
+      Dragging the thin bar upward expands the textarea; dragging down shrinks it. The height persists in <code>localStorage</code> under the key <code>gtd_chat_input_h</code>, so it remembers your preferred size across reloads. The range is 36px (one line) to 300px.
+    </p>
+
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Reusing an existing hook.</strong> The entire resize behaviour — mouse tracking, clamping to min/max, localStorage persistence — is already encapsulated in the <code>useResizer</code> hook built for the panel resize feature. Adding the chat input resize required only one new <code>useResizer</code> call, one <code>&lt;ResizeHandle&gt;</code> element, and changing the textarea's fixed <code>maxHeight</code> to a dynamic <code>height</code>. This is the payoff of writing well-scoped hooks: new use cases cost almost nothing.
+    </p>
+
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-b0965e3">📜 b0965e3 — Resizable chat input</a>
+    </div>
+  </section>
+
+  <section class="feat" id="feat-waterfall-invert">
+    <h2>Bottom-Up Task Progression (Inverted Waterfall)</h2>
+    <p>
+      The original waterfall filter showed tasks from the top down: level-2 subtasks (direct children of a
+      project) were always visible in Next Actions, and level-3 tasks appeared only after their parent was
+      done. This meant working from large to small — the project parent was always in view even before any
+      of its children were complete. The new rule inverts this: a task is visible in Next Actions
+      <em>only when it has no incomplete next-action children</em>. You see the most granular actions
+      first and work upward — leaf nodes surface, then their parents appear as the leaves are completed.
+    </p>
+    <p>
+      Two related improvements shipped with this change. First, the note roll-up target was changed from the
+      root project to the <em>immediate parent</em>. When you complete a level-3 subtask with notes, those
+      notes are appended to the level-2 task rather than skipping all the way to the top-level project — a
+      more natural home for fine-grained progress detail. (When you later complete the level-2 task, its own
+      notes can roll up to the level-1 project, building the record layer by layer.) The
+      <code>findRootProject</code> helper that walked the full ancestor chain was removed; the code now
+      simply calls <code>tasks.find(t =&gt; t.id === task.parentId)</code>.
+    </p>
+    <p>
+      Second, a new safety check fires when you complete any task that still has children sitting in the
+      Deferred or Someday bucket. A modal lists those children and offers two choices: <strong>Review
+      first</strong> (closes the modal without completing, so you can go look at those items) or
+      <strong>Complete anyway</strong> (bypasses the check and continues through the normal
+      roll-up &rarr; effort sequence). This prevents accidentally closing out a project while related but
+      deferred subtasks are forgotten.
+    </p>
+
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Deriving a filtered view with <code>Array.filter()</code>.</strong>
+      <code>waterfallFilter</code> is a plain JavaScript function — not a hook, not a component. It takes
+      two arrays (the tasks already in the "next" bucket, and the full task list) and returns a new array
+      containing only the tasks that pass the leaf-node rule. React re-runs this function every render,
+      so the visible list always reflects the latest state. Nothing is stored separately — the filter is
+      a pure computation over the data you already have.
+    </p>
+    <p>
+      <strong>Options objects as flexible function arguments.</strong>
+      <code>completeTask(id, options = {})</code> gains an optional second argument. Callers that don't
+      pass anything get the default <code>{}</code>; the deferred-check handler passes
+      <code>{ skipDeferCheck: true }</code> to re-enter the function and skip only that first check while
+      still running the roll-up and effort prompts. This avoids duplicating the cascade logic or adding a
+      separate function — the same function handles both entry points.
+    </p>
+    <p>
+      <strong>Sequencing multiple modals with a single shared function.</strong>
+      Three possible prompts can appear one after another when you complete a task: the deferred-child
+      check, the note roll-up, and the effort prompt. Each check is guarded by <code>return</code> after
+      setting its state, so only one modal is ever shown at a time. The deferred-check handler calls
+      <code>completeTask(taskId, { skipDeferCheck: true })</code> after clearing its own state,
+      which re-enters the function and picks up at check #2. The roll-up handler then calls
+      <code>finishComplete()</code>, which handles check #3. The result is a clean step-by-step sequence
+      driven entirely by state, with no timers or promise chains.
+    </p>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-waterfall-filter-inverted">🔬 waterfallFilter() — leaf-node rule</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-complete-task-checks">🔬 completeTask() — three-check cascade</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-defer-check-prompt">🔬 DeferCheckPrompt modal</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-5779170">📜 5779170 — Bottom-up waterfall + deferred check</a>
+    </div>
+  </section>
+
+</main>
+</div>
+
+</body>
+</html>

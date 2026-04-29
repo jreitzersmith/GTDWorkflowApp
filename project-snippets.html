@@ -1,0 +1,2609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GTD Workflow App — Code Snippets (Appendix A)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+  :root {
+    --bg:       #111210;
+    --surface:  #1a1c18;
+    --surface2: #222420;
+    --surface3: #2a2c28;
+    --border:   #333530;
+    --border2:  #404240;
+    --text:     #e8e4dc;
+    --text2:    #a8a49c;
+    --muted:    #5a5c58;
+    --inbox:    #e8c84a;
+    --next:     #5ab878;
+    --project:  #5a8fd4;
+    --waiting:  #d4845a;
+    --someday:  #9a8ad4;
+    --effort:   #6ec6a8;
+    --danger:   #d45a5a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; line-height: 1.7; }
+
+  /* ── Top nav bar ── */
+  .topnav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: var(--surface); border-bottom: 1px solid var(--border2);
+    height: 44px; display: flex; align-items: center; padding: 0 20px; gap: 16px;
+  }
+  .topnav .app-name { font-size: 12px; font-weight: 600; color: var(--text2); letter-spacing: .06em; text-transform: uppercase; margin-right: 8px; white-space: nowrap; }
+  .topnav .file-links { display: flex; gap: 4px; }
+  .topnav .file-links a, .topnav .file-links .current {
+    font-size: 12px; padding: 4px 12px; border-radius: 6px; text-decoration: none; white-space: nowrap;
+    border: 1px solid var(--border2); transition: background .15s;
+  }
+  .topnav .file-links a { color: var(--text2); background: transparent; }
+  .topnav .file-links a:hover { background: var(--surface2); color: var(--text); }
+  .topnav .file-links .current { color: var(--text); background: var(--project); border-color: var(--project); font-weight: 600; cursor: default; }
+  .topnav .updated { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  /* ── Layout ── */
+  .shell { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; padding-top: 44px; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 20px 0; position: sticky; top: 44px; height: calc(100vh - 44px); overflow-y: auto;
+  }
+  .sidebar h2 { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 16px 6px; font-weight: 600; }
+  .sidebar .group-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; padding: 10px 16px 2px; }
+  .sidebar a { display: block; padding: 3px 16px 3px 24px; font-size: 11.5px; color: var(--text2); text-decoration: none; border-left: 2px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar a:hover { color: var(--text); background: var(--surface2); }
+
+  /* ── Main ── */
+  main { padding: 40px 60px; max-width: 900px; }
+  h1 { font-family: Georgia, serif; font-size: 28px; font-weight: 300; color: var(--text); margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 12px; margin-bottom: 36px; }
+  h2 { font-family: Georgia, serif; font-size: 18px; font-weight: 400; color: var(--text2); margin: 36px 0 20px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+  a { color: var(--project); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: "SF Mono","Fira Code","Consolas",monospace; font-size: 11.5px; background: var(--surface3); border: 1px solid var(--border2); padding: 1px 5px; border-radius: 3px; color: var(--effort); }
+
+  /* ── Snippet entries ── */
+  .snippet { scroll-margin-top: 60px; margin-bottom: 40px; }
+  .snip-header {
+    background: var(--surface3); border: 1px solid var(--border2);
+    border-bottom: none; border-radius: 6px 6px 0 0;
+    padding: 7px 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .snip-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .snip-file { font-family: monospace; font-size: 11px; color: var(--muted); margin-left: auto; }
+  .snip-back { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .snip-back a { color: var(--muted); font-size: 11px; }
+  .snip-back a:hover { color: var(--text2); text-decoration: underline; }
+
+  /* Override highlight.js container to match our border radius */
+  .hljs-wrap { border-radius: 0 0 6px 6px; border: 1px solid var(--border2); overflow: hidden; }
+  .hljs-wrap pre { margin: 0; border-radius: 0; border: none; }
+  pre code.hljs { padding: 16px 18px; font-size: 12.5px; line-height: 1.6; font-family: "SF Mono","Fira Code","Consolas",monospace; }
+
+  /* Inline annotation boxes below snippets */
+  .annotation {
+    background: var(--surface2); border: 1px solid var(--border); border-left: 3px solid var(--someday);
+    border-radius: 0 6px 6px 0; padding: 8px 12px; font-size: 12px; color: var(--text2);
+    margin-top: 8px; margin-bottom: 4px;
+  }
+  .annotation strong { color: var(--someday); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+</style>
+</head>
+<body>
+
+<!-- ══ TOP NAV ══ -->
+<header class="topnav">
+  <span class="app-name">GTD Workflow App</span>
+  <div class="file-links">
+    <a href="project-summary.html">📄 Feature Summary</a>
+    <span class="current">📝 Code Snippets</span>
+    <a href="project-commits.html">📦 Commit Log</a>
+  </div>
+  <span class="updated">Last updated: 2026-04-29</span>
+</header>
+
+<div class="shell">
+
+<!-- ══ SIDEBAR ══ -->
+<nav class="sidebar">
+  <h2>All Snippets</h2>
+  <div class="group-label">Constants &amp; Data</div>
+  <a href="#snip-colors">COLORS object</a>
+  <a href="#snip-buckets">BUCKETS / COACH_MODES</a>
+  <a href="#snip-data-model">Task data model</a>
+  <div class="group-label">Helper Functions</div>
+  <a href="#snip-isdeferred">todayStr + isDeferred</a>
+  <a href="#snip-effort-helpers">effortToMinutes / label</a>
+  <a href="#snip-waterfall">waterfallFilter</a>
+  <a href="#snip-groupby">groupByField</a>
+  <a href="#snip-countdescendants">countDescendants</a>
+  <a href="#snip-sumdescendanteffort">sumDescendantEffort</a>
+  <a href="#snip-extract-suggestions">extractSuggestions</a>
+  <a href="#snip-extract-metadata">extractMetadata</a>
+  <a href="#snip-drag-helpers">getOrderedChildren / moveTaskInTree</a>
+  <div class="group-label">Custom Hooks</div>
+  <a href="#snip-useresizer">useResizer hook</a>
+  <div class="group-label">AI Integration</div>
+  <a href="#snip-process-prompt">SYSTEM_PROMPTS.process</a>
+  <a href="#snip-project-review-prompt">SYSTEM_PROMPTS.projectReview</a>
+  <a href="#snip-call-ai">callAI function</a>
+  <a href="#snip-gettaskcontext">getTaskContext()</a>
+  <a href="#snip-extract-update-action">extractUpdateAction()</a>
+  <a href="#snip-callai-update-block">callAI — update block</a>
+  <a href="#snip-chat-update-bubble">ChatBubble — update chip</a>
+  <a href="#snip-handle-confirm">handleConfirmMove</a>
+  <a href="#snip-review-callbacks">reviewProject / advance</a>
+  <div class="group-label">State &amp; Callbacks</div>
+  <a href="#snip-assign-callback">assignToProject</a>
+  <a href="#snip-reassign">reassignProject</a>
+  <a href="#snip-drag-callbacks">drag event handlers</a>
+  <div class="group-label">Components</div>
+  <a href="#snip-taskrow-sig">TaskRow signature</a>
+  <a href="#snip-project-tree">ProjectTree (recursive)</a>
+  <a href="#snip-group-divider">GroupDivider</a>
+  <a href="#snip-location-manager">LocationManager</a>
+  <a href="#snip-effort-manager">EffortManager</a>
+  <a href="#snip-taskdetailpanel">TaskDetailPanel</a>
+  <div class="group-label">UI Fragments</div>
+  <a href="#snip-metadata-panel">Metadata panel JSX</a>
+  <a href="#snip-title-edit">Inline title edit</a>
+  <a href="#snip-tag-display-setting">TagDisplaySetting</a>
+  <a href="#snip-tag-display-chip">Tag display chip logic</a>
+  <a href="#snip-effort-total">Effort total badge</a>
+  <a href="#snip-add-project-task">addProjectTask</a>
+  <a href="#snip-assign-ui">Assign to project UI</a>
+  <div class="group-label">Effort Tracking</div>
+  <a href="#snip-effort-accuracy-color">effortAccuracyColor()</a>
+  <a href="#snip-complete-task-prompt">completeTask() prompt</a>
+  <a href="#snip-actual-effort-modal">ActualEffortPrompt modal</a>
+  <a href="#snip-taskdetail-effort-rows">Detail panel effort rows</a>
+  <a href="#snip-build-calibration-context">buildCalibrationContext()</a>
+  <a href="#snip-effort-calibration-manager">EffortCalibrationManager</a>
+  <div class="group-label">Note Roll-up</div>
+  <a href="#snip-find-root-project">findRootProject()</a>
+  <a href="#snip-complete-task-rollup">completeTask() — roll-up</a>
+  <a href="#snip-handle-rollup-confirm">handleRollupConfirm()</a>
+  <a href="#snip-note-rollup-prompt">NoteRollupPrompt</a>
+</nav>
+
+<!-- ══ MAIN ══ -->
+<main>
+<h1>Code Snippets</h1>
+<div class="subtitle">Appendix A · All excerpts from <code>src/App.jsx</code> · Syntax highlighting by <a href="https://highlightjs.org/" target="_blank">highlight.js</a></div>
+
+<h2>Constants &amp; Data Model</h2>
+
+<!-- COLORS -->
+<div class="snippet" id="snip-colors">
+  <div class="snip-header">
+    <span class="snip-title">COLORS — the global design token object</span>
+    <span class="snip-file">App.jsx · lines 3–14</span>
+    <span class="snip-back"><a href="project-summary.html#overview">↑ Overview</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Every colour used in the app is defined once here.
+// Using a constant instead of inline hex strings means you can change
+// the whole colour scheme by editing this one object.
+// "Bg" variants are darkened versions used for chip backgrounds.
+const COLORS = {
+  bg: "#111210", surface: "#1a1c18", surface2: "#222420", surface3: "#2a2c28",
+  border: "#333530", border2: "#404240",
+  text: "#e8e4dc",   // near-white for primary text
+  text2: "#a8a49c",  // grey for secondary text and labels
+  muted: "#5a5c58",  // very grey for timestamps and decorative elements
+
+  // Each GTD bucket gets a foreground colour and a dark background tint
+  inbox:   "#e8c84a", inboxBg:   "#2a2618",  // amber
+  next:    "#5ab878", nextBg:    "#182418",  // green
+  project: "#5a8fd4", projectBg: "#181e2a",  // blue
+  waiting: "#d4845a", waitingBg: "#2a1e14",  // orange
+  someday: "#9a8ad4", somedayBg: "#1e1a2a",  // purple
+  effort:  "#6ec6a8", effortBg:  "#152520",  // teal — used for effort chips
+  done:    "#5a5c58",                         // same as muted — completed tasks are subdued
+};</code></pre></div>
+</div>
+
+<!-- BUCKETS -->
+<div class="snippet" id="snip-buckets">
+  <div class="snip-header">
+    <span class="snip-title">BUCKETS and COACH_MODES constants</span>
+    <span class="snip-file">App.jsx · lines 16–32</span>
+    <span class="snip-back"><a href="project-summary.html#overview">↑ Overview</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// BUCKETS drives both the sidebar rendering and all "which bucket am I in?" checks.
+// The key (e.g. "inbox") is what gets stored in task.bucket in localStorage.
+// The label is what the user sees.
+const BUCKETS = {
+  inbox:        { label: "📥 Inbox",           color: COLORS.inbox },
+  next:         { label: "⚡ Next Actions",     color: COLORS.next },
+  project:      { label: "📁 Projects",        color: COLORS.project },
+  waiting:      { label: "⏳ Waiting For",     color: COLORS.waiting },
+  someday:      { label: "💭 Someday / Maybe", color: COLORS.someday },
+  deferred:     { label: "⏰ Deferred",        color: COLORS.someday },  // virtual view
+  done:         { label: "✅ Completed",        color: COLORS.done },
+  inboxHistory: { label: "📋 Inbox History",   color: COLORS.muted },
+};
+
+// COACH_MODES drives the tab buttons in the AI Coach panel header.
+// "projectReview" is launched programmatically from the Projects view,
+// not by clicking a tab — but it still needs an entry here for the active-tab highlight.
+const COACH_MODES = {
+  chat:          { label: "Chat",           icon: "💬" },
+  process:       { label: "Process",        icon: "📥" },
+  review:        { label: "Review",         icon: "📋" },
+  dump:          { label: "Brain Dump",     icon: "🧠" },
+  projectReview: { label: "Project Review", icon: "🔍" },
+};</code></pre></div>
+</div>
+
+<!-- DATA MODEL -->
+<div class="snippet" id="snip-data-model">
+  <div class="snip-header">
+    <span class="snip-title">Task data model — three shapes at creation</span>
+    <span class="snip-file">App.jsx · addTask / handleConfirmMove / addProjectTask</span>
+    <span class="snip-back"><a href="project-summary.html#feat-foundation">↑ Foundation</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Every task is a plain JavaScript object. All fields are always present
+// on every task regardless of which bucket it lives in.
+// React stores the entire array of these objects in a single useState() call.
+
+// ── Standalone task (Inbox, Next, Waiting, Someday) ──
+{
+  id:         genId(),    // random string, e.g. "k7x2m" — the permanent identity of this task
+  text:       "...",      // the task title — the one field the user always sees
+  bucket:     "inbox",    // which sidebar bucket this task belongs to
+  done:       false,      // true when the task has been completed
+  created:    Date.now(), // Unix timestamp in ms — used for sorting
+  priority:   [],         // array of strings: ["Imperative", "Financial", ...]
+  location:   [],         // array of strings: ["Home", "Work", ...]
+  dueDate:    null,       // YYYY-MM-DD string, or null
+  deferUntil: null,       // YYYY-MM-DD string; when set and in the future, task is hidden
+  effort:     null,       // single string: "2 hours", "1 day", etc.
+  notes:      null,       // free-text string or null
+}
+
+// ── Root project task — carries a childIds array ──
+{
+  ...same fields...,
+  bucket:   "project",
+  childIds: ["id-of-first-subtask", ...],  // ordered list of direct child IDs
+  // parentId is absent (or null) — no parent means this is a root project
+}
+
+// ── Subtask — carries a parentId ──
+{
+  ...same fields...,
+  bucket:   "next",         // subtasks live in the Next Actions bucket
+  parentId: "id-of-parent", // points to the project (or another next action) above it
+  // childIds is absent — leaf tasks have no children
+}</code></pre></div>
+  <div class="annotation"><strong>Why plain objects?</strong> React state must be immutable — you never mutate an object in place, you replace it with a new copy. Plain objects make this easy: <code>{ ...oldTask, done: true }</code> creates a new object with all old fields plus the changed one, leaving the original untouched. This is exactly like immutable data in functional programming.</div>
+</div>
+
+<hr>
+<h2>Helper Functions</h2>
+
+<!-- ISDEFERRED -->
+<div class="snippet" id="snip-isdeferred">
+  <div class="snip-header">
+    <span class="snip-title">todayStr() + isDeferred() — date helpers</span>
+    <span class="snip-file">App.jsx · lines 109–115</span>
+    <span class="snip-back"><a href="project-summary.html#feat-deferred">↑ Deferred Tasks</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Returns today's date as a YYYY-MM-DD string in *local* time.
+// Using local time is important: if you use new Date().toISOString() you get UTC,
+// which can be off by a day depending on the user's timezone.
+function todayStr() {
+  const d = new Date();
+  // padStart(2, "0") ensures single-digit months/days get a leading zero: "04" not "4"
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// A task is "active-deferred" when its deferUntil date is strictly after today.
+// The string comparison works correctly for ISO dates: "2026-05-01" > "2026-04-30" is true.
+// Using string comparison instead of Date objects avoids timezone parsing issues.
+function isDeferred(task) {
+  return !!(task.deferUntil && task.deferUntil > todayStr());
+}
+
+// Subtracts months/weeks from a YYYY-MM-DD base date.
+// Used for the quick-pick buttons: "1 week before due", "1 month before due".
+function subtractFromDate(base, { months = 0, weeks = 0 }) {
+  const d = new Date(base + "T00:00:00"); // append T00:00:00 to force local-time parsing
+  d.setMonth(d.getMonth() - months);
+  d.setDate(d.getDate() - weeks * 7);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}</code></pre></div>
+</div>
+
+<!-- EFFORT HELPERS -->
+<div class="snippet" id="snip-effort-helpers">
+  <div class="snip-header">
+    <span class="snip-title">effortToMinutes() + minutesToEffortLabel() — effort arithmetic</span>
+    <span class="snip-file">App.jsx · lines 200–230</span>
+    <span class="snip-back"><a href="project-summary.html#feat-effort">↑ Effort Metadata</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Converts a human-readable effort string to minutes.
+// Uses substring matching rather than an exact lookup table, so user-defined
+// values like "4.5 hours" or "3 days" work without any extra configuration.
+function effortToMinutes(str) {
+  if (!str) return 0;
+  const s = str.toLowerCase().trim();
+  const num = parseFloat(s); // extracts the leading number from strings like "2 hours"
+  if (isNaN(num) || num <= 0) return 0;
+  // Check from longest unit to shortest to avoid "month" matching "min"
+  if (s.includes("month")) return Math.round(num * 9600);  // ~4 weeks × 5 days × 8 hours
+  if (s.includes("week"))  return Math.round(num * 2400);  // 5 working days × 8 hours
+  if (s.includes("day"))   return Math.round(num * 480);   // 8-hour working day
+  if (s.includes("hour") || s.endsWith("h")) return Math.round(num * 60);
+  if (s.includes("min")  || s.endsWith("m")) return Math.round(num);
+  return 0;
+}
+
+// Converts minutes back to a compact human-readable label for display.
+// Used in effort-total badges like "⏱ 3.5h" or "⏱ 2d".
+function minutesToEffortLabel(minutes) {
+  if (!minutes || minutes <= 0) return null;
+  if (minutes < 60)   return `${minutes}m`;
+  if (minutes < 480)  return `${+((minutes / 60).toFixed(1))}h`;   // 60–479 min → "Xh"
+  if (minutes < 2400) return `${+((minutes / 480).toFixed(1))}d`;  // 480–2399 min → "Xd"
+  if (minutes < 9600) return `${+((minutes / 2400).toFixed(1))}w`; // 2400–9599 → "Xw"
+  return `${+((minutes / 9600).toFixed(1))}mo`;                    // 9600+ → "Xmo"
+  // The unary + before ((...).toFixed(1)) removes trailing zeros: +(1.0) → 1, +(1.5) → 1.5
+}</code></pre></div>
+</div>
+
+<!-- WATERFALL -->
+<div class="snippet" id="snip-waterfall">
+  <div class="snip-header">
+    <span class="snip-title">waterfallFilter() — Next Actions visibility rule</span>
+    <span class="snip-file">App.jsx · lines 148–158</span>
+    <span class="snip-back"><a href="project-summary.html#feat-waterfall">↑ Waterfall &amp; Group-By</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// GTD rule: only show the *next* action in a sequence, not all downstream steps.
+// Level 2 tasks (direct children of a project) are always visible.
+// Level 3+ tasks (children of next actions) only appear once their parent is done.
+// This is a pure function — it only reads its inputs, has no side effects.
+function waterfallFilter(nextTasks, allTasks) {
+  return nextTasks.filter(task => {
+    // Tasks with no parent (standalone actions) are always shown
+    if (!task.parentId) return true;
+
+    const parent = allTasks.find(t => t.id === task.parentId);
+    if (!parent) return true; // orphaned task — show it rather than hiding it silently
+
+    // Level 2: parent is a project root → always visible
+    if (parent.bucket === "project") return true;
+
+    // Level 3+: parent is another next action → only visible when parent is complete
+    return !!parent.done;
+  });
+}</code></pre></div>
+</div>
+
+<!-- GROUP BY -->
+<div class="snippet" id="snip-groupby">
+  <div class="snip-header">
+    <span class="snip-title">groupByField() — multi-mode task grouping</span>
+    <span class="snip-file">App.jsx · lines 160–210</span>
+    <span class="snip-back"><a href="project-summary.html#feat-waterfall">↑ Waterfall &amp; Group-By</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Groups a flat task array by a named field.
+// Returns an array of { key, label, items } objects — one per group.
+// Multi-value fields (location, priority) use the first value as the group key.
+function groupByField(taskList, field, allTasks = []) {
+  // Each field type has a different label for tasks with no value set
+  const ungroupedLabel = field === "project" ? "No Project"
+                       : field === "effort"  ? "No Effort"
+                       : "Ungrouped";
+  const groups = {};   // { groupKey: [task, task, ...] }
+  const ungrouped = []; // tasks with no value for this field
+
+  taskList.forEach(task => {
+    let keys = [];
+    if      (field === "location") keys = task.location || [];
+    else if (field === "priority") keys = task.priority || [];
+    else if (field === "dueDate")  keys = task.dueDate ? [task.dueDate] : [];
+    else if (field === "effort")   keys = task.effort  ? [task.effort]  : [];
+    else if (field === "project") {
+      // Walk the parentId chain all the way to the root project name
+      if (task.parentId) {
+        let cur = task;
+        while (cur.parentId) {
+          const parent = allTasks.find(t => t.id === cur.parentId);
+          if (!parent) break;
+          cur = parent;
+        }
+        if (cur.id !== task.id) keys = [cur.text]; // cur is now the root project
+      }
+    }
+
+    if (!keys.length) { ungrouped.push(task); return; }
+    const key = keys[0]; // multi-value fields: only the first value determines the group
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(task);
+  });
+
+  // Sort groups: effort groups by duration (shortest first); all others alphabetically
+  const sorted = Object.entries(groups)
+    .sort(([a], [b]) => field === "effort"
+      ? effortToMinutes(a) - effortToMinutes(b)  // numeric sort by duration
+      : a.localeCompare(b))                        // alphabetic sort
+    .map(([key, items]) => ({ key, label: key, items }));
+
+  // Append the "no value" group at the bottom
+  if (ungrouped.length) sorted.push({ key: "__ungrouped__", label: ungroupedLabel, items: ungrouped });
+  return sorted;
+}</code></pre></div>
+</div>
+
+<!-- COUNT DESCENDANTS -->
+<div class="snippet" id="snip-countdescendants">
+  <div class="snip-header">
+    <span class="snip-title">countDescendants() — recursive task count with cycle guard</span>
+    <span class="snip-file">App.jsx · lines 254–268</span>
+    <span class="snip-back"><a href="project-summary.html#feat-descendant-badge">↑ Descendant Count Badge</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Recursively counts all descendants of a task via its childIds array.
+// Returns { total, incomplete } so the badge can show "↓ 3 / 5".
+// The visited Set prevents infinite loops if childIds ever forms a cycle
+// due to a data corruption bug — standard depth-first graph traversal guard.
+function countDescendants(taskId, allTasks, visited = new Set()) {
+  if (visited.has(taskId)) return { total: 0, incomplete: 0 }; // cycle detected
+  visited.add(taskId);
+
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task) return { total: 0, incomplete: 0 };
+
+  // Count this task itself
+  const own = { total: 1, incomplete: task.done ? 0 : 1 };
+
+  // Recursively count all children and accumulate
+  const childTotals = (task.childIds || []).reduce(
+    (acc, cid) => {
+      const c = countDescendants(cid, allTasks, visited);
+      return { total: acc.total + c.total, incomplete: acc.incomplete + c.incomplete };
+    },
+    { total: 0, incomplete: 0 } // starting accumulator
+  );
+
+  return {
+    total:      own.total      + childTotals.total,
+    incomplete: own.incomplete + childTotals.incomplete,
+  };
+}
+// Usage in TaskRow: const { total, incomplete } = countDescendants(task.id, allTasks);
+// Rendered as: ↓ {incomplete} / {total}</code></pre></div>
+</div>
+
+<!-- SUM DESCENDANT EFFORT -->
+<div class="snippet" id="snip-sumdescendanteffort">
+  <div class="snip-header">
+    <span class="snip-title">sumDescendantEffort() — recursive effort roll-up</span>
+    <span class="snip-file">App.jsx · lines 240–250</span>
+    <span class="snip-back"><a href="project-summary.html#feat-collapsible-tree">↑ Collapsible Project Tree</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Sums the effort of a task and ALL its descendants recursively.
+// Replaces the old one-level reduce that only counted direct children.
+// Returns minutes as an integer; caller converts with minutesToEffortLabel().
+function sumDescendantEffort(taskId, allTasks, visited = new Set()) {
+  if (visited.has(taskId)) return 0; // cycle guard — same pattern as countDescendants
+  visited.add(taskId);
+
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task) return 0;
+
+  const own = effortToMinutes(task.effort); // this task's own effort in minutes
+
+  // Sum recursively over all children
+  const childTotal = (task.childIds || []).reduce(
+    (sum, cid) => sum + sumDescendantEffort(cid, allTasks, visited),
+    0
+  );
+
+  return own + childTotal;
+}
+// In TaskRow for project rows:
+// const totalMin = sumDescendantEffort(task.id, allTasks);
+// const label = minutesToEffortLabel(totalMin); // → "3.5h", "2d", etc.</code></pre></div>
+</div>
+
+<!-- EXTRACT SUGGESTIONS -->
+<div class="snippet" id="snip-extract-suggestions">
+  <div class="snip-header">
+    <span class="snip-title">extractSuggestions() — parse AI →SUGGESTIONS: block</span>
+    <span class="snip-file">App.jsx · lines 271–281</span>
+    <span class="snip-back"><a href="project-summary.html#feat-ai-review">↑ AI Project Review</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Parses the structured block that the AI appends to every project review response.
+// Handles both arrow styles (→ U+2192 and ->) and both line-ending styles (\n and \r\n).
+function extractSuggestions(text) {
+  // Normalise: convert Windows line endings and ASCII arrows to a single canonical form
+  const normalised = text.replace(/\r\n/g, "\n").replace(/->/g, "→");
+
+  // Match everything after "→SUGGESTIONS:\n" to the end of the string
+  const m = normalised.match(/→SUGGESTIONS:\n([\s\S]*)$/);
+  if (!m) return []; // AI didn't include the block — return empty
+
+  return m[1]
+    .split("\n")
+    // Strip leading "1. " or "- " numbering that the AI might add
+    .map(l => l.replace(/^\d+\.\s*|-\s*/, "").trim())
+    // Filter out empty lines and the "(none)" marker the AI uses for "no suggestions"
+    .filter(l => l && l !== "(none)" && l !== "(none).");
+}
+// Example input:    "...project assessment text...\n→SUGGESTIONS:\n1. Draft the API spec\n2. Book kickoff call"
+// Example output:   ["Draft the API spec", "Book kickoff call"]</code></pre></div>
+</div>
+
+<!-- EXTRACT METADATA -->
+<div class="snippet" id="snip-extract-metadata">
+  <div class="snip-header">
+    <span class="snip-title">extractMetadata() — parse AI →METADATA: block</span>
+    <span class="snip-file">App.jsx · lines 284–305</span>
+    <span class="snip-back"><a href="project-summary.html#feat-review-modes">↑ Project Review Mode Selection</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Parses the structured block from the "metadata quality" project review mode.
+// Each line has the form: taskId|field:value|field:value
+// Returns an array of { taskId, fields: { effort?, dueDate?, deferUntil? } }
+function extractMetadata(text) {
+  const normalised = text.replace(/\r\n/g, "\n").replace(/->/g, "→");
+  const m = normalised.match(/→METADATA:\n([\s\S]*)$/);
+  if (!m) return [];
+
+  return m[1]
+    .split("\n")
+    .map(l => l.trim())
+    // Only process lines that contain a | separator (the taskId|field:value format)
+    .filter(l => l && l !== "(none)" && l !== "(none)." && l.includes("|"))
+    .map(l => {
+      // Split on | to get [taskId, "effort:2 hours", "due:2026-06-01", ...]
+      const [taskId, ...pairs] = l.split("|");
+      const fields = {};
+      pairs.forEach(p => {
+        const [k, v] = p.split(":").map(s => s.trim());
+        if (k === "effort")  fields.effort     = v;
+        if (k === "due")     fields.dueDate    = v;
+        if (k === "defer")   fields.deferUntil = v;
+      });
+      return { taskId: taskId.trim(), fields };
+    })
+    // Only keep rows that have a valid taskId and at least one field suggestion
+    .filter(r => r.taskId && Object.keys(r.fields).length > 0);
+}</code></pre></div>
+</div>
+
+<!-- DRAG HELPERS -->
+<div class="snippet" id="snip-drag-helpers">
+  <div class="snip-header">
+    <span class="snip-title">getOrderedChildren() + moveTaskInTree() — tree mutation helpers</span>
+    <span class="snip-file">App.jsx · lines 307–380</span>
+    <span class="snip-back"><a href="project-summary.html#feat-dnd">↑ Drag-and-Drop Project Tree</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Returns the children of a task in their display order.
+// parentId === null → root projects, ordered by their position in the flat tasks array.
+// Otherwise → ordered by the parent's childIds array (which is the canonical order).
+function getOrderedChildren(parentId, allTasks) {
+  if (parentId === null) {
+    return allTasks.filter(t => t.bucket === "project" && !t.parentId);
+  }
+  const parent = allTasks.find(t => t.id === parentId);
+  // childIds controls order; map to actual task objects, filter nulls for safety
+  return (parent?.childIds || []).map(id => allTasks.find(t => t.id === id)).filter(Boolean);
+}
+
+// Moves a task to a new position in the tree.
+// position is "before" | "inside" | "after" relative to targetId.
+// Returns a NEW tasks array — never mutates the original (React immutability rule).
+function moveTaskInTree(allTasks, dragId, targetId, position) {
+  if (dragId === targetId) return allTasks; // can't drop on self
+
+  // Cycle guard: prevent dropping a task inside one of its own descendants.
+  // isAncestorOf walks up the parentId chain from nodeId looking for ancestorId.
+  function isAncestorOf(ancestorId, nodeId, seen = new Set()) {
+    const node = allTasks.find(t => t.id === nodeId);
+    if (node?.parentId === ancestorId) return true;
+    if (!node?.parentId || seen.has(nodeId)) return false;
+    seen.add(nodeId);
+    return isAncestorOf(ancestorId, node.parentId, seen);
+  }
+  if (isAncestorOf(dragId, targetId)) return allTasks; // would create a cycle
+
+  const target   = allTasks.find(t => t.id === targetId);
+  const newParentId = position === "inside" ? targetId : (target?.parentId || null);
+  const newBucket   = newParentId ? "next" : "project"; // root tasks are projects; children are next actions
+
+  // Build the new array in three passes:
+  // 1. Remove dragId from its current parent's childIds
+  // 2. Update the dragged task's parentId and bucket
+  // 3. Insert it into the new parent's childIds at the correct position
+  // (full implementation handles all edge cases including root reorder via tasks array position)
+  return result; // returns the fully updated tasks array
+}</code></pre></div>
+</div>
+
+<hr>
+<h2>Custom Hooks</h2>
+
+<!-- USERESIZER -->
+<div class="snippet" id="snip-useresizer">
+  <div class="snip-header">
+    <span class="snip-title">useResizer() — drag-to-resize custom hook</span>
+    <span class="snip-file">App.jsx · lines 384–437</span>
+    <span class="snip-back"><a href="project-summary.html#feat-resizable">↑ Resizable Panels</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// A custom hook packages reusable stateful logic.
+// Convention: custom hooks must start with "use" so React knows they contain hooks.
+// This hook manages a single resizable dimension (width or height).
+//
+// Parameters:
+//   storageKey  — localStorage key to persist the size across sessions
+//   defaultSize — initial size in pixels if nothing is stored yet
+//   { min, max, direction, sign }
+//     direction "h" = horizontal resize (width), "v" = vertical (height)
+//     sign +1 = dragging right/down makes it bigger; -1 = opposite
+function useResizer(storageKey, defaultSize, { min, max, direction = 'h', sign = 1 }) {
+  // Read the persisted size from localStorage on first render only (lazy initializer)
+  const [size, setSize] = useState(() => {
+    const stored = localStorage.getItem(storageKey);
+    return stored ? parseInt(stored, 10) : defaultSize;
+  });
+
+  // useRef gives us a mutable container that doesn't trigger re-renders.
+  // We need this so the mousemove closure always reads the current size,
+  // not the stale value captured when mousedown fired.
+  const sizeRef = useRef(size);
+  sizeRef.current = size; // keep ref in sync on every render
+
+  // Save to localStorage whenever size changes
+  useEffect(() => { localStorage.setItem(storageKey, size); }, [storageKey, size]);
+
+  // handleMouseDown is the function we attach to the resize handle element.
+  // It captures the starting position and size, then attaches temporary
+  // mousemove/mouseup listeners to the *window* (not the handle element)
+  // so the resize continues even if the mouse leaves the handle.
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault(); // prevent text selection during drag
+    const startPos  = direction === 'h' ? e.clientX : e.clientY;
+    const startSize = sizeRef.current;
+
+    const onMove = (ev) => {
+      const delta = sign * ((direction === 'h' ? ev.clientX : ev.clientY) - startPos);
+      setSize(Math.min(max, Math.max(min, startSize + delta))); // clamp to [min, max]
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup',   onUp);
+      document.body.style.cursor     = ''; // restore cursor
+      document.body.style.userSelect = ''; // restore text selection
+    };
+
+    document.body.style.cursor     = direction === 'h' ? 'col-resize' : 'row-resize';
+    document.body.style.userSelect = 'none'; // prevent text selection while dragging
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup',   onUp);
+  }, [min, max, direction, sign]);
+
+  return [size, handleMouseDown]; // caller uses: const [width, onMouseDown] = useResizer(...)
+}
+
+// The visible resize handle — a thin 4px div that highlights on hover
+function ResizeHandle({ onMouseDown, direction = 'h' }) {
+  const [hovered, setHovered] = useState(false);
+  const isH = direction === 'h';
+  return (
+    &lt;div
+      onMouseDown={onMouseDown}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        flexShrink: 0,
+        width:  isH ? 4 : '100%',
+        height: isH ? '100%' : 4,
+        cursor: isH ? 'col-resize' : 'row-resize',
+        background: hovered ? COLORS.border2 : COLORS.border,
+        transition: 'background 0.15s',
+      }}
+    /&gt;
+  );
+}</code></pre></div>
+  <div class="annotation"><strong>Why useRef for sizeRef?</strong> The <code>onMove</code> closure captures <code>startSize</code> at mousedown time. If we read from the React state variable inside <code>onMove</code> instead, we'd read a stale value (the state at the time mousedown ran). The ref is updated on every render, so it always reflects the current value — a safe bridge between React's render cycle and imperative event listeners.</div>
+</div>
+
+<hr>
+<h2>AI Integration</h2>
+
+<!-- PROCESS PROMPT -->
+<div class="snippet" id="snip-process-prompt">
+  <div class="snip-header">
+    <span class="snip-title">SYSTEM_PROMPTS.process — inbox processor prompt</span>
+    <span class="snip-file">App.jsx · lines 36–59</span>
+    <span class="snip-back"><a href="project-summary.html#feat-inbox">↑ Smart Inbox Processing</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// The system prompt for the Process (inbox) mode.
+// The key design decision: the AI must end every response with a machine-parseable
+// →ACTION: tag on its own line. This lets the app parse the action without
+// interpreting free-form text — the same principle as structured logging.
+process: `You are a GTD inbox processor. For each inbox item given to you:
+
+1. Determine if it's actionable. If not actionable, end with: →ACTION:delete
+2. If actionable, decide: is this a SINGLE next action, or a multi-step PROJECT?
+   - If you need clarification, ask ONE specific question. Do NOT include →ACTION until clarified.
+3. Reword the action as a concrete physical action starting with a strong verb.
+4. End your response with EXACTLY one of these tags on its own line:
+
+Single next action:  →ACTION:next|&lt;Reworded action title&gt;
+Multi-step project:  →ACTION:project|&lt;Project name&gt;|&lt;First next action title&gt;
+Someday / not urgent: →ACTION:someday|&lt;Reworded title&gt;
+Waiting on someone:  →ACTION:waiting|&lt;What you are waiting for&gt;
+Not actionable:      →ACTION:delete
+
+Optional date fields (append after the last | on any action type):
+  |due:YYYY-MM-DD    — infer a due date from context ("before Christmas" → "2026-12-25")
+  |defer:YYYY-MM-DD  — suggest a defer date ("no need to think about until March")
+
+Be concise — under 80 words before the tag.`</code></pre></div>
+</div>
+
+<!-- PROJECT REVIEW PROMPT -->
+<div class="snippet" id="snip-project-review-prompt">
+  <div class="snip-header">
+    <span class="snip-title">SYSTEM_PROMPTS.projectReview — AI project review prompt</span>
+    <span class="snip-file">App.jsx · lines 69–85</span>
+    <span class="snip-back"><a href="project-summary.html#feat-ai-review">↑ AI Project Review</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">projectReview: `You are reviewing a GTD project to identify missing next actions.
+
+Given a project name, its current subtasks, and any metadata, you will:
+1. Write 2-3 sentences assessing the project's current state and momentum.
+2. Identify 2-4 specific, concrete next actions that appear missing or would unblock progress.
+
+End your response with EXACTLY this block — nothing after it:
+→SUGGESTIONS:
+1. [First missing action — start with a strong verb]
+2. [Second missing action]
+
+If the project is fully on track with no missing actions, write:
+→SUGGESTIONS:
+(none)
+
+Be concise. Under 80 words before the suggestions block.`</code></pre></div>
+</div>
+
+<!-- CALL AI -->
+<div class="snippet" id="snip-call-ai">
+  <div class="snip-header">
+    <span class="snip-title">callAI() — provider-aware AI dispatch</span>
+    <span class="snip-file">App.jsx · lines 353–421</span>
+    <span class="snip-back"><a href="project-summary.html#feat-provider">↑ Multi-Provider AI</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Central function for all AI calls. Branches on the selected provider.
+// getTaskContext() returns a formatted snapshot of all tasks — sent as part of
+// every system prompt so the AI always has full context.
+const callAI = useCallback(async (userMsg, mode, history) => {
+  // Build system prompt: mode-specific instructions + current task list
+  const systemPrompt = SYSTEM_PROMPTS[mode] + "\n\n[Current Task List]\n" + getTaskContext();
+  const newHistory = [...history, { role: "user", content: userMsg }];
+  setLoading(true);
+
+  let reply = null;
+  try {
+    if (provider === "claude") {
+      // Anthropic API — uses their proprietary request format
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,  // from .env file
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",  // required for browser-origin requests
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          system: systemPrompt,      // Anthropic uses a top-level "system" field
+          messages: newHistory,      // array of { role: "user"|"assistant", content: "..." }
+        }),
+      });
+      const data = await res.json();
+      reply = data.content?.[0]?.text; // Anthropic wraps the reply in content[0].text
+
+    } else {
+      // Open WebUI — uses the OpenAI-compatible chat completions format
+      const res = await fetch(`${OPENWEBUI_URL}/api/chat/completions`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${import.meta.env.VITE_OPENWEBUI_API_KEY}` },
+        body: JSON.stringify({
+          model: localModel,
+          // OpenAI format: system prompt is a message with role "system"
+          messages: [{ role: "system", content: systemPrompt }, ...newHistory],
+        }),
+      });
+      const data = await res.json();
+      reply = data.choices?.[0]?.message?.content; // OpenAI wraps the reply differently
+    }
+  } finally {
+    setLoading(false);
+  }
+  return reply;
+}, [getTaskContext, provider, localModel]);</code></pre></div>
+</div>
+
+<!-- HANDLE CONFIRM -->
+<div class="snippet" id="snip-handle-confirm">
+  <div class="snip-header">
+    <span class="snip-title">handleConfirmMove() — inbox confirm + auto-continue</span>
+    <span class="snip-file">App.jsx · lines 630–680</span>
+    <span class="snip-back"><a href="project-summary.html#feat-inbox">↑ Smart Inbox Processing</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Fires when the user clicks "Confirm" in the PendingActionBar.
+// Performs the actual task mutation and starts the next inbox item.
+const handleConfirmMove = useCallback(() => {
+  // pendingAction holds the parsed →ACTION: result: { type, title, nextAction, dueDate, deferUntil }
+  const { type, title, nextAction, dueDate: aiDue, deferUntil: aiDefer } = pendingAction;
+  const inboxItems = tasks.filter(t => t.bucket === "inbox");
+  const current  = inboxItems[0]; // the item being processed right now
+  const nextItem = inboxItems[1]; // the next item to process after this one
+
+  // Step 1: Archive the current inbox item to Inbox History (not deleted — preserved for reference)
+  setTasks(prev => prev.map(t =>
+    t.id === current.id ? { ...t, bucket: "inboxHistory" } : t
+  ));
+
+  // Step 2: Create the new task(s) based on the AI's action type
+  if (type === "project") {
+    const projectId = genId();
+    const actionId  = genId();
+    // Create both the project and its first next action simultaneously
+    setTasks(prev => [
+      { id: projectId, text: title, bucket: "project", childIds: [actionId],
+        dueDate: aiDue || null, deferUntil: aiDefer || null, /* ...other fields */ },
+      { id: actionId, text: nextAction, bucket: "next", parentId: projectId,
+        deferUntil: aiDefer || null, /* ...other fields */ },
+      ...prev,
+    ]);
+  } else if (type === "next") {
+    setTasks(prev => [{ id: genId(), text: title, bucket: "next",
+      dueDate: aiDue || null, deferUntil: aiDefer || null, /* ... */ }, ...prev]);
+  }
+  // ... someday / waiting / delete cases follow the same pattern ...
+
+  setPendingAction(null); // clear the confirmation bar
+
+  // Step 3: Auto-continue — feed the next inbox item to the AI after 300ms
+  if (nextItem) {
+    setTimeout(() => processNextInboxItem(nextItem), 300);
+  }
+}, [pendingAction, tasks, processNextInboxItem]);</code></pre></div>
+</div>
+
+<!-- REVIEW CALLBACKS -->
+<div class="snippet" id="snip-review-callbacks">
+  <div class="snip-header">
+    <span class="snip-title">reviewProject() + advanceProjectReview() — project review loop</span>
+    <span class="snip-file">App.jsx · lines 760–840</span>
+    <span class="snip-back"><a href="project-summary.html#feat-ai-review">↑ AI Project Review</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Sends one project to the AI and stores the suggestions it returns.
+// Called once per project as the review steps through the list.
+const reviewProject = useCallback(async (project, idx, total) => {
+  // Build the structured prompt: "Project 2 of 5: 'Launch website'"
+  const children = getOrderedChildren(project.id, tasks);
+  const subtaskLines = children.length
+    ? children.map(t => `- ${t.text}${t.done ? " ✓" : ""}`).join("\n")
+    : "(none yet)";
+  const prompt =
+    `Project ${idx + 1} of ${total}: "${project.text}"\n` +
+    `Effort: ${project.effort || "not set"} · Due: ${project.dueDate || "not set"}\n` +
+    `Current subtasks:\n${subtaskLines}`;
+
+  const reply = await callAI(prompt, "projectReview", []);
+  if (reply) {
+    const suggestions = extractSuggestions(reply);
+    // Each suggestion starts as checked=true; the user can uncheck ones they want to skip
+    setReviewSuggestions(suggestions.map(text => ({ text, checked: true })));
+    setReviewReady(true); // show the ProjectReviewBar
+  }
+}, [tasks, callAI]);
+
+// Called when the user clicks "Add N & Next →" or "Skip →".
+// Creates subtasks for all checked suggestions, then moves to the next project.
+const advanceProjectReview = useCallback(() => {
+  const selected = reviewSuggestions.filter(s => s.checked);
+  if (selected.length && reviewProjects[reviewProjectIdx]) {
+    const project   = reviewProjects[reviewProjectIdx];
+    const newTasks  = selected.map(s => ({
+      id: genId(), text: s.text, bucket: "next", parentId: project.id,
+      priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null,
+    }));
+    const newIds = newTasks.map(t => t.id);
+    // Atomically add the new subtasks and append their IDs to the project's childIds
+    setTasks(prev => [
+      ...prev.map(t => t.id === project.id
+        ? { ...t, childIds: [...(t.childIds || []), ...newIds] } : t),
+      ...newTasks,
+    ]);
+  }
+  // Advance to next project or finish
+  const nextIdx = reviewProjectIdx + 1;
+  if (nextIdx < reviewProjects.length) {
+    setReviewProjectIdx(nextIdx);
+    setReviewSuggestions([]);
+    setReviewReady(false);
+    reviewProject(reviewProjects[nextIdx], nextIdx, reviewProjects.length);
+  } else {
+    // All projects reviewed — exit project review mode
+    setCoachMode("chat");
+    setReviewMode(null);
+  }
+}, [reviewProjectIdx, reviewSuggestions, reviewProjects, reviewProject]);</code></pre></div>
+</div>
+
+<hr>
+<h2>State &amp; Callbacks</h2>
+
+<!-- ASSIGN CALLBACK -->
+<div class="snippet" id="snip-assign-callback">
+  <div class="snip-header">
+    <span class="snip-title">assignToProject() — link an unparented Next Action to a project</span>
+    <span class="snip-file">App.jsx · lines 1009–1025</span>
+    <span class="snip-back"><a href="project-summary.html#feat-next-enhancements">↑ Next Actions Enhancements</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Called when the user clicks "Assign" in the inline assign panel.
+// Either links to an existing project, or creates a new project and links to that.
+const assignToProject = useCallback((taskId, projectId, newProjectName) => {
+  if (newProjectName) {
+    // "New project…" path: create the project task and link in one atomic setTasks call
+    const newProjId = genId();
+    setTasks(prev => [
+      ...prev.map(t => t.id === taskId ? { ...t, parentId: newProjId } : t),
+      { id: newProjId, text: newProjectName.trim(), bucket: "project",
+        done: false, created: Date.now(), childIds: [taskId],
+        priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null },
+    ]);
+  } else if (projectId) {
+    // Existing project path: set parentId on the task AND append to project's childIds
+    // Both updates happen in a single map pass — one render, no inconsistent intermediate state
+    setTasks(prev => prev.map(t => {
+      if (t.id === taskId)    return { ...t, parentId: projectId };
+      if (t.id === projectId) return { ...t, childIds: [...(t.childIds || []), taskId] };
+      return t;
+    }));
+  }
+}, []);</code></pre></div>
+</div>
+
+<!-- REASSIGN PROJECT -->
+<div class="snippet" id="snip-reassign">
+  <div class="snip-header">
+    <span class="snip-title">reassignProject() — move a task to a different project via detail panel</span>
+    <span class="snip-file">App.jsx · lines 973–1007</span>
+    <span class="snip-back"><a href="project-summary.html#feat-reassign">↑ Project Reassignment</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Called when the user changes the Project dropdown in TaskDetailPanel.
+// Atomically: removes from old parent's childIds, updates task's parentId, adds to new parent's childIds.
+const reassignProject = useCallback((taskId, newProjectId) => {
+  setTasks(prev => {
+    const task = prev.find(t => t.id === taskId);
+    if (!task) return prev;
+    const oldProjectId = task.parentId || null;
+    if (oldProjectId === newProjectId) return prev; // no-op
+
+    // Cycle guard: don't allow assigning to a descendant of the task itself
+    if (newProjectId) {
+      // isDescendant walks the childIds tree down from a given node
+      function isDescendant(ancestorId, nodeId, seen = new Set()) {
+        if (seen.has(nodeId) || !nodeId) return false;
+        seen.add(nodeId);
+        const node = prev.find(t => t.id === nodeId);
+        return (node?.childIds || []).some(cid =>
+          cid === ancestorId || isDescendant(ancestorId, cid, seen)
+        );
+      }
+      if (isDescendant(taskId, newProjectId)) return prev;
+    }
+
+    // Apply all three changes in a single map pass
+    return prev.map(t => {
+      if (t.id === taskId)    return { ...t, parentId: newProjectId || null };
+      // Remove from old parent's childIds
+      if (oldProjectId && t.id === oldProjectId)
+        return { ...t, childIds: (t.childIds || []).filter(id => id !== taskId) };
+      // Add to new parent's childIds (guard against duplicates)
+      if (newProjectId && t.id === newProjectId) {
+        const existing = t.childIds || [];
+        return existing.includes(taskId) ? t : { ...t, childIds: [...existing, taskId] };
+      }
+      return t;
+    });
+  });
+}, []);</code></pre></div>
+</div>
+
+<!-- DRAG CALLBACKS -->
+<div class="snippet" id="snip-drag-callbacks">
+  <div class="snip-header">
+    <span class="snip-title">handleProjectDragOver() — compute drop position from mouse Y</span>
+    <span class="snip-file">App.jsx · lines 687–705</span>
+    <span class="snip-back"><a href="project-summary.html#feat-dnd">↑ Drag-and-Drop Project Tree</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Fires on every mousemove while a task is being dragged over another task.
+// Determines whether the drop should be "before", "inside", or "after" the target.
+const handleProjectDragOver = useCallback((e, taskId) => {
+  if (taskId === dragId) return; // don't target yourself
+  const rect  = e.currentTarget.getBoundingClientRect(); // position and size of hovered element
+  const ratio = (e.clientY - rect.top) / rect.height;   // 0.0 = top edge, 1.0 = bottom edge
+
+  // Divide the row into thirds:
+  // top third (0–0.33) → drop BEFORE  → shows a blue line above the row
+  // middle third (0.33–0.67) → drop INSIDE  → reparent as first child; shows blue outline
+  // bottom third (0.67–1.0) → drop AFTER  → shows a blue line below the row
+  const position = ratio < 0.33 ? "before" : ratio > 0.67 ? "after" : "inside";
+
+  // Only update state if something actually changed — avoids unnecessary re-renders
+  // during rapid mousemove events
+  setDropTarget(prev =>
+    prev?.id === taskId && prev?.position === position ? prev : { id: taskId, position }
+  );
+}, [dragId]);</code></pre></div>
+</div>
+
+<hr>
+<h2>Components</h2>
+
+<!-- TASKROW SIG -->
+<div class="snippet" id="snip-taskrow-sig">
+  <div class="snip-header">
+    <span class="snip-title">TaskRow — component signature and key local state</span>
+    <span class="snip-file">App.jsx · lines 1094–1145</span>
+    <span class="snip-back"><a href="project-summary.html#feat-metadata">↑ Task Metadata Panel</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// TaskRow is the shared renderer for every task in every bucket.
+// It receives many props (parameters) because it needs to work in all contexts.
+function TaskRow({
+  task,           // the task object to render
+  currentBucket,  // which bucket view is currently active
+  allTasks,       // the full task list — needed for project grouping and effort totals
+  locations,      // configurable location list — used to render location chip options
+  efforts,        // configurable effort list
+  tagDisplay,     // "below" | "inline" — controls chip placement
+  onComplete, onDelete, onMove, onUpdateTask, onOpenDetail,
+  selectedTaskId, // ID of the currently open detail panel — used to highlight this row
+  onAssignToProject,
+  isSubtask, indentOverride, // layout hints for nested project tree rendering
+}) {
+  // Local state — private to this row instance
+  const [hover,      setHover]      = useState(false);   // shows action buttons on hover
+  const [expanded,   setExpanded]   = useState(false);   // chevron panel open/closed
+  const [showAssign, setShowAssign] = useState(false);   // "Assign to Project" panel
+
+  // editTitle is a draft — local copy of task.text that can be modified without saving
+  const [editTitle,  setEditTitle]  = useState(task.text);
+  // useEffect keeps the draft in sync if the task text changes externally
+  // (e.g. the AI renames the task, or another panel edits it)
+  useEffect(() => { setEditTitle(task.text); }, [task.text]);
+
+  // Compute the effort total for project rows — sum all direct children's effort
+  // Returns null for non-project rows or projects with no children that have effort set
+  const projectEffortTotal = (() => {
+    if (task.bucket !== "project" || currentBucket !== "project") return null;
+    const totalMin = sumDescendantEffort(task.id, allTasks || []);
+    return minutesToEffortLabel(totalMin);
+  })();
+}</code></pre></div>
+</div>
+
+<!-- PROJECT TREE -->
+<div class="snippet" id="snip-project-tree">
+  <div class="snip-header">
+    <span class="snip-title">ProjectTree — recursive drag-and-drop tree renderer</span>
+    <span class="snip-file">App.jsx · lines 1924–1975</span>
+    <span class="snip-back"><a href="project-summary.html#feat-dnd">↑ Drag-and-Drop Project Tree</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Renders the task tree recursively. Each call handles one level of children.
+// depth controls indentation (22px per level) and which collapse handler fires.
+function ProjectTree({ parentId, depth, allTasks, dragId, dropTarget,
+                        collapsedNodes, onCollapseToggle,
+                        onDragStart, onDragOver, onDragEnd, onDrop, rowProps }) {
+  if (depth > 5) return null; // max depth guard — prevents infinite recursion on corrupted data
+
+  const children = getOrderedChildren(parentId, allTasks);
+  if (!children.length) return null;
+
+  return (
+    &lt;&gt;
+      {children.map(task => {
+        const isTarget    = dropTarget?.id === task.id;
+        const isDragging  = dragId === task.id;
+        const isCollapsed = collapsedNodes.has(task.id);
+
+        return (
+          &lt;div key={task.id}&gt;
+            {/* Blue horizontal line shown ABOVE the row when dragging "before" it */}
+            {isTarget && dropTarget.position === "before" && &lt;DropLine depth={depth} /&gt;}
+
+            &lt;div
+              draggable
+              onDragStart={e => { e.stopPropagation(); onDragStart(task.id); }}
+              onDragOver={e => { e.preventDefault(); e.stopPropagation(); onDragOver(e, task.id); }}
+              onDrop={e => { e.preventDefault(); e.stopPropagation(); onDrop(task.id); }}
+              style={{
+                opacity: isDragging ? 0.35 : 1, // fade the row being dragged
+                // Blue outline when "inside" drop position — shows reparenting target
+                outline: isTarget && dropTarget.position === "inside"
+                         ? `2px solid ${COLORS.project}66` : "none",
+              }}
+            &gt;
+              &lt;TaskRow task={task} isSubtask={depth &gt; 0}
+                       indentOverride={depth * 22} {...rowProps} /&gt;
+            &lt;/div&gt;
+
+            {/* Blue horizontal line shown BELOW the row when dragging "after" it */}
+            {isTarget && dropTarget.position === "after" && &lt;DropLine depth={depth} /&gt;}
+
+            {/* Recurse into children unless this node is collapsed */}
+            {!isCollapsed && (
+              &lt;ProjectTree parentId={task.id} depth={depth + 1} allTasks={allTasks}
+                           dragId={dragId} dropTarget={dropTarget}
+                           collapsedNodes={collapsedNodes} onCollapseToggle={onCollapseToggle}
+                           onDragStart={onDragStart} onDragOver={onDragOver}
+                           onDrop={onDrop} onDragEnd={onDragEnd} rowProps={rowProps} /&gt;
+            )}
+          &lt;/div&gt;
+        );
+      })}
+    &lt;/&gt;
+  );
+}</code></pre></div>
+</div>
+
+<!-- GROUP DIVIDER -->
+<div class="snippet" id="snip-group-divider">
+  <div class="snip-header">
+    <span class="snip-title">GroupDivider — section header with count and effort total</span>
+    <span class="snip-file">App.jsx · lines 1882–1920</span>
+    <span class="snip-back"><a href="project-summary.html#feat-waterfall">↑ Waterfall &amp; Group-By</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Renders the header row between groups in a grouped task list.
+// Shows the group name, a count badge, and optionally an effort total.
+function GroupDivider({ label, count, effortTotal, isUngrouped }) {
+  return (
+    &lt;div style={{
+      display: "flex", alignItems: "center", gap: 8,
+      padding: "8px 18px 5px",
+      borderBottom: `1px solid ${COLORS.border}`,
+    }}&gt;
+      {/* Group name — "Work", "Imperative", "Q2 Website", etc. */}
+      &lt;span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase",
+                     letterSpacing: "0.06em", color: isUngrouped ? COLORS.muted : COLORS.text2 }}&gt;
+        {label}
+      &lt;/span&gt;
+
+      {/* Count badge: "3" — how many tasks in this group */}
+      &lt;span style={{ fontSize: 10, background: COLORS.surface3, border: `1px solid ${COLORS.border2}`,
+                     color: COLORS.muted, padding: "1px 6px", borderRadius: 8 }}&gt;
+        {count}
+      &lt;/span&gt;
+
+      {/* Effort total badge: "⏱ 3.5h" — only shown when at least one task has effort set */}
+      {effortTotal && (
+        &lt;span style={{ fontSize: 10, background: COLORS.effortBg, color: COLORS.effort,
+                       border: `1px solid ${COLORS.effort}44`, padding: "1px 6px", borderRadius: 8 }}&gt;
+          ⏱ {effortTotal}
+        &lt;/span&gt;
+      )}
+    &lt;/div&gt;
+  );
+}
+// The effortTotal is computed in the render loop before calling GroupDivider:
+// const effortTotal = minutesToEffortLabel(
+//   items.reduce((sum, t) => sum + effortToMinutes(t.effort), 0)
+// );</code></pre></div>
+</div>
+
+<!-- LOCATION MANAGER -->
+<div class="snippet" id="snip-location-manager">
+  <div class="snip-header">
+    <span class="snip-title">LocationManager — CRUD interface for the location list</span>
+    <span class="snip-file">App.jsx · LocationManager component</span>
+    <span class="snip-back"><a href="project-summary.html#feat-locations">↑ Location Settings Manager</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">function LocationManager({ locations, tasks, onAdd, onRename, onRemove }) {
+  // editingIdx: which row is in rename-mode (null = none)
+  const [editingIdx,  setEditingIdx]  = useState(null);
+  // removingName: which location's remove confirmation is open (null = none)
+  const [removingName, setRemovingName] = useState(null);
+  // replaceWith: the replacement location chosen in the remove confirmation
+  const [replaceWith,  setReplaceWith]  = useState("");
+
+  // Computed: how many tasks use a given location name
+  const usedByCount = (name) => tasks.filter(t => (t.location || []).includes(name)).length;
+
+  // Each row renders as:  ● Location Name  [N tasks]  [✎ Rename]  [✕ Remove]
+  //
+  // Rename flow: click "✎ Rename" → setEditingIdx(i)
+  //   → input appears pre-filled with current name
+  //   → Enter or "Save" calls onRename(oldName, newName)
+  //   → onRename cascades: setTasks maps t.location.map(l => l===old ? new : l)
+  //
+  // Remove flow: click "✕ Remove"
+  //   → if usedByCount > 0: show sub-row with replacement picker and "Confirm" button
+  //   → if usedByCount === 0: remove immediately
+  //   → onRemove(name, replacementName) cascades: filter or substitute across all tasks
+
+  // Add new location: text input at the bottom + "+" button
+  // onAdd silently ignores duplicate names (case-sensitive)
+}</code></pre></div>
+</div>
+
+<!-- EFFORT MANAGER -->
+<div class="snippet" id="snip-effort-manager">
+  <div class="snip-header">
+    <span class="snip-title">EffortManager — CRUD interface for the effort levels list</span>
+    <span class="snip-file">App.jsx · EffortManager component</span>
+    <span class="snip-back"><a href="project-summary.html#feat-effort">↑ Effort Metadata System</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Same structure as LocationManager, but simpler because:
+// - Effort is single-select (not multi-select), so only one task field per task to update
+// - Remove uses window.confirm() instead of an inline sub-row (no replacement needed —
+//   removing an effort level just clears the field on affected tasks)
+// - Rename cascades: setTasks(prev => prev.map(t => t.effort === old ? {...t, effort: newName} : t))
+function EffortManager({ efforts, tasks, onAdd, onRename, onRemove }) {
+  const [editingIdx, setEditingIdx] = useState(null);
+
+  const usedByCount = (name) => tasks.filter(t => t.effort === name).length;
+
+  // Default effort levels initialised in GTDManager if nothing is in localStorage:
+  // ["2 min", "5 min", "10 min", "30 min", "1 hour", "2 hours",
+  //  "6 hours", "1 day", "3 days", "1 week", "1 month"]
+  // Users can add custom values like "15 min" or "2.5 hours" —
+  // effortToMinutes() handles these via substring parsing.
+}</code></pre></div>
+</div>
+
+<!-- TASK DETAIL PANEL -->
+<div class="snippet" id="snip-taskdetailpanel">
+  <div class="snip-header">
+    <span class="snip-title">TaskDetailPanel — full-height side panel with notes editor</span>
+    <span class="snip-file">App.jsx · lines 2795–2932</span>
+    <span class="snip-back"><a href="project-summary.html#feat-detail-panel">↑ Task Detail Panel</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">function TaskDetailPanel({ task, allTasks, locations, efforts,
+                           onUpdate, onComplete, onDelete, onReassignProject, onClose, style }) {
+  // Local draft states — decouple the UI from the underlying data
+  // so the user can type freely without every keystroke saving to localStorage
+  const [titleDraft, setTitleDraft] = useState(task.text);
+  const [notesDraft, setNotesDraft] = useState(task.notes || "");
+
+  // Sync drafts when the task changes (panel stays open but shows a different task)
+  useEffect(() => { setTitleDraft(task.text);        }, [task.id, task.text]);
+  useEffect(() => { setNotesDraft(task.notes || ""); }, [task.id, task.notes]);
+
+  // Register Escape key to close — cleaned up when the panel unmounts
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler); // cleanup
+  }, [onClose]);
+
+  // Save title on blur (losing focus) — reverts if empty
+  const saveTitle = () => {
+    const t = titleDraft.trim();
+    if (t && t !== task.text) onUpdate(task.id, { text: t });
+    else setTitleDraft(task.text); // revert to saved value
+  };
+
+  // Save notes on blur — converts empty string to null (no "empty notes" in storage)
+  const saveNotes = () => {
+    const val = notesDraft.trim() || null;
+    if (val !== (task.notes || null)) onUpdate(task.id, { notes: val });
+  };
+
+  // Build list of projects this task can be moved to.
+  // Excludes the task itself and all its descendants to prevent circular references.
+  const getDescendantIds = (taskId, tasks, seen = new Set()) => {
+    if (seen.has(taskId)) return seen;
+    seen.add(taskId);
+    const t = tasks.find(x => x.id === taskId);
+    (t?.childIds || []).forEach(cid => getDescendantIds(cid, tasks, seen));
+    return seen;
+  };
+  const excludedIds = getDescendantIds(task.id, allTasks);
+  const eligibleProjects = allTasks.filter(t => t.bucket === "project" && !excludedIds.has(t.id));
+
+  return (
+    &lt;div style={{ ...style, background: COLORS.surface, display: "flex", flexDirection: "column" }}&gt;
+      {/* Header: "Task Detail" label + × close button */}
+      {/* Scrollable body: Title input, Notes textarea, Info section */}
+      {/* Info section: Bucket (read-only), Project dropdown (reassign),
+                        Due date picker, Defer date picker, Effort select, Location chips,
+                        Move bucket select */}
+      {/* Footer: Complete button, Delete button */}
+    &lt;/div&gt;
+  );
+}</code></pre></div>
+</div>
+
+<hr>
+<h2>UI Fragments</h2>
+
+<!-- METADATA PANEL -->
+<div class="snippet" id="snip-metadata-panel">
+  <div class="snip-header">
+    <span class="snip-title">Expanded metadata panel — structure overview</span>
+    <span class="snip-file">App.jsx · TaskRow expanded section</span>
+    <span class="snip-back"><a href="project-summary.html#feat-metadata">↑ Task Metadata Panel</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Rendered inside TaskRow when expanded === true (chevron clicked open)
+// The indentation (18 + indent + 24)px aligns the panel under the task text
+{expanded && (
+  &lt;div style={{ margin: `0 18px 8px ${18 + indent + 24}px`, padding: "10px 12px",
+                background: COLORS.surface2, border: `1px solid ${COLORS.border}`,
+                borderRadius: 8, display: "flex", flexDirection: "column", gap: 10 }}&gt;
+
+    {/* ── Title (editable input — see snip-title-edit) ── */}
+
+    {/* ── Location: multi-select chip buttons ── */}
+    {/* Each location is a button; active locations have project-blue background */}
+    {locations.map(loc => (
+      &lt;button key={loc}
+        onClick={() =&gt; toggleLocation(loc)}  // adds or removes from task.location array
+        style={{ background: task.location?.includes(loc) ? COLORS.projectBg : COLORS.surface3,
+                 border: `1px solid ${task.location?.includes(loc) ? COLORS.project : COLORS.border2}`,
+                 color:  task.location?.includes(loc) ? COLORS.project : COLORS.text2 }}&gt;
+        {loc}
+      &lt;/button&gt;
+    ))}
+
+    {/* ── Due Date: HTML5 date picker with clear button ── */}
+    &lt;input type="date" value={task.dueDate || ""}
+           onChange={e =&gt; onUpdateTask(task.id, { dueDate: e.target.value || null })} /&gt;
+    {task.dueDate && &lt;button onClick={() =&gt; onUpdateTask(task.id, { dueDate: null })}&gt;✕&lt;/button&gt;}
+
+    {/* ── Defer Until: date picker with purple border when set ── */}
+    &lt;input type="date" value={task.deferUntil || ""}
+           onChange={e =&gt; onUpdateTask(task.id, { deferUntil: e.target.value || null })}
+           style={{ borderColor: task.deferUntil ? COLORS.someday : COLORS.border }} /&gt;
+
+    {/* ── Priority: multi-select chips (Imperative / As Possible / Financial / External) ── */}
+
+    {/* ── Effort: single-select chips from the configurable efforts list ── */}
+  &lt;/div&gt;
+)}</code></pre></div>
+</div>
+
+<!-- TITLE EDIT -->
+<div class="snippet" id="snip-title-edit">
+  <div class="snip-header">
+    <span class="snip-title">Inline title edit — dirty-state indicator + save/revert</span>
+    <span class="snip-file">App.jsx · TaskRow expanded title section</span>
+    <span class="snip-back"><a href="project-summary.html#feat-title-edit">↑ Inline Title Editing</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// The title input inside the expanded chevron panel.
+// editTitle is a local draft that diverges from task.text while the user is typing.
+&lt;div&gt;
+  &lt;div style={{ fontSize: 10, color: COLORS.muted, textTransform: "uppercase" }}&gt;Title&lt;/div&gt;
+  &lt;div style={{ display: "flex", gap: 6, alignItems: "center" }}&gt;
+    &lt;input
+      value={editTitle}
+      onChange={e =&gt; setEditTitle(e.target.value)}
+      onKeyDown={e =&gt; {
+        if (e.key === "Enter")  saveTitle();              // Enter saves
+        if (e.key === "Escape") setEditTitle(task.text);  // Escape reverts
+      }}
+      style={{
+        flex: 1,
+        // Border turns blue (project colour) when the draft differs from the saved text
+        // This acts as a "dirty" indicator — the user knows there's an unsaved change
+        border: `1px solid ${editTitle !== task.text ? COLORS.project : COLORS.border}`,
+      }}
+    /&gt;
+    {/* Save and revert buttons only appear when there is an unsaved change */}
+    {editTitle !== task.text && (
+      &lt;&gt;
+        &lt;button onClick={saveTitle} disabled={!editTitle.trim()}&gt;Save&lt;/button&gt;
+        &lt;button onClick={() =&gt; setEditTitle(task.text)}&gt;✕&lt;/button&gt;
+      &lt;/&gt;
+    )}
+  &lt;/div&gt;
+&lt;/div&gt;
+
+// saveTitle: trims the draft; if it's non-empty and different, calls onUpdateTask
+// If the user clears the input entirely and tries to save, it silently reverts
+const saveTitle = () => {
+  const trimmed = editTitle.trim();
+  if (trimmed && trimmed !== task.text) onUpdateTask(task.id, { text: trimmed });
+  else setEditTitle(task.text); // revert — don't allow blank titles
+};</code></pre></div>
+</div>
+
+<!-- TAG DISPLAY SETTING -->
+<div class="snippet" id="snip-tag-display-setting">
+  <div class="snip-header">
+    <span class="snip-title">TagDisplaySetting — two-button mode toggle in Settings</span>
+    <span class="snip-file">App.jsx · TagDisplaySetting component</span>
+    <span class="snip-back"><a href="project-summary.html#feat-tag-display">↑ Tag Display Mode</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">function TagDisplaySetting({ value, onChange }) {
+  const opts = [
+    { key: "below",  label: "Below text", desc: "Tags on a new line beneath the task name" },
+    { key: "inline", label: "Inline",     desc: "Tags between the task name and the chevron" },
+  ];
+  return (
+    &lt;div style={{ display: "flex", gap: 8 }}&gt;
+      {opts.map(opt =&gt; {
+        const active = value === opt.key;
+        return (
+          &lt;button
+            key={opt.key}
+            onClick={() =&gt; onChange(opt.key)} // calls setTagDisplay in GTDManager
+            style={{
+              flex: 1, padding: "10px 14px", borderRadius: 8, cursor: "pointer",
+              border:      `1px solid ${active ? COLORS.project : COLORS.border}`,
+              background:  active ? COLORS.project + "22" : COLORS.surface2,
+              textAlign: "left",
+            }}
+          &gt;
+            &lt;div style={{ fontWeight: 600, color: active ? COLORS.project : COLORS.text }}&gt;
+              {opt.label}
+            &lt;/div&gt;
+            &lt;div style={{ fontSize: 11, color: COLORS.muted }}&gt;{opt.desc}&lt;/div&gt;
+          &lt;/button&gt;
+        );
+      })}
+    &lt;/div&gt;
+  );
+}</code></pre></div>
+</div>
+
+<!-- TAG DISPLAY CHIP -->
+<div class="snippet" id="snip-tag-display-chip">
+  <div class="snip-header">
+    <span class="snip-title">Tag display — conditional chip placement in TaskRow</span>
+    <span class="snip-file">App.jsx · TaskRow render</span>
+    <span class="snip-back"><a href="project-summary.html#feat-tag-display">↑ Tag Display Mode</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Two rendering paths controlled by tagDisplay prop.
+// Neither renders when expanded === true (the full metadata panel is already visible).
+
+// ── BELOW-TEXT mode (default) ──
+// Chips appear inside the text column div, pushing it taller
+{tagDisplay !== "inline" && !expanded && hasMetadata && (
+  &lt;div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}&gt;
+    {task.location?.map(loc =&gt; &lt;span key={loc} style={{ /* location chip styles */ }}&gt;{loc}&lt;/span&gt;)}
+    {task.dueDate   && &lt;span style={{ /* date chip styles */ }}&gt;📅 {task.dueDate}&lt;/span&gt;}
+    {task.deferUntil && isDeferred(task) && &lt;span style={{ color: COLORS.someday }}&gt;⏰ {task.deferUntil}&lt;/span&gt;}
+    {task.priority?.map(p =&gt; &lt;span key={p}&gt;{p}&lt;/span&gt;)}
+    {task.effort    && &lt;span style={{ color: COLORS.effort }}&gt;⏱ {task.effort}&lt;/span&gt;}
+  &lt;/div&gt;
+)}
+
+// ── INLINE mode ──
+// Chips appear in a separate flex div between the text column and the action buttons.
+// whiteSpace: "nowrap" prevents chip text from wrapping onto a second line.
+{tagDisplay === "inline" && !expanded && hasMetadata && (
+  &lt;div style={{ display: "flex", flexWrap: "wrap", gap: 4, flexShrink: 0, alignSelf: "center" }}&gt;
+    {task.location?.map(loc =&gt; &lt;span key={loc} style={{ whiteSpace: "nowrap" }}&gt;{loc}&lt;/span&gt;)}
+    {task.dueDate   && &lt;span style={{ whiteSpace: "nowrap" }}&gt;📅 {task.dueDate}&lt;/span&gt;}
+    {task.deferUntil && isDeferred(task) && &lt;span style={{ whiteSpace: "nowrap", color: COLORS.someday }}&gt;⏰ {task.deferUntil}&lt;/span&gt;}
+    {/* ...priority and effort chips follow the same pattern... */}
+  &lt;/div&gt;
+)}</code></pre></div>
+</div>
+
+<!-- EFFORT TOTAL -->
+<div class="snippet" id="snip-effort-total">
+  <div class="snip-header">
+    <span class="snip-title">Effort total badge — teal chip inline with project name</span>
+    <span class="snip-file">App.jsx · TaskRow project name render</span>
+    <span class="snip-back"><a href="project-summary.html#feat-effort">↑ Effort Metadata System</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// projectEffortTotal is computed at the top of TaskRow (see snip-taskrow-sig).
+// It's null for non-project rows or projects with no effort data at all.
+// This renders the name + effort badge as a flex row so the badge sits inline.
+&lt;div style={{ fontSize: 13.5, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}&gt;
+  &lt;span&gt;{task.text}&lt;/span&gt;
+
+  {/* Only shown on project rows that have at least one child with effort set */}
+  {projectEffortTotal && (
+    &lt;span style={{
+      fontSize: 10, padding: "1px 7px", borderRadius: 10,
+      background: COLORS.effortBg,            // dark teal background
+      color:      COLORS.effort,              // teal text
+      border:     `1px solid ${COLORS.effort}44`,  // semi-transparent teal border
+    }}&gt;
+      ⏱ {projectEffortTotal}  {/* e.g. "⏱ 3.5h" or "⏱ 2d" */}
+    &lt;/span&gt;
+  )}
+
+  {/* Descendant count badge: "↓ 3 / 5" (3 incomplete, 5 total) */}
+  {task.childIds?.length > 0 && (() => {
+    const { total, incomplete } = countDescendants(task.id, allTasks || []);
+    return total > 0 ? (
+      &lt;span style={{ fontSize: 10, color: COLORS.text2, background: COLORS.surface3,
+                     border: `1px solid ${COLORS.border}`, padding: "1px 6px", borderRadius: 8 }}&gt;
+        ↓ {incomplete} / {total}
+      &lt;/span&gt;
+    ) : null;
+  })()}
+&lt;/div&gt;</code></pre></div>
+</div>
+
+<!-- ADD PROJECT TASK -->
+<div class="snippet" id="snip-add-project-task">
+  <div class="snip-header">
+    <span class="snip-title">addProjectTask() — context-aware project/subtask creation</span>
+    <span class="snip-file">App.jsx · lines 915–940</span>
+    <span class="snip-back"><a href="project-summary.html#feat-project-add">↑ Project Task Creation</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// addProjectTask runs when the user presses Enter or clicks the add button in the Projects view.
+// Its behavior depends on projectParentId — the value of the mode-select dropdown.
+const addProjectTask = () => {
+  const text = addText.trim();
+  if (!text) return;
+
+  if (projectParentId === "__new__") {
+    // ── New root project path ──
+    setTasks(prev => [
+      {
+        id: genId(), text, bucket: "project", done: false, created: Date.now(),
+        priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null,
+        childIds: [], // root projects always start with an empty childIds array
+      },
+      ...prev,
+    ]);
+  } else {
+    // ── New subtask under existing project path ──
+    const childId = genId();
+    setTasks(prev => [
+      // Update the parent project's childIds to include the new child's ID
+      ...prev.map(t =>
+        t.id === projectParentId
+          ? { ...t, childIds: [...(t.childIds || []), childId] }
+          : t
+      ),
+      // Create the subtask with parentId pointing up to the project
+      {
+        id: childId, text, bucket: "next", done: false, created: Date.now(),
+        parentId: projectParentId,
+        priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null,
+      },
+    ]);
+  }
+  setAddText(""); // clear the input field
+};</code></pre></div>
+</div>
+
+
+<!-- ASSIGN UI -->
+<div class="snippet" id="snip-assign-ui">
+  <div class="snip-header">
+    <span class="snip-title">Assign-to-project inline panel — TaskRow JSX</span>
+    <span class="snip-file">App.jsx · TaskRow assign panel section</span>
+    <span class="snip-back"><a href="project-summary.html#feat-next-enhancements">↑ Next Actions Enhancements</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// This panel appears below a Next Action row when the user clicks the 📁 button.
+// showAssign is local state in TaskRow; it's only true for this one row.
+{showAssign && currentBucket === "next" && !task.parentId && (
+  &lt;div style={{ margin: "4px 18px 8px 42px", padding: "10px 12px",
+                border: `1px solid ${COLORS.project}44`, borderRadius: 8,
+                background: COLORS.surface2 }}&gt;
+    &lt;div style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, marginBottom: 6 }}&gt;
+      Assign to Project
+    &lt;/div&gt;
+    &lt;div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}&gt;
+      &lt;select value={assignTarget} onChange={e =&gt; setAssignTarget(e.target.value)}&gt;
+        &lt;option value="__new__"&gt;+ New project…&lt;/option&gt;
+        {/* rootProjects is computed from allTasks: non-done project-bucket tasks with no parentId */}
+        {rootProjects.map(p =&gt; &lt;option key={p.id} value={p.id}&gt;{p.text}&lt;/option&gt;)}
+      &lt;/select&gt;
+
+      {/* Show the new project name input when "New project…" is selected */}
+      {assignTarget === "__new__" && (
+        &lt;input
+          value={newProjName}
+          onChange={e =&gt; setNewProjName(e.target.value)}
+          onKeyDown={e =&gt; { if (e.key === "Enter") handleAssign(); }}
+          placeholder="Project name…"
+        /&gt;
+      )}
+
+      &lt;button onClick={handleAssign}&gt;Assign&lt;/button&gt;
+      &lt;button onClick={() =&gt; setShowAssign(false)}&gt;Cancel&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+)}</code></pre></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     EFFORT TRACKING SNIPPETS  (commits 9ceebdc + 9387df5)
+══════════════════════════════════════════════════════════════ -->
+
+<!-- effortAccuracyColor -->
+<div class="snippet" id="snip-effort-accuracy-color">
+  <div class="snip-header">
+    <span class="snip-title">effortAccuracyColor() — colour-code estimated vs actual time</span>
+    <span class="snip-file">App.jsx · module-level helper ~line 230</span>
+    <span class="snip-back"><a href="project-summary.html#feat-effort-tracking">↑ Actual Effort Tracking</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Pure helper — takes two numbers (minutes) and returns a CSS colour string.
+// Called wherever the app needs to colour a chip or dropdown to signal accuracy.
+function effortAccuracyColor(estimatedMin, actualMin) {
+  // If either value is missing, fall back to the neutral teal effort colour.
+  if (!estimatedMin || !actualMin) return COLORS.effort;
+
+  // delta = how much OVER estimate we went, as a fraction.
+  //   0.0 = exactly on time, 0.25 = 25% over, -0.2 = 20% under
+  const delta = (actualMin - estimatedMin) / estimatedMin;
+
+  if (delta &lt;= 0)    return "#5ab878"; // green  — on time or under
+  if (delta &lt;= 0.25) return "#d4a95a"; // amber  — up to 25% over
+  return "#d45a5a";                    // red    — more than 25% over
+}
+
+// ── Where it's used ──────────────────────────────────────────
+//
+// 1. Completed-bucket task row chip:
+//    color: effortAccuracyColor(effortToMinutes(task.effort), effortToMinutes(task.actualEffort))
+//
+// 2. TaskDetailPanel "Actual" dropdown — text colour updates live as the user picks a value.
+//
+// 3. EffortCalibrationManager — colours each label's auto-average cell
+//    (green = accurate, red = chronically underestimating).</code></pre></div>
+</div>
+
+<!-- completeTask with prompt -->
+<div class="snippet" id="snip-complete-task-prompt">
+  <div class="snip-header">
+    <span class="snip-title">completeTask() — intercept completion to ask for actual effort</span>
+    <span class="snip-file">App.jsx · GTDManager callbacks ~line 1021</span>
+    <span class="snip-back"><a href="project-summary.html#feat-effort-tracking">↑ Actual Effort Tracking</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// completeTask is wrapped in useCallback so React doesn't recreate it every render.
+// It depends on [tasks] because it reads tasks directly (not via functional update).
+const completeTask = useCallback((id) =&gt; {
+  const task = tasks.find(t =&gt; t.id === id);
+  if (!task) return;
+
+  // Show the prompt only when ALL THREE conditions are true:
+  //   1. The task is currently incomplete  (!task.done)
+  //   2. It has an effort estimate         (task.effort is set)
+  //   3. It has no actual time yet         (!task.actualEffort)
+  if (!task.done &amp;&amp; task.effort &amp;&amp; !task.actualEffort) {
+    setActualEffortPrompt({
+      taskId: id,
+      taskText: task.text,
+      estimatedEffort: task.effort,
+    });
+    return; // return early; the modal will handle the actual completion
+  }
+
+  // Normal path: toggle done and move to/from the "done" bucket.
+  // The conditional spread clears actualEffort when UN-completing (t.done is true → going back to inbox).
+  // When completing normally (t.done is false), the spread is {} which is a no-op.
+  setTasks(prev =&gt; prev.map(t =&gt;
+    t.id === id
+      ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox",
+          ...(t.done ? { actualEffort: null } : {}) }
+      : t
+  ));
+}, [tasks]); // tasks in dep array so the closure sees the current list
+
+// ── Handlers called by the modal ─────────────────────────────
+
+const handleActualEffortSave = useCallback((actualEffort) =&gt; {
+  if (!actualEffortPrompt) return;
+  setTasks(prev =&gt; prev.map(t =&gt;
+    t.id === actualEffortPrompt.taskId
+      ? { ...t, done: true, bucket: "done", actualEffort } // record + complete
+      : t
+  ));
+  setActualEffortPrompt(null); // dismiss the modal
+}, [actualEffortPrompt]);
+
+const handleActualEffortSkip = useCallback(() =&gt; {
+  if (!actualEffortPrompt) return;
+  setTasks(prev =&gt; prev.map(t =&gt;
+    t.id === actualEffortPrompt.taskId
+      ? { ...t, done: true, bucket: "done" } // complete WITHOUT recording actual
+      : t
+  ));
+  setActualEffortPrompt(null); // dismiss the modal
+}, [actualEffortPrompt]);</code></pre></div>
+</div>
+
+<!-- ActualEffortPrompt modal -->
+<div class="snippet" id="snip-actual-effort-modal">
+  <div class="snip-header">
+    <span class="snip-title">ActualEffortPrompt — modal overlay component</span>
+    <span class="snip-file">App.jsx · component ~line 2325</span>
+    <span class="snip-back"><a href="project-summary.html#feat-effort-tracking">↑ Actual Effort Tracking</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Rendered conditionally in GTDManager JSX:
+//   {actualEffortPrompt &amp;&amp; &lt;ActualEffortPrompt taskText={...} estimatedEffort={...}
+//                              efforts={efforts} onSave={handleActualEffortSave}
+//                              onSkip={handleActualEffortSkip} /&gt;}
+function ActualEffortPrompt({ taskText, estimatedEffort, efforts, onSave, onSkip }) {
+  const [selected, setSelected] = useState("");
+
+  return (
+    // ── Backdrop ────────────────────────────────────────────
+    // position: fixed; inset: 0  → covers the entire viewport
+    // background: rgba(0,0,0,0.55) → dims everything behind it
+    // display flex + align/justify center → centres the card
+    // zIndex: 999 → sits above all other content
+    &lt;div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  zIndex: 999 }}&gt;
+
+      {/* ── Card ──────────────────────────────────────────── */}
+      &lt;div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border2}`,
+                    borderRadius: 12, padding: "22px 26px", maxWidth: 380, width: "90%",
+                    display: "flex", flexDirection: "column", gap: 14,
+                    boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}&gt;
+
+        &lt;div style={{ fontSize: 14, fontWeight: 600, color: COLORS.next }}&gt;
+          ✓ Task complete!
+        &lt;/div&gt;
+
+        &lt;div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.6 }}&gt;
+          &lt;span style={{ color: COLORS.text, fontWeight: 500 }}&gt;"{taskText}"&lt;/span&gt;&lt;br /&gt;
+          Estimated: &lt;span style={{ color: COLORS.effort }}&gt;⏱ {estimatedEffort}&lt;/span&gt;&lt;br /&gt;
+          How long did it actually take?
+        &lt;/div&gt;
+
+        {/* Dropdown — populated from the user's effort labels list */}
+        &lt;select autoFocus value={selected} onChange={e =&gt; setSelected(e.target.value)}
+          style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border2}`,
+                   borderRadius: 7, padding: "7px 10px",
+                   color: selected ? COLORS.text : COLORS.muted,
+                   fontFamily: "inherit", fontSize: 13, outline: "none", colorScheme: "dark" }}&gt;
+          &lt;option value=""&gt;— Select actual time —&lt;/option&gt;
+          {(efforts || []).map(e =&gt; &lt;option key={e} value={e}&gt;{e}&lt;/option&gt;)}
+        &lt;/select&gt;
+
+        &lt;div style={{ display: "flex", gap: 8 }}&gt;
+          {/* Save button — disabled until a value is selected */}
+          &lt;button onClick={() =&gt; selected &amp;&amp; onSave(selected)} disabled={!selected}
+            style={{ flex: 1, padding: "8px 14px", borderRadius: 7,
+                     border: `1px solid ${COLORS.next}`, background: "transparent",
+                     color: COLORS.next, fontFamily: "inherit", fontSize: 13,
+                     cursor: selected ? "pointer" : "not-allowed",
+                     opacity: selected ? 1 : 0.4, fontWeight: 600 }}&gt;
+            Save &amp; Complete
+          &lt;/button&gt;
+          {/* Skip — completes without recording actual effort */}
+          &lt;button onClick={onSkip}
+            style={{ padding: "8px 14px", borderRadius: 7,
+                     border: `1px solid ${COLORS.border}`, background: "transparent",
+                     color: COLORS.muted, fontFamily: "inherit", fontSize: 12,
+                     cursor: "pointer" }}&gt;
+            Skip
+          &lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</code></pre></div>
+</div>
+
+<!-- TaskDetailPanel effort rows -->
+<div class="snippet" id="snip-taskdetail-effort-rows">
+  <div class="snip-header">
+    <span class="snip-title">TaskDetailPanel — Estimated / Actual effort rows with live % delta</span>
+    <span class="snip-file">App.jsx · TaskDetailPanel JSX ~line 3263</span>
+    <span class="snip-back"><a href="project-summary.html#feat-effort-tracking">↑ Actual Effort Tracking</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// ── Estimated effort ─────────────────────────────────────────
+// A plain dropdown bound to task.effort (controlled input pattern).
+&lt;div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}&gt;
+  &lt;span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}&gt;Estimated&lt;/span&gt;
+  &lt;select value={task.effort || ""} onChange={e =&gt; onUpdate(task.id, { effort: e.target.value || null })}
+    style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}&gt;
+    &lt;option value=""&gt;—&lt;/option&gt;
+    {(efforts || []).map(e =&gt; &lt;option key={e} value={e}&gt;{e}&lt;/option&gt;)}
+  &lt;/select&gt;
+&lt;/div&gt;
+
+// ── Actual effort ─────────────────────────────────────────────
+// Same shape, with two extras:
+//   1. The select text colour changes dynamically based on accuracy.
+//   2. A percentage badge appears next to the picker when both values are set.
+&lt;div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}&gt;
+  &lt;span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}&gt;Actual&lt;/span&gt;
+  &lt;select value={task.actualEffort || ""}
+    onChange={e =&gt; onUpdate(task.id, { actualEffort: e.target.value || null })}
+    style={{
+      ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px",
+      // Colour the selected text green/amber/red based on accuracy
+      color: task.actualEffort
+        ? effortAccuracyColor(effortToMinutes(task.effort), effortToMinutes(task.actualEffort))
+        : undefined
+    }}&gt;
+    &lt;option value=""&gt;—&lt;/option&gt;
+    {(efforts || []).map(e =&gt; &lt;option key={e} value={e}&gt;{e}&lt;/option&gt;)}
+  &lt;/select&gt;
+
+  {/* Live percentage delta — only appears when both values are set.
+      Uses an IIFE (immediately-invoked function expression) inside JSX
+      so we can declare local variables (estMin, actMin, pct) without
+      extracting them into a separate component. */}
+  {task.effort &amp;&amp; task.actualEffort &amp;&amp; (() =&gt; {
+    const estMin = effortToMinutes(task.effort);
+    const actMin = effortToMinutes(task.actualEffort);
+    const pct = estMin ? Math.round(((actMin - estMin) / estMin) * 100) : null;
+    const color = effortAccuracyColor(estMin, actMin);
+    return pct !== null ? (
+      &lt;span style={{ fontSize: 11, color, fontWeight: 500 }}&gt;
+        {pct &gt; 0 ? `+${pct}%` : `${pct}%`}
+      &lt;/span&gt;
+    ) : null;
+  })()}
+&lt;/div&gt;</code></pre></div>
+</div>
+
+<!-- buildCalibrationContext -->
+<div class="snippet" id="snip-build-calibration-context">
+  <div class="snip-header">
+    <span class="snip-title">buildCalibrationContext() — inject calibration data into AI system prompt</span>
+    <span class="snip-file">App.jsx · module-level helper ~line 252</span>
+    <span class="snip-back"><a href="project-summary.html#feat-effort-tracking">↑ Actual Effort Tracking</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">const MIN_CALIBRATION_SAMPLES = 3; // minimum tasks per label before the average is trusted
+
+// Builds a plain-text block appended to the AI system prompt
+// only for "process" and "projectMetadata" modes.
+// Returns "" when there is nothing useful to say.
+function buildCalibrationContext(tasks, efforts, calibrationOverrides) {
+  const completed = tasks.filter(t =&gt; t.done &amp;&amp; t.effort &amp;&amp; t.actualEffort);
+  if (!completed.length &amp;&amp; !Object.values(calibrationOverrides || {}).some(Boolean)) return "";
+
+  // ── Per-label stats ──────────────────────────────────────
+  const stats = {};
+  efforts.forEach(label =&gt; { stats[label] = { totalActual: 0, count: 0 }; });
+  completed.forEach(t =&gt; {
+    if (stats[t.effort]) {
+      stats[t.effort].totalActual += effortToMinutes(t.actualEffort);
+      stats[t.effort].count       += 1;
+    }
+  });
+
+  // ── Global average ratio ─────────────────────────────────
+  const globalTotalActual = completed.reduce((s, t) =&gt; s + effortToMinutes(t.actualEffort), 0);
+  const globalTotalEst    = completed.reduce((s, t) =&gt; s + effortToMinutes(t.effort), 0);
+  const globalRatioPct    = globalTotalEst &gt; 0
+    ? Math.round(((globalTotalActual - globalTotalEst) / globalTotalEst) * 100)
+    : null;
+
+  // ── Build per-label lines ─────────────────────────────────
+  const lines = [];
+  efforts.forEach(label =&gt; {
+    const override = calibrationOverrides?.[label];
+    const s = stats[label];
+    if (override) {
+      lines.push(`- "${label}" → use "${override}" (manual override)`);
+    } else if (s &amp;&amp; s.count &gt;= MIN_CALIBRATION_SAMPLES) {
+      const avgMin   = Math.round(s.totalActual / s.count);
+      const avgLabel = minutesToEffortLabel(avgMin) || label;
+      const estMin   = effortToMinutes(label);
+      const pct      = estMin ? Math.round(((avgMin - estMin) / estMin) * 100) : 0;
+      lines.push(`- "${label}" → actual avg ~${avgLabel} (${pct &gt; 0 ? "+" : ""}${pct}%, n=${s.count})`);
+    } else if (s &amp;&amp; s.count &gt; 0) {
+      lines.push(`- "${label}" → ${s.count} sample(s) so far (need ${MIN_CALIBRATION_SAMPLES})`);
+    }
+  });
+
+  if (!lines.length &amp;&amp; globalRatioPct === null) return "";
+
+  let globalNote = "";
+  if (globalRatioPct !== null &amp;&amp; completed.length &gt;= MIN_CALIBRATION_SAMPLES) {
+    globalNote = globalRatioPct &gt; 0
+      ? `\nOverall this user underestimates by ~${globalRatioPct}% — suggest the next label up when unsure.`
+      : `\nOverall this user estimates accurately (avg ${globalRatioPct}% variance).`;
+  }
+
+  return `\n\n## User's effort estimation calibration\n${lines.join("\n")}${globalNote}\nAlways choose effort suggestions from the user's existing effort label list only.`;
+}</code></pre></div>
+</div>
+
+<!-- EffortCalibrationManager -->
+<div class="snippet" id="snip-effort-calibration-manager">
+  <div class="snip-header">
+    <span class="snip-title">EffortCalibrationManager — Settings panel calibration table</span>
+    <span class="snip-file">App.jsx · component ~line 2913</span>
+    <span class="snip-back"><a href="project-summary.html#feat-effort-tracking">↑ Actual Effort Tracking</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">function EffortCalibrationManager({ efforts, tasks, calibrationOverrides, onSetOverride, onClearOverride }) {
+  // ── Derived state — computed fresh every render, never stored ──
+  // Storing these averages would risk stale values when tasks change.
+  const stats = {};
+  efforts.forEach(label =&gt; { stats[label] = { totalActual: 0, count: 0 }; });
+  tasks.filter(t =&gt; t.done &amp;&amp; t.effort &amp;&amp; t.actualEffort).forEach(t =&gt; {
+    if (stats[t.effort]) {
+      stats[t.effort].totalActual += effortToMinutes(t.actualEffort);
+      stats[t.effort].count       += 1;
+    }
+  });
+  const totalCompleted = tasks.filter(t =&gt; t.done &amp;&amp; t.effort &amp;&amp; t.actualEffort).length;
+
+  return (
+    &lt;div style={{ maxWidth: 520 }}&gt;
+      &lt;div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}&gt;
+        Effort Calibration
+      &lt;/div&gt;
+      &lt;div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 16, lineHeight: 1.6 }}&gt;
+        When you record actual effort on completed tasks, this table updates automatically.
+        The AI uses these averages during inbox processing and project review.
+        Set a manual override to seed a label before you have {MIN_CALIBRATION_SAMPLES} data points.
+      &lt;/div&gt;
+
+      {totalCompleted === 0 &amp;&amp; Object.values(calibrationOverrides || {}).every(v =&gt; !v) ? (
+        &lt;div style={{ fontSize: 12, color: COLORS.muted, fontStyle: "italic", marginBottom: 16 }}&gt;
+          No calibration data yet. Complete tasks with both estimated and actual effort to build history.
+        &lt;/div&gt;
+      ) : null}
+
+      &lt;div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}&gt;
+        {/* Header */}
+        &lt;div style={{ display: "grid", gridTemplateColumns: "1fr 120px 140px 80px",
+                      gap: 8, padding: "4px 10px", fontSize: 10, color: COLORS.muted,
+                      textTransform: "uppercase", letterSpacing: "0.06em" }}&gt;
+          &lt;span&gt;Label&lt;/span&gt;&lt;span&gt;Auto avg&lt;/span&gt;&lt;span&gt;Manual override&lt;/span&gt;&lt;span&gt;AI uses&lt;/span&gt;
+        &lt;/div&gt;
+
+        {efforts.map(label =&gt; {
+          const s         = stats[label] || { totalActual: 0, count: 0 };
+          const override  = calibrationOverrides?.[label] || "";
+          const hasEnough = s.count &gt;= MIN_CALIBRATION_SAMPLES;
+          const avgMin    = hasEnough ? Math.round(s.totalActual / s.count) : null;
+          const avgLabel  = avgMin ? minutesToEffortLabel(avgMin) : null;
+          const estMin    = effortToMinutes(label);
+          const pct       = avgMin &amp;&amp; estMin ? Math.round(((avgMin - estMin) / estMin) * 100) : null;
+          const color     = avgMin ? effortAccuracyColor(estMin, avgMin) : COLORS.muted;
+
+          // What the AI will actually use for this label
+          let aiUses, aiColor;
+          if (override)              { aiUses = override;     aiColor = COLORS.project; } // blue = manual
+          else if (hasEnough &amp;&amp; avgLabel) { aiUses = avgLabel; aiColor = color;        } // data-driven
+          else                       { aiUses = "global avg"; aiColor = COLORS.muted;  } // not enough data
+
+          return (
+            &lt;div key={label} style={{ display: "grid", gridTemplateColumns: "1fr 120px 140px 80px",
+                  gap: 8, alignItems: "center", padding: "8px 10px",
+                  background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8 }}&gt;
+
+              {/* Label name */}
+              &lt;div style={{ display: "flex", alignItems: "center", gap: 6 }}&gt;
+                &lt;span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.effort, flexShrink: 0 }} /&gt;
+                &lt;span style={{ fontSize: 13, color: COLORS.text }}&gt;{label}&lt;/span&gt;
+              &lt;/div&gt;
+
+              {/* Auto average — shows count while building up, avg when ready */}
+              &lt;div style={{ fontSize: 12 }}&gt;
+                {hasEnough &amp;&amp; avgLabel ? (
+                  &lt;span style={{ color }}&gt;
+                    {avgLabel}{pct !== null ? ` (${pct &gt; 0 ? "+" : ""}${pct}%)` : ""}
+                    &lt;span style={{ color: COLORS.muted, fontSize: 10, marginLeft: 4 }}&gt;n={s.count}&lt;/span&gt;
+                  &lt;/span&gt;
+                ) : s.count &gt; 0 ? (
+                  &lt;span style={{ color: COLORS.muted }}&gt;{s.count}/{MIN_CALIBRATION_SAMPLES} samples&lt;/span&gt;
+                ) : (
+                  &lt;span style={{ color: COLORS.muted }}&gt;—&lt;/span&gt;
+                )}
+              &lt;/div&gt;
+
+              {/* Manual override dropdown */}
+              &lt;div style={{ display: "flex", gap: 4, alignItems: "center" }}&gt;
+                &lt;select value={override}
+                  onChange={e =&gt; e.target.value ? onSetOverride(label, e.target.value) : onClearOverride(label)}
+                  style={{ flex: 1, background: COLORS.surface3,
+                           border: `1px solid ${override ? COLORS.project : COLORS.border}`,
+                           borderRadius: 5, padding: "3px 6px",
+                           color: override ? COLORS.project : COLORS.muted,
+                           fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}&gt;
+                  &lt;option value=""&gt;— none —&lt;/option&gt;
+                  {efforts.map(e =&gt; &lt;option key={e} value={e}&gt;{e}&lt;/option&gt;)}
+                &lt;/select&gt;
+                {override &amp;&amp; (
+                  &lt;button onClick={() =&gt; onClearOverride(label)}
+                    style={{ padding: "2px 6px", borderRadius: 4, border: `1px solid ${COLORS.border}`,
+                             background: "transparent", color: COLORS.muted,
+                             fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}&gt;✕&lt;/button&gt;
+                )}
+              &lt;/div&gt;
+
+              {/* AI uses — shows which value the AI will act on */}
+              &lt;div style={{ fontSize: 11, color: aiColor, fontWeight: 500 }}&gt;{aiUses}&lt;/div&gt;
+            &lt;/div&gt;
+          );
+        })}
+      &lt;/div&gt;
+      <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.5 }}>
+        Auto avg requires {MIN_CALIBRATION_SAMPLES}+ completed tasks per label. Manual overrides take priority.
+      </div>
+    </div>
+  );
+}</code></pre></div>
+</div>
+
+
+<!-- getTaskContext -->
+<div class="snippet" id="snip-gettaskcontext">
+  <div class="snip-header">
+    <span class="snip-title">getTaskContext() — inject full task metadata into every AI system prompt</span>
+    <span class="snip-file">App.jsx · hook ~line 589</span>
+    <span class="snip-back"><a href="project-summary.html#feat-inbox">↑ Inbox &amp; AI Coach</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Returns a structured plain-text snapshot of all active tasks,
+// grouped by bucket, with every metadata field inline.
+// Called on every AI request; the string is injected into the system prompt.
+const getTaskContext = useCallback(() => {
+  const today = todayStr();
+  const bucketNames = {
+    inbox:   "Inbox",
+    next:    "Next Actions",
+    project: "Projects",
+    waiting: "Waiting For",
+    someday: "Someday/Maybe",
+  };
+
+  const sections = Object.entries(bucketNames).map(([k, label]) => {
+    const items = tasks.filter(t => t.bucket === k && !t.done);
+    if (!items.length) return `${label}: empty`;
+
+    const lines = items.map(t => {
+      const meta = [];
+      if (t.dueDate)          meta.push(`due:${t.dueDate}`);
+      if (t.deferUntil)       meta.push(`defer-until:${t.deferUntil}`);
+      if (t.effort)           meta.push(`effort:${t.effort}`);
+      if (t.actualEffort)     meta.push(`actual-effort:${t.actualEffort}`);
+      if (t.location?.length) meta.push(`location:${t.location.join(",")}`);
+      if (t.priority?.length) meta.push(`priority:${t.priority.join(",")}`);
+      if (t.notes)            meta.push(`has-notes`);
+      return meta.length
+        ? `- ${t.text} [${meta.join("] [")}]`
+        : `- ${t.text}`;
+    });
+
+    return `${label} (${items.length}):\n${lines.join("\n")}`;
+  });
+
+  return `Today's date: ${today}\n\n${sections.join("\n\n")}`;
+}, [tasks]);</code></pre></div>
+  <div class="snip-note">
+    <strong>Why this matters:</strong> The original implementation only sent task names (<code>t =&gt; t.text</code>), so the AI had no visibility into due dates, effort, location, priority, or notes. Any question like "what's due today?" would produce a hallucinated or apologetic response. The fix builds a rich metadata line per task using a <code>meta[]</code> accumulator — fields that are unset are simply omitted, keeping the prompt concise. Today's date is prepended so the AI can answer relative-date questions (<em>today</em>, <em>overdue</em>, <em>this week</em>) correctly.
+  </div>
+</div>
+<!-- extractUpdateAction -->
+<div class="snippet" id="snip-extract-update-action">
+  <div class="snip-header">
+    <span class="snip-title">extractUpdateAction() — parse →ACTION:update from AI reply</span>
+    <span class="snip-file">App.jsx · module-level helper ~line 156</span>
+    <span class="snip-back"><a href="project-summary.html#feat-chat-update">↑ AI Chat Task Updates</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Called after every AI response in Chat mode.
+// Returns { taskId, changes } when the reply contains →ACTION:update, or null.
+function extractUpdateAction(text) {
+  // The 's' flag makes '.' match newlines too — needed for multi-line notes.
+  const m = text.match(/→ACTION:update\|([^|\n]+)\|(.*)/s);
+  if (!m) return null;
+
+  const taskId   = m[1].trim();   // e.g. "lf8j2k5r"
+  const fieldStr = m[2];          // everything after the task ID
+
+  // 'notes' must be the last field because its value may contain '|'.
+  // Find where 'notes:' starts (may be preceded by a pipe delimiter).
+  const notesIdx   = fieldStr.search(/(^|\|)notes:/);
+  const pureFields = notesIdx !== -1
+    ? fieldStr.slice(0, notesIdx).replace(/\|$/, "")  // fields before notes
+    : fieldStr;
+  const notesRaw   = notesIdx !== -1
+    ? fieldStr.slice(fieldStr.indexOf("notes:", notesIdx) + 6)  // value after "notes:"
+    : null;
+
+  // Build a changes object from the remaining pipe-delimited key:value pairs.
+  const changes = {};
+  pureFields.split("|").filter(Boolean).forEach(pair => {
+    const colon = pair.indexOf(":");
+    if (colon === -1) return;
+    const key = pair.slice(0, colon).trim();
+    const val = pair.slice(colon + 1).trim();
+    if (key === "due")      changes.dueDate    = val;
+    if (key === "defer")    changes.deferUntil = val;
+    if (key === "effort")   changes.effort     = val;
+    if (key === "bucket")   changes.bucket     = val;
+    if (key === "title")    changes.text       = val;  // 'text' is the internal field name
+    if (key === "priority") changes.priority   = val.split(",").map(s =&gt; s.trim()).filter(Boolean);
+    if (key === "location") changes.location   = val.split(",").map(s =&gt; s.trim()).filter(Boolean);
+  });
+
+  // Decode \n back to real newlines in notes.
+  // The AI is instructed to write \n; here we reverse that encoding.
+  if (notesRaw !== null) changes.notes = notesRaw.replace(/\\n/g, "\n");
+
+  // Return null if nothing parseable was found (avoids empty updateTask calls).
+  return Object.keys(changes).length ? { taskId, changes } : null;
+}</code></pre></div>
+  <div class="snip-note">
+    <strong>Why a separate helper?</strong> Keeping the parser outside <code>callAI</code> makes it independently testable and keeps the hook body readable. The <code>/s</code> dotAll flag is the key subtlety — without it, <code>.*</code> stops at the first newline, which would silently truncate multi-line notes. The <code>notes:</code>-must-be-last rule avoids having to escape pipe characters inside note text.
+  </div>
+</div>
+
+<!-- callAI update block -->
+<div class="snippet" id="snip-callai-update-block">
+  <div class="snip-header">
+    <span class="snip-title">callAI — detect and apply →ACTION:update in Chat mode</span>
+    <span class="snip-file">App.jsx · callAI hook ~line 726</span>
+    <span class="snip-back"><a href="project-summary.html#feat-chat-update">↑ AI Chat Task Updates</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Inside callAI, after receiving the AI reply:
+
+// Only act in 'chat' mode — process/projectReview use their own action parsers.
+let updateChip = null;
+if (mode === "chat") {
+  const upd = extractUpdateAction(reply);
+  if (upd) {
+    // Look up the task by ID so we can show its name in the confirmation chip.
+    const target = tasks.find(t =&gt; t.id === upd.taskId);
+    if (target) {
+      updateTask(upd.taskId, upd.changes);   // write changes to React state → localStorage
+
+      // Map internal field names to human-readable labels for the chip.
+      const fieldLabels = Object.keys(upd.changes).map(k =&gt; ({
+        notes: "notes", dueDate: "due date", deferUntil: "defer date",
+        effort: "effort", text: "title", bucket: "bucket",
+        priority: "priority", location: "location",
+      }[k] || k));
+
+      updateChip = { taskName: target.text, fields: fieldLabels };
+    }
+  }
+}
+
+// Attach the chip payload to the message so ChatBubble can render it.
+setMessages(prev =&gt; [...prev, { role: "assistant", text: reply, updateChip }]);
+
+// Dependency array must include updateTask — omitting it would capture a stale
+// closure and silently apply updates against the wrong task list snapshot.
+// }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, updateTask]);</code></pre></div>
+  <div class="snip-note">
+    <strong>Stale closure risk.</strong> <code>callAI</code> is memoised with <code>useCallback</code>. If <code>updateTask</code> were omitted from the dependency array, React would reuse the original closure — meaning <code>updateTask</code> inside the hook would reference the version captured at mount time, which sees an empty task list. Adding <code>updateTask</code> to the deps ensures the hook always uses the current version.
+  </div>
+</div>
+
+<!-- ChatBubble update chip -->
+<div class="snippet" id="snip-chat-update-bubble">
+  <div class="snip-header">
+    <span class="snip-title">ChatBubble — ✏️ update confirmation chip</span>
+    <span class="snip-file">App.jsx · ChatBubble component ~line 2330</span>
+    <span class="snip-back"><a href="project-summary.html#feat-chat-update">↑ AI Chat Task Updates</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">function ChatBubble({ msg }) {
+  const isUser = msg.role === "user";
+  return (
+    &lt;div style={{ display: "flex", gap: 7, flexDirection: isUser ? "row-reverse" : "row", maxWidth: "100%" }}&gt;
+      {/* Avatar circle */}
+      &lt;div style={{ width: 22, height: 22, borderRadius: "50%", ... }}&gt;
+        {isUser ? "Y" : "G"}
+      &lt;/div&gt;
+
+      {/* Bubble + optional chip, stacked vertically */}
+      &lt;div style={{ display: "flex", flexDirection: "column", gap: 5, maxWidth: "calc(100% - 70px)" }}&gt;
+
+        {/* Main text bubble — unchanged */}
+        &lt;div style={{ padding: "8px 11px", borderRadius: 11, ... }}&gt;
+          {formatBubble(msg.text)}
+        &lt;/div&gt;
+
+        {/* Confirmation chip — only rendered when the message carried an update */}
+        {msg.updateChip &amp;&amp; (
+          &lt;div style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "4px 9px", borderRadius: 20,
+            background: COLORS.surface3, border: `1px solid ${COLORS.border}`,
+            fontSize: 11, color: COLORS.text2, alignSelf: "flex-start",
+          }}&gt;
+            &lt;span&gt;✏️&lt;/span&gt;
+            &lt;span&gt;
+              Updated &lt;strong style={{ color: COLORS.text }}&gt;{msg.updateChip.taskName}&lt;/strong&gt;
+              {" — "}{msg.updateChip.fields.join(" · ")}
+            &lt;/span&gt;
+          &lt;/div&gt;
+        )}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</code></pre></div>
+  <div class="snip-note">
+    <strong>Why attach chip data to the message object?</strong> React re-renders the whole chat list whenever <code>messages</code> state changes. By storing <code>updateChip</code> directly on the message object (alongside <code>role</code> and <code>text</code>), the chip persists across re-renders and is part of the conversation record — scroll up and it's still there. If we stored it in a separate <code>useState</code>, it would reset every time anything else caused a re-render.
+  </div>
+</div>
+
+<!-- findRootProject -->
+<div class="snippet" id="snip-find-root-project">
+  <div class="snip-header">
+    <span class="snip-title">findRootProject() — walk parentId chain to find the top-level project</span>
+    <span class="snip-file">App.jsx · hook ~line 1096</span>
+    <span class="snip-back"><a href="project-summary.html#feat-note-rollup">↑ Subtask Note Roll-up</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Returns the top-most ancestor of parentId — the root project task.
+// Works for subtasks at any depth: level 2, 3, 4, etc.
+const findRootProject = useCallback((parentId) => {
+  const visited = new Set(); // guards against corrupt data cycles
+
+  let current = tasks.find(t =&gt; t.id === parentId);
+
+  // Walk upward while the current node has its own parent
+  while (current && current.parentId && !visited.has(current.id)) {
+    visited.add(current.id);                          // mark as seen
+    current = tasks.find(t =&gt; t.id === current.parentId); // step up
+  }
+
+  return current || null; // null if parentId not found in task list
+}, [tasks]);</code></pre></div>
+  <div class="snip-note">
+    <strong>Why a visited Set?</strong> Task data lives in localStorage. If it were ever corrupted with a circular <code>parentId</code> reference (e.g. task A → B → A), the while loop would run forever. The Set breaks the cycle by bailing out the moment a node is seen a second time. This is the standard safe-traversal pattern for any linked list or tree walk.
+  </div>
+</div>
+
+<!-- completeTask with rollup -->
+<div class="snippet" id="snip-complete-task-rollup">
+  <div class="snip-header">
+    <span class="snip-title">completeTask() — roll-up check + effort prompt sequencing</span>
+    <span class="snip-file">App.jsx · hook ~line 1106</span>
+    <span class="snip-back"><a href="project-summary.html#feat-note-rollup">↑ Subtask Note Roll-up</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">const completeTask = useCallback((id) => {
+  const task = tasks.find(t =&gt; t.id === id);
+  if (!task) return;
+
+  // Only intercept when marking DONE (not when un-doing a completed task)
+  if (!task.done) {
+    // ① Roll-up prompt: subtask with notes → offer to append to root project
+    if (task.notes && task.parentId) {
+      const root = findRootProject(task.parentId);
+      if (root) {
+        setPendingRollup({
+          taskId: id,
+          taskText: task.text,
+          notes: task.notes,
+          rootProjectId: root.id,
+          rootProjectText: root.text,
+        });
+        return; // pause here; modal takes over
+      }
+    }
+
+    // ② Effort prompt: task has an estimate but no recorded actual time
+    if (task.effort && !task.actualEffort) {
+      setActualEffortPrompt({ taskId: id, taskText: task.text, estimatedEffort: task.effort });
+      return; // pause here; modal takes over
+    }
+  }
+
+  // No prompts needed — complete (or un-complete) immediately
+  setTasks(prev =&gt; prev.map(t =&gt; t.id === id
+    ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox",
+        ...(t.done ? { actualEffort: null } : {}) }
+    : t
+  ));
+}, [tasks, findRootProject]);</code></pre></div>
+  <div class="snip-note">
+    <strong>Prompt sequencing matters.</strong> The two <code>return</code> statements make the prompts mutually exclusive at any given moment — only one modal is shown at a time. Roll-up always comes first; the effort prompt is triggered afterward via <code>finishComplete()</code>. This avoids the complexity of stacking two modals simultaneously.
+  </div>
+</div>
+
+<!-- handleRollupConfirm + finishComplete -->
+<div class="snippet" id="snip-handle-rollup-confirm">
+  <div class="snip-header">
+    <span class="snip-title">handleRollupConfirm() + finishComplete() — apply roll-up and continue</span>
+    <span class="snip-file">App.jsx · hooks ~line 1134</span>
+    <span class="snip-back"><a href="project-summary.html#feat-note-rollup">↑ Subtask Note Roll-up</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Shared continuation — called after both confirm and skip paths.
+// Checks whether an effort prompt is still needed before completing.
+const finishComplete = useCallback((taskId) => {
+  const task = tasks.find(t =&gt; t.id === taskId);
+  if (task && task.effort && !task.actualEffort) {
+    setActualEffortPrompt({ taskId, taskText: task.text, estimatedEffort: task.effort });
+  } else {
+    setTasks(prev =&gt; prev.map(t =&gt; t.id === taskId ? { ...t, done: true, bucket: "done" } : t));
+  }
+}, [tasks]);
+
+// Called when user clicks "Add to project notes".
+// heading = the (possibly edited) label line from NoteRollupPrompt.
+const handleRollupConfirm = useCallback((heading) => {
+  if (!pendingRollup) return;
+  const { taskId, notes, rootProjectId } = pendingRollup;
+
+  const stamp = `${heading}
+${notes}`; // heading + newline + notes body
+
+  setTasks(prev =&gt; prev.map(t =&gt; {
+    if (t.id !== rootProjectId) return t;
+    const existing = t.notes ? t.notes.trim() : "";
+    // Append with a --- separator if the project already has notes
+    return { ...t, notes: existing ? `${existing}
+
+---
+${stamp}` : stamp };
+  }));
+
+  setPendingRollup(null);
+  finishComplete(taskId); // check effort prompt next
+}, [pendingRollup, finishComplete]);
+
+// Called when user clicks "Skip" — just continue to effort prompt or complete.
+const handleRollupSkip = useCallback(() => {
+  if (!pendingRollup) return;
+  const { taskId } = pendingRollup;
+  setPendingRollup(null);
+  finishComplete(taskId);
+}, [pendingRollup, finishComplete]);</code></pre></div>
+  <div class="snip-note">
+    <strong>Why <code>finishComplete</code> is a separate function.</strong> Both <code>handleRollupConfirm</code> and <code>handleRollupSkip</code> need to do the same thing after their own work: check for the effort prompt, then complete. Rather than copy-pasting that logic into each handler, it's extracted into <code>finishComplete</code>. This is a simple refactor: when two paths converge at the same step, name and extract that step.
+  </div>
+</div>
+
+<!-- NoteRollupPrompt -->
+<div class="snippet" id="snip-note-rollup-prompt">
+  <div class="snip-header">
+    <span class="snip-title">NoteRollupPrompt — modal with editable heading and notes preview</span>
+    <span class="snip-file">App.jsx · component ~line 2476</span>
+    <span class="snip-back"><a href="project-summary.html#feat-note-rollup">↑ Subtask Note Roll-up</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">function NoteRollupPrompt({ taskText, notes, rootProjectText, onConfirm, onSkip }) {
+  // Build the default heading once at mount, from the prop values.
+  // useState(defaultHeading) initialises the field — React then owns it.
+  // The prop is never read again; edits update the state, not the prop.
+  const d = new Date();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const defaultHeading = `✓ ${taskText} (${months[d.getMonth()]} ${d.getDate()}):`;
+  const [heading, setHeading] = useState(defaultHeading);
+
+  return (
+    &lt;div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", ... }}&gt;
+      &lt;div style={{ ... }}&gt;
+        &lt;div&gt;📋 Roll up notes?&lt;/div&gt;
+
+        &lt;div&gt;"{taskText}" has notes. Add them to "{rootProjectText}"?&lt;/div&gt;
+
+        {/* Editable heading field */}
+        &lt;div&gt;
+          &lt;div style={{ fontSize: 11, color: COLORS.muted }}&gt;Heading (editable)&lt;/div&gt;
+          &lt;input
+            value={heading}
+            onChange={e =&gt; setHeading(e.target.value)}
+            style={{ ... }}
+          /&gt;
+        &lt;/div&gt;
+
+        {/* Read-only notes preview */}
+        &lt;div style={{ whiteSpace: "pre-wrap", maxHeight: 120, overflowY: "auto" }}&gt;
+          {notes}
+        &lt;/div&gt;
+
+        &lt;div style={{ display: "flex", gap: 8 }}&gt;
+          {/* Pass the current heading state to the confirm handler */}
+          &lt;button autoFocus onClick={() =&gt; onConfirm(heading)}&gt;Add to project notes&lt;/button&gt;
+          &lt;button onClick={onSkip}&gt;Skip&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</code></pre></div>
+  <div class="snip-note">
+    <strong>Initialising state from a prop — the right way.</strong> Passing <code>defaultHeading</code> to <code>useState()</code> sets the field's starting value. This is different from using the prop directly as the value — if you wrote <code>value={defaultHeading}</code> with no state, the field would be read-only (React calls this a "controlled component with no way to change"). By putting it in state, the user can type freely while the component stays fully controlled.
+  </div>
+</div>
+
+<div class="snippet" id="snip-waterfall-filter-inverted">
+  <div class="snip-header">
+    <span class="snip-title">waterfallFilter() — leaf-node visibility rule</span>
+    <a class="back-link" href="project-summary.html#feat-waterfall-invert">↑ Feature: Bottom-Up Task Progression</a>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// A task is visible in Next Actions only when it has NO incomplete next-action children.
+// "Leaf nodes" (tasks with no children in the next bucket) always show.
+// Parents unlock as their children are completed — bottom-up progression.
+function waterfallFilter(nextTasks, allTasks) {
+  return nextTasks.filter(task => {
+    // Find any sibling tasks that:
+    //   · belong to this task as a child (parentId === task.id)
+    //   · are in the "next" bucket (a concrete action, not deferred or someday)
+    //   · are not yet done
+    const incompleteNextChildren = allTasks.filter(
+      t => t.parentId === task.id && t.bucket === "next" && !t.done
+    );
+    // If there are any, this task is hidden — work the children first.
+    return incompleteNextChildren.length === 0;
+  });
+}
+
+// ── How it is called ────────────────────────────────────────────────────────
+// Inside the Next Actions view render, AFTER filtering to only "next" bucket tasks
+// and BEFORE the deferred-date filter:
+const visible = waterfallFilter(bucketTasks, tasks).filter(t => !isDeferred(t));
+</code></pre></div>
+  <div class="snip-note">
+    <strong>Pure functions over data.</strong> <code>waterfallFilter</code> is a plain function — no hooks,
+    no side effects. It takes two arrays and returns a new one. React calls it on every render, so the
+    visible list is always in sync with current state. Because it does not mutate anything, it is trivial
+    to test and reason about in isolation.
+  </div>
+</div>
+
+<div class="snippet" id="snip-complete-task-checks">
+  <div class="snip-header">
+    <span class="snip-title">completeTask() — three-check cascade with options flag</span>
+    <a class="back-link" href="project-summary.html#feat-waterfall-invert">↑ Feature: Bottom-Up Task Progression</a>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// options = {} lets callers skip specific checks without needing a separate function.
+// The deferred-check handler re-enters with { skipDeferCheck: true } to jump to check #2.
+const completeTask = useCallback((id, options = {}) => {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+
+  // Only run these extra checks when the user is marking a task DONE (not un-doing it).
+  if (!task.done) {
+
+    // ── Check 1: Deferred / Someday children ─────────────────────────────────
+    // If the task has incomplete children sitting in "deferred" or "someday",
+    // warn the user before completing the parent.
+    if (!options.skipDeferCheck) {
+      const deferredKids = tasks.filter(
+        t => t.parentId === id &&
+             (t.bucket === "deferred" || t.bucket === "someday") &&
+             !t.done
+      );
+      if (deferredKids.length > 0) {
+        // Open the DeferCheckPrompt modal; return early to pause here.
+        setPendingDeferCheck({ taskId: id, taskText: task.text, deferredChildren: deferredKids });
+        return;
+      }
+    }
+
+    // ── Check 2: Note roll-up ──────────────────────────────────────────────
+    // If the task has notes AND a parent, offer to append those notes
+    // to the immediate parent's notes field.
+    if (task.notes && task.parentId) {
+      const parent = tasks.find(t => t.id === task.parentId); // direct parent only
+      if (parent) {
+        setPendingRollup({
+          taskId: id,
+          taskText: task.text,
+          notes: task.notes,
+          parentId: parent.id,    // was rootProjectId in the old version
+          parentText: parent.text // was rootProjectText in the old version
+        });
+        return;
+      }
+    }
+
+    // ── Check 3: Effort prompt ────────────────────────────────────────────
+    // If the task had an estimated effort but no actual time was recorded,
+    // ask the user how long it really took.
+    if (task.effort && !task.actualEffort) {
+      setActualEffortPrompt({ taskId: id, taskText: task.text, estimatedEffort: task.effort });
+      return;
+    }
+  }
+
+  // All checks passed (or this is an un-do) — flip the done state.
+  setTasks(prev => prev.map(t => t.id === id
+    ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox", ...(t.done ? { actualEffort: null } : {}) }
+    : t
+  ));
+}, [tasks]);
+
+// ── Deferred-check handlers ──────────────────────────────────────────────────
+// "Complete anyway" — clear the modal and re-enter completeTask skipping check #1.
+const handleDeferCheckSkip = useCallback(() => {
+  if (!pendingDeferCheck) return;
+  const { taskId } = pendingDeferCheck;
+  setPendingDeferCheck(null);
+  completeTask(taskId, { skipDeferCheck: true }); // picks up at check #2
+}, [pendingDeferCheck, completeTask]);
+
+// "Review first" — just close the modal. The task stays incomplete.
+const handleDeferCheckReview = useCallback(() => {
+  setPendingDeferCheck(null);
+}, []);
+</code></pre></div>
+  <div class="snip-note">
+    <strong>Options objects as escape hatches.</strong> Instead of writing a second function (e.g.
+    <code>completeTaskSkipDeferCheck</code>) or duplicating the roll-up and effort logic in the
+    deferred-check handler, a single optional flag threads back through the same function. The default
+    value <code>options = {}</code> means existing callers (which pass nothing) are unchanged. Only the
+    new deferred-check handler passes the flag. This keeps all three checks together and readable in one
+    place.
+  </div>
+</div>
+
+<div class="snippet" id="snip-defer-check-prompt">
+  <div class="snip-header">
+    <span class="snip-title">DeferCheckPrompt — modal warning for deferred/someday children</span>
+    <a class="back-link" href="project-summary.html#feat-waterfall-invert">↑ Feature: Bottom-Up Task Progression</a>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Shown when the user tries to complete a task that still has children
+// in the "deferred" or "someday" bucket.
+// Props:
+//   taskText        — name of the task being completed
+//   deferredChildren — array of child task objects ({ id, text, bucket })
+//   onSkip          — "Complete anyway" — bypasses check and continues
+//   onReview        — "Review first"   — closes modal, leaves task incomplete
+function DeferCheckPrompt({ taskText, deferredChildren, onSkip, onReview }) {
+  return (
+    // Full-screen semi-transparent overlay — same pattern as NoteRollupPrompt and ActualEffortPrompt.
+    &lt;div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", ... }}&gt;
+      &lt;div style={{ /* card */ }}&gt;
+
+        {/* Header */}
+        &lt;div style={{ color: COLORS.deferred }}&gt;⏳ Deferred subtasks remain&lt;/div&gt;
+
+        {/* Sentence describing the situation */}
+        &lt;div&gt;
+          "{taskText}" has {deferredChildren.length} deferred or someday
+          subtask{deferredChildren.length !== 1 ? "s" : ""}:
+        &lt;/div&gt;
+
+        {/* List each child — colour-coded by bucket */}
+        &lt;ul&gt;
+          {deferredChildren.map(c =&gt; (
+            &lt;li key={c.id}&gt;
+              &lt;span style={{ color: c.bucket === "deferred" ? COLORS.deferred : COLORS.someday }}&gt;
+                ({c.bucket})
+              &lt;/span&gt; {c.text}
+            &lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+
+        &lt;div style={{ display: "flex", gap: 8 }}&gt;
+          {/* Primary action — autoFocus so Enter = Review first */}
+          &lt;button autoFocus onClick={onReview}&gt;Review first&lt;/button&gt;
+          {/* Secondary — complete without reviewing */}
+          &lt;button onClick={onSkip}&gt;Complete anyway&lt;/button&gt;
+        &lt;/div&gt;
+
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+
+// ── Rendered in the app root ─────────────────────────────────────────────────
+// The modal only mounts when pendingDeferCheck is non-null.
+{pendingDeferCheck && (
+  &lt;DeferCheckPrompt
+    taskText={pendingDeferCheck.taskText}
+    deferredChildren={pendingDeferCheck.deferredChildren}
+    onSkip={handleDeferCheckSkip}
+    onReview={handleDeferCheckReview}
+  /&gt;
+)}
+</code></pre></div>
+  <div class="snip-note">
+    <strong>State-driven modal mounting.</strong> React conditionally renders <code>DeferCheckPrompt</code>
+    based on whether <code>pendingDeferCheck</code> is non-null. When it is null, the component does not
+    exist in the DOM at all. When a value is set, the component mounts, <code>autoFocus</code> moves
+    keyboard focus inside it, and pressing Enter immediately triggers "Review first" — the safer default.
+    Clearing the state unmounts the modal instantly. No separate <code>isOpen</code> boolean is needed
+    because the data itself acts as the open/close signal.
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => { hljs.highlightAll(); });
+</script>
+</body>
+</html>
