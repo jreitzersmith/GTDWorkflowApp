@@ -410,6 +410,8 @@ export default function GTDManager() {
   const [projectParentId, setProjectParentId] = useState("__new__");
   // Set of task IDs whose children are currently hidden in the Projects view.
   const [collapsedNodes, setCollapsedNodes] = useState(new Set());
+  // ID of the task whose detail panel is currently open (null = closed).
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [dragId,             setDragId]             = useState(null);
   const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
   const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
@@ -432,6 +434,7 @@ export default function GTDManager() {
   useEffect(() => { localStorage.setItem("gtd_efforts",   JSON.stringify(efforts));   }, [efforts]);
   useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
+  useEffect(() => { setSelectedTaskId(null); }, [currentBucket]);
 
   // Auto-surface: on mount, move any standalone deferred tasks whose wake date has passed into Inbox.
   // Only moves tasks with no parentId (project subtasks stay in place; their deferUntil just stops hiding them).
@@ -582,19 +585,19 @@ export default function GTDManager() {
 
     // Create new tasks based on action type, applying any AI-suggested dates
     if (type === "next") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
     } else if (type === "project") {
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null },
-        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, deferUntil: aiDefer || null },
+        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null, notes: null },
+        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, deferUntil: aiDefer || null, notes: null },
         ...prev,
       ]);
     } else if (type === "someday") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
     } else if (type === "waiting") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
     }
     // type === "delete": just archive, no new task
 
@@ -831,14 +834,14 @@ export default function GTDManager() {
   const addTask = (bucket) => {
     const text = addText.trim();
     if (!text) return;
-    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null }, ...prev]);
+    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null }, ...prev]);
     setAddText("");
   };
 
   const addAndProcess = () => {
     const text = addText.trim();
     if (!text) return;
-    const task = { id: genId(), text, bucket: "inbox", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null };
+    const task = { id: genId(), text, bucket: "inbox", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null };
     setTasks(prev => [task, ...prev]);
     setAddText("");
     setCurrentBucket("inbox");
@@ -851,7 +854,7 @@ export default function GTDManager() {
     if (projectParentId === "__new__") {
       // Create a new root project
       setTasks(prev => [
-        { id: genId(), text, bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, childIds: [] },
+        { id: genId(), text, bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null, childIds: [] },
         ...prev,
       ]);
     } else {
@@ -863,7 +866,7 @@ export default function GTDManager() {
             ? { ...t, childIds: [...(t.childIds || []), childId] }
             : t
         ),
-        { id: childId, text, bucket: "next", done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null, effort: null, deferUntil: null },
+        { id: childId, text, bucket: "next", done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null },
       ]);
     }
     setAddText("");
@@ -907,7 +910,7 @@ export default function GTDManager() {
       const newProjId = genId();
       setTasks(prev => [
         ...prev.map(t => t.id === taskId ? { ...t, parentId: newProjId } : t),
-        { id: newProjId, text: newProjectName.trim(), bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, childIds: [taskId] },
+        { id: newProjId, text: newProjectName.trim(), bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null, childIds: [taskId] },
       ]);
     } else if (projectId) {
       setTasks(prev => prev.map(t => {
@@ -1044,7 +1047,9 @@ export default function GTDManager() {
     bucketList: { flex: 1, padding: "8px 0", overflowY: "auto" },
     sidebarActions: { padding: 10, borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", gap: 6 },
     main: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
-    taskPanel: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", borderBottom: `1px solid ${COLORS.border}` },
+    taskRow: { flex: 1, display: "flex", overflow: "hidden", borderBottom: `1px solid ${COLORS.border}` },
+    taskPanel: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
+    detailPanel: { width: 360, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden", borderLeft: `1px solid ${COLORS.border}` },
     panelHeader: { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 },
     addRow: { display: "flex", gap: 6, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}` },
     taskList: { flex: 1, overflowY: "auto", padding: "4px 0" },
@@ -1082,6 +1087,8 @@ export default function GTDManager() {
 
       {/* MAIN */}
       <div style={s.main}>
+        {/* TASK + DETAIL ROW */}
+        <div style={s.taskRow}>
         {/* TASK PANEL */}
         <div style={s.taskPanel}>
           {showSettings ? (
@@ -1265,6 +1272,8 @@ export default function GTDManager() {
                         collapsedNodes,
                         onToggleCollapse: toggleCollapse,
                         onToggleCollapseLevel: toggleCollapseLevel,
+                        onOpenDetail: setSelectedTaskId,
+                        selectedTaskId,
                       }}
                     />
                   </div>
@@ -1285,7 +1294,7 @@ export default function GTDManager() {
                       <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                         onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                         pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                        onAssignToProject={assignToProject} tagDisplay={tagDisplay} />
+                        onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} />
                     ));
                   }
                   return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => {
@@ -1299,7 +1308,7 @@ export default function GTDManager() {
                           <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                             onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                             pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                            onAssignToProject={assignToProject} tagDisplay={tagDisplay} />
+                            onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} />
                         ))}
                       </div>
                     );
@@ -1316,7 +1325,7 @@ export default function GTDManager() {
                         <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                           onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                           pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                          onAssignToProject={assignToProject} tagDisplay={tagDisplay} />
+                          onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} />
                       ))}
                     </div>
                   )
@@ -1325,13 +1334,31 @@ export default function GTDManager() {
                     <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                       onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                       pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                      onAssignToProject={assignToProject} tagDisplay={tagDisplay} />
+                      onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} />
                   ))
                 )}
               </div>
             </>
           )}
         </div>
+        {/* TASK DETAIL PANEL */}
+        {selectedTaskId && (() => {
+          const selTask = tasks.find(t => t.id === selectedTaskId);
+          return selTask ? (
+            <TaskDetailPanel
+              task={selTask}
+              allTasks={tasks}
+              locations={locations}
+              efforts={efforts}
+              onUpdate={(id, changes) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t))}
+              onComplete={(id) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, done: true, bucket: "done" } : t)); setSelectedTaskId(null); }}
+              onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
+              onClose={() => setSelectedTaskId(null)}
+              style={s.detailPanel}
+            />
+          ) : null;
+        })()}
+        </div>{/* end taskRow */}
 
         {/* COACH PANEL */}
         <div style={s.coachPanel}>
@@ -1469,7 +1496,7 @@ function Btn({ children, onClick, style = {} }) {
 
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, tagDisplay, indentOverride, depth = 0, collapsedNodes, onToggleCollapse, onToggleCollapseLevel }) {
+function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, tagDisplay, indentOverride, depth = 0, collapsedNodes, onToggleCollapse, onToggleCollapseLevel, onOpenDetail, selectedTaskId }) {
   const [hover, setHover] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
@@ -1582,7 +1609,7 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
       style={{ borderLeft: `3px solid ${highlight ? COLORS.inbox : isSubtask ? COLORS.project + "55" : "transparent"}`, opacity: task.done ? 0.4 : (deferred && currentBucket === "project") ? 0.55 : 1, transition: "all 0.12s" }}
     >
       {/* Main task row */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: highlight ? COLORS.inboxBg : (hover ? COLORS.surface2 : "transparent") }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: highlight ? COLORS.inboxBg : (selectedTaskId === task.id ? COLORS.surface3 : hover ? COLORS.surface2 : "transparent") }}>
         {isSubtask && <span style={{ color: COLORS.project, fontSize: 10, marginTop: 3, flexShrink: 0 }}>↳</span>}
         {currentBucket === "project" && (
           <span style={{ color: COLORS.muted, fontSize: 12, marginTop: 1, flexShrink: 0, cursor: "grab", userSelect: "none", opacity: hover ? 0.6 : 0, transition: "opacity 0.1s", lineHeight: 1 }}>⠿</span>
@@ -1610,7 +1637,14 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13.5, color: COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-            <span>{task.text}</span>
+            <span
+              onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task.id); }}
+              title="Open detail panel"
+              style={{ cursor: "pointer" }}
+            >{task.text}</span>
+            {task.notes && (
+              <span title="Has notes" style={{ fontSize: 10, opacity: 0.6, flexShrink: 0 }}>📝</span>
+            )}
             {descendantCounts && (
               <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.surface3, color: COLORS.text2, border: `1px solid ${COLORS.border}`, flexShrink: 0, whiteSpace: "nowrap" }}>
                 ↓ {descendantCounts.incomplete} / {descendantCounts.total}
@@ -2638,6 +2672,185 @@ function EmptyState({ bucket }) {
       <div style={{ fontSize: 28, opacity: 0.3 }}>○</div>
       <strong style={{ fontSize: 13 }}>{title}</strong>
       <div style={{ fontSize: 12 }}>{sub}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TaskDetailPanel — side panel showing full task detail + notes editor
+// ---------------------------------------------------------------------------
+function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onComplete, onDelete, onClose, style }) {
+  const [titleDraft, setTitleDraft] = useState(task.text);
+  const [notesDraft, setNotesDraft] = useState(task.notes || "");
+
+  // Sync drafts if task changes (e.g. another panel opens a different task)
+  useEffect(() => { setTitleDraft(task.text); }, [task.id, task.text]);
+  useEffect(() => { setNotesDraft(task.notes || ""); }, [task.id, task.notes]);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const saveTitle = () => {
+    const t = titleDraft.trim();
+    if (t && t !== task.text) onUpdate(task.id, { text: t });
+    else setTitleDraft(task.text);
+  };
+
+  const saveNotes = () => {
+    const val = notesDraft.trim() || null;
+    if (val !== (task.notes || null)) onUpdate(task.id, { notes: val });
+  };
+
+  const parentProject = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
+  const bucketColor = BUCKETS[task.bucket]?.color || COLORS.muted;
+  const bucketLabel = BUCKETS[task.bucket]?.label || task.bucket;
+
+  const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
+  const fieldInput = { width: "100%", background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", boxSizing: "border-box" };
+
+  return (
+    <div style={{ ...style, background: COLORS.surface, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px 8px", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.06em", textTransform: "uppercase", flex: 1 }}>Task Detail</span>
+        <button
+          onClick={onClose}
+          title="Close (Esc)"
+          style={{ background: "none", border: "none", color: COLORS.muted, fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+        >×</button>
+      </div>
+
+      {/* Scrollable body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 10px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+        {/* Title */}
+        <div>
+          <div style={fieldLabel}>Title</div>
+          <input
+            value={titleDraft}
+            onChange={e => setTitleDraft(e.target.value)}
+            onBlur={saveTitle}
+            onKeyDown={e => { if (e.key === "Enter") { e.target.blur(); } if (e.key === "Escape") { setTitleDraft(task.text); e.target.blur(); } }}
+            style={{ ...fieldInput, fontSize: 13, fontWeight: 500 }}
+          />
+        </div>
+
+        {/* Notes */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 140 }}>
+          <div style={fieldLabel}>Notes</div>
+          <textarea
+            value={notesDraft}
+            onChange={e => setNotesDraft(e.target.value)}
+            onBlur={saveNotes}
+            placeholder="Add notes, context, links…"
+            style={{ ...fieldInput, flex: 1, resize: "none", lineHeight: 1.5, minHeight: 120 }}
+          />
+        </div>
+
+        {/* Metadata */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={fieldLabel}>Info</div>
+
+          {/* Bucket */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Bucket</span>
+            <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
+          </div>
+
+          {/* Parent project */}
+          {parentProject && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Project</span>
+              <span style={{ color: COLORS.project }}>{parentProject.text}</span>
+            </div>
+          )}
+
+          {/* Due date */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Due</span>
+            <input
+              type="date"
+              value={task.dueDate || ""}
+              onChange={e => onUpdate(task.id, { dueDate: e.target.value || null })}
+              style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
+            />
+          </div>
+
+          {/* Defer until */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Defer</span>
+            <input
+              type="date"
+              value={task.deferUntil || ""}
+              onChange={e => onUpdate(task.id, { deferUntil: e.target.value || null })}
+              style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
+            />
+          </div>
+
+          {/* Effort */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Effort</span>
+            <select
+              value={task.effort || ""}
+              onChange={e => onUpdate(task.id, { effort: e.target.value || null })}
+              style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
+            >
+              <option value="">—</option>
+              {(efforts || []).map(e => <option key={e} value={e}>{e}</option>)}
+            </select>
+          </div>
+
+          {/* Location */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, paddingTop: 2 }}>Location</span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {(locations || []).map(loc => {
+                const active = (task.location || []).includes(loc);
+                return (
+                  <button
+                    key={loc}
+                    onClick={() => {
+                      const cur = task.location || [];
+                      onUpdate(task.id, { location: active ? cur.filter(l => l !== loc) : [...cur, loc] });
+                    }}
+                    style={{ padding: "2px 8px", borderRadius: 10, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + "22" : "transparent", color: active ? COLORS.project : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+                  >{loc}</button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Move to bucket */}
+        <div>
+          <div style={fieldLabel}>Move to</div>
+          <select
+            value={task.bucket}
+            onChange={e => onUpdate(task.id, { bucket: e.target.value })}
+            style={{ ...fieldInput, fontSize: 12 }}
+          >
+            {Object.entries(BUCKETS).filter(([k]) => k !== "inboxHistory").map(([key, cfg]) => (
+              <option key={key} value={key}>{cfg.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Footer actions */}
+      <div style={{ display: "flex", gap: 8, padding: "10px 14px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+        <button
+          onClick={() => onComplete(task.id)}
+          style={{ flex: 1, padding: "6px 0", borderRadius: 7, border: `1px solid ${COLORS.next}`, background: "transparent", color: COLORS.next, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+        >✓ Complete</button>
+        <button
+          onClick={() => { if (window.confirm(`Delete "${task.text}"?`)) onDelete(task.id); }}
+          style={{ flex: 1, padding: "6px 0", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+        >🗑 Delete</button>
+      </div>
     </div>
   );
 }
