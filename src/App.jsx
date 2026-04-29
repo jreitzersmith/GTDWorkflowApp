@@ -225,6 +225,16 @@ function effortToMinutes(str) {
   return 0;
 }
 
+// Returns a color for effort accuracy comparison (actual vs estimated).
+// delta ≤ 0 → green (under/on time), ≤ 25% over → amber, > 25% → red.
+function effortAccuracyColor(estimatedMin, actualMin) {
+  if (!estimatedMin || !actualMin) return COLORS.effort;
+  const delta = (actualMin - estimatedMin) / estimatedMin;
+  if (delta <= 0)    return "#5ab878"; // under or on time
+  if (delta <= 0.25) return "#d4a95a"; // within 25% over
+  return "#d45a5a";                    // significantly over
+}
+
 // Converts a minutes total back to a compact human label (e.g. 150 → "2.5h").
 function minutesToEffortLabel(minutes) {
   if (!minutes || minutes <= 0) return null;
@@ -470,6 +480,7 @@ export default function GTDManager() {
   const [collapsedNodes, setCollapsedNodes] = useState(new Set());
   // ID of the task whose detail panel is currently open (null = closed).
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [actualEffortPrompt, setActualEffortPrompt] = useState(null); // { taskId, taskText, estimatedEffort }
   const [dragId,             setDragId]             = useState(null);
   const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
   const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
@@ -648,19 +659,19 @@ export default function GTDManager() {
 
     // Create new tasks based on action type, applying any AI-suggested dates
     if (type === "next") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
     } else if (type === "project") {
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null, notes: null },
-        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, deferUntil: aiDefer || null, notes: null },
+        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null },
+        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null },
         ...prev,
       ]);
     } else if (type === "someday") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
     } else if (type === "waiting") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
     }
     // type === "delete": just archive, no new task
 
@@ -734,7 +745,7 @@ export default function GTDManager() {
         const newSubtasks = selected.map(s => ({
           id: genId(), text: s.text, bucket: "next", done: false,
           created: Date.now(), parentId: project.id,
-          priority: [], location: [], dueDate: null, effort: null, deferUntil: null,
+          priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null,
         }));
         const newIds = newSubtasks.map(t => t.id);
         setTasks(prev => [
@@ -897,14 +908,14 @@ export default function GTDManager() {
   const addTask = (bucket) => {
     const text = addText.trim();
     if (!text) return;
-    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null }, ...prev]);
+    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null }, ...prev]);
     setAddText("");
   };
 
   const addAndProcess = () => {
     const text = addText.trim();
     if (!text) return;
-    const task = { id: genId(), text, bucket: "inbox", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null };
+    const task = { id: genId(), text, bucket: "inbox", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null };
     setTasks(prev => [task, ...prev]);
     setAddText("");
     setCurrentBucket("inbox");
@@ -917,7 +928,7 @@ export default function GTDManager() {
     if (projectParentId === "__new__") {
       // Create a new root project
       setTasks(prev => [
-        { id: genId(), text, bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null, childIds: [] },
+        { id: genId(), text, bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null, childIds: [] },
         ...prev,
       ]);
     } else {
@@ -929,7 +940,7 @@ export default function GTDManager() {
             ? { ...t, childIds: [...(t.childIds || []), childId] }
             : t
         ),
-        { id: childId, text, bucket: "next", done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null },
+        { id: childId, text, bucket: "next", done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null },
       ]);
     }
     setAddText("");
@@ -942,7 +953,37 @@ export default function GTDManager() {
   };
 
   const deleteTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
-  const completeTask = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox" } : t));
+
+  const completeTask = useCallback((id) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    // When marking done: if task has an effort estimate but no actual effort recorded, show prompt
+    if (!task.done && task.effort && !task.actualEffort) {
+      setActualEffortPrompt({ taskId: id, taskText: task.text, estimatedEffort: task.effort });
+      return;
+    }
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox" } : t));
+  }, [tasks]);
+
+  const handleActualEffortSave = useCallback((actualEffort) => {
+    if (!actualEffortPrompt) return;
+    setTasks(prev => prev.map(t =>
+      t.id === actualEffortPrompt.taskId
+        ? { ...t, done: true, bucket: "done", actualEffort }
+        : t
+    ));
+    setActualEffortPrompt(null);
+  }, [actualEffortPrompt]);
+
+  const handleActualEffortSkip = useCallback(() => {
+    if (!actualEffortPrompt) return;
+    setTasks(prev => prev.map(t =>
+      t.id === actualEffortPrompt.taskId
+        ? { ...t, done: true, bucket: "done" }
+        : t
+    ));
+    setActualEffortPrompt(null);
+  }, [actualEffortPrompt]);
   // Toggle collapse for a single node (subtask level: hides its children).
   const toggleCollapse = useCallback((id) => {
     setCollapsedNodes(prev => {
@@ -1012,7 +1053,7 @@ export default function GTDManager() {
       const newProjId = genId();
       setTasks(prev => [
         ...prev.map(t => t.id === taskId ? { ...t, parentId: newProjId } : t),
-        { id: newProjId, text: newProjectName.trim(), bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, deferUntil: null, notes: null, childIds: [taskId] },
+        { id: newProjId, text: newProjectName.trim(), bucket: "project", done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null, childIds: [taskId] },
       ]);
     } else if (projectId) {
       setTasks(prev => prev.map(t => {
@@ -1090,12 +1131,20 @@ export default function GTDManager() {
     const trimmed = newName.trim();
     if (!trimmed || trimmed === oldName) return;
     setEfforts(prev => prev.map(e => e === oldName ? trimmed : e));
-    setTasks(prev => prev.map(t => ({ ...t, effort: t.effort === oldName ? trimmed : t.effort })));
+    setTasks(prev => prev.map(t => ({
+      ...t,
+      effort:       t.effort       === oldName ? trimmed : t.effort,
+      actualEffort: t.actualEffort === oldName ? trimmed : t.actualEffort,
+    })));
   }, []);
 
   const removeEffort = useCallback((name) => {
     setEfforts(prev => prev.filter(e => e !== name));
-    setTasks(prev => prev.map(t => ({ ...t, effort: t.effort === name ? null : t.effort })));
+    setTasks(prev => prev.map(t => ({
+      ...t,
+      effort:       t.effort       === name ? null : t.effort,
+      actualEffort: t.actualEffort === name ? null : t.actualEffort,
+    })));
   }, []);
 
   const handleExport = useCallback(() => {
@@ -1436,12 +1485,42 @@ export default function GTDManager() {
                     </div>
                   )
                 ) : (
-                  bucketTasks.map(task => (
-                    <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                      onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                      pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                      onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} />
-                  ))
+                  <>
+                    {currentBucket === "done" && (() => {
+                      const withBoth = bucketTasks.filter(t => t.effort && t.actualEffort);
+                      if (!withBoth.length) return null;
+                      const byLabel = {};
+                      withBoth.forEach(t => {
+                        if (!byLabel[t.effort]) byLabel[t.effort] = { totalActual: 0, count: 0 };
+                        byLabel[t.effort].totalActual += effortToMinutes(t.actualEffort);
+                        byLabel[t.effort].count += 1;
+                      });
+                      const entries = Object.entries(byLabel);
+                      return (
+                        <div style={{ padding: "6px 18px 6px", fontSize: 11, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}`, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                          <span style={{ color: COLORS.text2, fontWeight: 600 }}>⏱ Accuracy:</span>
+                          {entries.map(([label, { totalActual, count }]) => {
+                            const avgActual = totalActual / count;
+                            const estMin = effortToMinutes(label);
+                            const color = effortAccuracyColor(estMin, avgActual);
+                            const pct = estMin ? Math.round(((avgActual - estMin) / estMin) * 100) : null;
+                            const pctStr = pct === null ? "" : pct > 0 ? ` +${pct}%` : ` ${pct}%`;
+                            return (
+                              <span key={label} style={{ padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color, border: `1px solid ${color}44`, whiteSpace: "nowrap" }}>
+                                {label} → avg {minutesToEffortLabel(Math.round(avgActual))}{pctStr} <span style={{ opacity: 0.6 }}>({count})</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                    {bucketTasks.map(task => (
+                      <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
+                        onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
+                        pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
+                        onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} />
+                    ))}
+                  </>
                 )}
               </div>
             </>
@@ -1551,8 +1630,8 @@ export default function GTDManager() {
                 allTasks={tasks}
                 locations={locations}
                 efforts={efforts}
-                onUpdate={(id, changes) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t))}
-                onComplete={(id) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, done: true, bucket: "done" } : t)); setSelectedTaskId(null); }}
+                onUpdate={updateTask}
+                onComplete={(id) => { completeTask(id); setSelectedTaskId(null); }}
                 onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
                 onReassignProject={reassignProject}
                 onClose={() => setSelectedTaskId(null)}
@@ -1562,6 +1641,17 @@ export default function GTDManager() {
           ) : null;
         })()}
       </div>{/* end main */}
+
+      {/* Actual effort prompt — modal overlay shown when completing a task with an estimate */}
+      {actualEffortPrompt && (
+        <ActualEffortPrompt
+          taskText={actualEffortPrompt.taskText}
+          estimatedEffort={actualEffortPrompt.estimatedEffort}
+          efforts={efforts}
+          onSave={handleActualEffortSave}
+          onSkip={handleActualEffortSkip}
+        />
+      )}
     </div>
   );
 }
@@ -1782,9 +1872,11 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
               {taskPriority.map(p => (
                 <span key={p} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.inbox, border: `1px solid ${COLORS.inbox}44` }}>{p}</span>
               ))}
-              {taskEffort && (
+              {taskEffort && task.actualEffort ? (
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: effortAccuracyColor(effortToMinutes(taskEffort), effortToMinutes(task.actualEffort)), border: `1px solid ${effortAccuracyColor(effortToMinutes(taskEffort), effortToMinutes(task.actualEffort))}44` }}>⏱ {taskEffort} → {task.actualEffort}</span>
+              ) : taskEffort ? (
                 <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44` }}>⏱ {taskEffort}</span>
-              )}
+              ) : null}
               {task.deferUntil && (
                 <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44` }}>⏰ {task.deferUntil}</span>
               )}
@@ -1815,9 +1907,11 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
             {taskPriority.map(p => (
               <span key={p} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.inbox, border: `1px solid ${COLORS.inbox}44`, whiteSpace: "nowrap" }}>{p}</span>
             ))}
-            {taskEffort && (
+            {taskEffort && task.actualEffort ? (
+              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: effortAccuracyColor(effortToMinutes(taskEffort), effortToMinutes(task.actualEffort)), border: `1px solid ${effortAccuracyColor(effortToMinutes(taskEffort), effortToMinutes(task.actualEffort))}44`, whiteSpace: "nowrap" }}>⏱ {taskEffort} → {task.actualEffort}</span>
+            ) : taskEffort ? (
               <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, whiteSpace: "nowrap" }}>⏱ {taskEffort}</span>
-            )}
+            ) : null}
             {task.deferUntil && (
               <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44`, whiteSpace: "nowrap" }}>⏰ {task.deferUntil}</span>
             )}
@@ -2144,6 +2238,48 @@ function PendingActionBar({ action, onConfirm, onDismiss }) {
         <button onClick={onDismiss} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>
           Skip
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ActualEffortPrompt({ taskText, estimatedEffort, efforts, onSave, onSkip }) {
+  const [selected, setSelected] = useState("");
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
+      <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border2}`, borderRadius: 12, padding: "22px 26px", maxWidth: 380, width: "90%", display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.next }}>✓ Task complete!</div>
+        <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.6 }}>
+          <span style={{ color: COLORS.text, fontWeight: 500 }}>"{taskText}"</span>
+          <br />
+          Estimated: <span style={{ color: COLORS.effort }}>⏱ {estimatedEffort}</span>
+          <br />
+          How long did it actually take?
+        </div>
+        <select
+          autoFocus
+          value={selected}
+          onChange={e => setSelected(e.target.value)}
+          style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 7, padding: "7px 10px", color: selected ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 13, outline: "none", colorScheme: "dark" }}
+        >
+          <option value="">— Select actual time —</option>
+          {(efforts || []).map(e => <option key={e} value={e}>{e}</option>)}
+        </select>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => selected && onSave(selected)}
+            disabled={!selected}
+            style={{ flex: 1, padding: "8px 14px", borderRadius: 7, border: `1px solid ${COLORS.next}`, background: "transparent", color: COLORS.next, fontFamily: "inherit", fontSize: 13, cursor: selected ? "pointer" : "not-allowed", opacity: selected ? 1 : 0.4, fontWeight: 600 }}
+          >
+            Save &amp; Complete
+          </button>
+          <button
+            onClick={onSkip}
+            style={{ padding: "8px 14px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+          >
+            Skip
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -2593,7 +2729,7 @@ function EffortManager({ efforts, tasks, onAdd, onRename, onRemove }) {
   const [editingIdx, setEditingIdx] = useState(null);
   const [editText, setEditText] = useState("");
 
-  const usedByCount = (name) => tasks.filter(t => t.effort === name).length;
+  const usedByCount = (name) => tasks.filter(t => t.effort === name || t.actualEffort === name).length;
 
   const handleAdd = () => {
     const trimmed = newText.trim();
@@ -2925,9 +3061,9 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             />
           </div>
 
-          {/* Effort */}
+          {/* Effort (expected) */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Effort</span>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Estimated</span>
             <select
               value={task.effort || ""}
               onChange={e => onUpdate(task.id, { effort: e.target.value || null })}
@@ -2936,6 +3072,30 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
               <option value=''>—</option>
               {(efforts || []).map(e => <option key={e} value={e}>{e}</option>)}
             </select>
+          </div>
+
+          {/* Actual effort */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Actual</span>
+            <select
+              value={task.actualEffort || ""}
+              onChange={e => onUpdate(task.id, { actualEffort: e.target.value || null })}
+              style={{ ...fieldInput, width: 'auto', fontSize: 12, padding: '3px 6px', color: task.actualEffort ? effortAccuracyColor(effortToMinutes(task.effort), effortToMinutes(task.actualEffort)) : undefined }}
+            >
+              <option value=''>—</option>
+              {(efforts || []).map(e => <option key={e} value={e}>{e}</option>)}
+            </select>
+            {task.effort && task.actualEffort && (() => {
+              const estMin = effortToMinutes(task.effort);
+              const actMin = effortToMinutes(task.actualEffort);
+              const pct = estMin ? Math.round(((actMin - estMin) / estMin) * 100) : null;
+              const color = effortAccuracyColor(estMin, actMin);
+              return pct !== null ? (
+                <span style={{ fontSize: 11, color, fontWeight: 500 }}>
+                  {pct > 0 ? `+${pct}%` : `${pct}%`}
+                </span>
+              ) : null;
+            })()}
           </div>
 
           {/* Location */}
