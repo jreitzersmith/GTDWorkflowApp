@@ -587,11 +587,25 @@ export default function GTDManager() {
   }, []); // run once on mount
 
   const getTaskContext = useCallback(() => {
+    const today = todayStr();
     const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe" };
-    return Object.entries(bucketNames).map(([k, label]) => {
-      const items = tasks.filter(t => t.bucket === k).map(t => t.text);
-      return `${label} (${items.length}): ${items.length ? items.join(" | ") : "empty"}`;
-    }).join("\n");
+    const sections = Object.entries(bucketNames).map(([k, label]) => {
+      const items = tasks.filter(t => t.bucket === k && !t.done);
+      if (!items.length) return `${label}: empty`;
+      const lines = items.map(t => {
+        const meta = [];
+        if (t.dueDate)          meta.push(`due:${t.dueDate}`);
+        if (t.deferUntil)       meta.push(`defer-until:${t.deferUntil}`);
+        if (t.effort)           meta.push(`effort:${t.effort}`);
+        if (t.actualEffort)     meta.push(`actual-effort:${t.actualEffort}`);
+        if (t.location?.length) meta.push(`location:${t.location.join(",")}`);
+        if (t.priority?.length) meta.push(`priority:${t.priority.join(",")}`);
+        if (t.notes)            meta.push(`has-notes`);
+        return meta.length ? `- ${t.text} [${meta.join("] [")}]` : `- ${t.text}`;
+      });
+      return `${label} (${items.length}):\n${lines.join("\n")}`;
+    });
+    return `Today's date: ${today}\n\n${sections.join("\n\n")}`;
   }, [tasks]);
 
   const fetchModels = useCallback(async () => {
