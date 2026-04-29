@@ -34,7 +34,15 @@ const COACH_MODES = {
 };
 
 const SYSTEM_PROMPTS = {
-  chat: `You are a GTD (Getting Things Done) coach for a knowledge worker. You have access to their full task list (provided in each message). Help them stay organized, clarify tasks, define next actions, and maintain their GTD system. Be concise — under 100 words per response. When recommending a bucket move, be explicit: say "→ Move to Next Actions" or similar.`,
+  chat: `You are a GTD (Getting Things Done) coach for a knowledge worker. You have access to their full task list (provided in each message). Help them stay organized, clarify tasks, define next actions, and maintain their GTD system. Be concise — under 100 words per response. When recommending a bucket move, be explicit: say "→ Move to Next Actions" or similar.
+
+To update an existing task, end your response with EXACTLY one line:
+→ACTION:update|<task_id>|field:value[|field:value...]
+
+Updatable fields: due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · bucket:<inbox|next|project|waiting|someday> · title:<new name> · priority:<p1,p2> · location:<loc1,loc2> · notes:<text — use \\n for line breaks, must be the last field>
+
+The task_id comes from the [id:...] tag shown on each task in the task list.
+Only emit →ACTION:update when the user explicitly asks you to change something. Never include it unsolicited.`,
   process: `You are a GTD inbox processor. For each inbox item given to you:
 
 1. Determine if it's actionable. If not actionable, end with: →ACTION:delete
@@ -143,6 +151,37 @@ function extractAction(text) {
     dueDate: dueMatch ? dueMatch[1] : null,
     deferUntil: deferMatch ? deferMatch[1] : null,
   };
+}
+
+// Parse →ACTION:update from AI reply; returns { taskId, changes } or null.
+function extractUpdateAction(text) {
+  const m = text.match(/→ACTION:update\|([^|\n]+)\|(.*)/s);
+  if (!m) return null;
+  const taskId = m[1].trim();
+  const fieldStr = m[2];
+
+  // notes must be last — everything after 'notes:' is its value (may contain |)
+  const notesIdx = fieldStr.search(/(^|\|)notes:/);
+  const pureFields = notesIdx !== -1 ? fieldStr.slice(0, notesIdx).replace(/\|$/, '') : fieldStr;
+  const notesRaw   = notesIdx !== -1 ? fieldStr.slice(fieldStr.indexOf('notes:', notesIdx) + 6) : null;
+
+  const changes = {};
+  pureFields.split('|').filter(Boolean).forEach(pair => {
+    const colon = pair.indexOf(':');
+    if (colon === -1) return;
+    const key = pair.slice(0, colon).trim();
+    const val = pair.slice(colon + 1).trim();
+    if (key === 'due')      changes.dueDate    = val;
+    if (key === 'defer')    changes.deferUntil = val;
+    if (key === 'effort')   changes.effort     = val;
+    if (key === 'bucket')   changes.bucket     = val;
+    if (key === 'title')    changes.text       = val;
+    if (key === 'priority') changes.priority   = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'location') changes.location   = val.split(',').map(s => s.trim()).filter(Boolean);
+  });
+  if (notesRaw !== null) changes.notes = notesRaw.replace(/\\n/g, '\n');
+
+  return Object.keys(changes).length ? { taskId, changes } : null;
 }
 
 // Waterfall: level-2 tasks (direct children of a project) always show in Next Actions.
@@ -601,7 +640,8 @@ export default function GTDManager() {
         if (t.location?.length) meta.push(`location:${t.location.join(",")}`);
         if (t.priority?.length) meta.push(`priority:${t.priority.join(",")}`);
         if (t.notes)            meta.push(`has-notes`);
-        return meta.length ? `- ${t.text} [${meta.join("] [")}]` : `- ${t.text}`;
+        const idTag = `[id:${t.id}] `;
+        return meta.length ? `- ${idTag}${t.text} [${meta.join("] [")}]` : `- ${idTag}${t.text}`;
       });
       return `${label} (${items.length}):\n${lines.join("\n")}`;
     });
@@ -682,7 +722,26 @@ export default function GTDManager() {
 
       const updatedHistory = [...newHistory, { role: "assistant", content: reply }];
       setChatHistory(updatedHistory);
-      setMessages(prev => [...prev, { role: "assistant", text: reply }]);
+
+      // Apply →ACTION:update when in chat mode
+      let updateChip = null;
+      if (mode === "chat") {
+        const upd = extractUpdateAction(reply);
+        if (upd) {
+          const target = tasks.find(t => t.id === upd.taskId);
+          if (target) {
+            updateTask(upd.taskId, upd.changes);
+            const fieldLabels = Object.keys(upd.changes).map(k => ({
+              notes: 'notes', dueDate: 'due date', deferUntil: 'defer date',
+              effort: 'effort', text: 'title', bucket: 'bucket',
+              priority: 'priority', location: 'location',
+            }[k] || k));
+            updateChip = { taskName: target.text, fields: fieldLabels };
+          }
+        }
+      }
+
+      setMessages(prev => [...prev, { role: "assistant", text: reply, updateChip }]);
 
       const action = extractAction(reply);
       if (action) setPendingAction(action);
@@ -695,7 +754,7 @@ export default function GTDManager() {
     } finally {
       setLoading(false);
     }
-  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel]);
+  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, updateTask]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
@@ -2280,8 +2339,16 @@ function ChatBubble({ msg }) {
       <div style={{ width: 22, height: 22, borderRadius: "50%", background: isUser ? COLORS.surface3 : COLORS.inbox, color: isUser ? COLORS.text2 : "#111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isUser ? 9 : 11, fontFamily: "Georgia, serif", flexShrink: 0, marginTop: 1 }}>
         {isUser ? "Y" : "G"}
       </div>
-      <div style={{ padding: "8px 11px", borderRadius: 11, fontSize: 13, lineHeight: 1.55, maxWidth: "calc(100% - 70px)", background: isUser ? COLORS.surface3 : COLORS.surface2, color: isUser ? COLORS.text2 : COLORS.text, borderTopLeftRadius: isUser ? 11 : 3, borderTopRightRadius: isUser ? 3 : 11 }}>
-        {formatBubble(msg.text)}
+      <div style={{ display: "flex", flexDirection: "column", gap: 5, maxWidth: "calc(100% - 70px)" }}>
+        <div style={{ padding: "8px 11px", borderRadius: 11, fontSize: 13, lineHeight: 1.55, background: isUser ? COLORS.surface3 : COLORS.surface2, color: isUser ? COLORS.text2 : COLORS.text, borderTopLeftRadius: isUser ? 11 : 3, borderTopRightRadius: isUser ? 3 : 11 }}>
+          {formatBubble(msg.text)}
+        </div>
+        {msg.updateChip && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 20, background: COLORS.surface3, border: `1px solid ${COLORS.border}`, fontSize: 11, color: COLORS.text2, alignSelf: "flex-start" }}>
+            <span>✏️</span>
+            <span>Updated <strong style={{ color: COLORS.text }}>{msg.updateChip.taskName}</strong> — {msg.updateChip.fields.join(" · ")}</span>
+          </div>
+        )}
       </div>
     </div>
   );
