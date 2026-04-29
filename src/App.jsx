@@ -1046,8 +1046,9 @@ export default function GTDManager() {
     sidebarSub: { fontSize: 11, color: COLORS.muted, marginTop: 3 },
     bucketList: { flex: 1, padding: "8px 0", overflowY: "auto" },
     sidebarActions: { padding: 10, borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", gap: 6 },
-    main: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
-    taskRow: { flex: 1, display: "flex", overflow: "hidden", borderBottom: `1px solid ${COLORS.border}` },
+    main: { flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" },
+    mainLeft: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
+    taskRow: { flex: 1, display: "flex", overflow: "hidden" },
     taskPanel: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
     detailPanel: { width: 360, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden", borderLeft: `1px solid ${COLORS.border}` },
     panelHeader: { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 },
@@ -1087,7 +1088,9 @@ export default function GTDManager() {
 
       {/* MAIN */}
       <div style={s.main}>
-        {/* TASK + DETAIL ROW */}
+        {/* LEFT COLUMN: task panel + coach panel */}
+        <div style={s.mainLeft}>
+        {/* TASK ROW */}
         <div style={s.taskRow}>
         {/* TASK PANEL */}
         <div style={s.taskPanel}>
@@ -1341,23 +1344,6 @@ export default function GTDManager() {
             </>
           )}
         </div>
-        {/* TASK DETAIL PANEL */}
-        {selectedTaskId && (() => {
-          const selTask = tasks.find(t => t.id === selectedTaskId);
-          return selTask ? (
-            <TaskDetailPanel
-              task={selTask}
-              allTasks={tasks}
-              locations={locations}
-              efforts={efforts}
-              onUpdate={(id, changes) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t))}
-              onComplete={(id) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, done: true, bucket: "done" } : t)); setSelectedTaskId(null); }}
-              onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
-              onClose={() => setSelectedTaskId(null)}
-              style={s.detailPanel}
-            />
-          ) : null;
-        })()}
         </div>{/* end taskRow */}
 
         {/* COACH PANEL */}
@@ -1447,8 +1433,27 @@ export default function GTDManager() {
               style={{ width: 34, height: 34, background: loading ? COLORS.surface3 : COLORS.inbox, color: "#111", border: "none", borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
             >↑</button>
           </div>
-        </div>
-      </div>
+        </div>{/* end coachPanel */}
+        </div>{/* end mainLeft */}
+
+        {/* TASK DETAIL PANEL — full height alongside both task list and coach */}
+        {selectedTaskId && (() => {
+          const selTask = tasks.find(t => t.id === selectedTaskId);
+          return selTask ? (
+            <TaskDetailPanel
+              task={selTask}
+              allTasks={tasks}
+              locations={locations}
+              efforts={efforts}
+              onUpdate={(id, changes) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t))}
+              onComplete={(id) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, done: true, bucket: "done" } : t)); setSelectedTaskId(null); }}
+              onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
+              onClose={() => setSelectedTaskId(null)}
+              style={s.detailPanel}
+            />
+          ) : null;
+        })()}
+      </div>{/* end main */}
     </div>
   );
 }
