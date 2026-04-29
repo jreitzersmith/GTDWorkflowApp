@@ -589,9 +589,10 @@ export default function GTDManager() {
   const [metadataSuggestions,setMetadataSuggestions] = useState([]);  // [{ taskId, taskText, fields: {effort?,dueDate?,deferUntil?}, overrides: {...}, accepted: bool }]
 
   // Panel resize state — persisted across sessions
-  const [sidebarWidth, sidebarDragDown] = useResizer("gtd_sidebar_w", 240, { min: 160, max: 420, direction: 'h', sign:  1 });
-  const [coachHeight,  coachDragDown]   = useResizer("gtd_coach_h",   Math.round(window.innerHeight * 0.42), { min: 80, max: 650, direction: 'v', sign: -1 });
-  const [detailWidth,  detailDragDown]  = useResizer("gtd_detail_w",  360, { min: 240, max: 600, direction: 'h', sign: -1 });
+  const [sidebarWidth, sidebarDragDown]      = useResizer("gtd_sidebar_w",     240,                                    { min: 160, max: 420, direction: 'h', sign:  1 });
+  const [coachHeight,  coachDragDown]         = useResizer("gtd_coach_h",       Math.round(window.innerHeight * 0.42), { min: 80,  max: 650, direction: 'v', sign: -1 });
+  const [detailWidth,  detailDragDown]        = useResizer("gtd_detail_w",      360,                                   { min: 240, max: 600, direction: 'h', sign: -1 });
+  const [chatInputHeight, chatInputDragDown]  = useResizer("gtd_chat_input_h",  60,                                    { min: 36,  max: 300, direction: 'v', sign: -1 });
 
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
@@ -1811,6 +1812,7 @@ export default function GTDManager() {
             <div ref={chatEndRef} />
           </div>
 
+          <ResizeHandle onMouseDown={chatInputDragDown} direction="v" />
           <div style={s.chatInputRow}>
             <textarea
               ref={chatInputRef}
@@ -1818,8 +1820,7 @@ export default function GTDManager() {
               onChange={e => setChatInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
               placeholder="Ask the coach anything…"
-              rows={1}
-              style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none", resize: "none", maxHeight: 80 }}
+              style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none", resize: "none", height: chatInputHeight, minHeight: 36 }}
             />
             <button
               onClick={sendChat}
