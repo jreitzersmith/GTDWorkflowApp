@@ -1026,7 +1026,10 @@ export default function GTDManager() {
       setActualEffortPrompt({ taskId: id, taskText: task.text, estimatedEffort: task.effort });
       return;
     }
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox" } : t));
+    setTasks(prev => prev.map(t => t.id === id
+      ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox", ...(t.done ? { actualEffort: null } : {}) }
+      : t
+    ));
   }, [tasks]);
 
   const handleActualEffortSave = useCallback((actualEffort) => {
