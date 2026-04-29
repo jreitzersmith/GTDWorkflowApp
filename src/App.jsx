@@ -378,6 +378,64 @@ function moveTaskInTree(allTasks, dragId, targetId, position) {
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// Resizable panel utilities
+// ---------------------------------------------------------------------------
+function useResizer(storageKey, defaultSize, { min, max, direction = 'h', sign = 1 }) {
+  const [size, setSize] = useState(() => {
+    const stored = localStorage.getItem(storageKey);
+    return stored ? parseInt(stored, 10) : defaultSize;
+  });
+  // Keep a ref in sync so mousedown closures always see the current size.
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+
+  useEffect(() => { localStorage.setItem(storageKey, size); }, [storageKey, size]);
+
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startPos  = direction === 'h' ? e.clientX : e.clientY;
+    const startSize = sizeRef.current;
+    const onMove = (ev) => {
+      const delta = sign * ((direction === 'h' ? ev.clientX : ev.clientY) - startPos);
+      setSize(Math.min(max, Math.max(min, startSize + delta)));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup',   onUp);
+      document.body.style.cursor     = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor     = direction === 'h' ? 'col-resize' : 'row-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup',   onUp);
+  }, [min, max, direction, sign]);
+
+  return [size, handleMouseDown];
+}
+
+function ResizeHandle({ onMouseDown, direction = 'h' }) {
+  const [hovered, setHovered] = useState(false);
+  const isH = direction === 'h';
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        flexShrink: 0,
+        width:  isH ? 4 : '100%',
+        height: isH ? '100%' : 4,
+        cursor: isH ? 'col-resize' : 'row-resize',
+        background: hovered ? COLORS.border2 : COLORS.border,
+        transition: 'background 0.15s',
+        zIndex: 10,
+      }}
+    />
+  );
+}
+
 export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
@@ -419,6 +477,11 @@ export default function GTDManager() {
   const [reviewReady,        setReviewReady]        = useState(false); // true after AI responds for current project
   const [reviewMode,         setReviewMode]         = useState(null);  // null | "tasks" | "metadata"
   const [metadataSuggestions,setMetadataSuggestions] = useState([]);  // [{ taskId, taskText, fields: {effort?,dueDate?,deferUntil?}, overrides: {...}, accepted: bool }]
+
+  // Panel resize state — persisted across sessions
+  const [sidebarWidth, sidebarDragDown] = useResizer("gtd_sidebar_w", 240, { min: 160, max: 420, direction: 'h', sign:  1 });
+  const [coachHeight,  coachDragDown]   = useResizer("gtd_coach_h",   Math.round(window.innerHeight * 0.42), { min: 80, max: 650, direction: 'v', sign: -1 });
+  const [detailWidth,  detailDragDown]  = useResizer("gtd_detail_w",  360, { min: 240, max: 600, direction: 'h', sign: -1 });
 
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
@@ -1078,7 +1141,7 @@ export default function GTDManager() {
 
   const s = {
     app: { display: "flex", height: "100vh", background: COLORS.bg, color: COLORS.text, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif", fontSize: 14, overflow: "hidden" },
-    sidebar: { width: 240, background: COLORS.surface, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", flexShrink: 0 },
+    sidebar: { width: sidebarWidth, background: COLORS.surface, display: "flex", flexDirection: "column", flexShrink: 0 },
     sidebarHeader: { padding: "18px 16px 14px", borderBottom: `1px solid ${COLORS.border}` },
     logo: { fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 300, color: COLORS.text },
     logoEm: { fontStyle: "italic", color: COLORS.inbox },
@@ -1089,11 +1152,11 @@ export default function GTDManager() {
     mainLeft: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
     taskRow: { flex: 1, display: "flex", overflow: "hidden" },
     taskPanel: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
-    detailPanel: { width: 360, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden", borderLeft: `1px solid ${COLORS.border}` },
+    detailPanel: { width: detailWidth, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" },
     panelHeader: { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 },
     addRow: { display: "flex", gap: 6, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}` },
     taskList: { flex: 1, overflowY: "auto", padding: "4px 0" },
-    coachPanel: { height: "42vh", display: "flex", flexDirection: "column" },
+    coachPanel: { height: coachHeight, display: "flex", flexDirection: "column", flexShrink: 0 },
     coachHeader: { padding: "8px 14px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 },
     chatMessages: { flex: 1, overflowY: "auto", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 },
     chatInputRow: { display: "flex", gap: 6, padding: "8px 12px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, alignItems: "flex-end" },
@@ -1124,6 +1187,7 @@ export default function GTDManager() {
           <SidebarBtn onClick={() => setShowSettings(v => !v)}>⚙ Settings</SidebarBtn>
         </div>
       </div>
+      <ResizeHandle onMouseDown={sidebarDragDown} direction="h" />
 
       {/* MAIN */}
       <div style={s.main}>
@@ -1384,6 +1448,7 @@ export default function GTDManager() {
           )}
         </div>
         </div>{/* end taskRow */}
+        <ResizeHandle onMouseDown={coachDragDown} direction="v" />
 
         {/* COACH PANEL */}
         <div style={s.coachPanel}>
@@ -1479,18 +1544,21 @@ export default function GTDManager() {
         {selectedTaskId && (() => {
           const selTask = tasks.find(t => t.id === selectedTaskId);
           return selTask ? (
-            <TaskDetailPanel
-              task={selTask}
-              allTasks={tasks}
-              locations={locations}
-              efforts={efforts}
-              onUpdate={(id, changes) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t))}
-              onComplete={(id) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, done: true, bucket: "done" } : t)); setSelectedTaskId(null); }}
-              onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
-              onReassignProject={reassignProject}
-              onClose={() => setSelectedTaskId(null)}
-              style={s.detailPanel}
-            />
+            <>
+              <ResizeHandle onMouseDown={detailDragDown} direction="h" />
+              <TaskDetailPanel
+                task={selTask}
+                allTasks={tasks}
+                locations={locations}
+                efforts={efforts}
+                onUpdate={(id, changes) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t))}
+                onComplete={(id) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, done: true, bucket: "done" } : t)); setSelectedTaskId(null); }}
+                onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
+                onReassignProject={reassignProject}
+                onClose={() => setSelectedTaskId(null)}
+                style={s.detailPanel}
+              />
+            </>
           ) : null;
         })()}
       </div>{/* end main */}
