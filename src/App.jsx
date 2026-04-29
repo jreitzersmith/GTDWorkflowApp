@@ -1140,14 +1140,11 @@ export default function GTDManager() {
     }
   }, [tasks]);
 
-  const handleRollupConfirm = useCallback(() => {
+  const handleRollupConfirm = useCallback((heading) => {
     if (!pendingRollup) return;
-    const { taskId, taskText, notes, rootProjectId } = pendingRollup;
-    // Build the stamped block and append to root project notes
-    const d = new Date();
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const dateLabel = `${months[d.getMonth()]} ${d.getDate()}`;
-    const stamp = `\u2713 ${taskText} (${dateLabel}):\n${notes}`;
+    const { taskId, notes, rootProjectId } = pendingRollup;
+    // heading is the (possibly edited) label line from NoteRollupPrompt
+    const stamp = `${heading}\n${notes}`;
     setTasks(prev => prev.map(t => {
       if (t.id !== rootProjectId) return t;
       const existing = t.notes ? t.notes.trim() : "";
@@ -2477,6 +2474,10 @@ function PendingActionBar({ action, onConfirm, onDismiss }) {
 }
 
 function NoteRollupPrompt({ taskText, notes, rootProjectText, onConfirm, onSkip }) {
+  const d = new Date();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const defaultHeading = `\u2713 ${taskText} (${months[d.getMonth()]} ${d.getDate()}):`;
+  const [heading, setHeading] = useState(defaultHeading);
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
       <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border2}`, borderRadius: 12, padding: "22px 26px", maxWidth: 400, width: "90%", display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}>
@@ -2485,13 +2486,21 @@ function NoteRollupPrompt({ taskText, notes, rootProjectText, onConfirm, onSkip 
           <span style={{ color: COLORS.text, fontWeight: 500 }}>&#8220;{taskText}&#8221;</span> has notes.
           Add them to the project <span style={{ color: COLORS.text, fontWeight: 500 }}>&#8220;{rootProjectText}&#8221;</span>?
         </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <div style={{ fontSize: 11, color: COLORS.muted }}>Heading (editable)</div>
+          <input
+            value={heading}
+            onChange={e => setHeading(e.target.value)}
+            style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 7, padding: "7px 10px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
+          />
+        </div>
         <div style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "9px 11px", fontSize: 12, color: COLORS.text2, lineHeight: 1.6, maxHeight: 120, overflowY: "auto", whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
           {notes}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
             autoFocus
-            onClick={onConfirm}
+            onClick={() => onConfirm(heading)}
             style={{ flex: 1, padding: "8px 14px", borderRadius: 7, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 13, cursor: "pointer", fontWeight: 600 }}
           >
             Add to project notes
