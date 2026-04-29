@@ -245,6 +245,60 @@ function minutesToEffortLabel(minutes) {
   return `${+((minutes / 9600).toFixed(1))}mo`;
 }
 
+// Builds a calibration context string for the AI system prompt.
+// Uses per-label averages from completed tasks (minSamples required) and manual overrides.
+// calibrationOverrides: { [label]: overrideLabel | null }
+const MIN_CALIBRATION_SAMPLES = 3;
+function buildCalibrationContext(tasks, efforts, calibrationOverrides) {
+  const completed = tasks.filter(t => t.done && t.effort && t.actualEffort);
+  if (!completed.length && !Object.values(calibrationOverrides || {}).some(Boolean)) return "";
+
+  // Per-label stats from completed tasks
+  const stats = {};
+  efforts.forEach(label => { stats[label] = { totalActual: 0, count: 0 }; });
+  completed.forEach(t => {
+    if (stats[t.effort]) {
+      stats[t.effort].totalActual += effortToMinutes(t.actualEffort);
+      stats[t.effort].count       += 1;
+    }
+  });
+
+  // Global average ratio (actual / estimated) — used as fallback narrative
+  const globalTotalActual = completed.reduce((s, t) => s + effortToMinutes(t.actualEffort), 0);
+  const globalTotalEst    = completed.reduce((s, t) => s + effortToMinutes(t.effort), 0);
+  const globalRatioPct    = globalTotalEst > 0
+    ? Math.round(((globalTotalActual - globalTotalEst) / globalTotalEst) * 100)
+    : null;
+
+  const lines = [];
+  efforts.forEach(label => {
+    const override = calibrationOverrides?.[label];
+    const s = stats[label];
+    if (override) {
+      lines.push(`- "${label}" → use "${override}" (manual override)`);
+    } else if (s && s.count >= MIN_CALIBRATION_SAMPLES) {
+      const avgMin   = Math.round(s.totalActual / s.count);
+      const avgLabel = minutesToEffortLabel(avgMin) || label;
+      const estMin   = effortToMinutes(label);
+      const pct      = estMin ? Math.round(((avgMin - estMin) / estMin) * 100) : 0;
+      lines.push(`- "${label}" → actual avg ~${avgLabel} (${pct > 0 ? "+" : ""}${pct}%, n=${s.count})`);
+    } else if (s && s.count > 0) {
+      lines.push(`- "${label}" → ${s.count} sample${s.count > 1 ? "s" : ""} so far (insufficient for calibration, need ${MIN_CALIBRATION_SAMPLES})`);
+    }
+  });
+
+  if (!lines.length && globalRatioPct === null) return "";
+
+  let globalNote = "";
+  if (globalRatioPct !== null && completed.length >= MIN_CALIBRATION_SAMPLES) {
+    globalNote = globalRatioPct > 0
+      ? `\nOverall this user underestimates by ~${globalRatioPct}% on average — when in doubt, suggest the next label up.`
+      : `\nOverall this user estimates accurately (avg ${globalRatioPct}% variance).`;
+  }
+
+  return `\n\n## User's effort estimation calibration\n${lines.join("\n")}${globalNote}\nAlways choose effort suggestions from the user's existing effort label list only.`;
+}
+
 // Recursively sums the effort of a task and all its descendants (via childIds).
 // Used to compute the total effort shown on top-level project rows.
 function sumDescendantEffort(taskId, allTasks, visited = new Set()) {
@@ -472,6 +526,11 @@ export default function GTDManager() {
   const [efforts, setEfforts] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_efforts") || "null") || DEFAULT_EFFORTS; } catch { return DEFAULT_EFFORTS; }
   });
+  // calibrationOverrides: { [effortLabel]: overrideLabel | null }
+  // Stores manual overrides set in Settings; auto-computed values are derived from tasks at runtime.
+  const [calibrationOverrides, setCalibrationOverrides] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_effort_calibration") || "null") || {}; } catch { return {}; }
+  });
   const [tagDisplay,  setTagDisplay]  = useState(() => localStorage.getItem("gtd_tag_display") || "below");
   const [showSettings, setShowSettings] = useState(false);
   const [nextGroupBy, setNextGroupBy] = useState("none");
@@ -505,7 +564,8 @@ export default function GTDManager() {
   useEffect(() => { localStorage.setItem("gtd_provider", provider); }, [provider]);
   useEffect(() => { localStorage.setItem("gtd_local_model", localModel); }, [localModel]);
   useEffect(() => { localStorage.setItem("gtd_locations", JSON.stringify(locations)); }, [locations]);
-  useEffect(() => { localStorage.setItem("gtd_efforts",   JSON.stringify(efforts));   }, [efforts]);
+  useEffect(() => { localStorage.setItem("gtd_efforts",             JSON.stringify(efforts));             }, [efforts]);
+  useEffect(() => { localStorage.setItem("gtd_effort_calibration", JSON.stringify(calibrationOverrides)); }, [calibrationOverrides]);
   useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
   useEffect(() => { setSelectedTaskId(null); }, [currentBucket]);
@@ -550,7 +610,11 @@ export default function GTDManager() {
   }, [provider, fetchModels]);
 
   const callAI = useCallback(async (userMsg, mode, history) => {
-    const systemPrompt = SYSTEM_PROMPTS[mode] + "\n\n[Current Task List]\n" + getTaskContext();
+    // Inject calibration context only for modes that suggest effort estimates
+    const calibCtx = (mode === "process" || mode === "projectMetadata")
+      ? buildCalibrationContext(tasks, efforts, calibrationOverrides)
+      : "";
+    const systemPrompt = SYSTEM_PROMPTS[mode] + calibCtx + "\n\n[Current Task List]\n" + getTaskContext();
     const newHistory = [...history, { role: "user", content: userMsg }];
 
     setLoading(true);
@@ -617,7 +681,7 @@ export default function GTDManager() {
     } finally {
       setLoading(false);
     }
-  }, [getTaskContext, provider, localModel]);
+  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
@@ -1147,6 +1211,18 @@ export default function GTDManager() {
     })));
   }, []);
 
+  const setCalibrationOverride = useCallback((label, overrideLabel) => {
+    setCalibrationOverrides(prev => ({ ...prev, [label]: overrideLabel || null }));
+  }, []);
+
+  const clearCalibrationOverride = useCallback((label) => {
+    setCalibrationOverrides(prev => {
+      const next = { ...prev };
+      delete next[label];
+      return next;
+    });
+  }, []);
+
   const handleExport = useCallback(() => {
     const data = { version: 1, exportedAt: new Date().toISOString(), tasks, locations, efforts };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -1257,6 +1333,9 @@ export default function GTDManager() {
               onAddEffort={addEffort}
               onRenameEffort={renameEffort}
               onRemoveEffort={removeEffort}
+              calibrationOverrides={calibrationOverrides}
+              onSetCalibrationOverride={setCalibrationOverride}
+              onClearCalibrationOverride={clearCalibrationOverride}
               tagDisplay={tagDisplay}
               onSetTagDisplay={setTagDisplay}
               onExport={handleExport}
@@ -2491,7 +2570,7 @@ function ProviderOption({ label, icon, color, active, onClick }) {
   );
 }
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, tagDisplay, onSetTagDisplay, onExport, onImport, onClose }) {
+function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose }) {
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
@@ -2529,6 +2608,15 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
         </div>
         <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
           <EffortManager efforts={efforts} tasks={tasks} onAdd={onAddEffort} onRename={onRenameEffort} onRemove={onRemoveEffort} />
+        </div>
+        <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
+          <EffortCalibrationManager
+            efforts={efforts}
+            tasks={tasks}
+            calibrationOverrides={calibrationOverrides}
+            onSetOverride={onSetCalibrationOverride}
+            onClearOverride={onClearCalibrationOverride}
+          />
         </div>
         <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Backup &amp; Restore</div>
@@ -2817,6 +2905,117 @@ function EffortManager({ efforts, tasks, onAdd, onRename, onRemove }) {
           disabled={!newText.trim()}
           style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.effort}`, background: "transparent", color: COLORS.effort, fontFamily: "inherit", fontSize: 12, cursor: newText.trim() ? "pointer" : "not-allowed", opacity: newText.trim() ? 1 : 0.4 }}
         >+ Add</button>
+      </div>
+    </div>
+  );
+}
+
+function EffortCalibrationManager({ efforts, tasks, calibrationOverrides, onSetOverride, onClearOverride }) {
+  // Compute auto stats from completed tasks
+  const stats = {};
+  efforts.forEach(label => { stats[label] = { totalActual: 0, count: 0 }; });
+  tasks.filter(t => t.done && t.effort && t.actualEffort).forEach(t => {
+    if (stats[t.effort]) {
+      stats[t.effort].totalActual += effortToMinutes(t.actualEffort);
+      stats[t.effort].count       += 1;
+    }
+  });
+
+  const totalCompleted = tasks.filter(t => t.done && t.effort && t.actualEffort).length;
+
+  return (
+    <div style={{ maxWidth: 520 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Effort Calibration</div>
+      <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 16, lineHeight: 1.6 }}>
+        When you record actual effort on completed tasks, this table updates automatically.
+        The AI uses these averages to give better effort suggestions during inbox processing and project review.
+        Set a manual override to seed a label before you have {MIN_CALIBRATION_SAMPLES} data points.
+      </div>
+
+      {totalCompleted === 0 && Object.values(calibrationOverrides || {}).every(v => !v) ? (
+        <div style={{ fontSize: 12, color: COLORS.muted, fontStyle: "italic", marginBottom: 16 }}>
+          No calibration data yet. Complete tasks with both estimated and actual effort to build your history.
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+        {/* Header row */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 140px 80px", gap: 8, padding: "4px 10px", fontSize: 10, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span>Label</span>
+          <span>Auto avg</span>
+          <span>Manual override</span>
+          <span>AI uses</span>
+        </div>
+
+        {efforts.map(label => {
+          const s = stats[label] || { totalActual: 0, count: 0 };
+          const override = calibrationOverrides?.[label] || "";
+          const hasEnough = s.count >= MIN_CALIBRATION_SAMPLES;
+          const avgMin    = hasEnough ? Math.round(s.totalActual / s.count) : null;
+          const avgLabel  = avgMin ? minutesToEffortLabel(avgMin) : null;
+          const estMin    = effortToMinutes(label);
+          const pct       = avgMin && estMin ? Math.round(((avgMin - estMin) / estMin) * 100) : null;
+          const color     = avgMin ? effortAccuracyColor(estMin, avgMin) : COLORS.muted;
+
+          // What the AI will use
+          let aiUses, aiColor;
+          if (override) {
+            aiUses = override; aiColor = COLORS.project;
+          } else if (hasEnough && avgLabel) {
+            aiUses = avgLabel; aiColor = color;
+          } else {
+            aiUses = "global avg"; aiColor = COLORS.muted;
+          }
+
+          return (
+            <div key={label} style={{ display: "grid", gridTemplateColumns: "1fr 120px 140px 80px", gap: 8, alignItems: "center", padding: "8px 10px", background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8 }}>
+              {/* Label */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.effort, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: COLORS.text }}>{label}</span>
+              </div>
+
+              {/* Auto avg */}
+              <div style={{ fontSize: 12 }}>
+                {hasEnough && avgLabel ? (
+                  <span style={{ color }}>
+                    {avgLabel}{pct !== null ? ` (${pct > 0 ? "+" : ""}${pct}%)` : ""}
+                    <span style={{ color: COLORS.muted, fontSize: 10, marginLeft: 4 }}>n={s.count}</span>
+                  </span>
+                ) : s.count > 0 ? (
+                  <span style={{ color: COLORS.muted }}>{s.count}/{MIN_CALIBRATION_SAMPLES} samples</span>
+                ) : (
+                  <span style={{ color: COLORS.muted }}>—</span>
+                )}
+              </div>
+
+              {/* Manual override */}
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <select
+                  value={override}
+                  onChange={e => e.target.value ? onSetOverride(label, e.target.value) : onClearOverride(label)}
+                  style={{ flex: 1, background: COLORS.surface3, border: `1px solid ${override ? COLORS.project : COLORS.border}`, borderRadius: 5, padding: "3px 6px", color: override ? COLORS.project : COLORS.muted, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
+                >
+                  <option value="">— none —</option>
+                  {efforts.map(e => <option key={e} value={e}>{e}</option>)}
+                </select>
+                {override && (
+                  <button
+                    onClick={() => onClearOverride(label)}
+                    title="Clear override"
+                    style={{ padding: "2px 6px", borderRadius: 4, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+                  >✕</button>
+                )}
+              </div>
+
+              {/* AI uses */}
+              <div style={{ fontSize: 11, color: aiColor, fontWeight: 500 }}>{aiUses}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.5 }}>
+        Auto avg requires {MIN_CALIBRATION_SAMPLES}+ completed tasks per label. Manual overrides take priority.
       </div>
     </div>
   );
