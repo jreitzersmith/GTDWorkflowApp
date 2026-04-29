@@ -20,7 +20,7 @@ const BUCKETS = {
   project:      { label: "📁 Projects",        desc: "Anything requiring more than one step",        color: COLORS.project },
   waiting:      { label: "⏳ Waiting For",     desc: "Delegated — ball in someone else's court",     color: COLORS.waiting },
   someday:      { label: "💭 Someday / Maybe", desc: "Ideas and aspirations, not commitments",       color: COLORS.someday },
-  scheduled:    { label: "⏰ Scheduled",        desc: "Deferred tasks waiting for their wake date",  color: COLORS.scheduled },
+  scheduled:    { label: "⏰ Deferred",          desc: "Deferred tasks waiting for their wake date",  color: COLORS.scheduled },
   done:         { label: "✅ Completed",        desc: "Finished tasks",                              color: COLORS.done },
   inboxHistory: { label: "📋 Inbox History",   desc: "Processed inbox items — archived for reference", color: COLORS.muted },
 };
@@ -1221,7 +1221,7 @@ export default function GTDManager() {
                   {deferredDupeWarning && (
                     <div style={{ padding: "3px 16px 6px", fontSize: 11, color: COLORS.scheduled, display: "flex", alignItems: "center", gap: 6 }}>
                       <span>⏰</span>
-                      <span>Similar scheduled task: <strong>"{deferredDupeWarning.text}"</strong> (wakes {deferredDupeWarning.deferUntil})</span>
+                      <span>Similar deferred task: <strong>"{deferredDupeWarning.text}"</strong> (wakes {deferredDupeWarning.deferUntil})</span>
                       <button onClick={() => setCurrentBucket("scheduled")} style={{ background: "none", border: "none", color: COLORS.scheduled, cursor: "pointer", fontFamily: "inherit", fontSize: 11, padding: "0 2px", textDecoration: "underline" }}>View it</button>
                     </div>
                   )}
@@ -1269,7 +1269,7 @@ export default function GTDManager() {
                     />
                   </div>
                 ) : currentBucket === "next" ? (() => {
-                  // Deferred tasks are hidden from Next Actions; they live in the Scheduled view.
+                  // Deferred tasks are hidden from Next Actions; they live in the Deferred view.
                   const visible = waterfallFilter(bucketTasks, tasks).filter(t => !isDeferred(t));
                   if (!visible.length) {
                     return (
@@ -2629,7 +2629,7 @@ function EmptyState({ bucket }) {
     project:   ["No projects", "Multi-step goals go here."],
     waiting:   ["Nothing waiting", "Track delegated items here."],
     someday:   ["No someday items", "Capture future ideas without committing to them."],
-    scheduled: ["No scheduled tasks", "Open any task's chevron → set a 'Defer Until' date to hide it until you need it."],
+    scheduled: ["No deferred tasks", "Open any task's chevron → set a 'Defer Until' date to hide it until you need it."],
     done:      ["Nothing completed yet", "Complete tasks and they'll appear here."],
   };
   const [title, sub] = msgs[bucket] || ["Empty", ""];
