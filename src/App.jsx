@@ -184,15 +184,14 @@ function extractUpdateAction(text) {
   return Object.keys(changes).length ? { taskId, changes } : null;
 }
 
-// Waterfall: level-2 tasks (direct children of a project) always show in Next Actions.
-// Level 3+ tasks only show when their direct parent is done.
+// Waterfall: a task is visible in Next Actions only when it has no incomplete next-bucket children.
+// This enforces bottom-up progression — complete leaf nodes before their parents.
 function waterfallFilter(nextTasks, allTasks) {
   return nextTasks.filter(task => {
-    if (!task.parentId) return true;
-    const parent = allTasks.find(t => t.id === task.parentId);
-    if (!parent) return true;
-    if (parent.bucket === "project") return true; // level 2 — always visible
-    return !!parent.done;                          // level 3+ — visible only when parent done
+    const incompleteNextChildren = allTasks.filter(
+      t => t.parentId === task.id && t.bucket === "next" && !t.done
+    );
+    return incompleteNextChildren.length === 0;
   });
 }
 
@@ -579,7 +578,8 @@ export default function GTDManager() {
   // ID of the task whose detail panel is currently open (null = closed).
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [actualEffortPrompt, setActualEffortPrompt] = useState(null); // { taskId, taskText, estimatedEffort }
-  const [pendingRollup, setPendingRollup] = useState(null);           // { taskId, taskText, notes, rootProjectId, rootProjectText }
+  const [pendingRollup, setPendingRollup] = useState(null);           // { taskId, taskText, notes, parentId, parentText }
+  const [pendingDeferCheck, setPendingDeferCheck] = useState(null);    // { taskId, taskText, deferredChildren }
   const [dragId,             setDragId]             = useState(null);
   const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
   const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
@@ -1093,32 +1093,29 @@ export default function GTDManager() {
 
   const deleteTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
 
-  // Walk up parentId chain to find the root ancestor (the top-level project task).
-  const findRootProject = useCallback((parentId) => {
-    const visited = new Set();
-    let current = tasks.find(t => t.id === parentId);
-    while (current && current.parentId && !visited.has(current.id)) {
-      visited.add(current.id);
-      current = tasks.find(t => t.id === current.parentId);
-    }
-    return current || null;
-  }, [tasks]);
-
-  const completeTask = useCallback((id) => {
+  const completeTask = useCallback((id, options = {}) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
 
     // When marking DONE (not un-doing):
     if (!task.done) {
-      // 1. Roll-up prompt: subtask with notes gets a chance to append to root project
-      if (task.notes && task.parentId) {
-        const root = findRootProject(task.parentId);
-        if (root) {
-          setPendingRollup({ taskId: id, taskText: task.text, notes: task.notes, rootProjectId: root.id, rootProjectText: root.text });
+      // 1. Deferred/Someday child check — warn if any children are in defer or someday
+      if (!options.skipDeferCheck) {
+        const deferredKids = tasks.filter(t => t.parentId === id && (t.bucket === "deferred" || t.bucket === "someday") && !t.done);
+        if (deferredKids.length > 0) {
+          setPendingDeferCheck({ taskId: id, taskText: task.text, deferredChildren: deferredKids });
           return;
         }
       }
-      // 2. Effort prompt: task has estimate but no recorded actual time
+      // 2. Roll-up prompt: subtask with notes gets a chance to append to immediate parent
+      if (task.notes && task.parentId) {
+        const parent = tasks.find(t => t.id === task.parentId);
+        if (parent) {
+          setPendingRollup({ taskId: id, taskText: task.text, notes: task.notes, parentId: parent.id, parentText: parent.text });
+          return;
+        }
+      }
+      // 3. Effort prompt: task has estimate but no recorded actual time
       if (task.effort && !task.actualEffort) {
         setActualEffortPrompt({ taskId: id, taskText: task.text, estimatedEffort: task.effort });
         return;
@@ -1129,7 +1126,7 @@ export default function GTDManager() {
       ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox", ...(t.done ? { actualEffort: null } : {}) }
       : t
     ));
-  }, [tasks, findRootProject]);
+  }, [tasks]);
 
   // After roll-up decision, check if effort prompt is also needed, then complete the task.
   const finishComplete = useCallback((taskId) => {
@@ -1143,11 +1140,11 @@ export default function GTDManager() {
 
   const handleRollupConfirm = useCallback((heading) => {
     if (!pendingRollup) return;
-    const { taskId, notes, rootProjectId } = pendingRollup;
+    const { taskId, notes, parentId } = pendingRollup;
     // heading is the (possibly edited) label line from NoteRollupPrompt
     const stamp = `${heading}\n${notes}`;
     setTasks(prev => prev.map(t => {
-      if (t.id !== rootProjectId) return t;
+      if (t.id !== parentId) return t;
       const existing = t.notes ? t.notes.trim() : "";
       return { ...t, notes: existing ? `${existing}\n\n---\n${stamp}` : stamp };
     }));
@@ -1161,6 +1158,17 @@ export default function GTDManager() {
     setPendingRollup(null);
     finishComplete(taskId);
   }, [pendingRollup, finishComplete]);
+
+  const handleDeferCheckSkip = useCallback(() => {
+    if (!pendingDeferCheck) return;
+    const { taskId } = pendingDeferCheck;
+    setPendingDeferCheck(null);
+    completeTask(taskId, { skipDeferCheck: true });
+  }, [pendingDeferCheck, completeTask]);
+
+  const handleDeferCheckReview = useCallback(() => {
+    setPendingDeferCheck(null);
+  }, []);
 
   const handleActualEffortSave = useCallback((actualEffort) => {
     if (!actualEffortPrompt) return;
@@ -1859,9 +1867,19 @@ export default function GTDManager() {
         <NoteRollupPrompt
           taskText={pendingRollup.taskText}
           notes={pendingRollup.notes}
-          rootProjectText={pendingRollup.rootProjectText}
+          parentText={pendingRollup.parentText}
           onConfirm={handleRollupConfirm}
           onSkip={handleRollupSkip}
+        />
+      )}
+
+      {/* Deferred child check — shown when completing a task with deferred or someday subtasks */}
+      {pendingDeferCheck && (
+        <DeferCheckPrompt
+          taskText={pendingDeferCheck.taskText}
+          deferredChildren={pendingDeferCheck.deferredChildren}
+          onSkip={handleDeferCheckSkip}
+          onReview={handleDeferCheckReview}
         />
       )}
 
@@ -2474,7 +2492,42 @@ function PendingActionBar({ action, onConfirm, onDismiss }) {
   );
 }
 
-function NoteRollupPrompt({ taskText, notes, rootProjectText, onConfirm, onSkip }) {
+function DeferCheckPrompt({ taskText, deferredChildren, onSkip, onReview }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
+      <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border2}`, borderRadius: 12, padding: "22px 26px", maxWidth: 440, width: "90%", display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.deferred }}>⏳ Deferred subtasks remain</div>
+        <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.6 }}>
+          <span style={{ color: COLORS.text, fontWeight: 500 }}>&#8220;{taskText}&#8221;</span> has {deferredChildren.length} deferred or someday subtask{deferredChildren.length !== 1 ? "s" : ""}:
+        </div>
+        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: COLORS.text2, lineHeight: 1.9 }}>
+          {deferredChildren.map(c => (
+            <li key={c.id}>
+              <span style={{ color: c.bucket === "deferred" ? COLORS.deferred : COLORS.someday }}>({c.bucket})</span> {c.text}
+            </li>
+          ))}
+        </ul>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            autoFocus
+            onClick={onReview}
+            style={{ flex: 1, padding: "8px 14px", borderRadius: 7, border: `1px solid ${COLORS.deferred}`, background: "transparent", color: COLORS.deferred, fontFamily: "inherit", fontSize: 13, cursor: "pointer", fontWeight: 600 }}
+          >
+            Review first
+          </button>
+          <button
+            onClick={onSkip}
+            style={{ padding: "8px 14px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+          >
+            Complete anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NoteRollupPrompt({ taskText, notes, parentText, onConfirm, onSkip }) {
   const d = new Date();
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const defaultHeading = `\u2713 ${taskText} (${months[d.getMonth()]} ${d.getDate()}):`;
@@ -2485,7 +2538,7 @@ function NoteRollupPrompt({ taskText, notes, rootProjectText, onConfirm, onSkip 
         <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.project }}>📋 Roll up notes?</div>
         <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.6 }}>
           <span style={{ color: COLORS.text, fontWeight: 500 }}>&#8220;{taskText}&#8221;</span> has notes.
-          Add them to the project <span style={{ color: COLORS.text, fontWeight: 500 }}>&#8220;{rootProjectText}&#8221;</span>?
+          Add them to the parent task <span style={{ color: COLORS.text, fontWeight: 500 }}>&#8220;{parentText}&#8221;</span>?
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <div style={{ fontSize: 11, color: COLORS.muted }}>Heading (editable)</div>
@@ -2504,7 +2557,7 @@ function NoteRollupPrompt({ taskText, notes, rootProjectText, onConfirm, onSkip 
             onClick={() => onConfirm(heading)}
             style={{ flex: 1, padding: "8px 14px", borderRadius: 7, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 13, cursor: "pointer", fontWeight: 600 }}
           >
-            Add to project notes
+            Add to parent notes
           </button>
           <button
             onClick={onSkip}
