@@ -2926,6 +2926,104 @@ function SettingsPanel({ ..., onExport, onImport, ... }) {
 </div>
 
 
+
+<div class="snip-card" id="snip-completed-tree">
+  <div class="snip-header">
+    <span class="snip-title">CompletedTree — virtual-root filtered hierarchy</span>
+    <a class="link-chip chip-feat" href="project-summary.html#feat-completed-tree">✅ Completed Hierarchy</a>
+  </div>
+  <div class="snip-body"><pre><code class="language-jsx">function CompletedTree({ parentId, depth, allTasks, rowProps }) {
+  if (depth > 5) return null;
+
+  let children;
+  if (parentId === null) {
+    // Virtual roots: done tasks whose parent is not also done
+    const doneIds = new Set(allTasks.filter(t => t.done).map(t => t.id));
+    children = allTasks.filter(t => t.done && (!t.parentId || !doneIds.has(t.parentId)));
+  } else {
+    // Done children of parentId in original childIds order
+    children = getOrderedChildren(parentId, allTasks).filter(t => t.done);
+  }
+
+  if (!children.length) return null;
+
+  return (
+    &lt;&gt;
+      {children.map(task => (
+        &lt;div key={task.id}&gt;
+          &lt;TaskRow task={task} isSubtask={depth &gt; 0} indentOverride={depth * 22}
+                   depth={depth} {...rowProps} /&gt;
+          {!rowProps.collapsedNodes?.has(task.id) &amp;&amp; (
+            &lt;CompletedTree parentId={task.id} depth={depth + 1}
+                            allTasks={allTasks} rowProps={rowProps} /&gt;
+          )}
+        &lt;/div&gt;
+      ))}
+    &lt;/&gt;
+  );
+}</code></pre></div>
+  <div class="snip-note">
+    <strong>Virtual root detection.</strong> Starting from <code>parentId === null</code> only
+    finds tasks with no parent at all. Instead, we build a Set of done IDs and find tasks whose
+    parent is absent from that set — this catches the common case of a completed subtask whose
+    parent project is still active. The rest of the traversal uses the existing
+    <code>getOrderedChildren</code> helper filtered to <code>.done</code>, preserving
+    <code>childIds</code> order without duplicating any ordering logic.
+  </div>
+</div>
+
+<div class="snip-card" id="snip-action-create">
+  <div class="snip-header">
+    <span class="snip-title">→ACTION:create handler — atomic task creation in callAI</span>
+    <a class="link-chip chip-feat" href="project-summary.html#feat-ai-coach-metadata">🤖 AI Coach Metadata</a>
+  </div>
+  <div class="snip-body"><pre><code class="language-js">// Parser
+function extractCreateAction(text) {
+  const m = text.match(/→ACTION:create\|([^|
+]+)\|(.*)/s);
+  if (!m) return null;
+  const title = m[1].trim();
+  const VALID_BUCKETS = new Set(['inbox', 'next', 'someday', 'waiting']);
+  const fields = {};
+  m[2].split('|').filter(Boolean).forEach(pair => {
+    const colon = pair.indexOf(':');
+    if (colon === -1) return;
+    const key = pair.slice(0, colon).trim();
+    const val = pair.slice(colon + 1).trim();
+    if (key === 'bucket' &amp;&amp; VALID_BUCKETS.has(val)) fields.bucket = val;
+    if (key === 'due')      fields.dueDate    = val;
+    if (key === 'defer')    fields.deferUntil = val;
+    // ... effort, location, recur
+  });
+  if (!title || !fields.bucket) return null;
+  return { title, ...fields };
+}
+
+// Handler (inside callAI, chat mode)
+const create = extractCreateAction(reply);
+if (create) {
+  const { title, bucket, dueDate = null, /* ... */ } = create;
+  const newId = genId();
+  setTasks(prev => [{ id: newId, text: title, bucket, done: false,
+                       created: Date.now(), priority: [], ... }, ...prev]);
+  updateChip = { taskName: title, fields: ["created in " + bucket] };
+}
+
+// Error path for →ACTION:add with missing parent
+if (!parent) {
+  actionError = `⚠ Action failed: no task found with parent ID "${parentId}".`;
+}</code></pre></div>
+  <div class="snip-note">
+    <strong>Separating create from add.</strong> <code>→ACTION:create</code> makes a standalone
+    task with no parent; <code>→ACTION:add</code> makes a child and must update both sides of
+    the parent/child link atomically. Keeping them as separate action types avoids an optional
+    <code>parent</code> field making the handler logic branchy. The <code>actionError</code>
+    string is appended as a second assistant bubble immediately after the AI reply, so failures
+    are visible in the chat without polluting the main reply text.
+  </div>
+</div>
+
+
 </main>
 </div>
 

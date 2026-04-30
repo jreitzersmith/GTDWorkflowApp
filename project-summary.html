@@ -1328,6 +1328,125 @@ Marriott downtown. Confirmation #XYZ123.</pre>
   </section>
 
 
+  <section class="feat" id="feat-effort-sort">
+    <div class="feat-header">
+      <span class="feat-icon">⚡</span>
+      <span class="feat-title">Effort List Sorted by Duration</span>
+      <span class="feat-badge badge-new">New</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        When a new effort label is added in Settings, the full effort list is immediately
+        re-sorted from shortest to longest using <code>effortToMinutes</code> as the sort key.
+        The sorted order is reflected in both the Effort Levels list and the Effort Calibration
+        table, since both derive from the same <code>efforts</code> array.
+      </p>
+      <p>
+        This change also prompted switching <code>effortToMinutes</code> to calendar time:
+        1 day = 24 h, 1 week = 7 days, 1 month = 30 days (previously work-hours: 8 h/day).
+        The calendar model affects effort totals on project rows, calibration accuracy
+        percentages, and the AI's effort context.
+      </p>
+    </div>
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Sorting inside a functional state updater.</strong> <code>addEffort</code> calls
+      <code>setEfforts(prev =&gt; [...prev, trimmed].sort((a, b) =&gt; effortToMinutes(a) - effortToMinutes(b)))</code>.
+      The sort runs inside the updater so it sees the freshly-appended array and the result is
+      committed in a single React state transition — no extra <code>useEffect</code> or second
+      <code>setState</code> needed.
+    </p>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-227f12c">📜 227f12c — Sort effort list by duration</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-30d7e2d">📜 30d7e2d — Switch to calendar hours</a>
+    </div>
+  </section>
+
+  <section class="feat" id="feat-completed-tree">
+    <div class="feat-header">
+      <span class="feat-icon">✅</span>
+      <span class="feat-title">Project Hierarchy in Completed View</span>
+      <span class="feat-badge badge-new">New</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        The Completed bucket now renders tasks in their original project hierarchy rather than
+        as a flat list. A <code>CompletedTree</code> component (read-only, no drag-and-drop)
+        walks the task graph using only completed tasks. "Virtual roots" are completed tasks
+        whose parent is not itself completed — they appear at depth 0. Completed children are
+        indented beneath their completed parent using <code>getOrderedChildren</code> filtered
+        to <code>.done</code>, preserving the original <code>childIds</code> ordering.
+      </p>
+      <p>
+        Collapsed state (<code>collapsedNodes</code>) is respected so branches can be toggled,
+        and depth is capped at 5 to match <code>ProjectTree</code>. Buckets other than
+        <code>done</code> continue to use the flat map.
+      </p>
+    </div>
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Virtual root detection for a filtered tree.</strong> Rather than starting the
+      traversal from <code>parentId === null</code> (which only finds top-level project tasks),
+      <code>CompletedTree</code> builds a <code>Set</code> of done IDs and finds tasks whose
+      parent is absent from that set. This correctly handles the common case where a subtask is
+      completed but its parent project is still in progress.
+    </p>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-3f34e90">📜 3f34e90 — Project hierarchy in Completed view</a>
+    </div>
+  </section>
+
+  <section class="feat" id="feat-ai-coach-metadata">
+    <div class="feat-header">
+      <span class="feat-icon">🤖</span>
+      <span class="feat-title">AI Coach — Extended Metadata &amp; Task Creation</span>
+      <span class="feat-badge badge-new">New</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        The AI coach's chat mode gained three new capabilities and improved error visibility:
+      </p>
+      <p>
+        <strong>Recurrence via <code>→ACTION:update</code>.</strong> The coach can now set or
+        clear recurrence on any task using <code>recur:frequency:interval[:days]</code> (e.g.
+        <code>recur:weekly:1:mon,fri</code>) or <code>recur:off</code>. The task context fed to
+        the AI now also includes existing recurrence info so it can see which tasks already recur.
+      </p>
+      <p>
+        <strong>Add subtask via <code>→ACTION:add</code>.</strong> The coach can create a new
+        task as a child of any existing project or task by emitting
+        <code>→ACTION:add|title|parent:&lt;id&gt;[|field:value…]</code>. The handler updates
+        both <code>parentId</code> on the new task and <code>childIds</code> on the parent
+        atomically, so the task immediately appears in the Projects tree.
+      </p>
+      <p>
+        <strong>Create standalone task via <code>→ACTION:create</code>.</strong> The coach can
+        add a new top-level task to any bucket (inbox, next, someday, waiting) with full metadata
+        support. The system prompt now also instructs the AI to verify task IDs before use and
+        to report failures explicitly rather than silently succeeding.
+      </p>
+      <p>
+        <strong>Error reporting.</strong> When an action handler cannot find a referenced task
+        ID, a <code>⚠ Action failed</code> message is appended to the chat immediately after
+        the AI reply, making silent failures visible.
+      </p>
+    </div>
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Atomic two-sided tree update.</strong> <code>→ACTION:add</code> must update both
+      the new task's <code>parentId</code> and the parent's <code>childIds</code> in one
+      <code>setTasks</code> call. Using a single functional updater
+      (<code>prev =&gt; [...prev.map(update parent), newTask]</code>) guarantees React sees one
+      transition — no intermediate render where the child exists but the parent hasn't yet
+      acknowledged it.
+    </p>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-984a401">📜 984a401 — AI coach extended metadata</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-bb80bc9">📜 bb80bc9 — →ACTION:create + error reporting</a>
+    </div>
+  </section>
+
+
 </main>
 </div>
 

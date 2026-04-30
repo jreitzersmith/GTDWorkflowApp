@@ -928,6 +928,91 @@
 </div>
 
 
+<div class="commit-card" id="commit-227f12c">
+  <div class="commit-meta"><span class="commit-hash">227f12c</span><span class="commit-date">2026-04-29</span></div>
+  <div class="commit-msg">feat: sort effort list by duration after adding a new label</div>
+  <div class="commit-body">
+    <code>addEffort</code> now calls <code>.sort((a, b) =&gt; effortToMinutes(a) - effortToMinutes(b))</code>
+    inside the functional updater after appending the new label. The sorted order is immediately
+    reflected in both the Effort Levels list and the Effort Calibration table.
+  </div>
+  <div class="commit-lesson">
+    <strong>Sort inside the functional updater.</strong> Doing the sort inside
+    <code>setEfforts(prev =&gt; ...)</code> means React sees a single transition from old array
+    to new sorted array — no second setState or useEffect required.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-effort-sort">↑ Feature: Effort Sort</a></div>
+</div>
+
+<div class="commit-card" id="commit-30d7e2d">
+  <div class="commit-meta"><span class="commit-hash">30d7e2d</span><span class="commit-date">2026-04-29</span></div>
+  <div class="commit-msg">fix: switch effortToMinutes to calendar time</div>
+  <div class="commit-body">
+    Changed the day/week/month multipliers in <code>effortToMinutes</code> to calendar time
+    (1 day = 1440 min, 1 week = 10 080 min, 1 month = 43 200 min). Hours and minutes were
+    already calendar-based and are unchanged. Affects effort sort order, project totals, and
+    calibration percentages.
+  </div>
+  <div class="commit-lesson">
+    <strong>Shared utility, wide impact.</strong> <code>effortToMinutes</code> is called in
+    four places (sort, totals, calibration, AI context). Changing one function updates all
+    consistently — a good argument for centralising unit conversion rather than inlining it.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-effort-sort">↑ Feature: Effort Sort</a></div>
+</div>
+
+<div class="commit-card" id="commit-3f34e90">
+  <div class="commit-meta"><span class="commit-hash">3f34e90</span><span class="commit-date">2026-04-29</span></div>
+  <div class="commit-msg">feat: preserve project hierarchy in Completed view</div>
+  <div class="commit-body">
+    Added <code>CompletedTree</code> — a read-only recursive component that renders only done
+    tasks. Virtual roots are done tasks whose parent is not also done. Children use
+    <code>getOrderedChildren</code> filtered to <code>.done</code>. Collapsed state and depth
+    cap match <code>ProjectTree</code>. Non-done buckets keep the flat map.
+  </div>
+  <div class="commit-lesson">
+    <strong>Virtual root detection.</strong> A set-membership check (<code>doneIds.has(t.parentId)</code>)
+    finds tasks that are orphaned within the filtered view without requiring a separate pass or
+    extra bookkeeping field.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-completed-tree">↑ Feature: Completed Hierarchy</a></div>
+</div>
+
+<div class="commit-card" id="commit-984a401">
+  <div class="commit-meta"><span class="commit-hash">984a401</span><span class="commit-date">2026-04-30</span></div>
+  <div class="commit-msg">feat: extend AI coach with recurrence, actualEffort, and add-to-project</div>
+  <div class="commit-body">
+    Added <code>recur</code> and <code>actualEffort</code> fields to <code>→ACTION:update</code>.
+    Added <code>→ACTION:add</code> for creating a task as a child of an existing project/task —
+    the handler updates both <code>parentId</code> and the parent's <code>childIds</code>
+    atomically. <code>getTaskContext</code> now includes recurrence info in task meta lines.
+  </div>
+  <div class="commit-lesson">
+    <strong>Atomic two-sided tree link.</strong> A single <code>setTasks(prev =&gt; [prev.map(update parent), newTask])</code>
+    ensures no intermediate render where the child exists but the parent's childIds hasn't
+    been updated yet.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-ai-coach-metadata">↑ Feature: AI Coach Metadata</a></div>
+</div>
+
+<div class="commit-card" id="commit-bb80bc9">
+  <div class="commit-meta"><span class="commit-hash">bb80bc9</span><span class="commit-date">2026-04-30</span></div>
+  <div class="commit-msg">feat: add →ACTION:create for standalone tasks and action error reporting</div>
+  <div class="commit-body">
+    Added <code>→ACTION:create</code> for creating top-level tasks in any bucket with full
+    metadata. Added <code>actionError</code> — when any action handler fails to find a
+    referenced task ID, a <code>⚠ Action failed</code> bubble is appended to the chat.
+    System prompt updated to instruct the AI to verify IDs and report failures explicitly.
+  </div>
+  <div class="commit-lesson">
+    <strong>Error feedback without polluting the reply.</strong> Appending a second assistant
+    bubble for the error (rather than modifying the AI's reply text) keeps the displayed
+    response clean while still surfacing the failure visibly in the chat flow.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-ai-coach-metadata">↑ Feature: AI Coach Metadata</a></div>
+</div>
+
+
 </main>
 </div>
 
