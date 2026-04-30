@@ -271,6 +271,7 @@ function groupByField(taskList, field, allTasks = []) {
 
 // Converts a human effort string (e.g. "2 hours", "3 days", "30m", "1h") to minutes.
 // Handles both long-form ("30 min", "2 hours") and compact abbreviations ("30m", "2h", "1d", "1w", "1mo").
+// Uses calendar time: 1 day = 24 h, 1 week = 7 d, 1 month = 30 d.
 // Returns 0 for unrecognised strings so sums degrade gracefully.
 function effortToMinutes(str) {
   if (!str) return 0;
@@ -278,15 +279,15 @@ function effortToMinutes(str) {
   const num = parseFloat(s);
   if (isNaN(num) || num <= 0) return 0;
   // Long-form checks first (order matters: "month" before "m", "week" before "w", etc.)
-  if (s.includes("month")) return Math.round(num * 9600); // ~4 w × 5 d × 8 h
-  if (s.includes("week"))  return Math.round(num * 2400); // 5 d × 8 h
-  if (s.includes("day"))   return Math.round(num * 480);  // 8 h
+  if (s.includes("month")) return Math.round(num * 43200); // 30 d × 24 h
+  if (s.includes("week"))  return Math.round(num * 10080); // 7 d × 24 h
+  if (s.includes("day"))   return Math.round(num * 1440);  // 24 h
   if (s.includes("hour"))  return Math.round(num * 60);
   if (s.includes("min"))   return Math.round(num);
   // Compact abbreviations (e.g. "30m", "1h", "2d", "1w", "1mo")
-  if (/^\d+(\.\d+)?mo$/.test(s)) return Math.round(num * 9600);
-  if (/^\d+(\.\d+)?w$/.test(s))  return Math.round(num * 2400);
-  if (/^\d+(\.\d+)?d$/.test(s))  return Math.round(num * 480);
+  if (/^\d+(\.\d+)?mo$/.test(s)) return Math.round(num * 43200);
+  if (/^\d+(\.\d+)?w$/.test(s))  return Math.round(num * 10080);
+  if (/^\d+(\.\d+)?d$/.test(s))  return Math.round(num * 1440);
   if (/^\d+(\.\d+)?h$/.test(s))  return Math.round(num * 60);
   if (/^\d+(\.\d+)?m$/.test(s))  return Math.round(num);
   return 0;
