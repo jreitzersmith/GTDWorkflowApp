@@ -1080,6 +1080,30 @@
 </div>
 
 
+<div class="commit-card" id="commit-67fb83e">
+  <div class="commit-meta"><span class="commit-hash">67fb83e</span><span class="commit-date">2026-04-30</span></div>
+  <div class="commit-msg">feat: web search via Anthropic tool use + Tavily API</div>
+  <div class="commit-body">
+    Added <code>TOOLS</code> constant (web_search definition) and <code>doWebSearch(query)</code>
+    helper at module level. Replaced single-shot Claude fetch in <code>callAI</code> with
+    an agentic tool-use loop (up to 5 iterations). When <code>stop_reason === "tool_use"</code>,
+    Tavily is called and results are appended as <code>tool_result</code> blocks before
+    the next iteration. A <code>🔍 Searching: "…"</code> chip is shown in chat during
+    the search. Tools only injected when <code>mode === "chat"</code> and
+    <code>VITE_TAVILY_API_KEY</code> is set. <code>.env.example</code> updated with
+    Tavily placeholder.
+  </div>
+  <div class="commit-lesson">
+    <strong>Tool results must be sent as a user-role message.</strong> After an assistant
+    message containing <code>tool_use</code> blocks, the Anthropic API requires a
+    corresponding <code>{ role: "user", content: [tool_result, ...] }</code> message
+    before the next assistant turn. Getting this message structure wrong produces a 400
+    validation error from the API.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-web-search">↑ Feature: Web Search</a></div>
+</div>
+
+
 </main>
 </div>
 

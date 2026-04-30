@@ -1588,6 +1588,50 @@ Marriott downtown. Confirmation #XYZ123.</pre>
   </section>
 
 
+  <section class="feat" id="feat-web-search">
+    <div class="feat-header">
+      <span class="feat-icon">🔍</span>
+      <span class="feat-title">AI Coach — Web Search via Tavily (Chat mode)</span>
+      <span class="feat-badge badge-new">New</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        The AI Coach in Chat mode can now search the web before answering. When the user
+        asks a research question, Claude decides whether a live search would improve the
+        answer and — if so — calls the <code>web_search</code> tool. The tool hits the
+        <a href="https://www.tavily.com/">Tavily API</a>, retrieves a summary plus the top
+        5 sources, and feeds the results back into the conversation. Claude then writes a
+        final grounded reply citing the sources.
+      </p>
+      <p>
+        The implementation uses the <strong>Anthropic tool use API</strong> with an
+        agentic loop (up to 5 iterations). The Claude branch in <code>callAI</code> was
+        replaced with a <code>while</code> loop: each iteration sends the current message
+        list to the API; if <code>stop_reason === "tool_use"</code>, tool calls are
+        extracted, Tavily is called, results are appended as <code>tool_result</code>
+        blocks, and the loop continues. When <code>stop_reason</code> is anything else,
+        the text reply is extracted and the loop exits.
+      </p>
+      <p>
+        A compact <em>🔍 Searching: "…"</em> chip appears in the chat panel during the
+        search so the user knows work is in progress. Tools are only injected when
+        <code>mode === "chat"</code> and <code>VITE_TAVILY_API_KEY</code> is set, so
+        other AI modes (Process, Weekly Review, Brain Dump, Project Review) and the
+        Ollama provider are unaffected.
+      </p>
+    </div>
+    <h3>Setup</h3>
+    <p>
+      Add <code>VITE_TAVILY_API_KEY=&lt;your key&gt;</code> to <code>.env</code>
+      (get a free key at <a href="https://www.tavily.com/">tavily.com</a>). The feature
+      is silently disabled if the key is absent.
+    </p>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-67fb83e">📜 67fb83e — Web search via Tavily tool use</a>
+    </div>
+  </section>
+
+
 </main>
 </div>
 
