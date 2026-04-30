@@ -771,6 +771,8 @@ export default function GTDManager() {
   const [supabaseReady, setSupabaseReady] = useState(false);
   // tracks previous tasks snapshot for write-sync diffing
   const prevTasksRef = useRef(null);
+  // 'synced' | 'offline'
+  const [syncStatus, setSyncStatus] = useState('synced');
 
   // Panel resize state — persisted across sessions
   const [sidebarWidth, sidebarDragDown]      = useResizer("gtd_sidebar_w",     240,                                    { min: 160, max: 420, direction: 'h', sign:  1 });
@@ -846,18 +848,96 @@ export default function GTDManager() {
       return !old || JSON.stringify(old) !== JSON.stringify(t);
     });
     const deletes = prev.filter(t => !currMap.has(t.id));
+    if (!upserts.length && !deletes.length) return;
+
+    const queuePending = (ops) => {
+      const existing = JSON.parse(localStorage.getItem('gtd_pending_writes') || '[]');
+      localStorage.setItem('gtd_pending_writes', JSON.stringify([...existing, ...ops]));
+      setSyncStatus('offline');
+    };
 
     if (upserts.length) {
       supabase.from('tasks')
         .upsert(upserts.map(t => taskToDb(t, authUser.id)), { onConflict: 'id' })
-        .then(({ error }) => { if (error) console.error('Supabase upsert:', error); });
+        .then(({ error }) => {
+          if (error) {
+            console.error('Supabase upsert:', error);
+            queuePending(upserts.map(t => ({ type: 'upsert', row: taskToDb(t, authUser.id) })));
+          } else { setSyncStatus('synced'); }
+        });
     }
     if (deletes.length) {
       supabase.from('tasks').delete()
         .in('id', deletes.map(t => t.id)).eq('user_id', authUser.id)
-        .then(({ error }) => { if (error) console.error('Supabase delete:', error); });
+        .then(({ error }) => {
+          if (error) {
+            console.error('Supabase delete:', error);
+            queuePending(deletes.map(t => ({ type: 'delete', id: t.id })));
+          } else if (!upserts.length) { setSyncStatus('synced'); }
+        });
     }
   }, [tasks, authUser, supabaseReady]);
+
+  // Phase 6 — offline resilience: flush pending writes when connectivity returns
+  useEffect(() => {
+    const flushPending = async () => {
+      const raw = localStorage.getItem('gtd_pending_writes');
+      if (!raw || !authUser) return;
+      const pending = JSON.parse(raw);
+      if (!pending?.length) return;
+      const upserts = pending.filter(p => p.type === 'upsert');
+      const deletes = pending.filter(p => p.type === 'delete');
+      let ok = true;
+      if (upserts.length) {
+        const { error } = await supabase.from('tasks')
+          .upsert(upserts.map(p => p.row), { onConflict: 'id' });
+        if (error) { console.error('Flush upsert failed:', error); ok = false; }
+      }
+      if (ok && deletes.length) {
+        const { error } = await supabase.from('tasks').delete()
+          .in('id', deletes.map(p => p.id)).eq('user_id', authUser.id);
+        if (error) { console.error('Flush delete failed:', error); ok = false; }
+      }
+      if (ok) {
+        localStorage.removeItem('gtd_pending_writes');
+        setSyncStatus('synced');
+        console.log('Pending writes flushed successfully');
+      }
+    };
+    setSyncStatus(navigator.onLine ? 'synced' : 'offline');
+    window.addEventListener('online', flushPending);
+    window.addEventListener('offline', () => setSyncStatus('offline'));
+    return () => {
+      window.removeEventListener('online', flushPending);
+      window.removeEventListener('offline', () => setSyncStatus('offline'));
+    };
+  }, [authUser]);
+
+  // Phase 7 — realtime: receive changes from other devices
+  useEffect(() => {
+    if (!authUser || !supabaseReady) return;
+    const channel = supabase
+      .channel(`tasks-${authUser.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'tasks',
+        filter: `user_id=eq.${authUser.id}`,
+      }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const incoming = dbToTask(payload.new);
+          setTasks(prev => {
+            const idx = prev.findIndex(t => t.id === incoming.id);
+            if (idx === -1) return [incoming, ...prev];
+            const next = [...prev];
+            next[idx] = incoming;
+            return next;
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setTasks(prev => prev.filter(t => t.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [authUser, supabaseReady]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1853,7 +1933,19 @@ export default function GTDManager() {
       {/* SIDEBAR */}
       <div style={s.sidebar}>
         <div style={s.sidebarHeader}>
-          <div style={s.logo}>GTD <em style={s.logoEm}>Manager</em></div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={s.logo}>GTD <em style={s.logoEm}>Manager</em></div>
+            {supabaseReady && (
+              <div title={syncStatus === 'synced' ? 'Synced to cloud' : 'Offline — changes queued'}
+                   style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'default' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                               background: syncStatus === 'synced' ? COLORS.next : COLORS.waiting }} />
+                <span style={{ fontSize: 10, color: syncStatus === 'synced' ? COLORS.next : COLORS.waiting }}>
+                  {syncStatus === 'synced' ? 'synced' : 'offline'}
+                </span>
+              </div>
+            )}
+          </div>
           <div style={s.sidebarSub}>Knowledge Worker Edition</div>
         </div>
 
