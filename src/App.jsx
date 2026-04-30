@@ -1395,7 +1395,10 @@ export default function GTDManager() {
   const addEffort = useCallback((name) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setEfforts(prev => prev.includes(trimmed) ? prev : [...prev, trimmed]);
+    setEfforts(prev => {
+      if (prev.includes(trimmed)) return prev;
+      return [...prev, trimmed].sort((a, b) => effortToMinutes(a) - effortToMinutes(b));
+    });
   }, []);
 
   const renameEffort = useCallback((oldName, newName) => {
