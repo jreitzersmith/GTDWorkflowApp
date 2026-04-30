@@ -130,6 +130,35 @@ function subtractFromDate(base, { months = 0, weeks = 0 }) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Computes the next occurrence task object for a recurring task.
+// Returns a new task object ready to insert, or null if no recurrence set.
+function buildNextOccurrence(task) {
+  const rec = task.recurrence;
+  if (!rec) return null;
+  const anchor = rec.rescheduleFrom === "dueDate" && task.dueDate ? task.dueDate : todayStr();
+  const d = new Date(anchor + "T00:00:00");
+  const { frequency, interval = 1, weekDays } = rec;
+  if (frequency === "daily") {
+    d.setDate(d.getDate() + interval);
+  } else if (frequency === "weekly") {
+    if (weekDays && weekDays.length > 0) {
+      d.setDate(d.getDate() + 1);
+      let tries = 0;
+      while (!weekDays.includes(d.getDay()) && tries < 14) { d.setDate(d.getDate() + 1); tries++; }
+    } else {
+      d.setDate(d.getDate() + interval * 7);
+    }
+  } else if (frequency === "monthly") {
+    d.setMonth(d.getMonth() + interval);
+  } else if (frequency === "yearly") {
+    d.setFullYear(d.getFullYear() + interval);
+  }
+  const nextDue = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const { id: _id, done: _done, actualEffort: _ae, ...rest } = task;
+  return { ...rest, id: genId(), done: false, dueDate: nextDue, created: Date.now(),
+    bucket: rec.sendToInbox ? "inbox" : task.bucket };
+}
+
 function formatBubble(text) {
   const parts = text.split(/(→ACTION:[^\n]+)/g);
   return parts.map((part, i) => {
@@ -984,6 +1013,21 @@ export default function GTDManager() {
     });
   }, []);
 
+  const spawnNextOccurrence = useCallback((task) => {
+    if (!task.recurrence) return;
+    const newTask = buildNextOccurrence(task);
+    if (newTask) setTasks(prev => [newTask, ...prev]);
+  }, []);
+
+  const skipRecurrence = useCallback((id) => {
+    setTasks(prev => {
+      const task = prev.find(t => t.id === id);
+      if (!task || !task.recurrence) return prev;
+      const newTask = buildNextOccurrence(task);
+      return newTask ? [newTask, ...prev.filter(t => t.id !== id)] : prev.filter(t => t.id !== id);
+    });
+  }, []);
+
   const advanceMetadataReview = useCallback(() => {
     // Apply all accepted metadata suggestions
     metadataSuggestions
@@ -1122,10 +1166,18 @@ export default function GTDManager() {
       }
     }
 
-    setTasks(prev => prev.map(t => t.id === id
-      ? { ...t, done: !t.done, bucket: !t.done ? "done" : "inbox", ...(t.done ? { actualEffort: null } : {}) }
-      : t
-    ));
+    if (!task.done) {
+      const nextOcc = task.recurrence ? buildNextOccurrence(task) : null;
+      setTasks(prev => {
+        const mapped = prev.map(t => t.id === id ? { ...t, done: true, bucket: "done" } : t);
+        return nextOcc ? [nextOcc, ...mapped] : mapped;
+      });
+    } else {
+      setTasks(prev => prev.map(t => t.id === id
+        ? { ...t, done: false, bucket: "inbox", actualEffort: null }
+        : t
+      ));
+    }
   }, [tasks]);
 
   // After roll-up decision, check if effort prompt is also needed, then complete the task.
@@ -1134,7 +1186,11 @@ export default function GTDManager() {
     if (task && task.effort && !task.actualEffort) {
       setActualEffortPrompt({ taskId, taskText: task.text, estimatedEffort: task.effort });
     } else {
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, done: true, bucket: "done" } : t));
+      const nextOcc = task?.recurrence ? buildNextOccurrence(task) : null;
+      setTasks(prev => {
+        const mapped = prev.map(t => t.id === taskId ? { ...t, done: true, bucket: "done" } : t);
+        return nextOcc ? [nextOcc, ...mapped] : mapped;
+      });
     }
   }, [tasks]);
 
@@ -1172,23 +1228,33 @@ export default function GTDManager() {
 
   const handleActualEffortSave = useCallback((actualEffort) => {
     if (!actualEffortPrompt) return;
-    setTasks(prev => prev.map(t =>
-      t.id === actualEffortPrompt.taskId
-        ? { ...t, done: true, bucket: "done", actualEffort }
-        : t
-    ));
+    const task = tasks.find(t => t.id === actualEffortPrompt.taskId);
+    const nextOcc = task?.recurrence ? buildNextOccurrence(task) : null;
+    setTasks(prev => {
+      const mapped = prev.map(t =>
+        t.id === actualEffortPrompt.taskId
+          ? { ...t, done: true, bucket: "done", actualEffort }
+          : t
+      );
+      return nextOcc ? [nextOcc, ...mapped] : mapped;
+    });
     setActualEffortPrompt(null);
-  }, [actualEffortPrompt]);
+  }, [actualEffortPrompt, tasks]);
 
   const handleActualEffortSkip = useCallback(() => {
     if (!actualEffortPrompt) return;
-    setTasks(prev => prev.map(t =>
-      t.id === actualEffortPrompt.taskId
-        ? { ...t, done: true, bucket: "done" }
-        : t
-    ));
+    const task = tasks.find(t => t.id === actualEffortPrompt.taskId);
+    const nextOcc = task?.recurrence ? buildNextOccurrence(task) : null;
+    setTasks(prev => {
+      const mapped = prev.map(t =>
+        t.id === actualEffortPrompt.taskId
+          ? { ...t, done: true, bucket: "done" }
+          : t
+      );
+      return nextOcc ? [nextOcc, ...mapped] : mapped;
+    });
     setActualEffortPrompt(null);
-  }, [actualEffortPrompt]);
+  }, [actualEffortPrompt, tasks]);
   // Toggle collapse for a single node (subtask level: hides its children).
   const toggleCollapse = useCallback((id) => {
     setCollapsedNodes(prev => {
@@ -1649,6 +1715,7 @@ export default function GTDManager() {
                         onToggleCollapseLevel: toggleCollapseLevel,
                         onOpenDetail: setSelectedTaskId,
                         selectedTaskId,
+                        onSkipRecurrence: skipRecurrence,
                       }}
                     />
                   </div>
@@ -1669,7 +1736,7 @@ export default function GTDManager() {
                       <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                         onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                         pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                        onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} />
+                        onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence} />
                     ));
                   }
                   return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => {
@@ -1683,7 +1750,7 @@ export default function GTDManager() {
                           <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                             onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                             pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                            onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} />
+                            onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence} />
                         ))}
                       </div>
                     );
@@ -1700,7 +1767,7 @@ export default function GTDManager() {
                         <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                           onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                           pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                          onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} />
+                          onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence} />
                       ))}
                     </div>
                   )
@@ -1738,7 +1805,7 @@ export default function GTDManager() {
                       <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
                         onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
                         pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                        onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} />
+                        onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence} />
                     ))}
                   </>
                 )}
@@ -1854,6 +1921,7 @@ export default function GTDManager() {
                 onComplete={(id) => { completeTask(id); setSelectedTaskId(null); }}
                 onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
                 onReassignProject={reassignProject}
+                onSkipRecurrence={(id) => { skipRecurrence(id); setSelectedTaskId(null); }}
                 onClose={() => setSelectedTaskId(null)}
                 style={s.detailPanel}
               />
@@ -1940,7 +2008,7 @@ function Btn({ children, onClick, style = {} }) {
 
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, tagDisplay, indentOverride, depth = 0, collapsedNodes, onToggleCollapse, onToggleCollapseLevel, onOpenDetail, selectedTaskId }) {
+function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, tagDisplay, indentOverride, depth = 0, collapsedNodes, onToggleCollapse, onToggleCollapseLevel, onOpenDetail, selectedTaskId, onSkipRecurrence }) {
   const [hover, setHover] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
@@ -2089,6 +2157,9 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
             {task.notes && (
               <span title="Has notes" style={{ fontSize: 10, opacity: 0.6, flexShrink: 0 }}>📝</span>
             )}
+            {task.recurrence && (
+              <span title="Recurring task" style={{ fontSize: 10, opacity: 0.6, flexShrink: 0 }}>↻</span>
+            )}
             {descendantCounts && (
               <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.surface3, color: COLORS.text2, border: `1px solid ${COLORS.border}`, flexShrink: 0, whiteSpace: "nowrap" }}>
                 ↓ {descendantCounts.incomplete} / {descendantCounts.total}
@@ -2177,6 +2248,9 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
               )}
               {currentBucket === "next" && !task.parentId && onAssignToProject && (
                 <ActionBtn onClick={() => setShowAssign(x => !x)} color={showAssign ? COLORS.project : undefined}>📁</ActionBtn>
+              )}
+              {task.recurrence && onSkipRecurrence && (
+                <ActionBtn onClick={() => onSkipRecurrence(task.id)} color={COLORS.deferred} title="Skip — advance schedule without completing">↻ Skip</ActionBtn>
               )}
               <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
                 <ActionBtn onClick={() => setMoveMenu(moveMenu === task.id ? null : task.id)}>Move ▾</ActionBtn>
@@ -3376,7 +3450,7 @@ function EmptyState({ bucket }) {
 // ---------------------------------------------------------------------------
 // TaskDetailPanel — side panel showing full task detail + notes editor
 // ---------------------------------------------------------------------------
-function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onComplete, onDelete, onReassignProject, onClose, style }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
   const [titleDraft, setTitleDraft] = useState(task.text);
   const [notesDraft, setNotesDraft] = useState(task.notes || "");
 
@@ -3405,6 +3479,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
   const parentProject = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
   const bucketColor = BUCKETS[task.bucket]?.color || COLORS.muted;
   const bucketLabel = BUCKETS[task.bucket]?.label || task.bucket;
+  const rec = task.recurrence || null;
 
   // Build the list of projects the task can be assigned to.
   // Excludes: the task itself, and any of its descendants (would create a cycle).
@@ -3498,6 +3573,84 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             />
           </div>
 
+          {/* Recurrence */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, fontSize: 12 }}>Repeat</span>
+              <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={!!rec}
+                  onChange={e => onUpdate(task.id, { recurrence: e.target.checked
+                    ? { frequency: "weekly", interval: 1, rescheduleFrom: "completion", sendToInbox: false }
+                    : null })}
+                />
+                {rec ? "Enabled" : "Off"}
+              </label>
+            </div>
+            {rec && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                  <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Every</span>
+                  <input
+                    type="number" min={1} max={99}
+                    value={rec.interval || 1}
+                    onChange={e => onUpdate(task.id, { recurrence: { ...rec, interval: Math.max(1, parseInt(e.target.value) || 1) } })}
+                    style={{ ...fieldInput, width: 46, textAlign: "center", padding: "3px 4px", fontSize: 12 }}
+                  />
+                  <select
+                    value={rec.frequency}
+                    onChange={e => onUpdate(task.id, { recurrence: { ...rec, frequency: e.target.value, weekDays: e.target.value !== "weekly" ? undefined : rec.weekDays } })}
+                    style={{ ...fieldInput, flex: 1, fontSize: 12, padding: "3px 6px" }}
+                  >
+                    <option value="daily">day(s)</option>
+                    <option value="weekly">week(s)</option>
+                    <option value="monthly">month(s)</option>
+                    <option value="yearly">year(s)</option>
+                  </select>
+                </div>
+                {rec.frequency === "weekly" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                    <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>On</span>
+                    <div style={{ display: "flex", gap: 3 }}>
+                      {["Su","Mo","Tu","We","Th","Fr","Sa"].map((day, i) => {
+                        const active = (rec.weekDays || []).includes(i);
+                        return (
+                          <button key={i} onClick={() => {
+                            const cur = rec.weekDays || [];
+                            const next = active ? cur.filter(x => x !== i) : [...cur, i].sort((a,b) => a-b);
+                            onUpdate(task.id, { recurrence: { ...rec, weekDays: next.length ? next : undefined } });
+                          }}
+                          style={{ width: 26, height: 22, borderRadius: 4, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + "22" : "transparent", color: active ? COLORS.project : COLORS.muted, fontSize: 10, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+                          >{day}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                  <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Base on</span>
+                  <select
+                    value={rec.rescheduleFrom || "completion"}
+                    onChange={e => onUpdate(task.id, { recurrence: { ...rec, rescheduleFrom: e.target.value } })}
+                    style={{ ...fieldInput, flex: 1, fontSize: 12, padding: "3px 6px" }}
+                  >
+                    <option value="completion">Completion date</option>
+                    <option value="dueDate">Original due date</option>
+                  </select>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>On spawn</span>
+                  <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!rec.sendToInbox}
+                      onChange={e => onUpdate(task.id, { recurrence: { ...rec, sendToInbox: e.target.checked } })} />
+                    Send to Inbox
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Defer until */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
             <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Defer</span>
@@ -3583,11 +3736,18 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
       </div>
 
       {/* Footer actions */}
-      <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, flexWrap: 'wrap' }}>
         <button
           onClick={() => onComplete(task.id)}
           style={{ flex: 1, padding: '6px 0', borderRadius: 7, border: `1px solid ${COLORS.next}`, background: 'transparent', color: COLORS.next, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}
         >✓ Complete</button>
+        {task.recurrence && onSkipRecurrence && (
+          <button
+            onClick={() => onSkipRecurrence(task.id)}
+            title="Skip this occurrence — advances schedule without completing"
+            style={{ flex: 1, padding: '6px 0', borderRadius: 7, border: `1px solid ${COLORS.deferred}`, background: 'transparent', color: COLORS.deferred, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}
+          >↻ Skip</button>
+        )}
         <button
           onClick={() => { if (window.confirm(`Delete "${task.text}"?`)) onDelete(task.id); }}
           style={{ flex: 1, padding: '6px 0', borderRadius: 7, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}
