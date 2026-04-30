@@ -129,6 +129,52 @@ const OPENWEBUI_URL = (import.meta.env.VITE_OPENWEBUI_URL || "http://192.168.0.1
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+// ── Supabase field mappers (camelCase ↔ snake_case) ──────────────────────────
+function taskToDb(task, userId) {
+  return {
+    id:            task.id,
+    user_id:       userId,
+    text:          task.text,
+    bucket:        task.bucket,
+    done:          task.done,
+    created:       task.created,
+    priority:      task.priority      ?? [],
+    location:      task.location      ?? [],
+    due_date:      task.dueDate       ?? null,
+    effort:        task.effort        ?? null,
+    actual_effort: task.actualEffort  ?? null,
+    defer_until:   task.deferUntil    ?? null,
+    notes:         task.notes         ?? null,
+    recurrence:    task.recurrence    ?? null,
+    parent_id:     task.parentId      ?? null,
+    child_ids:     task.childIds      ?? [],
+    sort_order:    task.sortOrder     ?? 0,
+    updated_at:    new Date().toISOString(),
+  };
+}
+
+function dbToTask(row) {
+  const t = {
+    id:           row.id,
+    text:         row.text,
+    bucket:       row.bucket,
+    done:         row.done,
+    created:      row.created,
+    priority:     row.priority      ?? [],
+    location:     row.location      ?? [],
+    dueDate:      row.due_date      ?? null,
+    effort:       row.effort        ?? null,
+    actualEffort: row.actual_effort ?? null,
+    deferUntil:   row.defer_until   ?? null,
+    notes:        row.notes         ?? null,
+    recurrence:   row.recurrence    ?? null,
+    childIds:     row.child_ids     ?? [],
+    sortOrder:    row.sort_order    ?? 0,
+  };
+  if (row.parent_id) t.parentId = row.parent_id;
+  return t;
+}
+
 // Returns today as "YYYY-MM-DD" in local time (for deferred-date comparisons).
 function todayStr() {
   const d = new Date();
@@ -721,6 +767,11 @@ export default function GTDManager() {
     setAuthSent(true);
   }, [authEmail]);
 
+  // true once the initial Supabase read (or migration) has completed
+  const [supabaseReady, setSupabaseReady] = useState(false);
+  // tracks previous tasks snapshot for write-sync diffing
+  const prevTasksRef = useRef(null);
+
   // Panel resize state — persisted across sessions
   const [sidebarWidth, sidebarDragDown]      = useResizer("gtd_sidebar_w",     240,                                    { min: 160, max: 420, direction: 'h', sign:  1 });
   const [coachHeight,  coachDragDown]         = useResizer("gtd_coach_h",       Math.round(window.innerHeight * 0.42), { min: 80,  max: 650, direction: 'v', sign: -1 });
@@ -742,6 +793,71 @@ export default function GTDManager() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // Supabase read: fetch tasks once auth resolves; auto-migrate localStorage if empty
+  useEffect(() => {
+    if (!authUser) return;
+    supabase
+      .from('tasks')
+      .select('*')
+      .eq('user_id', authUser.id)
+      .order('created', { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Supabase read error:', error);
+          setSupabaseReady(true);
+          return;
+        }
+        if (data && data.length > 0) {
+          // Supabase has data — use it as the source of truth
+          setTasks(data.map(dbToTask));
+          setSupabaseReady(true);
+        } else {
+          // Supabase is empty — migrate from localStorage
+          const local = (() => {
+            try { return JSON.parse(localStorage.getItem('gtd_tasks') || '[]'); } catch { return []; }
+          })();
+          if (local.length > 0) {
+            const rows = local.map(t => taskToDb(t, authUser.id));
+            supabase.from('tasks').insert(rows).then(({ error: e2 }) => {
+              if (e2) console.error('Migration failed:', e2);
+              else console.log(`Migrated ${rows.length} tasks to Supabase`);
+              setSupabaseReady(true);
+            });
+          } else {
+            setSupabaseReady(true);
+          }
+        }
+      });
+  }, [authUser]);
+
+  // Supabase write: diff tasks on every change and sync inserts/updates/deletes
+  useEffect(() => {
+    if (!authUser || !supabaseReady) { prevTasksRef.current = tasks; return; }
+    const prev = prevTasksRef.current;
+    prevTasksRef.current = tasks;
+    if (!prev) return;
+
+    const prevMap = new Map(prev.map(t => [t.id, t]));
+    const currMap = new Map(tasks.map(t => [t.id, t]));
+
+    const upserts = tasks.filter(t => {
+      const old = prevMap.get(t.id);
+      return !old || JSON.stringify(old) !== JSON.stringify(t);
+    });
+    const deletes = prev.filter(t => !currMap.has(t.id));
+
+    if (upserts.length) {
+      supabase.from('tasks')
+        .upsert(upserts.map(t => taskToDb(t, authUser.id)), { onConflict: 'id' })
+        .then(({ error }) => { if (error) console.error('Supabase upsert:', error); });
+    }
+    if (deletes.length) {
+      supabase.from('tasks').delete()
+        .in('id', deletes.map(t => t.id)).eq('user_id', authUser.id)
+        .then(({ error }) => { if (error) console.error('Supabase delete:', error); });
+    }
+  }, [tasks, authUser, supabaseReady]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
