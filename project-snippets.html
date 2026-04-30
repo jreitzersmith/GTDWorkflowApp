@@ -3151,6 +3151,80 @@ useEffect(() => {
 </div>
 
 
+<div class="snip-card" id="snip-offline-realtime">
+  <div class="snip-header">
+    <span class="snip-title">Offline Queue &amp; Realtime Subscription</span>
+    <span class="snip-file">src/App.jsx</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Offline queue helper (inside write useEffect)
+const queuePending = (ops) => {
+  const existing = JSON.parse(localStorage.getItem('gtd_pending_writes') || '[]');
+  localStorage.setItem('gtd_pending_writes', JSON.stringify([...existing, ...ops]));
+  setSyncStatus('offline');
+};
+// On upsert error: queuePending(upserts.map(t => ({ type: 'upsert', row: taskToDb(t, authUser.id) })))
+// On delete error: queuePending(deletes.map(t => ({ type: 'delete', id: t.id })))
+
+// Flush pending writes when connectivity returns (Phase 6)
+useEffect(() => {
+  const flushPending = async () => {
+    const pending = JSON.parse(localStorage.getItem('gtd_pending_writes') || '[]');
+    if (!pending.length || !authUser) return;
+    const upserts = pending.filter(p => p.type === 'upsert');
+    const deletes = pending.filter(p => p.type === 'delete');
+    let ok = true;
+    if (upserts.length) {
+      const { error } = await supabase.from('tasks')
+        .upsert(upserts.map(p => p.row), { onConflict: 'id' });
+      if (error) ok = false;
+    }
+    if (ok && deletes.length) {
+      const { error } = await supabase.from('tasks').delete()
+        .in('id', deletes.map(p => p.id)).eq('user_id', authUser.id);
+      if (error) ok = false;
+    }
+    if (ok) { localStorage.removeItem('gtd_pending_writes'); setSyncStatus('synced'); }
+  };
+  setSyncStatus(navigator.onLine ? 'synced' : 'offline');
+  window.addEventListener('online', flushPending);
+  window.addEventListener('offline', () => setSyncStatus('offline'));
+  return () => { window.removeEventListener('online', flushPending); /* ... */ };
+}, [authUser]);
+
+// Realtime subscription (Phase 7)
+useEffect(() => {
+  if (!authUser || !supabaseReady) return;
+  const channel = supabase
+    .channel(`tasks-${authUser.id}`)
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'tasks',
+      filter: `user_id=eq.${authUser.id}`,
+    }, (payload) => {
+      if (payload.eventType === 'DELETE') {
+        setTasks(prev => prev.filter(t => t.id !== payload.old.id));
+      } else {
+        const incoming = dbToTask(payload.new);
+        setTasks(prev => {
+          const idx = prev.findIndex(t => t.id === incoming.id);
+          if (idx === -1) return [incoming, ...prev];
+          const next = [...prev]; next[idx] = incoming; return next;
+        });
+      }
+    })
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}, [authUser, supabaseReady]);</code></pre></div>
+  <div class="snip-note">
+    <strong>Why queue ops rather than tasks.</strong> The pending queue stores the already-serialised
+    Supabase row objects (<code>{ type, row }</code>) rather than JS task objects. This means the
+    flush path doesn't need to re-run <code>taskToDb</code> or know <code>authUser.id</code> —
+    the rows are self-contained and ready to send. The realtime handler is idempotent: our own
+    writes come back as events too, but since the data is identical, the state update resolves
+    to the same array contents.
+  </div>
+</div>
+
+
 </main>
 </div>
 

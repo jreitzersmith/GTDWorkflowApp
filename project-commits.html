@@ -1058,6 +1058,28 @@
 </div>
 
 
+<div class="commit-card" id="commit-3f30019">
+  <div class="commit-meta"><span class="commit-hash">3f30019</span><span class="commit-date">2026-04-30</span></div>
+  <div class="commit-msg">feat: offline resilience and realtime sync (Phases 6–7)</div>
+  <div class="commit-body">
+    Added <code>syncStatus</code> state (<code>'synced' | 'offline'</code>) with a dot
+    indicator in the sidebar header. Write useEffect now queues failed ops to
+    <code>gtd_pending_writes</code> in localStorage on error. New online/offline useEffect
+    flushes the queue when connectivity returns. New realtime useEffect subscribes to
+    <code>postgres_changes</code> on the tasks table; INSERT/UPDATE merges incoming rows
+    into state; DELETE filters them out. Realtime publication enabled on the tasks table
+    via Management API.
+  </div>
+  <div class="commit-lesson">
+    <strong>Queue ops not tasks.</strong> Storing the already-serialised DB row in the
+    pending queue (rather than the JS task object) means the flush path is self-contained —
+    no need to re-run the camelCase→snake_case mapper or re-attach <code>user_id</code>
+    at flush time.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-supabase-resilience">↑ Feature: Offline + Realtime</a></div>
+</div>
+
+
 </main>
 </div>
 

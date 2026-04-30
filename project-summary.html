@@ -1546,6 +1546,48 @@ Marriott downtown. Confirmation #XYZ123.</pre>
   </section>
 
 
+  <section class="feat" id="feat-supabase-resilience">
+    <div class="feat-header">
+      <span class="feat-icon">📡</span>
+      <span class="feat-title">Supabase — Offline Resilience &amp; Realtime Sync (Phases 6–7)</span>
+      <span class="feat-badge badge-new">New</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        <strong>Phase 6 — Offline resilience.</strong> The write <code>useEffect</code> now
+        catches Supabase errors and queues failed operations to
+        <code>localStorage</code> under <code>gtd_pending_writes</code>. A separate
+        <code>useEffect</code> listens to <code>window online</code> and <code>offline</code>
+        events: when connectivity returns, the queue is flushed in order (upserts first,
+        then deletes); on success the queue is cleared and sync status returns to
+        <code>'synced'</code>. A small dot indicator in the sidebar header shows
+        <span style="color:#5ab878">● synced</span> or
+        <span style="color:#d4845a">● offline</span> at all times once the initial
+        read completes.
+      </p>
+      <p>
+        <strong>Phase 7 — Realtime.</strong> After <code>supabaseReady</code> is set, a
+        Supabase realtime channel subscribes to <code>postgres_changes</code> on the
+        <code>tasks</code> table filtered to <code>user_id = authUser.id</code>.
+        <code>INSERT</code> and <code>UPDATE</code> events merge the incoming row into
+        React state (update in place if the task ID already exists, prepend if new);
+        <code>DELETE</code> events filter the row out. The channel is cleaned up on
+        unmount. The <code>tasks</code> table was added to the
+        <code>supabase_realtime</code> publication via the Management API. Changes made
+        on another device appear within ~1 second without a page refresh.
+      </p>
+    </div>
+    <h3>Verification</h3>
+    <p>
+      Confirmed via Management API: 18-column schema intact, RLS enabled with all four
+      policies, realtime publication active, 40 rows present after localStorage migration.
+    </p>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-3f30019">📜 3f30019 — Offline resilience + realtime</a>
+    </div>
+  </section>
+
+
 </main>
 </div>
 
