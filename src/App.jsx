@@ -216,6 +216,12 @@ async function doGmailSearch(query, token) {
   return `Found ${messages.length} email(s). Top ${details.length} result(s):\n\n${details.join('\n\n---\n\n')}`;
 }
 
+const GMAIL_LIST_LABELS_TOOL = {
+  name: "gmail_list_labels",
+  description: "List all Gmail labels with their IDs and display names. Call this before gmail_label when you need to find the ID for a user-named label (e.g. 'Tax Docs', 'Work'). System labels — STARRED, UNREAD, IMPORTANT, INBOX — are always available without calling this.",
+  input_schema: { type: "object", properties: {}, required: [] },
+};
+
 const GMAIL_LABEL_TOOL = {
   name: "gmail_label",
   description: "Apply or remove labels on a Gmail message — e.g. add STARRED, apply a custom label, or mark as read (remove UNREAD). Requires Organize access or higher.",
@@ -268,6 +274,19 @@ const GMAIL_SCOPE_OPTS = [
   { key: 'send',     label: 'Send',      desc: '+ send emails directly' },
 ];
 const GMAIL_SCOPE_DISPLAY = { readonly: 'read only', modify: 'organize', compose: 'compose', send: 'send' };
+
+// Fetch all label names + IDs (requires gmail.modify scope or higher)
+async function doGmailListLabels(token) {
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const data = await res.json();
+  const labels = (data.labels || [])
+    .map(l => `${l.name} (ID: ${l.id})`)
+    .join('\n');
+  return labels || 'No labels found.';
+}
 
 // Modify message labels (requires gmail.modify scope)
 async function doGmailLabel(messageId, addLabelIds, removeLabelIds, token) {
@@ -1357,8 +1376,10 @@ export default function GTDManager() {
             if (import.meta.env.VITE_TAVILY_API_KEY) availableTools.push(...TOOLS);
             if (googleToken) {
               availableTools.push(GMAIL_SEARCH_TOOL);
-              if (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send')
+              if (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send') {
+                availableTools.push(GMAIL_LIST_LABELS_TOOL);
                 availableTools.push(GMAIL_LABEL_TOOL);
+              }
               if (googleScope === 'compose' || googleScope === 'send')
                 availableTools.push(GMAIL_COMPOSE_TOOL);
               if (googleScope === 'send')
@@ -1407,6 +1428,9 @@ export default function GTDManager() {
                   tool_use_id: toolUse.id,
                   content: result,
                 });
+              } else if (toolUse.name === "gmail_list_labels") {
+                const result = await doGmailListLabels(googleToken);
+                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
               } else if (toolUse.name === "gmail_label") {
                 const result = await doGmailLabel(
                   toolUse.input.message_id, toolUse.input.add_label_ids,
