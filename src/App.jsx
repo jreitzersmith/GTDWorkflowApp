@@ -2908,6 +2908,27 @@ function ProviderOption({ label, icon, color, active, onClick }) {
   );
 }
 
+function SettingsSection({ label, storageKey, children }) {
+  const [open, setOpen] = useState(() => localStorage.getItem(storageKey) === "1");
+  const toggle = () => setOpen(v => {
+    const next = !v;
+    localStorage.setItem(storageKey, next ? "1" : "0");
+    return next;
+  });
+  return (
+    <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+      <button
+        onClick={toggle}
+        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", background: "transparent", border: "none", cursor: "pointer", color: COLORS.text, fontFamily: "inherit" }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: 12, color: COLORS.muted }}>{open ? "▾" : "▸"}</span>
+      </button>
+      {open && <div style={{ paddingBottom: 20 }}>{children}</div>}
+    </div>
+  );
+}
+
 function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose }) {
   const fileInputRef = useRef(null);
 
@@ -2940,15 +2961,17 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
           style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
         >✕ Close</button>
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 32 }}>
-        <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
-        <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 24px" }}>
+        <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
+          <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
+        </SettingsSection>
+        <SettingsSection label="Locations" storageKey="gtd_settings_locations">
           <LocationManager locations={locations} tasks={tasks} onAdd={onAdd} onRename={onRename} onRemove={onRemove} />
-        </div>
-        <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
+        </SettingsSection>
+        <SettingsSection label="Effort Levels" storageKey="gtd_settings_efforts">
           <EffortManager efforts={efforts} tasks={tasks} onAdd={onAddEffort} onRename={onRenameEffort} onRemove={onRemoveEffort} />
-        </div>
-        <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
+        </SettingsSection>
+        <SettingsSection label="Effort Calibration" storageKey="gtd_settings_calibration">
           <EffortCalibrationManager
             efforts={efforts}
             tasks={tasks}
@@ -2956,9 +2979,8 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
             onSetOverride={onSetCalibrationOverride}
             onClearOverride={onClearCalibrationOverride}
           />
-        </div>
-        <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Backup &amp; Restore</div>
+        </SettingsSection>
+        <SettingsSection label="Backup & Restore" storageKey="gtd_settings_backup">
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 14, lineHeight: 1.5 }}>
             Export all tasks, locations, and effort labels to a JSON file.{" "}
             <strong style={{ color: COLORS.text2 }}>Replace</strong> overwrites all current tasks;{" "}
@@ -2979,7 +3001,7 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
             >⬆ Import (Merge)</button>
             <input ref={fileInputRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={handleFileChange} />
           </div>
-        </div>
+        </SettingsSection>
       </div>
     </div>
   );
@@ -2992,7 +3014,6 @@ function TagDisplaySetting({ value, onChange }) {
   ];
   return (
     <div style={{ maxWidth: 480 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Tag Display</div>
       <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 14, lineHeight: 1.5 }}>
         Controls where metadata tags (location, due date, priority, effort) appear on collapsed task rows.
       </div>
@@ -3061,7 +3082,6 @@ function LocationManager({ locations, tasks, onAdd, onRename, onRemove }) {
 
   return (
     <div style={{ maxWidth: 480 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Locations</div>
       <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 16, lineHeight: 1.5 }}>
         Locations tag where a task can be done. Changes cascade to all existing tasks.
       </div>
@@ -3192,7 +3212,6 @@ function EffortManager({ efforts, tasks, onAdd, onRename, onRemove }) {
 
   return (
     <div style={{ maxWidth: 480 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Effort Levels</div>
       <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 16, lineHeight: 1.5 }}>
         Effort estimates for tasks. Changes cascade to all existing tasks. Values are parsed for project totals (e.g. "2 hours", "1 day").
       </div>
@@ -3270,7 +3289,6 @@ function EffortCalibrationManager({ efforts, tasks, calibrationOverrides, onSetO
 
   return (
     <div style={{ maxWidth: 520 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Effort Calibration</div>
       <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 16, lineHeight: 1.6 }}>
         When you record actual effort on completed tasks, this table updates automatically.
         The AI uses these averages to give better effort suggestions during inbox processing and project review.
