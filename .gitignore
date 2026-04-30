@@ -48,6 +48,7 @@ coverage/
 .vite/
 .cache/
 .parcel-cache/
+vite.config.js.timestamp-*.mjs
 
 # Misc
 *.tsbuildinfo
