@@ -2783,6 +2783,100 @@ const rec = task.recurrence || null;
 </div>
 
 
+<div class="snippet" id="snip-import-export">
+  <div class="snip-header">
+    <span class="snip-title">handleExport / handleImport — JSON backup with Replace and Merge modes</span>
+    <a class="back-link" href="project-summary.html#feat-import-export">↑ Feature: Backup Import / Export</a>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// ── Export ────────────────────────────────────────────────────────────────
+// Serialises tasks + locations + efforts to a timestamped JSON download.
+const handleExport = useCallback(() =&gt; {
+  const data = { version: 1, exportedAt: new Date().toISOString(), tasks, locations, efforts };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `gtd-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}, [tasks, locations, efforts]);
+
+// ── Import ─────────────────────────────────────────────────────────────────
+// mode = "replace" | "merge"  (set by whichever button triggered the picker)
+const handleImport = useCallback((data, mode = "replace") =&gt; {
+  if (!data || !Array.isArray(data.tasks)) {
+    alert("Invalid backup file — expected a tasks array.");
+    return;
+  }
+  if (mode === "replace") {
+    if (!window.confirm(
+      `Replace all ${tasks.length} current tasks with ${data.tasks.length} imported tasks?`
+    )) return;
+    setTasks(data.tasks);
+    if (Array.isArray(data.locations)) setLocations(data.locations);
+    if (Array.isArray(data.efforts))   setEfforts(data.efforts);
+  } else {
+    // Merge: deduplicate by task ID — only genuinely new tasks are added
+    const existingIds = new Set(tasks.map(t =&gt; t.id));
+    const incoming = data.tasks.filter(t =&gt; !existingIds.has(t.id));
+    if (!incoming.length) {
+      alert("Nothing to merge — all tasks in this backup already exist.");
+      return;
+    }
+    setTasks(prev =&gt; [...incoming, ...prev]);
+    // Union-merge locations and efforts (no duplicates)
+    if (Array.isArray(data.locations))
+      setLocations(prev =&gt; [...new Set([...prev, ...data.locations])]);
+    if (Array.isArray(data.efforts))
+      setEfforts(prev =&gt; { const s = new Set(prev); return [...prev, ...data.efforts.filter(e =&gt; !s.has(e))]; });
+    alert(`Merged ${incoming.length} new task${incoming.length !== 1 ? "s" : ""}.`);
+  }
+}, [tasks]);
+
+// ── SettingsPanel — shared file input, importMode routes the handler ───────
+function SettingsPanel({ ..., onExport, onImport, ... }) {
+  const fileInputRef = useRef(null);
+  const [importMode, setImportMode] = useState("replace");
+
+  const handleFileChange = (e) =&gt; {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) =&gt; {
+      try   { onImport(JSON.parse(ev.target.result), importMode); }
+      catch { alert("Could not parse backup file — make sure it's a valid GTD JSON export."); }
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // reset so same file can be re-imported
+  };
+
+  return (
+    // ... inside Backup &amp; Restore section:
+    &lt;div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}&gt;
+      &lt;button onClick={onExport}&gt;⬇ Export&lt;/button&gt;
+      &lt;button onClick={() =&gt; { setImportMode("replace"); fileInputRef.current?.click(); }}&gt;
+        ⬆ Import (Replace)
+      &lt;/button&gt;
+      &lt;button onClick={() =&gt; { setImportMode("merge"); fileInputRef.current?.click(); }}&gt;
+        ⬆ Import (Merge)
+      &lt;/button&gt;
+      &lt;input ref={fileInputRef} type="file" accept=".json,application/json"
+        style={{ display: "none" }} onChange={handleFileChange} /&gt;
+    &lt;/div&gt;
+  );
+}</code></pre></div>
+  <div class="snip-note">
+    <strong>State as intent flag for a shared handler.</strong> Both import buttons share one
+    <code>&lt;input type="file"&gt;</code>. Each button writes its mode into
+    <code>importMode</code> state before programmatically clicking the input. By the time
+    <code>onChange</code> fires, <code>importMode</code> already holds the right value — the
+    handler just reads it. This avoids duplicating the FileReader setup and keeps the file input
+    as a single, stable DOM node. The reset (<code>e.target.value = ""</code>) ensures the same
+    file can be selected again immediately if needed.
+  </div>
+</div>
+
+
 </main>
 </div>
 

@@ -865,6 +865,37 @@
 </div>
 
 
+<div class="commit-entry" id="commit-030ead5">
+  <div class="commit-top">
+    <span class="commit-hash">030ead5</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: add Merge mode to backup import</div>
+  <div class="commit-body">
+    Extended the existing Backup &amp; Restore section (which already had Replace import and Export)
+    with a non-destructive <strong>Merge</strong> mode. <code>handleImport</code> gained a
+    <code>mode</code> parameter. The Replace path now includes a more descriptive confirm message
+    showing current vs. incoming task counts. The Merge path builds a <code>Set</code> of existing
+    task IDs, filters the imported array to genuinely new tasks only, prepends them via the
+    functional updater, and union-merges locations and efforts. An alert reports how many tasks were
+    added; no confirm is needed since existing data is untouched.<br><br>
+    In <code>SettingsPanel</code>, a local <code>importMode</code> state variable is set by
+    whichever button is clicked before the hidden file input is triggered, so the shared
+    <code>onChange</code> handler always knows which code path to run. The single Export button was
+    relabelled and the Import button was split into "Import (Replace)" and "Import (Merge)".
+  </div>
+  <div class="commit-lesson">
+    <strong>State as an intent flag for a shared event handler.</strong> When two UI actions share
+    the same underlying mechanism (one file input, one FileReader), storing the user's intent in
+    state before the async operation starts is cleaner than creating two separate elements or
+    passing the mode through multiple layers. Set the flag synchronously on click; read it in the
+    handler when the result arrives.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-import-export">↑ Feature: Backup Import / Export</a></div>
+</div>
+
+
 </main>
 </div>
 
