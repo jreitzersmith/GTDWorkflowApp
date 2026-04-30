@@ -1441,16 +1441,31 @@ export default function GTDManager() {
     URL.revokeObjectURL(url);
   }, [tasks, locations, efforts]);
 
-  const handleImport = useCallback((data) => {
+  const handleImport = useCallback((data, mode = "replace") => {
     if (!data || !Array.isArray(data.tasks)) {
       alert("Invalid backup file — expected a tasks array.");
       return;
     }
-    if (!window.confirm(`Import ${data.tasks.length} tasks? This will replace all current tasks.`)) return;
-    setTasks(data.tasks);
-    if (Array.isArray(data.locations)) setLocations(data.locations);
-    if (Array.isArray(data.efforts)) setEfforts(data.efforts);
-  }, []);
+    if (mode === "replace") {
+      if (!window.confirm(`Replace all ${tasks.length} current tasks with ${data.tasks.length} imported tasks?`)) return;
+      setTasks(data.tasks);
+      if (Array.isArray(data.locations)) setLocations(data.locations);
+      if (Array.isArray(data.efforts)) setEfforts(data.efforts);
+    } else {
+      const existingIds = new Set(tasks.map(t => t.id));
+      const incoming = data.tasks.filter(t => !existingIds.has(t.id));
+      if (!incoming.length) {
+        alert("Nothing to merge — all tasks in this backup already exist.");
+        return;
+      }
+      setTasks(prev => [...incoming, ...prev]);
+      if (Array.isArray(data.locations))
+        setLocations(prev => [...new Set([...prev, ...data.locations])]);
+      if (Array.isArray(data.efforts))
+        setEfforts(prev => { const s = new Set(prev); return [...prev, ...data.efforts.filter(e => !s.has(e))]; });
+      alert(`Merged ${incoming.length} new task${incoming.length !== 1 ? "s" : ""}.`);
+    }
+  }, [tasks]);
 
   // "deferred" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
   const bucketTasks = currentBucket === "deferred"
@@ -2896,6 +2911,7 @@ function ProviderOption({ label, icon, color, active, onClick }) {
 function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose }) {
   const fileInputRef = useRef(null);
 
+  const [importMode, setImportMode] = useState("replace");
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -2903,7 +2919,7 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target.result);
-        onImport(data);
+        onImport(data, importMode);
       } catch {
         alert("Could not parse backup file — make sure it's a valid GTD JSON export.");
       }
@@ -2944,17 +2960,23 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
         <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 28 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Backup &amp; Restore</div>
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 14, lineHeight: 1.5 }}>
-            Export all tasks, locations, and effort labels to a JSON file. Import restores from a previous export.
+            Export all tasks, locations, and effort labels to a JSON file.{" "}
+            <strong style={{ color: COLORS.text2 }}>Replace</strong> overwrites all current tasks;{" "}
+            <strong style={{ color: COLORS.text2 }}>Merge</strong> adds only tasks from the backup that don't already exist.
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
               onClick={onExport}
               style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
-            >⬇ Export backup</button>
+            >⬇ Export</button>
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => { setImportMode("replace"); fileInputRef.current?.click(); }}
               style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
-            >⬆ Import backup</button>
+            >⬆ Import (Replace)</button>
+            <button
+              onClick={() => { setImportMode("merge"); fileInputRef.current?.click(); }}
+              style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+            >⬆ Import (Merge)</button>
             <input ref={fileInputRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={handleFileChange} />
           </div>
         </div>
