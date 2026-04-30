@@ -276,6 +276,7 @@
     <li><a href="#feat-note-rollup">Subtask Note Roll-up</a></li>
     <li><a href="#feat-resizable-chat-input">Resizable Chat Input</a></li>
     <li><a href="#feat-waterfall-invert">Bottom-Up Task Progression</a></li>
+    <li><a href="#feat-recurring">Recurring Tasks</a></li>
   </ul>
 </aside>
 
@@ -1150,6 +1151,78 @@ Marriott downtown. Confirmation #XYZ123.</pre>
       <a class="link-chip chip-snippet" href="project-snippets.html#snip-complete-task-checks">🔬 completeTask() — three-check cascade</a>
       <a class="link-chip chip-snippet" href="project-snippets.html#snip-defer-check-prompt">🔬 DeferCheckPrompt modal</a>
       <a class="link-chip chip-commit" href="project-commits.html#commit-5779170">📜 5779170 — Bottom-up waterfall + deferred check</a>
+    </div>
+  </section>
+
+
+  <section class="feat" id="feat-recurring">
+    <div class="feat-header">
+      <span class="feat-icon">↻</span>
+      <span class="feat-title">Recurring Tasks</span>
+      <span class="feat-badge badge-new">New</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        Any task can be made recurring by enabling the <strong>Repeat</strong> toggle in the Task Detail
+        Panel. The recurrence rule is stored as a plain object on the task:
+        <code>{ frequency, interval, weekDays?, rescheduleFrom, sendToInbox }</code>. When a recurring
+        task is completed — through any path — a new instance is automatically spawned with the next
+        calculated due date. The original task moves to Completed as normal.
+      </p>
+      <p>
+        Four frequency modes are supported: <em>daily</em>, <em>weekly</em>, <em>monthly</em>, and
+        <em>yearly</em>, each with a configurable <strong>interval</strong> (e.g. "every 2 weeks").
+        Weekly tasks additionally offer a weekday picker (Su–Sa buttons) to lock occurrences to specific
+        days — "every Tuesday and Thursday" — rather than simply sliding the date forward by N×7 days.
+      </p>
+      <p>
+        Two <strong>reschedule anchors</strong> are available per task. <em>Completion date</em> sets the
+        next due date relative to when the task was actually done — useful for habits like "review
+        finances every 7 days after I do it." <em>Original due date</em> advances from the task's
+        current due date regardless of when it was completed — useful for fixed cadences like "always
+        on the 1st of the month." Each task stores its own preference.
+      </p>
+      <p>
+        A per-task <strong>Send to Inbox</strong> toggle lets the spawned instance land in the Inbox for
+        reprocessing instead of inheriting the current bucket. The default is same-bucket for minimal
+        friction; Inbox is available when each occurrence genuinely needs review before acting.
+      </p>
+      <p>
+        The <strong>Skip</strong> action (↻ Skip in the task row hover and the Detail Panel footer)
+        advances the schedule without marking the task complete: the current instance is discarded and
+        the next occurrence is created exactly as on a normal completion. Nothing is added to Completed.
+      </p>
+      <p>
+        Recurring tasks show a small <strong>↻ indicator</strong> in the task row alongside the
+        existing 📝 notes indicator.
+      </p>
+    </div>
+
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Pure helper functions for date arithmetic.</strong> All recurrence date logic lives in
+      <code>buildNextOccurrence(task)</code> — a plain function with no React dependencies. It receives
+      a task object and returns a new task object ready to insert (or <code>null</code> if no
+      recurrence is set). Because it is pure, the same function is called from four different
+      completion paths (<code>completeTask</code>, <code>finishComplete</code>,
+      <code>handleActualEffortSave</code>, <code>handleActualEffortSkip</code>) and from inside the
+      <code>skipRecurrence</code> updater — with no duplication and no shared mutable state.
+      Pure functions compose freely; hooks do not.
+    </p>
+    <p>
+      <strong>Calling a pure function inside a <code>setTasks</code> updater.</strong>
+      <code>skipRecurrence</code> must both remove the current task and insert its replacement
+      atomically — one state transition, no intermediate render. It does this in a single
+      <code>setTasks(prev =&gt; ...)</code> call: find the task in <code>prev</code>, call
+      <code>buildNextOccurrence</code> to compute the replacement, then return
+      <code>[newTask, ...prev.filter(t =&gt; t.id !== id)]</code>. React applies the whole
+      thing as one update.
+    </p>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-build-next-occurrence">🔬 buildNextOccurrence() — next due date logic</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-recurrence-ui">🔬 Recurrence editor in TaskDetailPanel</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-19c3973">📜 19c3973 — Recurring tasks</a>
     </div>
   </section>
 

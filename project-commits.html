@@ -830,6 +830,41 @@
   <div class="commit-back"><a href="project-summary.html#feat-waterfall-invert">↑ Feature: Bottom-Up Task Progression</a></div>
 </div>
 
+<div class="commit-entry" id="commit-19c3973">
+  <div class="commit-top">
+    <span class="commit-hash">19c3973</span>
+    <span class="commit-date">2026-04-29</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: recurring tasks</div>
+  <div class="commit-body">
+    Added full recurring-task support. A new <code>recurrence</code> field on each task stores the rule:
+    <code>{ frequency, interval, weekDays?, rescheduleFrom, sendToInbox }</code>. Four frequency modes
+    (daily / weekly / monthly / yearly) with configurable interval. Weekly tasks support specific
+    weekday selection (Su–Sa toggles) or every-N-weeks. Two reschedule anchors per task: completion
+    date or original due date. Per-task <em>Send to Inbox</em> toggle overrides the default
+    same-bucket spawn behaviour.<br><br>
+    All four completion paths — <code>completeTask</code>, <code>finishComplete</code>,
+    <code>handleActualEffortSave</code>, <code>handleActualEffortSkip</code> — were updated to call
+    the new pure helper <code>buildNextOccurrence(task)</code> and fold the result into their
+    <code>setTasks</code> call. A new <code>skipRecurrence</code> callback removes the current
+    instance and inserts the next one in a single atomic updater. The Task Detail Panel gained a full
+    recurrence editor (enable toggle, every-N selector, weekday picker, anchor dropdown, Inbox
+    checkbox) and a ↻ Skip button in the footer. Task rows show a ↻ indicator and a hover Skip
+    button alongside the existing 📝 and Move controls.
+  </div>
+  <div class="commit-lesson">
+    <strong>Pure functions compose; hooks don't.</strong> The date arithmetic for "what is the next
+    occurrence?" is written as a plain function (<code>buildNextOccurrence</code>) rather than a
+    <code>useCallback</code>. Plain functions can be called from inside <code>setTasks</code>
+    updaters, from multiple callbacks, and in tests — none of which are possible with hooks. The rule
+    of thumb: if the logic doesn't need to read or write React state directly, extract it as a pure
+    function and call it from the hook that does.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-recurring">↑ Feature: Recurring Tasks</a></div>
+</div>
+
+
 </main>
 </div>
 

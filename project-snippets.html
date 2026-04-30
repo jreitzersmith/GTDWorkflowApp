@@ -2599,6 +2599,190 @@ function DeferCheckPrompt({ taskText, deferredChildren, onSkip, onReview }) {
   </div>
 </div>
 
+<div class="snippet" id="snip-build-next-occurrence">
+  <div class="snip-header">
+    <span class="snip-title">buildNextOccurrence() — pure next-due-date helper + skipRecurrence + completeTask spawn</span>
+    <a class="back-link" href="project-summary.html#feat-recurring">↑ Feature: Recurring Tasks</a>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Computes the next task object for a recurring task.
+// Pure function — no React deps; can be called from any completion path.
+function buildNextOccurrence(task) {
+  const rec = task.recurrence;
+  if (!rec) return null;
+  // Anchor: either the original due date or today (completion date)
+  const anchor = rec.rescheduleFrom === "dueDate" &amp;&amp; task.dueDate
+    ? task.dueDate : todayStr();
+  const d = new Date(anchor + "T00:00:00");
+  const { frequency, interval = 1, weekDays } = rec;
+
+  if (frequency === "daily") {
+    d.setDate(d.getDate() + interval);
+  } else if (frequency === "weekly") {
+    if (weekDays &amp;&amp; weekDays.length &gt; 0) {
+      // Advance to next matching weekday (tries up to 14 days ahead)
+      d.setDate(d.getDate() + 1);
+      let tries = 0;
+      while (!weekDays.includes(d.getDay()) &amp;&amp; tries &lt; 14) {
+        d.setDate(d.getDate() + 1); tries++;
+      }
+    } else {
+      d.setDate(d.getDate() + interval * 7);
+    }
+  } else if (frequency === "monthly") {
+    d.setMonth(d.getMonth() + interval);
+  } else if (frequency === "yearly") {
+    d.setFullYear(d.getFullYear() + interval);
+  }
+
+  const nextDue = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  // Strip completion-specific fields from the previous occurrence
+  const { id: _id, done: _done, actualEffort: _ae, ...rest } = task;
+  return {
+    ...rest,
+    id: genId(),
+    done: false,
+    dueDate: nextDue,
+    created: Date.now(),
+    bucket: rec.sendToInbox ? "inbox" : task.bucket,
+  };
+}
+
+// ── skipRecurrence: discard current instance, spawn next atomically ──────────
+const skipRecurrence = useCallback((id) =&gt; {
+  setTasks(prev =&gt; {
+    const task = prev.find(t =&gt; t.id === id);
+    if (!task || !task.recurrence) return prev;
+    const newTask = buildNextOccurrence(task);
+    // Remove old + prepend new in one updater — zero intermediate renders
+    return newTask
+      ? [newTask, ...prev.filter(t =&gt; t.id !== id)]
+      : prev.filter(t =&gt; t.id !== id);
+  });
+}, []);
+
+// ── In completeTask: spawn after marking done (all four completion paths) ────
+if (!task.done) {
+  const nextOcc = task.recurrence ? buildNextOccurrence(task) : null;
+  setTasks(prev =&gt; {
+    const mapped = prev.map(t =&gt; t.id === id ? { ...t, done: true, bucket: "done" } : t);
+    return nextOcc ? [nextOcc, ...mapped] : mapped;
+  });
+}</code></pre></div>
+  <div class="snip-note">
+    <strong>Pure function as the single source of truth for date logic.</strong>
+    <code>buildNextOccurrence</code> is a plain function — no hooks, no React context — so it can be
+    called anywhere: inside a <code>useCallback</code>, inside a <code>setTasks</code> updater, or in
+    a unit test. The four completion paths each call it and fold the result into their own
+    <code>setTasks</code> call. <code>skipRecurrence</code> calls it inside the updater itself so that
+    the remove-and-insert is a single atomic state transition with no intermediate render.
+  </div>
+</div>
+
+<div class="snippet" id="snip-recurrence-ui">
+  <div class="snip-header">
+    <span class="snip-title">Recurrence editor — TaskDetailPanel UI (enable toggle, interval, weekday picker, anchor, Inbox option)</span>
+    <a class="back-link" href="project-summary.html#feat-recurring">↑ Feature: Recurring Tasks</a>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Recurrence section inside TaskDetailPanel — placed after the Due date field.
+// "rec" is derived from task.recurrence at the top of the component.
+const rec = task.recurrence || null;
+
+// In JSX (inside the metadata &lt;div&gt;):
+&lt;div&gt;
+  {/* Enable / disable toggle */}
+  &lt;div style={{ display: "flex", alignItems: "center", gap: 8 }}&gt;
+    &lt;span style={{ color: COLORS.muted, width: 64, flexShrink: 0, fontSize: 12 }}&gt;Repeat&lt;/span&gt;
+    &lt;label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 12 }}&gt;
+      &lt;input
+        type="checkbox"
+        checked={!!rec}
+        onChange={e =&gt; onUpdate(task.id, { recurrence: e.target.checked
+          ? { frequency: "weekly", interval: 1, rescheduleFrom: "completion", sendToInbox: false }
+          : null })}
+      /&gt;
+      {rec ? "Enabled" : "Off"}
+    &lt;/label&gt;
+  &lt;/div&gt;
+
+  {rec &amp;&amp; (
+    &lt;div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}&gt;
+
+      {/* Every N [day(s) / week(s) / month(s) / year(s)] */}
+      &lt;div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}&gt;
+        &lt;span style={{ color: COLORS.muted, width: 64 }}&gt;Every&lt;/span&gt;
+        &lt;input type="number" min={1} max={99} value={rec.interval || 1}
+          onChange={e =&gt; onUpdate(task.id, { recurrence: { ...rec,
+            interval: Math.max(1, parseInt(e.target.value) || 1) } })} /&gt;
+        &lt;select value={rec.frequency}
+          onChange={e =&gt; onUpdate(task.id, { recurrence: { ...rec,
+            frequency: e.target.value,
+            weekDays: e.target.value !== "weekly" ? undefined : rec.weekDays } })}&gt;
+          &lt;option value="daily"&gt;day(s)&lt;/option&gt;
+          &lt;option value="weekly"&gt;week(s)&lt;/option&gt;
+          &lt;option value="monthly"&gt;month(s)&lt;/option&gt;
+          &lt;option value="yearly"&gt;year(s)&lt;/option&gt;
+        &lt;/select&gt;
+      &lt;/div&gt;
+
+      {/* Weekday picker — only shown for weekly frequency */}
+      {rec.frequency === "weekly" &amp;&amp; (
+        &lt;div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}&gt;
+          &lt;span style={{ color: COLORS.muted, width: 64 }}&gt;On&lt;/span&gt;
+          {["Su","Mo","Tu","We","Th","Fr","Sa"].map((day, i) =&gt; {
+            const active = (rec.weekDays || []).includes(i);
+            return (
+              &lt;button key={i} onClick={() =&gt; {
+                const cur = rec.weekDays || [];
+                const next = active
+                  ? cur.filter(x =&gt; x !== i)
+                  : [...cur, i].sort((a, b) =&gt; a - b);
+                onUpdate(task.id, { recurrence: { ...rec,
+                  weekDays: next.length ? next : undefined } });
+              }}&gt;{day}&lt;/button&gt;
+            );
+          })}
+        &lt;/div&gt;
+      )}
+
+      {/* Reschedule anchor */}
+      &lt;div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}&gt;
+        &lt;span style={{ color: COLORS.muted, width: 64 }}&gt;Base on&lt;/span&gt;
+        &lt;select value={rec.rescheduleFrom || "completion"}
+          onChange={e =&gt; onUpdate(task.id, { recurrence:
+            { ...rec, rescheduleFrom: e.target.value } })}&gt;
+          &lt;option value="completion"&gt;Completion date&lt;/option&gt;
+          &lt;option value="dueDate"&gt;Original due date&lt;/option&gt;
+        &lt;/select&gt;
+      &lt;/div&gt;
+
+      {/* Send spawned task to Inbox instead of same bucket */}
+      &lt;label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}&gt;
+        &lt;input type="checkbox" checked={!!rec.sendToInbox}
+          onChange={e =&gt; onUpdate(task.id, { recurrence:
+            { ...rec, sendToInbox: e.target.checked } })} /&gt;
+        Send to Inbox on spawn
+      &lt;/label&gt;
+
+    &lt;/div&gt;
+  )}
+&lt;/div&gt;
+
+{/* Skip button in TaskDetailPanel footer (only shown for recurring tasks) */}
+{task.recurrence &amp;&amp; onSkipRecurrence &amp;&amp; (
+  &lt;button onClick={() =&gt; onSkipRecurrence(task.id)}&gt;↻ Skip&lt;/button&gt;
+)}</code></pre></div>
+  <div class="snip-note">
+    <strong>Deriving a toggle from a nullable object.</strong> The recurrence section uses
+    <code>rec = task.recurrence || null</code> as its gate: <code>!!rec</code> drives the checkbox,
+    and the entire sub-form only renders when <code>rec</code> is truthy. Enabling the checkbox calls
+    <code>onUpdate</code> with a default <code>recurrence</code> object; disabling it passes
+    <code>null</code>. Every field change spreads the existing <code>rec</code> and overwrites only
+    the changed key, so the rest of the rule is preserved. No separate "recurrence draft" state is
+    needed — the task itself is the source of truth and every keystroke is committed immediately.
+  </div>
+</div>
+
+
 </main>
 </div>
 
