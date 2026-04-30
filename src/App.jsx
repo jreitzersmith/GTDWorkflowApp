@@ -834,6 +834,23 @@ export default function GTDManager() {
       return access_token;
     } catch { return null; }
   });
+  // Capture Google OAuth callback data synchronously during render — before any useEffects
+  // run — so Supabase's ?code= URL detection can't consume our code first.
+  const [pendingGoogleAuth] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const code = p.get('code');
+      const state = p.get('state');
+      const storedState = sessionStorage.getItem('gtd_google_oauth_state');
+      if (!code || !state || !storedState || state !== storedState) return null;
+      const verifier = sessionStorage.getItem('gtd_google_pkce_verifier');
+      if (!verifier) return null;
+      // Consume both immediately so nothing else can race us
+      sessionStorage.removeItem('gtd_google_oauth_state');
+      sessionStorage.removeItem('gtd_google_pkce_verifier');
+      return { code, verifier };
+    } catch { return null; }
+  });
   const [nextGroupBy, setNextGroupBy] = useState("none");
   const [projectParentId, setProjectParentId] = useState("__new__");
   // Set of task IDs whose children are currently hidden in the Projects view.
@@ -1035,15 +1052,11 @@ export default function GTDManager() {
     return () => supabase.removeChannel(channel);
   }, [authUser, supabaseReady]);
 
-  // Google OAuth — exchange code for token when redirected back from Google
+  // Google OAuth — exchange code for token (code captured synchronously above to beat Supabase)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    if (!code) return;
+    if (!pendingGoogleAuth) return;
+    const { code, verifier } = pendingGoogleAuth;
     window.history.replaceState({}, document.title, window.location.pathname);
-    const verifier = sessionStorage.getItem('gtd_google_pkce_verifier');
-    if (!verifier) return;
-    sessionStorage.removeItem('gtd_google_pkce_verifier');
     (async () => {
       try {
         const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -1069,12 +1082,14 @@ export default function GTDManager() {
         console.error('Google OAuth error:', e);
       }
     })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingGoogleAuth]);
 
   const signInWithGoogle = useCallback(async () => {
     const verifier = generateCodeVerifier();
     const challenge = await generateCodeChallenge(verifier);
+    const state = 'gtd_' + generateCodeVerifier().slice(0, 16);
     sessionStorage.setItem('gtd_google_pkce_verifier', verifier);
+    sessionStorage.setItem('gtd_google_oauth_state', state);
     const params = new URLSearchParams({
       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
       redirect_uri: window.location.origin,
@@ -1084,6 +1099,7 @@ export default function GTDManager() {
       code_challenge_method: 'S256',
       access_type: 'offline',
       prompt: 'consent',
+      state,
     });
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   }, []);
