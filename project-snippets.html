@@ -3073,6 +3073,84 @@ if (!authUser)   return &lt;LoginScreen ... /&gt;;  // email input + signInWithO
 </div>
 
 
+<div class="snip-card" id="snip-supabase-sync">
+  <div class="snip-header">
+    <span class="snip-title">Supabase Sync — Mappers &amp; Diff-Based Write</span>
+    <span class="snip-file">src/App.jsx</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Module-level mappers
+function taskToDb(task, userId) {
+  return {
+    id: task.id, user_id: userId, text: task.text, bucket: task.bucket,
+    done: task.done, created: task.created,
+    priority: task.priority ?? [], location: task.location ?? [],
+    due_date: task.dueDate ?? null, effort: task.effort ?? null,
+    actual_effort: task.actualEffort ?? null, defer_until: task.deferUntil ?? null,
+    notes: task.notes ?? null, recurrence: task.recurrence ?? null,
+    parent_id: task.parentId ?? null, child_ids: task.childIds ?? [],
+    sort_order: task.sortOrder ?? 0, updated_at: new Date().toISOString(),
+  };
+}
+function dbToTask(row) {
+  const t = { id: row.id, text: row.text, bucket: row.bucket, /* ... */ };
+  if (row.parent_id) t.parentId = row.parent_id; // omit key if null
+  return t;
+}
+
+// Read + migrate on auth
+useEffect(() => {
+  if (!authUser) return;
+  supabase.from('tasks').select('*').eq('user_id', authUser.id)
+    .order('created', { ascending: true })
+    .then(({ data }) => {
+      if (data?.length > 0) {
+        setTasks(data.map(dbToTask));       // Supabase is source of truth
+        setSupabaseReady(true);
+      } else {
+        const local = JSON.parse(localStorage.getItem('gtd_tasks') || '[]');
+        if (local.length > 0) {
+          supabase.from('tasks').insert(local.map(t => taskToDb(t, authUser.id)))
+            .then(() => setSupabaseReady(true));
+        } else { setSupabaseReady(true); }
+      }
+    });
+}, [authUser]);
+
+// Diff-based write sync
+const prevTasksRef = useRef(null);
+useEffect(() => {
+  if (!authUser || !supabaseReady) { prevTasksRef.current = tasks; return; }
+  const prev = prevTasksRef.current;
+  prevTasksRef.current = tasks;
+  if (!prev) return;
+
+  const prevMap = new Map(prev.map(t => [t.id, t]));
+  const currMap = new Map(tasks.map(t => [t.id, t]));
+  const upserts = tasks.filter(t => {
+    const old = prevMap.get(t.id);
+    return !old || JSON.stringify(old) !== JSON.stringify(t);
+  });
+  const deletes = prev.filter(t => !currMap.has(t.id));
+
+  if (upserts.length)
+    supabase.from('tasks').upsert(upserts.map(t => taskToDb(t, authUser.id)),
+      { onConflict: 'id' });
+  if (deletes.length)
+    supabase.from('tasks').delete()
+      .in('id', deletes.map(t => t.id)).eq('user_id', authUser.id);
+}, [tasks, authUser, supabaseReady]);</code></pre></div>
+  <div class="snip-note">
+    <strong>Why diff instead of instrumenting every mutation.</strong> The app has dozens of
+    <code>setTasks</code> call sites. Wrapping each one with a Supabase call would be brittle
+    and easy to miss. A single <code>useEffect([tasks])</code> that diffs against a ref
+    catches every mutation automatically — inserts, updates, and deletes — in one place.
+    The <code>supabaseReady</code> gate ensures the diff only runs after the authoritative
+    read completes, preventing the initial localStorage → state hydration from triggering
+    a spurious write.
+  </div>
+</div>
+
+
 </main>
 </div>
 

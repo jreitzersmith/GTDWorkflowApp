@@ -1035,6 +1035,29 @@
 </div>
 
 
+<div class="commit-card" id="commit-99feae0">
+  <div class="commit-meta"><span class="commit-hash">99feae0</span><span class="commit-date">2026-04-30</span></div>
+  <div class="commit-msg">feat: Supabase sync — read path, write path, and localStorage migration (Phases 3–5)</div>
+  <div class="commit-body">
+    Added <code>taskToDb</code> / <code>dbToTask</code> field mappers at module level.
+    Added <code>supabaseReady</code> state and <code>prevTasksRef</code> for diff gating.
+    Read <code>useEffect</code>: fetches all tasks for <code>authUser.id</code> on login;
+    uses Supabase data as source of truth if present, otherwise bulk-inserts localStorage
+    tasks as a one-time migration. Write <code>useEffect</code>: diffs tasks against
+    previous snapshot on every state change; upserts new/changed rows and deletes removed
+    ones; gated by <code>supabaseReady</code> to prevent spurious writes during initial load.
+  </div>
+  <div class="commit-lesson">
+    <strong>supabaseReady gate.</strong> Without it, the write effect would fire immediately
+    after the read effect sets tasks from Supabase — treating the freshly-loaded rows as
+    "new" and writing them straight back. Setting <code>supabaseReady = true</code> only
+    after the read completes means the first diff always sees an identical prev/curr pair
+    and produces zero writes.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-supabase-sync">↑ Feature: Supabase Sync</a></div>
+</div>
+
+
 </main>
 </div>
 

@@ -1494,6 +1494,58 @@ Marriott downtown. Confirmation #XYZ123.</pre>
   </section>
 
 
+  <section class="feat" id="feat-supabase-sync">
+    <div class="feat-header">
+      <span class="feat-icon">🔄</span>
+      <span class="feat-title">Supabase Sync — Read, Write &amp; Migration (Phases 3–5)</span>
+      <span class="feat-badge badge-new">New</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        Tasks now persist to Supabase and sync across devices. Three phases delivered together:
+      </p>
+      <p>
+        <strong>Field mappers.</strong> Two module-level functions handle the camelCase ↔
+        snake_case translation between the JS task object and the Postgres row:
+        <code>taskToDb(task, userId)</code> converts for writes (adding <code>user_id</code>
+        and <code>updated_at</code>); <code>dbToTask(row)</code> converts for reads
+        (restoring optional <code>parentId</code> only when non-null to avoid polluting tasks
+        with an explicit <code>undefined</code> key).
+      </p>
+      <p>
+        <strong>Phase 3 — Read path.</strong> A <code>useEffect</code> keyed on
+        <code>authUser</code> fetches all tasks for the current user from Supabase after
+        login. If rows exist, they replace the localStorage state (Supabase becomes the
+        source of truth). If empty, the migration runs instead.
+      </p>
+      <p>
+        <strong>Phase 5 — One-time migration.</strong> On first login with an empty Supabase
+        table, all existing localStorage tasks are bulk-inserted tagged with
+        <code>authUser.id</code>. Automatic and silent — no UI required.
+      </p>
+      <p>
+        <strong>Phase 4 — Write path.</strong> A second <code>useEffect</code> keyed on
+        <code>[tasks, authUser, supabaseReady]</code> diffs the current tasks array against
+        a <code>prevTasksRef</code> snapshot on every state change. New or changed tasks are
+        upserted; removed tasks are deleted. The effect is a no-op until
+        <code>supabaseReady</code> is <code>true</code> (set after the read/migration
+        completes), preventing the initial load from triggering spurious writes.
+      </p>
+    </div>
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Ref-based diff for external sync.</strong> Comparing <code>tasks</code> against
+      <code>prevTasksRef.current</code> on each render lets us detect exactly which rows
+      changed without instrumenting every mutation site. <code>supabaseReady</code> acts as
+      a gate so the diff only fires after the authoritative read completes — avoiding a
+      round-trip that would write stale localStorage data back over fresh Supabase data.
+    </p>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-99feae0">📜 99feae0 — Supabase sync phases 3–5</a>
+    </div>
+  </section>
+
+
 </main>
 </div>
 
