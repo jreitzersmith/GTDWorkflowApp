@@ -1,4 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 const COLORS = {
   bg: "#111210", surface: "#1a1c18", surface2: "#222420", surface3: "#2a2c28",
@@ -703,6 +709,18 @@ export default function GTDManager() {
   const [reviewMode,         setReviewMode]         = useState(null);  // null | "tasks" | "metadata"
   const [metadataSuggestions,setMetadataSuggestions] = useState([]);  // [{ taskId, taskText, fields: {effort?,dueDate?,deferUntil?}, overrides: {...}, accepted: bool }]
 
+  // ── Auth ───────────────────────────────────────────────────────────────
+  const [authUser,    setAuthUser]    = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authEmail,   setAuthEmail]   = useState("");
+  const [authSent,    setAuthSent]    = useState(false);
+
+  const sendMagicLink = useCallback(async () => {
+    if (!authEmail.trim()) return;
+    await supabase.auth.signInWithOtp({ email: authEmail.trim() });
+    setAuthSent(true);
+  }, [authEmail]);
+
   // Panel resize state — persisted across sessions
   const [sidebarWidth, sidebarDragDown]      = useResizer("gtd_sidebar_w",     240,                                    { min: 160, max: 420, direction: 'h', sign:  1 });
   const [coachHeight,  coachDragDown]         = useResizer("gtd_coach_h",       Math.round(window.innerHeight * 0.42), { min: 80,  max: 650, direction: 'v', sign: -1 });
@@ -712,6 +730,18 @@ export default function GTDManager() {
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
   }, [tasks]);
+
+  // Auth: restore session on mount, listen for magic-link callback
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1653,6 +1683,54 @@ export default function GTDManager() {
     chatMessages: { flex: 1, overflowY: "auto", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 },
     chatInputRow: { display: "flex", gap: 6, padding: "8px 12px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, alignItems: "flex-end" },
   };
+
+  // ── Auth gate ────────────────────────────────────────────────────────
+  if (authLoading) return (
+    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center",
+                  background: COLORS.bg, color: COLORS.muted,
+                  fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif" }}>
+      Loading…
+    </div>
+  );
+
+  if (!authUser) return (
+    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center",
+                  background: COLORS.bg, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif" }}>
+      <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12,
+                    padding: "36px 40px", width: 340, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.text }}>
+          GTD <em style={{ fontStyle: "italic", color: COLORS.next }}>Manager</em>
+        </div>
+        <div style={{ fontSize: 13, color: COLORS.text2 }}>Sign in with a magic link — no password needed.</div>
+        {authSent ? (
+          <div style={{ fontSize: 13, color: COLORS.next, padding: "10px 14px",
+                        background: COLORS.nextBg, borderRadius: 8 }}>
+            Check your email for a login link.
+          </div>
+        ) : (
+          <>
+            <input
+              type="email"
+              placeholder="your@email.com"
+              value={authEmail}
+              onChange={e => setAuthEmail(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") sendMagicLink(); }}
+              autoFocus
+              style={{ padding: "8px 12px", borderRadius: 7, border: `1px solid ${COLORS.border}`,
+                       background: COLORS.surface2, color: COLORS.text,
+                       fontFamily: "inherit", fontSize: 13, outline: "none" }}
+            />
+            <button
+              onClick={sendMagicLink}
+              style={{ padding: "9px 0", borderRadius: 7, border: "none", background: COLORS.next,
+                       color: "#111", fontFamily: "inherit", fontSize: 13,
+                       fontWeight: 600, cursor: "pointer" }}
+            >Send login link</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div style={s.app} onClick={() => setMoveMenu(null)}>
