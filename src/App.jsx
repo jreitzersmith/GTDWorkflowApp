@@ -827,7 +827,8 @@ export default function GTDManager() {
   });
   const [tagDisplay,  setTagDisplay]  = useState(() => localStorage.getItem("gtd_tag_display") || "below");
   const [showSettings, setShowSettings] = useState(false);
-  // Google / Gmail OAuth token (null = disconnected)
+  // Google / Gmail OAuth token (null = disconnected) + error message for display
+  const [gmailError, setGmailError] = useState(null);
   const [googleToken, setGoogleToken] = useState(() => {
     try {
       const stored = localStorage.getItem('gtd_google_token');
@@ -839,21 +840,19 @@ export default function GTDManager() {
   });
   // Capture Google OAuth callback data synchronously during render.
   // Google callbacks have state starting with 'gtd_'; Supabase magic-link codes don't.
+  // READ-ONLY: no side effects here — React StrictMode double-invokes useState
+  // initializers, so any removeItem() in the first call would leave the second
+  // call empty, causing React to use null as the state value. Cleanup is in
+  // the useEffect below, which uses an atomic claim pattern.
   const [pendingGoogleAuth] = useState(() => {
     try {
       const p = new URLSearchParams(window.location.search);
       const code = p.get('code');
       const state = p.get('state');
-      // Must look like our Google callback (state prefix) — not a Supabase magic link
       if (!code || !state?.startsWith('gtd_')) return null;
-      // CSRF check: state must match what we stored before the redirect
-      const storedState = sessionStorage.getItem('gtd_google_oauth_state');
-      if (!storedState || state !== storedState) return null;
-      const verifier = sessionStorage.getItem('gtd_google_pkce_verifier');
-      if (!verifier) return null;
-      sessionStorage.removeItem('gtd_google_oauth_state');
-      sessionStorage.removeItem('gtd_google_pkce_verifier');
-      return { code, verifier };
+      const stored = JSON.parse(localStorage.getItem('gtd_google_pkce') || 'null');
+      if (!stored || Date.now() - stored.ts > 300000 || state !== stored.state) return null;
+      return { code, verifier: stored.verifier };
     } catch { return null; }
   });
   const [nextGroupBy, setNextGroupBy] = useState("none");
@@ -1066,18 +1065,27 @@ export default function GTDManager() {
     return () => supabase.removeChannel(channel);
   }, [authUser, supabaseReady]);
 
-  // Google OAuth — exchange code for token (code captured synchronously above to beat Supabase)
+  // Google OAuth — exchange code for token
+  // Atomic claim: localStorage.getItem('gtd_google_pkce') acts as a mutex.
+  // React StrictMode runs effects twice; the second run finds the entry already
+  // removed by the first run and exits, preventing a double exchange.
   useEffect(() => {
     if (!pendingGoogleAuth) return;
-    const { code, verifier } = pendingGoogleAuth;
+    // Claim the PKCE entry — exit if already claimed by a prior run
+    const pkceRaw = localStorage.getItem('gtd_google_pkce');
+    if (!pkceRaw) return;
+    localStorage.removeItem('gtd_google_pkce');
     window.history.replaceState({}, document.title, window.location.pathname);
+    const { code, verifier } = pendingGoogleAuth;
+    console.log('[Gmail OAuth] Exchanging code for token...');
     (async () => {
       try {
         const res = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
-            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+            client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
+            client_secret: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_SECRET,
             code,
             code_verifier: verifier,
             grant_type: 'authorization_code',
@@ -1085,15 +1093,20 @@ export default function GTDManager() {
           }),
         });
         const data = await res.json();
+        console.log('[Gmail OAuth] Exchange response:', data.access_token ? 'SUCCESS' : data.error);
         if (data.access_token) {
           const expiry = Date.now() + (data.expires_in || 3600) * 1000;
           localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, expiry }));
           setGoogleToken(data.access_token);
+          setGmailError(null);
         } else {
-          console.error('Google token exchange failed:', data);
+          const msg = data.error_description || data.error || JSON.stringify(data);
+          console.error('[Gmail OAuth] Token exchange failed:', data);
+          setGmailError(`Google error: ${msg}`);
         }
       } catch (e) {
-        console.error('Google OAuth error:', e);
+        console.error('[Gmail OAuth] Fetch error:', e);
+        setGmailError(`Network error: ${e.message}`);
       }
     })();
   }, [pendingGoogleAuth]);
@@ -1102,10 +1115,10 @@ export default function GTDManager() {
     const verifier = generateCodeVerifier();
     const challenge = await generateCodeChallenge(verifier);
     const state = 'gtd_' + generateCodeVerifier().slice(0, 16);
-    sessionStorage.setItem('gtd_google_pkce_verifier', verifier);
-    sessionStorage.setItem('gtd_google_oauth_state', state);
+    // localStorage persists across cross-origin redirects; sessionStorage can be cleared
+    localStorage.setItem('gtd_google_pkce', JSON.stringify({ verifier, state, ts: Date.now() }));
     const params = new URLSearchParams({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
       redirect_uri: window.location.origin,
       response_type: 'code',
       scope: 'https://www.googleapis.com/auth/gmail.readonly',
@@ -1120,7 +1133,9 @@ export default function GTDManager() {
 
   const disconnectGmail = useCallback(() => {
     localStorage.removeItem('gtd_google_token');
+    localStorage.removeItem('gtd_google_pkce');
     setGoogleToken(null);
+    setGmailError(null);
   }, []);
 
   useEffect(() => {
@@ -2230,6 +2245,7 @@ export default function GTDManager() {
               googleToken={googleToken}
               onConnectGmail={signInWithGoogle}
               onDisconnectGmail={disconnectGmail}
+              gmailError={gmailError}
             />
           ) : (
             <>
@@ -3633,7 +3649,7 @@ function SettingsSection({ label, storageKey, children }) {
   );
 }
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, onConnectGmail, onDisconnectGmail }) {
+function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, onConnectGmail, onDisconnectGmail, gmailError }) {
   const fileInputRef = useRef(null);
 
   const [importMode, setImportMode] = useState("replace");
@@ -3682,14 +3698,22 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
               >Disconnect</button>
             </div>
           ) : (
-            <button
-              onClick={onConnectGmail}
-              style={{ padding: '7px 14px', borderRadius: 7, border: `1px solid ${COLORS.border2}`,
-                       background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit',
-                       fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <span style={{ fontSize: 14 }}>G</span> Connect Gmail
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={onConnectGmail}
+                style={{ padding: '7px 14px', borderRadius: 7, border: `1px solid ${COLORS.border2}`,
+                         background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit',
+                         fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                         alignSelf: 'flex-start' }}
+              >
+                <span style={{ fontSize: 14 }}>G</span> Connect Gmail
+              </button>
+              {gmailError && (
+                <div style={{ fontSize: 11, color: '#d4845a', lineHeight: 1.4 }}>
+                  ⚠ {gmailError}
+                </div>
+              )}
+            </div>
           )}
         </SettingsSection>
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
