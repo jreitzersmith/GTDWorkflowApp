@@ -39,10 +39,15 @@ const SYSTEM_PROMPTS = {
 To update an existing task, end your response with EXACTLY one line:
 →ACTION:update|<task_id>|field:value[|field:value...]
 
-Updatable fields: due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · bucket:<inbox|next|project|waiting|someday> · title:<new name> · priority:<p1,p2> · location:<loc1,loc2> · notes:<text — use \\n for line breaks, must be the last field>
+Updatable fields: due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · actualEffort:<label> · bucket:<inbox|next|project|waiting|someday> · title:<new name> · priority:<p1,p2> · location:<loc1,loc2> · recur:<frequency>:<interval>[:<days>] or recur:off · notes:<text — use \\n for line breaks, must be the last field>
 
-The task_id comes from the [id:...] tag shown on each task in the task list.
-Only emit →ACTION:update when the user explicitly asks you to change something. Never include it unsolicited.`,
+Recurrence format: frequency is daily/weekly/monthly/yearly; interval is a number. For weekly on specific days add comma-separated abbreviations: mon,tue,wed,thu,fri,sat,sun (e.g. recur:weekly:1:mon,fri). Use recur:off to remove recurrence.
+
+To add a new task as a child of an existing project or task, end your response with EXACTLY one line:
+→ACTION:add|<task title>|parent:<parent_task_id>[|bucket:next][|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|location:<loc1,loc2>][|recur:<frequency>:<interval>[:<days>]]
+
+The task_id / parent_task_id comes from the [id:...] tag shown on each task in the task list.
+Only emit →ACTION:update or →ACTION:add when the user explicitly asks you to change or create something. Never include them unsolicited. Emit at most one ACTION line per response.`,
   process: `You are a GTD inbox processor. For each inbox item given to you:
 
 1. Determine if it's actionable. If not actionable, end with: →ACTION:delete
@@ -194,23 +199,67 @@ function extractUpdateAction(text) {
   const pureFields = notesIdx !== -1 ? fieldStr.slice(0, notesIdx).replace(/\|$/, '') : fieldStr;
   const notesRaw   = notesIdx !== -1 ? fieldStr.slice(fieldStr.indexOf('notes:', notesIdx) + 6) : null;
 
+  const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   const changes = {};
   pureFields.split('|').filter(Boolean).forEach(pair => {
     const colon = pair.indexOf(':');
     if (colon === -1) return;
     const key = pair.slice(0, colon).trim();
     const val = pair.slice(colon + 1).trim();
-    if (key === 'due')      changes.dueDate    = val;
-    if (key === 'defer')    changes.deferUntil = val;
-    if (key === 'effort')   changes.effort     = val;
-    if (key === 'bucket')   changes.bucket     = val;
-    if (key === 'title')    changes.text       = val;
-    if (key === 'priority') changes.priority   = val.split(',').map(s => s.trim()).filter(Boolean);
-    if (key === 'location') changes.location   = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'due')          changes.dueDate      = val;
+    if (key === 'defer')        changes.deferUntil   = val;
+    if (key === 'effort')       changes.effort       = val;
+    if (key === 'actualEffort') changes.actualEffort = val;
+    if (key === 'bucket')       changes.bucket       = val;
+    if (key === 'title')        changes.text         = val;
+    if (key === 'priority')     changes.priority     = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'location')     changes.location     = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'recur') {
+      if (val === 'off') {
+        changes.recurrence = null;
+      } else {
+        const [freq, intStr, daysStr] = val.split(':');
+        const interval = parseInt(intStr) || 1;
+        const rec = { frequency: freq, interval, rescheduleFrom: 'dueDate', sendToInbox: false };
+        if (daysStr) rec.weekDays = daysStr.split(',').map(d => DAY_MAP[d.toLowerCase()]).filter(n => n !== undefined);
+        changes.recurrence = rec;
+      }
+    }
   });
   if (notesRaw !== null) changes.notes = notesRaw.replace(/\\n/g, '\n');
 
   return Object.keys(changes).length ? { taskId, changes } : null;
+}
+
+// Parse →ACTION:add from AI reply; returns { title, parentId, ...fields } or null.
+function extractAddAction(text) {
+  const m = text.match(/→ACTION:add\|([^|\n]+)\|(.*)/s);
+  if (!m) return null;
+  const title = m[1].trim();
+  const rest = m[2];
+  const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  const fields = {};
+  rest.split('|').filter(Boolean).forEach(pair => {
+    const colon = pair.indexOf(':');
+    if (colon === -1) return;
+    const key = pair.slice(0, colon).trim();
+    const val = pair.slice(colon + 1).trim();
+    if (key === 'parent')   fields.parentId   = val;
+    if (key === 'bucket')   fields.bucket     = val;
+    if (key === 'due')      fields.dueDate    = val;
+    if (key === 'defer')    fields.deferUntil = val;
+    if (key === 'effort')   fields.effort     = val;
+    if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'recur' && val !== 'off') {
+      const [freq, intStr, daysStr] = val.split(':');
+      const interval = parseInt(intStr) || 1;
+      const rec = { frequency: freq, interval, rescheduleFrom: 'dueDate', sendToInbox: false };
+      if (daysStr) rec.weekDays = daysStr.split(',').map(d => DAY_MAP[d.toLowerCase()]).filter(n => n !== undefined);
+      fields.recurrence = rec;
+    }
+  });
+  if (!fields.parentId || !title) return null;
+  return { title, ...fields };
 }
 
 // Waterfall: a task is visible in Next Actions only when it has no incomplete next-bucket children.
@@ -672,6 +721,13 @@ export default function GTDManager() {
         if (t.location?.length) meta.push(`location:${t.location.join(",")}`);
         if (t.priority?.length) meta.push(`priority:${t.priority.join(",")}`);
         if (t.notes)            meta.push(`has-notes`);
+        if (t.recurrence) {
+          const r = t.recurrence;
+          const days = r.weekDays?.length
+            ? `:${r.weekDays.map(d => ["sun","mon","tue","wed","thu","fri","sat"][d]).join(",")}`
+            : "";
+          meta.push(`recur:${r.frequency}:${r.interval || 1}${days}`);
+        }
         const idTag = `[id:${t.id}] `;
         return meta.length ? `- ${idTag}${t.text} [${meta.join("] [")}]` : `- ${idTag}${t.text}`;
       });
@@ -755,7 +811,7 @@ export default function GTDManager() {
       const updatedHistory = [...newHistory, { role: "assistant", content: reply }];
       setChatHistory(updatedHistory);
 
-      // Apply →ACTION:update when in chat mode
+      // Apply →ACTION:update or →ACTION:add when in chat mode
       let updateChip = null;
       if (mode === "chat") {
         const upd = extractUpdateAction(reply);
@@ -765,10 +821,33 @@ export default function GTDManager() {
             updateTask(upd.taskId, upd.changes);
             const fieldLabels = Object.keys(upd.changes).map(k => ({
               notes: 'notes', dueDate: 'due date', deferUntil: 'defer date',
-              effort: 'effort', text: 'title', bucket: 'bucket',
-              priority: 'priority', location: 'location',
+              effort: 'effort', actualEffort: 'actual effort', text: 'title', bucket: 'bucket',
+              priority: 'priority', location: 'location', recurrence: 'recurrence',
             }[k] || k));
             updateChip = { taskName: target.text, fields: fieldLabels };
+          }
+        } else {
+          const add = extractAddAction(reply);
+          if (add) {
+            const { title, parentId, bucket = "next", dueDate = null, deferUntil = null,
+                    effort = null, location = [], recurrence = null } = add;
+            const parent = tasks.find(t => t.id === parentId);
+            if (parent) {
+              const newId = genId();
+              const newTask = {
+                id: newId, text: title, bucket, done: false, created: Date.now(),
+                parentId, priority: [], location, dueDate, effort, actualEffort: null,
+                deferUntil, notes: null, recurrence,
+              };
+              setTasks(prev => [
+                ...prev.map(t => t.id === parentId
+                  ? { ...t, childIds: [...(t.childIds || []), newId] }
+                  : t
+                ),
+                newTask,
+              ]);
+              updateChip = { taskName: title, fields: ["added under " + parent.text] };
+            }
           }
         }
       }
