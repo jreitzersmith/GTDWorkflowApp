@@ -161,6 +161,58 @@ async function doWebSearch(query) {
   return data.answer ? `Summary: ${data.answer}\n\nSources:\n${results}` : results;
 }
 
+// ── Gmail tool (Anthropic tool use) ──────────────────────────────────────────
+const GMAIL_SEARCH_TOOL = {
+  name: "gmail_search",
+  description: "Search the user's Gmail inbox for emails. Use this when the user asks about emails, correspondence, commitments made via email, or wants to find messages from a specific sender or about a specific topic. Supports Gmail search operators like from:, to:, subject:, has:attachment, after:, before:.",
+  input_schema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Gmail search query (supports operators: from:, to:, subject:, is:unread, has:attachment, after:2024/01/01, etc.)" },
+    },
+    required: ["query"],
+  },
+};
+
+// PKCE helpers for Google OAuth2
+function generateCodeVerifier() {
+  const array = new Uint8Array(64);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+async function generateCodeChallenge(verifier) {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function doGmailSearch(query, token) {
+  const listRes = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=10`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!listRes.ok) throw new Error(`Gmail API error: ${listRes.status}`);
+  const listData = await listRes.json();
+  const messages = listData.messages || [];
+  if (!messages.length) return "No emails found matching that query.";
+  const details = await Promise.all(
+    messages.slice(0, 5).map(async ({ id }) => {
+      const msgRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata`
+        + `&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const msg = await msgRes.json();
+      const hdrs = msg.payload?.headers || [];
+      const get = (name) => hdrs.find(h => h.name === name)?.value || '';
+      return `From: ${get('From')}\nDate: ${get('Date')}\nSubject: ${get('Subject')}\nSnippet: ${msg.snippet || ''}`;
+    })
+  );
+  return `Found ${messages.length} email(s). Top ${details.length} result(s):\n\n${details.join('\n\n---\n\n')}`;
+}
+
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 // ── Supabase field mappers (camelCase ↔ snake_case) ──────────────────────────
@@ -772,6 +824,16 @@ export default function GTDManager() {
   });
   const [tagDisplay,  setTagDisplay]  = useState(() => localStorage.getItem("gtd_tag_display") || "below");
   const [showSettings, setShowSettings] = useState(false);
+  // Google / Gmail OAuth token (null = disconnected)
+  const [googleToken, setGoogleToken] = useState(() => {
+    try {
+      const stored = localStorage.getItem('gtd_google_token');
+      if (!stored) return null;
+      const { access_token, expiry } = JSON.parse(stored);
+      if (Date.now() > expiry) { localStorage.removeItem('gtd_google_token'); return null; }
+      return access_token;
+    } catch { return null; }
+  });
   const [nextGroupBy, setNextGroupBy] = useState("none");
   const [projectParentId, setProjectParentId] = useState("__new__");
   // Set of task IDs whose children are currently hidden in the Projects view.
@@ -973,6 +1035,64 @@ export default function GTDManager() {
     return () => supabase.removeChannel(channel);
   }, [authUser, supabaseReady]);
 
+  // Google OAuth — exchange code for token when redirected back from Google
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (!code) return;
+    window.history.replaceState({}, document.title, window.location.pathname);
+    const verifier = sessionStorage.getItem('gtd_google_pkce_verifier');
+    if (!verifier) return;
+    sessionStorage.removeItem('gtd_google_pkce_verifier');
+    (async () => {
+      try {
+        const res = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+            code,
+            code_verifier: verifier,
+            grant_type: 'authorization_code',
+            redirect_uri: window.location.origin,
+          }),
+        });
+        const data = await res.json();
+        if (data.access_token) {
+          const expiry = Date.now() + (data.expires_in || 3600) * 1000;
+          localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, expiry }));
+          setGoogleToken(data.access_token);
+        } else {
+          console.error('Google token exchange failed:', data);
+        }
+      } catch (e) {
+        console.error('Google OAuth error:', e);
+      }
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const signInWithGoogle = useCallback(async () => {
+    const verifier = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
+    sessionStorage.setItem('gtd_google_pkce_verifier', verifier);
+    const params = new URLSearchParams({
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      redirect_uri: window.location.origin,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/gmail.readonly',
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      access_type: 'offline',
+      prompt: 'consent',
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  }, []);
+
+  const disconnectGmail = useCallback(() => {
+    localStorage.removeItem('gtd_google_token');
+    setGoogleToken(null);
+  }, []);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -1070,8 +1190,11 @@ export default function GTDManager() {
             system: systemPrompt,
             messages: apiMessages,
           };
-          if (mode === "chat" && import.meta.env.VITE_TAVILY_API_KEY) {
-            reqBody.tools = TOOLS;
+          if (mode === "chat") {
+            const availableTools = [];
+            if (import.meta.env.VITE_TAVILY_API_KEY) availableTools.push(...TOOLS);
+            if (googleToken) availableTools.push(GMAIL_SEARCH_TOOL);
+            if (availableTools.length > 0) reqBody.tools = availableTools;
           }
           const res = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
@@ -1098,6 +1221,17 @@ export default function GTDManager() {
                   role: "assistant", text: `🔍 Searching: "${query}"`, isSearchChip: true,
                 }]);
                 const result = await doWebSearch(query);
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: toolUse.id,
+                  content: result,
+                });
+              } else if (toolUse.name === "gmail_search") {
+                const query = toolUse.input.query;
+                setMessages(prev => [...prev, {
+                  role: "assistant", text: `📧 Searching Gmail: "${query}"`, isSearchChip: true,
+                }]);
+                const result = await doGmailSearch(query, googleToken);
                 toolResults.push({
                   type: "tool_result",
                   tool_use_id: toolUse.id,
@@ -1222,7 +1356,7 @@ export default function GTDManager() {
     } finally {
       setLoading(false);
     }
-  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel]);
+  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, googleToken]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
@@ -2063,6 +2197,9 @@ export default function GTDManager() {
               onExport={handleExport}
               onImport={handleImport}
               onClose={() => setShowSettings(false)}
+              googleToken={googleToken}
+              onConnectGmail={signInWithGoogle}
+              onDisconnectGmail={disconnectGmail}
             />
           ) : (
             <>
@@ -3466,7 +3603,7 @@ function SettingsSection({ label, storageKey, children }) {
   );
 }
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose }) {
+function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, onConnectGmail, onDisconnectGmail }) {
   const fileInputRef = useRef(null);
 
   const [importMode, setImportMode] = useState("replace");
@@ -3499,6 +3636,32 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
         >✕ Close</button>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "0 24px" }}>
+        <SettingsSection label="Google / Gmail" storageKey="gtd_settings_gmail">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
+            Connect Gmail so the AI coach can search your inbox when answering research questions.
+            Only read access is requested — no emails are sent or modified.
+          </div>
+          {googleToken ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 12, color: COLORS.next }}>✓ Gmail connected</span>
+              <button
+                onClick={onDisconnectGmail}
+                style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${COLORS.border2}`,
+                         background: COLORS.surface3, color: COLORS.muted, fontFamily: 'inherit',
+                         fontSize: 11, cursor: 'pointer' }}
+              >Disconnect</button>
+            </div>
+          ) : (
+            <button
+              onClick={onConnectGmail}
+              style={{ padding: '7px 14px', borderRadius: 7, border: `1px solid ${COLORS.border2}`,
+                       background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit',
+                       fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <span style={{ fontSize: 14 }}>G</span> Connect Gmail
+            </button>
+          )}
+        </SettingsSection>
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
           <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
         </SettingsSection>
