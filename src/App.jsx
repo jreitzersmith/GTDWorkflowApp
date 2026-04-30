@@ -46,8 +46,13 @@ Recurrence format: frequency is daily/weekly/monthly/yearly; interval is a numbe
 To add a new task as a child of an existing project or task, end your response with EXACTLY one line:
 →ACTION:add|<task title>|parent:<parent_task_id>[|bucket:next][|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|location:<loc1,loc2>][|recur:<frequency>:<interval>[:<days>]]
 
+To create a new standalone task, end your response with EXACTLY one line:
+→ACTION:create|<task title>|bucket:<inbox|next|someday|waiting>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|location:<loc1,loc2>][|recur:<frequency>:<interval>[:<days>]]
+
 The task_id / parent_task_id comes from the [id:...] tag shown on each task in the task list.
-Only emit →ACTION:update or →ACTION:add when the user explicitly asks you to change or create something. Never include them unsolicited. Emit at most one ACTION line per response.`,
+Only emit →ACTION:update, →ACTION:add, or →ACTION:create when the user explicitly asks you to change or create something. Never include them unsolicited. Emit at most one ACTION line per response.
+
+Before using any task ID, confirm it appears in the current task list. If you cannot find the task, say so explicitly rather than guessing. If an action cannot be completed (missing ID, ambiguous target, invalid field), state clearly what went wrong and what information you need.`,
   process: `You are a GTD inbox processor. For each inbox item given to you:
 
 1. Determine if it's actionable. If not actionable, end with: →ACTION:delete
@@ -259,6 +264,37 @@ function extractAddAction(text) {
     }
   });
   if (!fields.parentId || !title) return null;
+  return { title, ...fields };
+}
+
+// Parse →ACTION:create from AI reply; returns { title, bucket, ...fields } or null.
+function extractCreateAction(text) {
+  const m = text.match(/→ACTION:create\|([^|\n]+)\|(.*)/s);
+  if (!m) return null;
+  const title = m[1].trim();
+  const rest = m[2];
+  const VALID_BUCKETS = new Set(['inbox', 'next', 'someday', 'waiting']);
+  const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+  const fields = {};
+  rest.split('|').filter(Boolean).forEach(pair => {
+    const colon = pair.indexOf(':');
+    if (colon === -1) return;
+    const key = pair.slice(0, colon).trim();
+    const val = pair.slice(colon + 1).trim();
+    if (key === 'bucket' && VALID_BUCKETS.has(val)) fields.bucket = val;
+    if (key === 'due')      fields.dueDate    = val;
+    if (key === 'defer')    fields.deferUntil = val;
+    if (key === 'effort')   fields.effort     = val;
+    if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'recur' && val !== 'off') {
+      const [freq, intStr, daysStr] = val.split(':');
+      const interval = parseInt(intStr) || 1;
+      const rec = { frequency: freq, interval, rescheduleFrom: 'dueDate', sendToInbox: false };
+      if (daysStr) rec.weekDays = daysStr.split(',').map(d => DAY_MAP[d.toLowerCase()]).filter(n => n !== undefined);
+      fields.recurrence = rec;
+    }
+  });
+  if (!title || !fields.bucket) return null;
   return { title, ...fields };
 }
 
@@ -811,8 +847,9 @@ export default function GTDManager() {
       const updatedHistory = [...newHistory, { role: "assistant", content: reply }];
       setChatHistory(updatedHistory);
 
-      // Apply →ACTION:update or →ACTION:add when in chat mode
+      // Apply →ACTION:update, →ACTION:add, or →ACTION:create when in chat mode
       let updateChip = null;
+      let actionError = null;
       if (mode === "chat") {
         const upd = extractUpdateAction(reply);
         if (upd) {
@@ -825,6 +862,8 @@ export default function GTDManager() {
               priority: 'priority', location: 'location', recurrence: 'recurrence',
             }[k] || k));
             updateChip = { taskName: target.text, fields: fieldLabels };
+          } else {
+            actionError = `⚠ Action failed: no task found with ID "${upd.taskId}". The task may have been deleted or the ID is incorrect.`;
           }
         } else {
           const add = extractAddAction(reply);
@@ -847,12 +886,35 @@ export default function GTDManager() {
                 newTask,
               ]);
               updateChip = { taskName: title, fields: ["added under " + parent.text] };
+            } else {
+              actionError = `⚠ Action failed: no task found with parent ID "${parentId}". The parent may not exist or has been deleted.`;
+            }
+          } else {
+            const create = extractCreateAction(reply);
+            if (create) {
+              const { title, bucket, dueDate = null, deferUntil = null,
+                      effort = null, location = [], recurrence = null } = create;
+              const newId = genId();
+              const newTask = {
+                id: newId, text: title, bucket, done: false, created: Date.now(),
+                priority: [], location, dueDate, effort, actualEffort: null,
+                deferUntil, notes: null, recurrence,
+              };
+              setTasks(prev => [newTask, ...prev]);
+              updateChip = { taskName: title, fields: ["created in " + bucket] };
             }
           }
         }
       }
 
-      setMessages(prev => [...prev, { role: "assistant", text: reply, updateChip }]);
+      if (actionError) {
+        setMessages(prev => [...prev,
+          { role: "assistant", text: reply, updateChip },
+          { role: "assistant", text: actionError },
+        ]);
+      } else {
+        setMessages(prev => [...prev, { role: "assistant", text: reply, updateChip }]);
+      }
 
       const action = extractAction(reply);
       if (action) setPendingAction(action);
