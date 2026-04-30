@@ -266,10 +266,57 @@ const GMAIL_SEND_TOOL = {
   },
 };
 
+const GMAIL_CREATE_LABEL_TOOL = {
+  name: "gmail_create_label",
+  description: "Create a new Gmail label. IMPORTANT: Only call this tool after explicitly telling the user the label name and receiving confirmation. If the user asked to label a message and no matching label exists, say something like 'There\'s no [name] label yet — shall I create one?' and wait for a yes before proceeding.",
+  input_schema: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: "Display name for the new label" },
+    },
+    required: ["name"],
+  },
+};
+
+const GMAIL_LIST_FILTERS_TOOL = {
+  name: "gmail_list_filters",
+  description: "List all existing Gmail filters with their criteria and actions. Call this before creating or deleting a filter to show the user what rules are already in place.",
+  input_schema: { type: "object", properties: {}, required: [] },
+};
+
+const GMAIL_CREATE_FILTER_TOOL = {
+  name: "gmail_create_filter",
+  description: "Create a Gmail filter that automatically processes all future matching incoming emails. IMPORTANT: Before calling this tool, present the full filter rule to the user in plain English (e.g. 'Emails from newsletter@example.com → apply label Newsletter and skip inbox') and wait for explicit confirmation. Never call this tool without user approval.",
+  input_schema: {
+    type: "object",
+    properties: {
+      criteria_from:    { type: "string", description: "Match emails from this sender (email address or domain)" },
+      criteria_to:      { type: "string", description: "Match emails sent to this address" },
+      criteria_subject: { type: "string", description: "Match emails with this subject text" },
+      criteria_query:   { type: "string", description: "Match emails using a Gmail search query string" },
+      action_add_label_ids:    { type: "array", items: { type: "string" }, description: "Label IDs to apply to matching messages" },
+      action_remove_label_ids: { type: "array", items: { type: "string" }, description: "Label IDs to remove (e.g. INBOX to skip inbox / archive automatically)" },
+    },
+    required: [],
+  },
+};
+
+const GMAIL_DELETE_FILTER_TOOL = {
+  name: "gmail_delete_filter",
+  description: "Delete an existing Gmail filter. IMPORTANT: Tell the user exactly which filter you are about to delete (criteria + action) and get explicit confirmation before calling this tool.",
+  input_schema: {
+    type: "object",
+    properties: {
+      filter_id: { type: "string", description: "Filter ID from gmail_list_filters" },
+    },
+    required: ["filter_id"],
+  },
+};
+
 // Display metadata for Gmail scope levels — used in Settings UI
 const GMAIL_SCOPE_OPTS = [
   { key: 'readonly', label: 'Read only', desc: 'Search and read emails' },
-  { key: 'modify',   label: 'Organize',  desc: '+ label, archive, mark read/unread' },
+  { key: 'modify',   label: 'Organize',  desc: '+ label, archive, mark read/unread, filters' },
   { key: 'compose',  label: 'Compose',   desc: '+ create drafts and replies' },
   { key: 'send',     label: 'Send',      desc: '+ send emails directly' },
 ];
@@ -337,6 +384,70 @@ async function doGmailSend(to, subject, body, threadId, token) {
   if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
   const data = await res.json();
   return { message_id: data.id, status: 'Email sent successfully' };
+}
+
+// Create a Gmail label (requires gmail.settings.basic scope)
+async function doGmailCreateLabel(name, token) {
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, labelListVisibility: 'labelShow', messageListVisibility: 'show' }),
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const data = await res.json();
+  return { label_id: data.id, name: data.name, status: 'Label created successfully' };
+}
+
+// List all filters (requires gmail.settings.basic scope)
+async function doGmailListFilters(token) {
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/filters', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const data = await res.json();
+  const filters = data.filter || [];
+  if (!filters.length) return 'No filters found.';
+  return filters.map(f => {
+    const c = f.criteria || {};
+    const a = f.action || {};
+    const criteria = [c.from && `from:${c.from}`, c.to && `to:${c.to}`,
+      c.subject && `subject:${c.subject}`, c.query && `query:${c.query}`]
+      .filter(Boolean).join(', ') || '(any)';
+    const action = [a.addLabelIds?.length && `add: ${a.addLabelIds.join(', ')}`,
+      a.removeLabelIds?.length && `remove: ${a.removeLabelIds.join(', ')}`]
+      .filter(Boolean).join('; ') || '(no action)';
+    return `Filter ID: ${f.id}\nCriteria: ${criteria}\nAction: ${action}`;
+  }).join('\n\n---\n\n');
+}
+
+// Create a filter (requires gmail.settings.basic scope)
+async function doGmailCreateFilter(criteriaFrom, criteriaTo, criteriaSubject, criteriaQuery, actionAddLabelIds, actionRemoveLabelIds, token) {
+  const body = { criteria: {}, action: {} };
+  if (criteriaFrom)              body.criteria.from    = criteriaFrom;
+  if (criteriaTo)                body.criteria.to      = criteriaTo;
+  if (criteriaSubject)           body.criteria.subject = criteriaSubject;
+  if (criteriaQuery)             body.criteria.query   = criteriaQuery;
+  if (actionAddLabelIds?.length) body.action.addLabelIds    = actionAddLabelIds;
+  if (actionRemoveLabelIds?.length) body.action.removeLabelIds = actionRemoveLabelIds;
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/filters', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const data = await res.json();
+  return { filter_id: data.id, status: 'Filter created successfully' };
+}
+
+// Delete a filter (requires gmail.settings.basic scope)
+async function doGmailDeleteFilter(filterId, token) {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/settings/filters/${filterId}`,
+    { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (res.status === 204 || res.ok) return { status: 'Filter deleted successfully', filter_id: filterId };
+  const d = await res.json();
+  throw new Error(d.error?.message || `Gmail API ${res.status}`);
 }
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -1248,9 +1359,9 @@ export default function GTDManager() {
     localStorage.setItem('gtd_google_pkce', JSON.stringify({ verifier, state, ts: Date.now(), scope: accessLevel }));
     const scopeMap = {
       readonly: 'https://www.googleapis.com/auth/gmail.readonly',
-      modify:   'https://www.googleapis.com/auth/gmail.modify',
-      compose:  'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose',
-      send:     'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
+      modify:   'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic',
+      compose:  'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.settings.basic',
+      send:     'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.settings.basic',
     };
     const params = new URLSearchParams({
       client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
@@ -1379,6 +1490,10 @@ export default function GTDManager() {
               if (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send') {
                 availableTools.push(GMAIL_LIST_LABELS_TOOL);
                 availableTools.push(GMAIL_LABEL_TOOL);
+                availableTools.push(GMAIL_CREATE_LABEL_TOOL);
+                availableTools.push(GMAIL_LIST_FILTERS_TOOL);
+                availableTools.push(GMAIL_CREATE_FILTER_TOOL);
+                availableTools.push(GMAIL_DELETE_FILTER_TOOL);
               }
               if (googleScope === 'compose' || googleScope === 'send')
                 availableTools.push(GMAIL_COMPOSE_TOOL);
@@ -1431,6 +1546,24 @@ export default function GTDManager() {
               } else if (toolUse.name === "gmail_list_labels") {
                 const result = await doGmailListLabels(googleToken);
                 toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
+              } else if (toolUse.name === "gmail_create_label") {
+                const result = await doGmailCreateLabel(toolUse.input.name, googleToken);
+                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+              } else if (toolUse.name === "gmail_list_filters") {
+                const result = await doGmailListFilters(googleToken);
+                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
+              } else if (toolUse.name === "gmail_create_filter") {
+                setMessages(prev => [...prev, { role: "assistant", text: `🔧 Creating filter...`, isSearchChip: true }]);
+                const result = await doGmailCreateFilter(
+                  toolUse.input.criteria_from, toolUse.input.criteria_to,
+                  toolUse.input.criteria_subject, toolUse.input.criteria_query,
+                  toolUse.input.action_add_label_ids, toolUse.input.action_remove_label_ids,
+                  googleToken
+                );
+                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+              } else if (toolUse.name === "gmail_delete_filter") {
+                const result = await doGmailDeleteFilter(toolUse.input.filter_id, googleToken);
+                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
               } else if (toolUse.name === "gmail_label") {
                 const result = await doGmailLabel(
                   toolUse.input.message_id, toolUse.input.add_label_ids,
