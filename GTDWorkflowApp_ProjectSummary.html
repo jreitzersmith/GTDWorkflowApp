@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GTD Workflow App — Project Summary</title>
+<style>
+  :root {
+    --bg:       #111210;
+    --surface:  #1a1c18;
+    --surface2: #222420;
+    --surface3: #2a2c28;
+    --border:   #333530;
+    --border2:  #404240;
+    --text:     #e8e4dc;
+    --text2:    #a8a49c;
+    --muted:    #5a5c58;
+    --inbox:    #e8c84a;
+    --next:     #5ab878;
+    --project:  #5a8fd4;
+    --waiting:  #d4845a;
+    --someday:  #9a8ad4;
+    --effort:   #6ec6a8;
+    --danger:   #d45a5a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  /* ── Layout ── */
+  .shell {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+  }
+
+  nav {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 28px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  nav h2 {
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 20px 8px;
+    font-weight: 600;
+  }
+
+  nav a {
+    display: block;
+    padding: 5px 20px;
+    font-size: 12.5px;
+    color: var(--text2);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: all .1s;
+  }
+  nav a:hover { color: var(--text); background: var(--surface2); }
+  nav a.section { color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; padding-top: 14px; cursor: default; }
+  nav a.section:hover { background: transparent; color: var(--muted); }
+  nav a.indent { padding-left: 32px; }
+
+  main {
+    padding: 48px 64px;
+    max-width: 860px;
+  }
+
+  /* ── Typography ── */
+  h1 {
+    font-family: Georgia, serif;
+    font-size: 32px;
+    font-weight: 300;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 48px;
+  }
+
+  h2 {
+    font-family: Georgia, serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--text);
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 28px 0 10px;
+  }
+
+  p { color: var(--text2); margin-bottom: 12px; }
+
+  a { color: var(--project); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  ul, ol { color: var(--text2); padding-left: 20px; margin-bottom: 12px; }
+  li { margin-bottom: 4px; }
+
+  /* ── Code links ── */
+  a.code-link {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 11px;
+    background: var(--surface3);
+    border: 1px solid var(--border2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--effort);
+    white-space: nowrap;
+  }
+  a.code-link:hover { background: var(--surface2); }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .badge-commit { background: var(--surface3); border: 1px solid var(--border2); color: var(--muted); font-family: monospace; }
+  .badge-next   { background: #182418; border: 1px solid #5ab87844; color: var(--next); }
+  .badge-proj   { background: #181e2a; border: 1px solid #5a8fd444; color: var(--project); }
+  .badge-effort { background: #152520; border: 1px solid #6ec6a844; color: var(--effort); }
+  .badge-inbox  { background: #2a2618; border: 1px solid #e8c84a44; color: var(--inbox); }
+
+  /* ── Appendix ── */
+  .appendix-section {
+    scroll-margin-top: 24px;
+    margin-bottom: 40px;
+  }
+
+  .code-block-header {
+    background: var(--surface3);
+    border: 1px solid var(--border2);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    padding: 6px 14px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: monospace;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .code-block-header .file { color: var(--text2); }
+
+  pre {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 0 0 6px 6px;
+    padding: 16px;
+    overflow-x: auto;
+    font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text2);
+    tab-size: 2;
+    margin-bottom: 8px;
+  }
+
+  /* syntax hints */
+  .kw  { color: #c792ea; }
+  .fn  { color: var(--next); }
+  .str { color: var(--inbox); }
+  .cm  { color: var(--muted); font-style: italic; }
+  .num { color: var(--effort); }
+
+  /* ── Commit log ── */
+  .commit {
+    border-left: 3px solid var(--border2);
+    padding: 12px 0 12px 18px;
+    margin-bottom: 20px;
+  }
+  .commit-hash {
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .commit-msg {
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+    font-size: 13.5px;
+  }
+  .commit-note { color: var(--text2); font-size: 13px; }
+  .commit-date { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* ── Feature cards ── */
+  .feature-meta {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  /* ── Back link ── */
+  .back { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ════════════════════════════════════════
+     SIDEBAR NAVIGATION
+     ════════════════════════════════════════ -->
+<nav>
+  <h2>GTD Workflow App</h2>
+  <a href="#overview">Overview</a>
+  <a class="section" href="#">Features</a>
+  <a class="indent" href="#feat-foundation">Foundation</a>
+  <a class="indent" href="#feat-inbox">Smart Inbox Processing</a>
+  <a class="indent" href="#feat-provider">Multi-Provider AI</a>
+  <a class="indent" href="#feat-metadata">Task Metadata Panel</a>
+  <a class="indent" href="#feat-locations">Location Manager</a>
+  <a class="indent" href="#feat-waterfall">Waterfall &amp; Group-By</a>
+  <a class="indent" href="#feat-project-add">Project Task Creation</a>
+  <a class="indent" href="#feat-dnd">Drag-and-Drop Projects</a>
+  <a class="indent" href="#feat-ai-review">AI Project Review</a>
+  <a class="indent" href="#feat-effort">Effort Metadata</a>
+  <a class="indent" href="#feat-next-enhancements">Next Actions Enhancements</a>
+  <a class="indent" href="#feat-title-edit">Inline Title Editing</a>
+  <a class="indent" href="#feat-tag-display">Tag Display Mode</a>
+  <a class="section" href="#">Appendices</a>
+  <a class="indent" href="#appendix-a">A — Code Snippets</a>
+  <a class="indent" href="#appendix-b">B — Commit Log</a>
+</nav>
+
+<!-- ════════════════════════════════════════
+     MAIN CONTENT
+     ════════════════════════════════════════ -->
+<main>
+
+<h1>GTD Workflow App</h1>
+<div class="subtitle">Project summary · April 2026 · <code>src/App.jsx</code></div>
+
+<!-- ─────────────────── OVERVIEW ─────────────────── -->
+<section id="overview">
+<h2>Overview</h2>
+<p>This project is a personal <strong>Getting Things Done (GTD)</strong> task manager built as a React single-page application. It is implemented as a single component file — <code>src/App.jsx</code> — using React hooks, inline styles, and Vite as the build tool. All state is persisted to <code>localStorage</code>, making it fully client-side with no backend required.</p>
+
+<p>The application has two primary areas: a <strong>task panel</strong> on the left that displays one of seven GTD buckets (Inbox, Next Actions, Projects, Waiting For, Someday/Maybe, Completed, Inbox History), and an <strong>AI Coach panel</strong> on the right that connects to either the Anthropic Claude API or a locally-hosted Open WebUI instance. The coach operates in five modes: Chat, Process, Weekly Review, Brain Dump, and Project Review.</p>
+
+<p>The entire color palette is defined in a single <a href="#code-colors" class="code-link">COLORS</a> constant at the top of the file — each bucket has a dedicated foreground and background color. The seven buckets and five coach modes are declared as <a href="#code-buckets" class="code-link">BUCKETS / COACH_MODES</a> objects, which drive both the sidebar rendering and the system prompts.</p>
+</section>
+
+<!-- ─────────────────── FOUNDATION ─────────────────── -->
+<section id="feat-foundation">
+<h2>Foundation — React App Scaffold</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">058bedd</span>
+  <span class="badge badge-commit">81d5059</span>
+  <span>Commits: Initial commit + Vite scaffold</span>
+</div>
+
+<p>The project was bootstrapped with Vite 5 and the React plugin. The entry point is <code>src/main.jsx</code>, which mounts the single <code>GTDManager</code> component into <code>#root</code>. An <code>index.html</code> and <code>vite.config.js</code> provide the HTML shell and Vite configuration. A <code>launch.bat</code> file was added for double-click startup on Windows, combining <code>npm run dev</code> with automatic browser opening.</p>
+
+<p>The task <strong>data model</strong> is established at every creation site in the code — a plain object with eight fields. Every task always carries the full shape regardless of which bucket it lives in; project-specific fields (<code>childIds</code>, <code>parentId</code>) are added only where relevant. See <a href="#code-data-model" class="code-link">task data model</a>.</p>
+</section>
+
+<!-- ─────────────────── SMART INBOX ─────────────────── -->
+<section id="feat-inbox">
+<h2>Smart Inbox Processing</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">8d73f4c</span>
+  <span>Commit: Smart inbox processing</span>
+</div>
+
+<p>Inbox processing is the heart of GTD: every captured item must be clarified and moved to an appropriate bucket. The AI Coach assists this with a structured <strong>process mode</strong> whose system prompt — <a href="#code-process-prompt" class="code-link">SYSTEM_PROMPTS.process</a> — instructs the model to classify each item, rewrite it as a concrete verb-first action, and end its reply with an exactly-formatted <code>→ACTION:</code> tag on its own line.</p>
+
+<p>The <code>→ACTION</code> protocol supports five outcomes: <code>next</code>, <code>project</code>, <code>someday</code>, <code>waiting</code>, and <code>delete</code>. For a project outcome the tag carries three pipe-separated fields: <code>→ACTION:project|&lt;Project name&gt;|&lt;First next action&gt;</code>, allowing both the parent project and its initial subtask to be created in one confirm click.</p>
+
+<p>Once the model replies, the parsed action is held in <code>pendingAction</code> state and displayed in a <strong>PendingActionBar</strong> — a confirmation strip at the bottom of the coach panel showing the reworded title before the user commits. Clicking confirm fires <a href="#code-handle-confirm" class="code-link">handleConfirmMove</a>, which archives the original inbox item to the <em>Inbox History</em> bucket (rather than deleting it), creates the new task(s), and automatically feeds the next inbox item to the AI — a tight loop that processes the entire inbox without manual intervention.</p>
+</section>
+
+<!-- ─────────────────── MULTI-PROVIDER AI ─────────────────── -->
+<section id="feat-provider">
+<h2>Multi-Provider AI Support</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">28e0c25</span>
+  <span>Commit: Open WebUI provider support</span>
+</div>
+
+<p>Rather than hardcoding a single AI endpoint, the application supports two providers selectable from a <strong>ProviderSelector</strong> dropdown in the coach panel header: <strong>Claude</strong> (Anthropic's API direct from the browser) and <strong>Local</strong> (any Open WebUI instance on the local network). Both <code>provider</code> and <code>localModel</code> are persisted to <code>localStorage</code> so the choice survives page refresh.</p>
+
+<p>The central <a href="#code-call-ai" class="code-link">callAI</a> function branches on the selected provider. For Claude it calls <code>https://api.anthropic.com/v1/messages</code> with the <code>anthropic-dangerous-direct-browser-access</code> header (required for browser-origin requests). For Open WebUI it posts to <code>/api/chat/completions</code> using the OpenAI-compatible format — the same conversation history shape works for both. When the provider is switched to Local, a <code>fetchModels()</code> call hits <code>/api/models</code> to populate a live dropdown of available model IDs.</p>
+
+<p>The system prompt for every call is composed at call-time by concatenating the mode-specific prompt with a formatted snapshot of the user's entire task list via <code>getTaskContext()</code>, so the AI always has full visibility of the current state.</p>
+</section>
+
+<!-- ─────────────────── METADATA PANEL ─────────────────── -->
+<section id="feat-metadata">
+<h2>Task Metadata Panel (Phase 1)</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">5cde89e</span>
+  <span>Commit: Phase 1 — task metadata panel</span>
+</div>
+
+<p>Every task row in the application can expand to reveal a <strong>collapsible metadata panel</strong> triggered by a chevron button (<code>›</code> / <code>▾</code>) on the right side of the row. The panel is rendered by the <a href="#code-taskrow-sig" class="code-link">TaskRow</a> component using local <code>expanded</code> state — it appears and disappears without any global state involvement.</p>
+
+<p>The metadata panel — see <a href="#code-metadata-panel" class="code-link">expanded panel JSX</a> — exposes four editable fields:</p>
+<ul>
+  <li><strong>Location</strong> — multi-select chip buttons drawn from the global <code>locations</code> list. Active selections are highlighted in project-blue. Each click calls <code>toggleLocation()</code>, which computes the next array and calls <code>onUpdateTask</code>.</li>
+  <li><strong>Due Date</strong> — an HTML5 <code>&lt;input type="date"&gt;</code> with dark colorScheme. A clear button (<code>✕</code>) sets the field back to <code>null</code>.</li>
+  <li><strong>Priority</strong> — multi-select from four fixed values: Imperative, As Possible, Financial, External. Uses the same toggle pattern as Location.</li>
+  <li><strong>Effort</strong> — single-select chip buttons (only one effort level active at a time). Active selection highlighted in teal (<code>COLORS.effort</code>).</li>
+</ul>
+
+<p>When the panel is collapsed, any set values are shown as compact <strong>summary chips</strong> below the task text (or inline with the row, depending on the Tag Display setting). The chevron is always visible when any metadata is set, ensuring users can always find their way back in.</p>
+</section>
+
+<!-- ─────────────────── LOCATIONS ─────────────────── -->
+<section id="feat-locations">
+<h2>Location Settings Manager (Phase 2)</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">6c37280</span>
+  <span>Commit: Phase 2 — location settings manager</span>
+</div>
+
+<p>Locations are a user-configurable list stored in <code>localStorage</code> under <code>gtd_locations</code>, initialized to four defaults: Home, Work, Phone, Computer. A <strong>Settings</strong> button at the bottom of the sidebar swaps the task area for the <strong>SettingsPanel</strong>, which hosts the <a href="#code-location-manager" class="code-link">LocationManager</a> component.</p>
+
+<p>LocationManager provides a full CRUD interface for the location list. Each row shows the location name alongside a live count of how many tasks use it. <strong>Renaming</strong> is done inline — clicking "✎ Rename" replaces the label with an input; pressing Enter or clicking Save calls <code>renameLocation()</code>, which cascades the change across every task that carries that location. <strong>Removing</strong> a location that is in use triggers a confirmation sub-row with a replacement picker — the user can choose another location to substitute, or leave it empty to simply remove the tag. The <code>removeLocation</code> callback applies the substitution across all affected tasks atomically.</p>
+
+<p>New locations are added via a text input at the bottom of the list. Duplicate entries are silently ignored by the <code>addLocation</code> callback.</p>
+</section>
+
+<!-- ─────────────────── WATERFALL & GROUP-BY ─────────────────── -->
+<section id="feat-waterfall">
+<h2>Next Actions Waterfall &amp; Group-By (Phase 3)</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">68ef357</span>
+  <span class="badge badge-commit">053cffd</span>
+  <span>Commits: Phase 3 · Group-by Project</span>
+</div>
+
+<p>The <strong>Next Actions</strong> bucket has two distinct filtering and display systems layered on top of each other.</p>
+
+<h3>Waterfall Filter</h3>
+<p>In GTD, only the <em>next</em> action in a sequence should be visible — not all downstream steps at once. The <a href="#code-waterfall" class="code-link">waterfallFilter</a> pure function implements this rule in three lines. It always passes standalone actions (no <code>parentId</code>) and direct children of project tasks (level 2). Children of <em>other</em> next actions (level 3+) are hidden until their direct parent is marked done. This means a multi-step workflow surfaces one action at a time rather than overwhelming the list.</p>
+
+<h3>Group-By Toolbar</h3>
+<p>A toolbar in the Next Actions header offers six grouping modes: None, Project, Location, Due Date, Priority, and Effort. The <a href="#code-groupby" class="code-link">groupByField</a> pure function handles all modes. Multi-value fields (Location, Priority) use the first value as the group key. The <strong>Project</strong> mode is more complex — it walks the <code>parentId</code> chain of each task all the way to the root project, then groups by that root's text. This means even deeply-nested subtasks correctly appear under their top-level project heading.</p>
+
+<p>The <strong>Effort</strong> group-by mode sorts groups by duration rather than alphabetically — <code>effortToMinutes(a) - effortToMinutes(b)</code> — so groups always appear shortest-to-longest (2 min → 5 min → 1 hour → 1 day). Tasks with no value for the chosen field collect at the bottom under a contextual label ("No Project", "No Effort", or "Ungrouped").</p>
+
+<p>Each group is rendered by a <a href="#code-group-divider" class="code-link">GroupDivider</a> header that shows the group name, a task count badge, and — when any task in the group has effort set — a teal <code>⏱ total</code> badge showing the cumulative effort of the group.</p>
+</section>
+
+<!-- ─────────────────── PROJECT TASK CREATION ─────────────────── -->
+<section id="feat-project-add">
+<h2>Project Task Creation (Phase 4)</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">ffc7764</span>
+  <span>Commit: Phase 4 — project task creation</span>
+</div>
+
+<p>The add-task row in the Projects view is context-aware. A <code>&lt;select&gt;</code> dropdown controls which mode it operates in. When set to <strong>+ New project</strong> (the default), the input creates a root project task with an empty <code>childIds: []</code> array. When an existing project is selected from the dropdown, the input creates a next-action subtask that is simultaneously added to the selected project's <code>childIds</code> array and given a <code>parentId</code> pointing to that project.</p>
+
+<p>The <a href="#code-add-project-task" class="code-link">addProjectTask</a> function handles both paths. The button label and input placeholder both adapt to the current selection — the button reads "Add Project" in the default state and "Add Task" (highlighted in project-blue) when a parent is selected. The dropdown resets to the default when the user navigates away from the Projects bucket. Completed projects are excluded from the dropdown.</p>
+</section>
+
+<!-- ─────────────────── DRAG AND DROP ─────────────────── -->
+<section id="feat-dnd">
+<h2>Drag-and-Drop Project Tree (Phase 5)</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">186bf3e</span>
+  <span>Commit: Phase 5 — HTML5 drag-and-drop</span>
+</div>
+
+<p>The Projects view renders tasks as a recursive tree using the <a href="#code-project-tree" class="code-link">ProjectTree</a> component rather than a flat list. <code>ProjectTree</code> calls itself recursively up to 5 levels deep. At each level it calls <a href="#code-drag-helpers" class="code-link">getOrderedChildren</a>, which for root-level tasks uses array position as the ordering signal, and for child tasks uses the parent's <code>childIds</code> array.</p>
+
+<p>Every task row is wrapped in a <code>draggable</code> div with HTML5 drag event handlers wired to four callbacks in GTDManager: <code>onDragStart</code>, <code>onDragOver</code>, <code>onDragEnd</code>, and <code>onDrop</code>. The <a href="#code-drag-callbacks" class="code-link">drag callbacks</a> track two pieces of state: <code>dragId</code> (the task being dragged) and <code>dropTarget</code> (the task being hovered over and the computed drop position).</p>
+
+<p>Drop position is calculated from the mouse's Y coordinate relative to the hovered element: the top third is "before", the middle third is "inside" (reparent as first child), and the bottom third is "after". A <code>DropLine</code> component — a 2px blue horizontal rule — renders at the correct tree depth before or after the target row to give visual feedback. The "inside" position shows a blue outline on the target row instead.</p>
+
+<p>All tree mutation logic lives in the pure <a href="#code-drag-helpers" class="code-link">moveTaskInTree</a> function. It handles every move case: reordering within the same parent, reparenting to a different project, promoting to root, and demoting under a project. A recursive <code>isAncestorOf()</code> guard inside <code>moveTaskInTree</code> prevents circular references — you cannot drop a task inside one of its own descendants.</p>
+</section>
+
+<!-- ─────────────────── AI PROJECT REVIEW ─────────────────── -->
+<section id="feat-ai-review">
+<h2>AI Project Review (Phase 6)</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">879e53a</span>
+  <span>Commit: Phase 6 — AI Project Review</span>
+</div>
+
+<p>The AI Coach can review every active project in sequence, identify missing next actions, and add them directly to the task list. The flow begins with the "Review Projects" button in the Projects panel header, which calls <a href="#code-review-callbacks" class="code-link">startProjectReview</a>. This filters for all non-done root projects, switches the coach panel to <code>projectReview</code> mode, and immediately kicks off the first review.</p>
+
+<p>For each project, <code>reviewProject</code> constructs a structured prompt — project name, metadata, and current subtask list — and sends it to the AI using the <a href="#code-project-review-prompt" class="code-link">projectReview system prompt</a>. That prompt instructs the model to end every response with a <code>→SUGGESTIONS:</code> block listing up to four concrete missing actions. The <a href="#code-extract-suggestions" class="code-link">extractSuggestions</a> function parses that block using a regular expression and splits it into an array of strings.</p>
+
+<p>The coach panel renders a <strong>ProjectReviewBar</strong> component showing each suggestion as a pre-checked checkbox. The user can uncheck any suggestions they want to dismiss. A single adaptive button then reads "Add N &amp; Next →" (if there are projects remaining), "Skip →" (if all are unchecked), or "Finish Review ✓" (at the last project). Clicking it triggers <code>advanceProjectReview</code>, which creates new subtask objects for every checked suggestion, appends their IDs to the project's <code>childIds</code>, and either moves to the next project or exits review mode.</p>
+</section>
+
+<!-- ─────────────────── EFFORT METADATA ─────────────────── -->
+<section id="feat-effort">
+<h2>Effort Metadata System</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">61b3b06</span>
+  <span>Commit: Effort metadata field</span>
+</div>
+
+<p>Effort is a single-select metadata field on every task — unlike Location and Priority which are multi-value arrays, <code>effort</code> is a <code>string | null</code>. The available effort levels are stored in <code>localStorage</code> as <code>gtd_efforts</code> and initialized to an eleven-item default list ranging from "2 min" to "1 month".</p>
+
+<p>Two module-level pure functions handle effort arithmetic. <a href="#code-effort-helpers" class="code-link">effortToMinutes</a> converts a human-readable string to minutes using substring matching ("hour", "day", "week", etc.), so user-added values like "4 hours" or "2.5 days" parse correctly without a lookup table. <a href="#code-effort-helpers" class="code-link">minutesToEffortLabel</a> converts back to a compact label (150 → "2.5h", 1440 → "3d"). Both functions are used in two places: the group-by effort total in <code>GroupDivider</code>, and the <a href="#code-effort-total" class="code-link">projectEffortTotal</a> computed value inside <code>TaskRow</code>.</p>
+
+<p>The <code>projectEffortTotal</code> is calculated when a task is in the <code>project</code> bucket and is currently being viewed in the Projects panel. It maps the task's <code>childIds</code> to their task objects, sums their effort values via <code>effortToMinutes</code>, and converts the total back to a compact label. This total appears as a teal badge inline with the project name row.</p>
+
+<p>The <strong>Effort Levels</strong> section of Settings is managed by the <a href="#code-effort-manager" class="code-link">EffortManager</a> component, which follows the same pattern as LocationManager: inline rename (Enter/Escape, cascades to all tasks), remove with a confirm dialog (clears effort from affected tasks), and an add form at the bottom.</p>
+</section>
+
+<!-- ─────────────────── NEXT ACTIONS ENHANCEMENTS ─────────────────── -->
+<section id="feat-next-enhancements">
+<h2>Next Actions Enhancements</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">f98d445</span>
+  <span class="badge badge-commit">4de6b06</span>
+  <span>Commits: Group effort totals · Effort group-by · Assign to project</span>
+</div>
+
+<h3>Cumulative Effort in Group Headers</h3>
+<p>When Next Actions are grouped by any field, the <a href="#code-group-divider" class="code-link">GroupDivider</a> for each group shows a cumulative <code>⏱</code> badge. The total is computed inline in the render loop — <code>items.reduce((sum, t) =&gt; sum + effortToMinutes(t.effort), 0)</code> — and only displayed when the sum is non-zero. This makes it immediately visible how much total effort is committed to a given location, project, or priority category.</p>
+
+<h3>Assign Unaffiliated Tasks to a Project</h3>
+<p>A <strong>📁</strong> button appears on hover for any Next Action that has no <code>parentId</code>. Clicking it reveals an <a href="#code-assign-ui" class="code-link">inline assign panel</a> below the task row with a dropdown listing all active root projects plus a "New project…" option. Selecting an existing project and clicking Assign fires the <a href="#code-assign-callback" class="code-link">assignToProject</a> callback, which sets <code>parentId</code> on the task and appends its ID to the project's <code>childIds</code>. Selecting "New project…" shows a text input; on confirm, a new project task is created with the typed name and the current task is immediately linked to it as its first child.</p>
+</section>
+
+<!-- ─────────────────── TITLE EDITING ─────────────────── -->
+<section id="feat-title-edit">
+<h2>Inline Title Editing</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">988d26a</span>
+  <span>Commit: Inline title editing</span>
+</div>
+
+<p>The first field in every task's expanded metadata panel is a <strong>Title</strong> input — a full-width text field pre-filled with <code>task.text</code>. The <a href="#code-title-edit" class="code-link">title edit section</a> is managed by two pieces of local state in <code>TaskRow</code>: <code>editTitle</code> (the draft string) and a <code>useEffect</code> that syncs it from <code>task.text</code> whenever the task is updated externally.</p>
+
+<p>The input's border turns blue as soon as the draft diverges from the saved text, acting as a dirty indicator. <strong>Save</strong> and <strong>✕</strong> revert buttons appear only when there is an unsaved change. Enter saves, Escape reverts. Saving an empty or whitespace-only value reverts silently rather than blanking the title. The <code>saveTitle</code> function calls <code>onUpdateTask(task.id, { text: trimmed })</code>, which propagates through the standard update path.</p>
+
+<p>This feature works identically in all views — Inbox, Next Actions, Projects, Waiting For, Someday, and Completed — because <code>TaskRow</code> is the shared renderer across every bucket.</p>
+</section>
+
+<!-- ─────────────────── TAG DISPLAY ─────────────────── -->
+<section id="feat-tag-display">
+<h2>Tag Display Mode</h2>
+<div class="feature-meta">
+  <span class="badge badge-commit">6f2abf9</span>
+  <span>Commit: Inline tag display mode</span>
+</div>
+
+<p>The placement of metadata chips on collapsed task rows is controlled by a <code>tagDisplay</code> state value (<code>"below"</code> or <code>"inline"</code>), persisted to <code>localStorage</code> as <code>gtd_tag_display</code>. The setting is changed via the <a href="#code-tag-display-setting" class="code-link">TagDisplaySetting</a> component at the top of the Settings panel — two large toggle buttons, one per mode, with a short description of each.</p>
+
+<p>In <strong>Below text</strong> mode (the default), chips are rendered inside the text column div under the task name, adding vertical height to rows that have metadata. In <strong>Inline</strong> mode, the chips move to a separate flex div inserted between the text column and the action buttons column in the main row, using <code>whiteSpace: nowrap</code> and <code>alignSelf: center</code> to sit on the same baseline as the task text. The two render paths are controlled by a single conditional: <a href="#code-tag-display-chip" class="code-link">tagDisplay check in TaskRow</a>. In both modes, chips disappear from the row when the metadata panel is expanded, since the full editable fields are already visible.</p>
+</section>
+
+<hr>
+
+<!-- ════════════════════════════════════════
+     APPENDIX A — CODE SNIPPETS
+     ════════════════════════════════════════ -->
+<section id="appendix-a">
+<h2>Appendix A — Code Snippets</h2>
+<p style="color:var(--muted);font-size:12px;margin-bottom:32px;">All excerpts are from <code>src/App.jsx</code>. Line numbers are approximate and reflect the state of the file after all features described above were implemented.</p>
+
+<!-- COLORS -->
+<div class="appendix-section" id="code-colors">
+  <div class="back"><a href="#overview">↑ Overview</a></div>
+  <div class="code-block-header">
+    <span>COLORS object</span>
+    <span class="file">src/App.jsx · lines 3–14</span>
+  </div>
+  <pre>
+<span class="kw">const</span> <span class="fn">COLORS</span> = {
+  bg: <span class="str">"#111210"</span>, surface: <span class="str">"#1a1c18"</span>, surface2: <span class="str">"#222420"</span>, surface3: <span class="str">"#2a2c28"</span>,
+  border: <span class="str">"#333530"</span>, border2: <span class="str">"#404240"</span>,
+  text: <span class="str">"#e8e4dc"</span>, text2: <span class="str">"#a8a49c"</span>, muted: <span class="str">"#5a5c58"</span>,
+  inbox:   <span class="str">"#e8c84a"</span>, inboxBg:   <span class="str">"#2a2618"</span>,
+  next:    <span class="str">"#5ab878"</span>, nextBg:    <span class="str">"#182418"</span>,
+  project: <span class="str">"#5a8fd4"</span>, projectBg: <span class="str">"#181e2a"</span>,
+  waiting: <span class="str">"#d4845a"</span>, waitingBg: <span class="str">"#2a1e14"</span>,
+  someday: <span class="str">"#9a8ad4"</span>, somedayBg: <span class="str">"#1e1a2a"</span>,
+  effort:  <span class="str">"#6ec6a8"</span>, effortBg:  <span class="str">"#152520"</span>,
+  done:    <span class="str">"#5a5c58"</span>,
+};</pre>
+</div>
+
+<!-- BUCKETS -->
+<div class="appendix-section" id="code-buckets">
+  <div class="back"><a href="#overview">↑ Overview</a></div>
+  <div class="code-block-header">
+    <span>BUCKETS and COACH_MODES constants</span>
+    <span class="file">src/App.jsx · lines 16–32</span>
+  </div>
+  <pre>
+<span class="kw">const</span> <span class="fn">BUCKETS</span> = {
+  inbox:        { label: <span class="str">"📥 Inbox"</span>,           color: COLORS.inbox },
+  next:         { label: <span class="str">"⚡ Next Actions"</span>,     color: COLORS.next },
+  project:      { label: <span class="str">"📁 Projects"</span>,        color: COLORS.project },
+  waiting:      { label: <span class="str">"⏳ Waiting For"</span>,     color: COLORS.waiting },
+  someday:      { label: <span class="str">"💭 Someday / Maybe"</span>, color: COLORS.someday },
+  done:         { label: <span class="str">"✅ Completed"</span>,        color: COLORS.done },
+  inboxHistory: { label: <span class="str">"📋 Inbox History"</span>,   color: COLORS.muted },
+};
+
+<span class="kw">const</span> <span class="fn">COACH_MODES</span> = {
+  chat:          { label: <span class="str">"Chat"</span>,           icon: <span class="str">"💬"</span> },
+  process:       { label: <span class="str">"Process"</span>,        icon: <span class="str">"📥"</span> },
+  review:        { label: <span class="str">"Review"</span>,         icon: <span class="str">"📋"</span> },
+  dump:          { label: <span class="str">"Brain Dump"</span>,     icon: <span class="str">"🧠"</span> },
+  projectReview: { label: <span class="str">"Project Review"</span>, icon: <span class="str">"🔍"</span> },
+};</pre>
+</div>
+
+<!-- DATA MODEL -->
+<div class="appendix-section" id="code-data-model">
+  <div class="back"><a href="#feat-foundation">↑ Foundation</a></div>
+  <div class="code-block-header">
+    <span>Task data model — shape at creation</span>
+    <span class="file">src/App.jsx · addTask / handleConfirmMove / addProjectTask</span>
+  </div>
+  <pre>
+<span class="cm">// Standalone task (Inbox, Next, Waiting, Someday)</span>
+{ id: <span class="fn">genId</span>(), text, bucket, done: <span class="kw">false</span>, created: <span class="fn">Date.now</span>(),
+  priority: [], location: [], dueDate: <span class="kw">null</span>, effort: <span class="kw">null</span> }
+
+<span class="cm">// Root project task — carries childIds array</span>
+{ id: projectId, text, bucket: <span class="str">"project"</span>, done: <span class="kw">false</span>, created: <span class="fn">Date.now</span>(),
+  childIds: [actionId], priority: [], location: [], dueDate: <span class="kw">null</span>, effort: <span class="kw">null</span> }
+
+<span class="cm">// Subtask — carries parentId pointing to its project</span>
+{ id: actionId, text, bucket: <span class="str">"next"</span>, done: <span class="kw">false</span>, created: <span class="fn">Date.now</span>(),
+  parentId: projectId, priority: [], location: [], dueDate: <span class="kw">null</span>, effort: <span class="kw">null</span> }</pre>
+</div>
+
+<!-- PROCESS PROMPT -->
+<div class="appendix-section" id="code-process-prompt">
+  <div class="back"><a href="#feat-inbox">↑ Smart Inbox Processing</a></div>
+  <div class="code-block-header">
+    <span>SYSTEM_PROMPTS.process — inbox processor</span>
+    <span class="file">src/App.jsx · lines 36–59</span>
+  </div>
+  <pre>
+process: `You are a GTD inbox processor. For each inbox item given to you:
+
+<span class="num">1</span>. Determine if it's actionable. If not actionable, end with: →ACTION:delete
+<span class="num">2</span>. If actionable, decide: is this a SINGLE next action, or a multi-step PROJECT?
+   - If you need clarification, ask ONE specific question. Do NOT include →ACTION until clarified.
+<span class="num">3</span>. Reword the action as a concrete physical action starting with a strong verb.
+<span class="num">4</span>. End your response with EXACTLY one of these tags on its own line:
+
+Single next action:  →ACTION:next|&lt;Reworded action title&gt;
+Multi-step project:  →ACTION:project|&lt;Project name&gt;|&lt;First next action title&gt;
+Someday / not urgent: →ACTION:someday|&lt;Reworded title&gt;
+Waiting on someone:  →ACTION:waiting|&lt;What you are waiting for&gt;
+Not actionable:      →ACTION:delete
+
+Be concise — under 80 words before the tag.`</pre>
+</div>
+
+<!-- HANDLE CONFIRM -->
+<div class="appendix-section" id="code-handle-confirm">
+  <div class="back"><a href="#feat-inbox">↑ Smart Inbox Processing</a></div>
+  <div class="code-block-header">
+    <span>handleConfirmMove — inbox confirm + auto-continue</span>
+    <span class="file">src/App.jsx · lines 446–487</span>
+  </div>
+  <pre>
+<span class="kw">const</span> <span class="fn">handleConfirmMove</span> = <span class="fn">useCallback</span>(() => {
+  <span class="kw">const</span> { type, title, nextAction } = pendingAction;
+  <span class="kw">const</span> inboxItems = tasks.filter(t => t.bucket === <span class="str">"inbox"</span>);
+  <span class="kw">const</span> current = inboxItems[<span class="num">0</span>];
+  <span class="kw">const</span> nextItem = inboxItems[<span class="num">1</span>];
+
+  <span class="cm">// Archive the original inbox item to Inbox History</span>
+  setTasks(prev => prev.map(t =>
+    t.id === current.id ? { ...t, bucket: <span class="str">"inboxHistory"</span> } : t
+  ));
+
+  <span class="kw">if</span> (type === <span class="str">"project"</span>) {
+    <span class="kw">const</span> projectId = <span class="fn">genId</span>();
+    <span class="kw">const</span> actionId = <span class="fn">genId</span>();
+    setTasks(prev => [
+      { id: projectId, text: title, bucket: <span class="str">"project"</span>, childIds: [actionId], ... },
+      { id: actionId,  text: nextAction, bucket: <span class="str">"next"</span>, parentId: projectId, ... },
+      ...prev,
+    ]);
+  }
+  <span class="cm">// ... next / someday / waiting / delete cases ...</span>
+
+  <span class="cm">// Auto-continue: immediately process the next inbox item</span>
+  <span class="kw">if</span> (nextItem) {
+    <span class="fn">setTimeout</span>(() => <span class="fn">processNextInboxItem</span>(nextItem), <span class="num">300</span>);
+  }
+}, [pendingAction, tasks, processNextInboxItem]);</pre>
+</div>
+
+<!-- CALL AI -->
+<div class="appendix-section" id="code-call-ai">
+  <div class="back"><a href="#feat-provider">↑ Multi-Provider AI</a></div>
+  <div class="code-block-header">
+    <span>callAI — provider-aware dispatch</span>
+    <span class="file">src/App.jsx · lines 353–421</span>
+  </div>
+  <pre>
+<span class="kw">const</span> <span class="fn">callAI</span> = <span class="fn">useCallback</span>(<span class="kw">async</span> (userMsg, mode, history) => {
+  <span class="kw">const</span> systemPrompt = SYSTEM_PROMPTS[mode] + <span class="str">"\n\n[Current Task List]\n"</span> + <span class="fn">getTaskContext</span>();
+  <span class="kw">const</span> newHistory = [...history, { role: <span class="str">"user"</span>, content: userMsg }];
+  setLoading(<span class="kw">true</span>);
+
+  <span class="kw">if</span> (provider === <span class="str">"claude"</span>) {
+    <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">"https://api.anthropic.com/v1/messages"</span>, {
+      method: <span class="str">"POST"</span>,
+      headers: {
+        <span class="str">"x-api-key"</span>: import.meta.env.VITE_ANTHROPIC_API_KEY,
+        <span class="str">"anthropic-version"</span>: <span class="str">"2023-06-01"</span>,
+        <span class="str">"anthropic-dangerous-direct-browser-access"</span>: <span class="str">"true"</span>,
+      },
+      body: JSON.stringify({ model: <span class="str">"claude-sonnet-4-6"</span>, max_tokens: <span class="num">1000</span>,
+                             system: systemPrompt, messages: newHistory }),
+    });
+    reply = data.content?.[<span class="num">0</span>]?.text;
+  } <span class="kw">else</span> {
+    <span class="cm">// Open WebUI — OpenAI-compatible format</span>
+    <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(`${OPENWEBUI_URL}/api/chat/completions`, {
+      headers: { <span class="str">"Authorization"</span>: `Bearer ${import.meta.env.VITE_OPENWEBUI_API_KEY}` },
+      body: JSON.stringify({ model: localModel,
+                             messages: [{ role: <span class="str">"system"</span>, content: systemPrompt }, ...newHistory] }),
+    });
+    reply = data.choices?.[<span class="num">0</span>]?.message?.content;
+  }
+}, [getTaskContext, provider, localModel]);</pre>
+</div>
+
+<!-- WATERFALL -->
+<div class="appendix-section" id="code-waterfall">
+  <div class="back"><a href="#feat-waterfall">↑ Waterfall &amp; Group-By</a></div>
+  <div class="code-block-header">
+    <span>waterfallFilter — Next Actions visibility rule</span>
+    <span class="file">src/App.jsx · lines 115–123</span>
+  </div>
+  <pre>
+<span class="cm">// Level-2 tasks (direct children of a project) always show.
+// Level 3+ tasks only show when their direct parent is done.</span>
+<span class="kw">function</span> <span class="fn">waterfallFilter</span>(nextTasks, allTasks) {
+  <span class="kw">return</span> nextTasks.filter(task => {
+    <span class="kw">if</span> (!task.parentId) <span class="kw">return true</span>;
+    <span class="kw">const</span> parent = allTasks.find(t => t.id === task.parentId);
+    <span class="kw">if</span> (!parent) <span class="kw">return true</span>;
+    <span class="kw">if</span> (parent.bucket === <span class="str">"project"</span>) <span class="kw">return true</span>; <span class="cm">// level 2 — always visible</span>
+    <span class="kw">return</span> !!parent.done;                              <span class="cm">// level 3+ — visible only when parent done</span>
+  });
+}</pre>
+</div>
+
+<!-- GROUP BY -->
+<div class="appendix-section" id="code-groupby">
+  <div class="back"><a href="#feat-waterfall">↑ Waterfall &amp; Group-By</a></div>
+  <div class="code-block-header">
+    <span>groupByField — multi-mode grouping with effort sort</span>
+    <span class="file">src/App.jsx · lines 129–168</span>
+  </div>
+  <pre>
+<span class="kw">function</span> <span class="fn">groupByField</span>(taskList, field, allTasks = []) {
+  <span class="kw">const</span> ungroupedLabel = field === <span class="str">"project"</span> ? <span class="str">"No Project"</span>
+                       : field === <span class="str">"effort"</span>  ? <span class="str">"No Effort"</span>
+                       : <span class="str">"Ungrouped"</span>;
+  <span class="kw">const</span> groups = {}, ungrouped = [];
+  taskList.forEach(task => {
+    <span class="kw">let</span> keys = [];
+    <span class="kw">if</span>      (field === <span class="str">"location"</span>) keys = task.location || [];
+    <span class="kw">else if</span> (field === <span class="str">"priority"</span>) keys = task.priority || [];
+    <span class="kw">else if</span> (field === <span class="str">"dueDate"</span>)  keys = task.dueDate ? [task.dueDate] : [];
+    <span class="kw">else if</span> (field === <span class="str">"effort"</span>)   keys = task.effort  ? [task.effort]  : [];
+    <span class="kw">else if</span> (field === <span class="str">"project"</span>) {
+      <span class="cm">// Walk up parentId chain to find the root project name</span>
+      <span class="kw">if</span> (task.parentId) {
+        <span class="kw">let</span> cur = task;
+        <span class="kw">while</span> (cur.parentId) {
+          <span class="kw">const</span> parent = allTasks.find(t => t.id === cur.parentId);
+          <span class="kw">if</span> (!parent) <span class="kw">break</span>;
+          cur = parent;
+        }
+        <span class="kw">if</span> (cur.id !== task.id) keys = [cur.text];
+      }
+    }
+    <span class="kw">if</span> (!keys.length) { ungrouped.push(task); <span class="kw">return</span>; }
+    <span class="kw">const</span> key = keys[<span class="num">0</span>];
+    <span class="kw">if</span> (!groups[key]) groups[key] = [];
+    groups[key].push(task);
+  });
+  <span class="cm">// Effort: sort by duration (shortest first). Others: alphabetical.</span>
+  <span class="kw">const</span> sorted = Object.entries(groups)
+    .sort(([a], [b]) => field === <span class="str">"effort"</span>
+      ? <span class="fn">effortToMinutes</span>(a) - <span class="fn">effortToMinutes</span>(b)
+      : a.localeCompare(b))
+    .map(([key, items]) => ({ key, label: key, items }));
+  <span class="kw">if</span> (ungrouped.length) sorted.push({ key: <span class="str">"__ungrouped__"</span>, label: ungroupedLabel, items: ungrouped });
+  <span class="kw">return</span> sorted;
+}</pre>
+</div>
+
+<!-- EFFORT HELPERS -->
+<div class="appendix-section" id="code-effort-helpers">
+  <div class="back"><a href="#feat-effort">↑ Effort Metadata</a></div>
+  <div class="code-block-header">
+    <span>effortToMinutes + minutesToEffortLabel</span>
+    <span class="file">src/App.jsx · lines 172–193</span>
+  </div>
+  <pre>
+<span class="kw">function</span> <span class="fn">effortToMinutes</span>(str) {
+  <span class="kw">if</span> (!str) <span class="kw">return</span> <span class="num">0</span>;
+  <span class="kw">const</span> s = str.toLowerCase().trim();
+  <span class="kw">const</span> num = <span class="fn">parseFloat</span>(s);
+  <span class="kw">if</span> (isNaN(num) || num <= <span class="num">0</span>) <span class="kw">return</span> <span class="num">0</span>;
+  <span class="kw">if</span> (s.includes(<span class="str">"month"</span>)) <span class="kw">return</span> Math.round(num * <span class="num">9600</span>); <span class="cm">// ~4 w × 5 d × 8 h</span>
+  <span class="kw">if</span> (s.includes(<span class="str">"week"</span>))  <span class="kw">return</span> Math.round(num * <span class="num">2400</span>); <span class="cm">// 5 d × 8 h</span>
+  <span class="kw">if</span> (s.includes(<span class="str">"day"</span>))   <span class="kw">return</span> Math.round(num * <span class="num">480</span>);  <span class="cm">// 8 h</span>
+  <span class="kw">if</span> (s.includes(<span class="str">"hour"</span>))  <span class="kw">return</span> Math.round(num * <span class="num">60</span>);
+  <span class="kw">if</span> (s.includes(<span class="str">"min"</span>))   <span class="kw">return</span> Math.round(num);
+  <span class="kw">return</span> <span class="num">0</span>;
+}
+
+<span class="kw">function</span> <span class="fn">minutesToEffortLabel</span>(minutes) {
+  <span class="kw">if</span> (!minutes || minutes <= <span class="num">0</span>) <span class="kw">return null</span>;
+  <span class="kw">if</span> (minutes < <span class="num">60</span>)   <span class="kw">return</span> `${minutes}m`;
+  <span class="kw">if</span> (minutes < <span class="num">480</span>)  <span class="kw">return</span> `${+((minutes / <span class="num">60</span>).toFixed(<span class="num">1</span>))}h`;
+  <span class="kw">if</span> (minutes < <span class="num">2400</span>) <span class="kw">return</span> `${+((minutes / <span class="num">480</span>).toFixed(<span class="num">1</span>))}d`;
+  <span class="kw">if</span> (minutes < <span class="num">9600</span>) <span class="kw">return</span> `${+((minutes / <span class="num">2400</span>).toFixed(<span class="num">1</span>))}w`;
+  <span class="kw">return</span> `${+((minutes / <span class="num">9600</span>).toFixed(<span class="num">1</span>))}mo`;
+}</pre>
+</div>
+
+<!-- EXTRACT SUGGESTIONS -->
+<div class="appendix-section" id="code-extract-suggestions">
+  <div class="back"><a href="#feat-ai-review">↑ AI Project Review</a></div>
+  <div class="code-block-header">
+    <span>extractSuggestions — parse →SUGGESTIONS: block</span>
+    <span class="file">src/App.jsx · lines 197–204</span>
+  </div>
+  <pre>
+<span class="kw">function</span> <span class="fn">extractSuggestions</span>(text) {
+  <span class="kw">const</span> m = text.match(<span class="str">/→SUGGESTIONS:\n([\s\S]*?)$/</span>);
+  <span class="kw">if</span> (!m) <span class="kw">return</span> [];
+  <span class="kw">return</span> m[<span class="num">1</span>]
+    .split(<span class="str">'\n'</span>)
+    .map(l => l.replace(<span class="str">/^\d+\.\s*/</span>, <span class="str">''</span>).trim())
+    .filter(l => l && l !== <span class="str">"(none)"</span>);
+}</pre>
+</div>
+
+<!-- PROJECT REVIEW PROMPT -->
+<div class="appendix-section" id="code-project-review-prompt">
+  <div class="back"><a href="#feat-ai-review">↑ AI Project Review</a></div>
+  <div class="code-block-header">
+    <span>SYSTEM_PROMPTS.projectReview</span>
+    <span class="file">src/App.jsx · lines 69–85</span>
+  </div>
+  <pre>
+projectReview: `You are reviewing a GTD project to identify missing next actions.
+
+Given a project name, its current subtasks, and any metadata, you will:
+<span class="num">1</span>. Write 2-3 sentences assessing the project's current state and momentum.
+<span class="num">2</span>. Identify 2-4 specific, concrete next actions that appear missing or would unblock progress.
+
+End your response with EXACTLY this block — nothing after it:
+→SUGGESTIONS:
+<span class="num">1</span>. [First missing action — start with a strong verb]
+<span class="num">2</span>. [Second missing action]
+
+If the project is fully on track with no missing actions, write:
+→SUGGESTIONS:
+(none)
+
+Be concise. Under 80 words before the suggestions block.`</pre>
+</div>
+
+<!-- REVIEW CALLBACKS -->
+<div class="appendix-section" id="code-review-callbacks">
+  <div class="back"><a href="#feat-ai-review">↑ AI Project Review</a></div>
+  <div class="code-block-header">
+    <span>reviewProject + advanceProjectReview callbacks</span>
+    <span class="file">src/App.jsx · lines 509–588</span>
+  </div>
+  <pre>
+<span class="kw">const</span> <span class="fn">reviewProject</span> = <span class="fn">useCallback</span>(<span class="kw">async</span> (project, idx, total) => {
+  <span class="kw">const</span> children = <span class="fn">getOrderedChildren</span>(project.id, tasks);
+  <span class="kw">const</span> subtaskLines = children.length
+    ? children.map(t => `- ${t.text}${t.done ? <span class="str">" ✓"</span> : <span class="str">""</span>}`).join(<span class="str">"\n"</span>)
+    : <span class="str">"(none yet)"</span>;
+  <span class="kw">const</span> prompt =
+    `Project ${idx+<span class="num">1</span>} of ${total}: "${project.text}"\n` +
+    `Current subtasks:\n${subtaskLines}`;
+  <span class="kw">const</span> reply = <span class="kw">await</span> <span class="fn">callAI</span>(prompt, <span class="str">"projectReview"</span>, []);
+  <span class="kw">if</span> (reply) {
+    <span class="kw">const</span> suggestions = <span class="fn">extractSuggestions</span>(reply);
+    <span class="fn">setReviewSuggestions</span>(suggestions.map(text => ({ text, checked: <span class="kw">true</span> })));
+  }
+}, [tasks, callAI]);
+
+<span class="kw">const</span> <span class="fn">advanceProjectReview</span> = <span class="fn">useCallback</span>(() => {
+  <span class="kw">const</span> selected = reviewSuggestions.filter(s => s.checked);
+  <span class="kw">if</span> (selected.length && project) {
+    <span class="kw">const</span> newSubtasks = selected.map(s => ({
+      id: <span class="fn">genId</span>(), text: s.text, bucket: <span class="str">"next"</span>,
+      parentId: project.id, priority: [], location: [], dueDate: <span class="kw">null</span>,
+    }));
+    <span class="kw">const</span> newIds = newSubtasks.map(t => t.id);
+    <span class="fn">setTasks</span>(prev => [
+      ...prev.map(t => t.id === project.id
+        ? { ...t, childIds: [...(t.childIds || []), ...newIds] } : t),
+      ...newSubtasks,
+    ]);
+  }
+  <span class="cm">// advance to next project or finish</span>
+}, [reviewProjectIdx, reviewSuggestions, tasks, reviewProject]);</pre>
+</div>
+
+<!-- DRAG HELPERS -->
+<div class="appendix-section" id="code-drag-helpers">
+  <div class="back"><a href="#feat-dnd">↑ Drag-and-Drop</a></div>
+  <div class="code-block-header">
+    <span>getOrderedChildren + moveTaskInTree</span>
+    <span class="file">src/App.jsx · lines 209–278</span>
+  </div>
+  <pre>
+<span class="kw">function</span> <span class="fn">getOrderedChildren</span>(parentId, allTasks) {
+  <span class="kw">if</span> (parentId === <span class="kw">null</span>) {
+    <span class="cm">// Root projects: ordered by position in the flat tasks array</span>
+    <span class="kw">return</span> allTasks.filter(t => t.bucket === <span class="str">"project"</span> && !t.parentId);
+  }
+  <span class="kw">const</span> parent = allTasks.find(t => t.id === parentId);
+  <span class="kw">return</span> (parent?.childIds || []).map(id => allTasks.find(t => t.id === id)).filter(Boolean);
+}
+
+<span class="kw">function</span> <span class="fn">moveTaskInTree</span>(allTasks, dragId, targetId, position) {
+  <span class="kw">if</span> (dragId === targetId) <span class="kw">return</span> allTasks;
+  <span class="cm">// Guard: prevent dropping inside own descendant</span>
+  <span class="kw">function</span> <span class="fn">isAncestorOf</span>(ancestorId, nodeId, seen = <span class="kw">new</span> Set()) {
+    <span class="kw">const</span> node = allTasks.find(t => t.id === nodeId);
+    <span class="kw">if</span> (node?.parentId === ancestorId) <span class="kw">return true</span>;
+    <span class="kw">return</span> node?.parentId ? <span class="fn">isAncestorOf</span>(ancestorId, node.parentId, seen) : <span class="kw">false</span>;
+  }
+  <span class="kw">if</span> (<span class="fn">isAncestorOf</span>(dragId, targetId)) <span class="kw">return</span> allTasks;
+
+  <span class="kw">const</span> newParentId = position === <span class="str">"inside"</span> ? targetId : (target.parentId || <span class="kw">null</span>);
+  <span class="kw">const</span> newBucket   = newParentId ? <span class="str">"next"</span> : <span class="str">"project"</span>;
+
+  <span class="cm">// 1. Remove from current parent's childIds
+  // 2. Update dragged task parentId + bucket
+  // 3a. Insert into new parent's childIds at correct position
+  // 3b. OR splice into root tasks array for root-level reorder</span>
+  <span class="kw">return</span> result;
+}</pre>
+</div>
+
+<!-- DRAG CALLBACKS -->
+<div class="appendix-section" id="code-drag-callbacks">
+  <div class="back"><a href="#feat-dnd">↑ Drag-and-Drop</a></div>
+  <div class="code-block-header">
+    <span>handleProjectDragOver — position from mouse Y ratio</span>
+    <span class="file">src/App.jsx · lines 687–695</span>
+  </div>
+  <pre>
+<span class="kw">const</span> <span class="fn">handleProjectDragOver</span> = <span class="fn">useCallback</span>((e, taskId) => {
+  <span class="kw">if</span> (taskId === dragId) <span class="kw">return</span>; <span class="cm">// don't target self</span>
+  <span class="kw">const</span> rect = e.currentTarget.getBoundingClientRect();
+  <span class="kw">const</span> ratio = (e.clientY - rect.top) / rect.height;
+  <span class="cm">// top third = "before", middle = "inside" (reparent), bottom third = "after"</span>
+  <span class="kw">const</span> position = ratio &lt; <span class="num">0.33</span> ? <span class="str">"before"</span> : ratio &gt; <span class="num">0.67</span> ? <span class="str">"after"</span> : <span class="str">"inside"</span>;
+  <span class="fn">setDropTarget</span>(prev =>
+    prev?.id === taskId && prev?.position === position ? prev : { id: taskId, position }
+  );
+}, [dragId]);</pre>
+</div>
+
+<!-- PROJECT TREE -->
+<div class="appendix-section" id="code-project-tree">
+  <div class="back"><a href="#feat-dnd">↑ Drag-and-Drop</a></div>
+  <div class="code-block-header">
+    <span>ProjectTree — recursive drag-and-drop tree</span>
+    <span class="file">src/App.jsx · lines 1924–1970</span>
+  </div>
+  <pre>
+<span class="kw">function</span> <span class="fn">ProjectTree</span>({ parentId, depth, allTasks, dragId, dropTarget,
+                         onDragStart, onDragOver, onDragEnd, onDrop, rowProps }) {
+  <span class="kw">if</span> (depth > <span class="num">5</span>) <span class="kw">return null</span>; <span class="cm">// max depth guard</span>
+  <span class="kw">const</span> children = <span class="fn">getOrderedChildren</span>(parentId, allTasks);
+  <span class="kw">if</span> (!children.length) <span class="kw">return null</span>;
+
+  <span class="kw">return</span> &lt;&gt;
+    {children.map(task => {
+      <span class="kw">const</span> isTarget   = dropTarget?.id === task.id;
+      <span class="kw">const</span> isDragging = dragId === task.id;
+      <span class="kw">return</span> (
+        &lt;div key={task.id}&gt;
+          {isTarget && dropTarget.position === <span class="str">"before"</span> && &lt;DropLine depth={depth} /&gt;}
+          &lt;div
+            draggable
+            onDragStart={e => { e.stopPropagation(); <span class="fn">onDragStart</span>(task.id); }}
+            onDragOver={e => { e.preventDefault(); e.stopPropagation(); <span class="fn">onDragOver</span>(e, task.id); }}
+            onDrop={e => { e.preventDefault(); e.stopPropagation(); <span class="fn">onDrop</span>(task.id); }}
+            style={{ opacity: isDragging ? <span class="num">0.35</span> : <span class="num">1</span>,
+                     outline: isTarget && dropTarget.position === <span class="str">"inside"</span>
+                              ? `2px solid ${COLORS.project}66` : <span class="str">"none"</span> }}
+          &gt;
+            &lt;TaskRow task={task} isSubtask={depth &gt; <span class="num">0</span>}
+                     indentOverride={depth * <span class="num">22</span>} {...rowProps} /&gt;
+          &lt;/div&gt;
+          {isTarget && dropTarget.position === <span class="str">"after"</span> && &lt;DropLine depth={depth} /&gt;}
+          &lt;ProjectTree parentId={task.id} depth={depth + <span class="num">1</span>} ... /&gt;
+        &lt;/div&gt;
+      );
+    })}
+  &lt;/&gt;;
+}</pre>
+</div>
+
+<!-- TASKROW SIG -->
+<div class="appendix-section" id="code-taskrow-sig">
+  <div class="back"><a href="#feat-metadata">↑ Metadata Panel</a></div>
+  <div class="code-block-header">
+    <span>TaskRow — component signature and local state</span>
+    <span class="file">src/App.jsx · lines 1094–1121</span>
+  </div>
+  <pre>
+<span class="kw">function</span> <span class="fn">TaskRow</span>({ task, currentBucket, moveMenu, setMoveMenu,
+                  onComplete, onDelete, onMove, onAskAI, onUpdateTask,
+                  pendingAction, allTasks, onNavigate, isSubtask,
+                  locations, efforts, onAssignToProject, tagDisplay, indentOverride }) {
+
+  <span class="kw">const</span> [hover,       setHover]       = <span class="fn">useState</span>(<span class="kw">false</span>);
+  <span class="kw">const</span> [expanded,    setExpanded]    = <span class="fn">useState</span>(<span class="kw">false</span>);
+  <span class="kw">const</span> [showAssign,  setShowAssign]  = <span class="fn">useState</span>(<span class="kw">false</span>);
+  <span class="kw">const</span> [editTitle,   setEditTitle]   = <span class="fn">useState</span>(task.text);
+  <span class="cm">// Keep draft in sync if the task text is changed externally</span>
+  <span class="fn">useEffect</span>(() => { <span class="fn">setEditTitle</span>(task.text); }, [task.text]);
+
+  <span class="cm">// Computed effort total for project rows (sum of direct subtask efforts)</span>
+  <span class="kw">const</span> projectEffortTotal = (() => {
+    <span class="kw">if</span> (task.bucket !== <span class="str">"project"</span> || currentBucket !== <span class="str">"project"</span>) <span class="kw">return null</span>;
+    <span class="kw">const</span> children = (task.childIds || [])
+      .map(id => (allTasks || []).find(t => t.id === id)).filter(Boolean);
+    <span class="kw">if</span> (!children.length) <span class="kw">return null</span>;
+    <span class="kw">const</span> totalMin = children.reduce((sum, c) => sum + <span class="fn">effortToMinutes</span>(c.effort), <span class="num">0</span>);
+    <span class="kw">return</span> <span class="fn">minutesToEffortLabel</span>(totalMin);
+  })();
+}</pre>
+</div>
+
+<!-- EFFORT TOTAL -->
+<div class="appendix-section" id="code-effort-total">
+  <div class="back"><a href="#feat-effort">↑ Effort Metadata</a></div>
+  <div class="code-block-header">
+    <span>projectEffortTotal badge — inline with project name</span>
+    <span class="file">src/App.jsx · lines 1182–1187</span>
+  </div>
+  <pre>
+&lt;div style={{ fontSize: <span class="num">13.5</span>, display: <span class="str">"flex"</span>, alignItems: <span class="str">"center"</span>, gap: <span class="num">7</span>, flexWrap: <span class="str">"wrap"</span> }}&gt;
+  &lt;span&gt;{task.text}&lt;/span&gt;
+  {projectEffortTotal && (
+    &lt;span style={{ fontSize: <span class="num">10</span>, padding: <span class="str">"1px 7px"</span>, borderRadius: <span class="num">10</span>,
+                   background: COLORS.effortBg, color: COLORS.effort,
+                   border: `1px solid ${COLORS.effort}44` }}&gt;
+      ⏱ {projectEffortTotal}
+    &lt;/span&gt;
+  )}
+&lt;/div&gt;</pre>
+</div>
+
+<!-- METADATA PANEL -->
+<div class="appendix-section" id="code-metadata-panel">
+  <div class="back"><a href="#feat-metadata">↑ Metadata Panel</a></div>
+  <div class="code-block-header">
+    <span>Expanded metadata panel — structure</span>
+    <span class="file">src/App.jsx · lines 1279–1388</span>
+  </div>
+  <pre>
+{expanded && (
+  &lt;div style={{ margin: `0 18px 8px ${18 + indent + 24}px`, padding: <span class="str">"10px 12px"</span>,
+                background: COLORS.surface2, border: `1px solid ${COLORS.border}`,
+                borderRadius: <span class="num">8</span>, display: <span class="str">"flex"</span>, flexDirection: <span class="str">"column"</span>, gap: <span class="num">10</span> }}&gt;
+    {/* ── Title (editable) ── */}
+    {/* ── Location (multi-select chips from locations list) ── */}
+    {/* ── Due Date (HTML5 date input + clear button) ── */}
+    {/* ── Priority (multi-select: Imperative / As Possible / Financial / External) ── */}
+    {/* ── Effort (single-select chips from efforts list) ── */}
+  &lt;/div&gt;
+)}</pre>
+</div>
+
+<!-- TITLE EDIT -->
+<div class="appendix-section" id="code-title-edit">
+  <div class="back"><a href="#feat-title-edit">↑ Inline Title Editing</a></div>
+  <div class="code-block-header">
+    <span>Title edit section inside expanded panel</span>
+    <span class="file">src/App.jsx · lines 1285–1312</span>
+  </div>
+  <pre>
+{/* Title */}
+&lt;div&gt;
+  &lt;div style={{ fontSize: <span class="num">10</span>, color: COLORS.muted, textTransform: <span class="str">"uppercase"</span> }}&gt;Title&lt;/div&gt;
+  &lt;div style={{ display: <span class="str">"flex"</span>, gap: <span class="num">6</span>, alignItems: <span class="str">"center"</span> }}&gt;
+    &lt;input
+      value={editTitle}
+      onChange={e => <span class="fn">setEditTitle</span>(e.target.value)}
+      onKeyDown={e => {
+        <span class="kw">if</span> (e.key === <span class="str">"Enter"</span>)  <span class="fn">saveTitle</span>();
+        <span class="kw">if</span> (e.key === <span class="str">"Escape"</span>) <span class="fn">setEditTitle</span>(task.text);
+      }}
+      <span class="cm">// Border turns blue when the draft differs from the saved title</span>
+      style={{ border: `1px solid ${editTitle !== task.text ? COLORS.project : COLORS.border}` }}
+    /&gt;
+    {editTitle !== task.text && (
+      &lt;&gt;
+        &lt;button onClick={saveTitle} disabled={!editTitle.trim()}&gt;Save&lt;/button&gt;
+        &lt;button onClick={() =&gt; <span class="fn">setEditTitle</span>(task.text)}&gt;✕&lt;/button&gt;
+      &lt;/&gt;
+    )}
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+</div>
+
+<!-- TAG DISPLAY CHIP -->
+<div class="appendix-section" id="code-tag-display-chip">
+  <div class="back"><a href="#feat-tag-display">↑ Tag Display Mode</a></div>
+  <div class="code-block-header">
+    <span>Tag display mode — conditional rendering in TaskRow</span>
+    <span class="file">src/App.jsx · lines 1188–1230</span>
+  </div>
+  <pre>
+<span class="cm">// BELOW-TEXT mode: chips rendered inside text column, under the task name</span>
+{tagDisplay !== <span class="str">"inline"</span> && !expanded && hasMetadata && (
+  &lt;div style={{ display: <span class="str">"flex"</span>, flexWrap: <span class="str">"wrap"</span>, gap: <span class="num">4</span>, marginTop: <span class="num">4</span> }}&gt;
+    {taskLocation.map(loc => &lt;span ...&gt;{loc}&lt;/span&gt;)}
+    {taskDueDate   && &lt;span ...&gt;📅 {taskDueDate}&lt;/span&gt;}
+    {taskPriority.map(p => &lt;span ...&gt;{p}&lt;/span&gt;)}
+    {taskEffort    && &lt;span ...&gt;⏱ {taskEffort}&lt;/span&gt;}
+  &lt;/div&gt;
+)}
+
+<span class="cm">// INLINE mode: chips sit in a separate flex div between text column and action buttons</span>
+{tagDisplay === <span class="str">"inline"</span> && !expanded && hasMetadata && (
+  &lt;div style={{ display: <span class="str">"flex"</span>, flexWrap: <span class="str">"wrap"</span>, gap: <span class="num">4</span>,
+                flexShrink: <span class="num">0</span>, alignSelf: <span class="str">"center"</span> }}&gt;
+    {taskLocation.map(loc => &lt;span style={{ whiteSpace: <span class="str">"nowrap"</span> }} ...&gt;{loc}&lt;/span&gt;)}
+    <span class="cm">// ... dueDate, priority, effort chips with whiteSpace: nowrap ...</span>
+  &lt;/div&gt;
+)}</pre>
+</div>
+
+<!-- ASSIGN CALLBACK -->
+<div class="appendix-section" id="code-assign-callback">
+  <div class="back"><a href="#feat-next-enhancements">↑ Next Actions Enhancements</a></div>
+  <div class="code-block-header">
+    <span>assignToProject callback</span>
+    <span class="file">src/App.jsx · lines 650–664</span>
+  </div>
+  <pre>
+<span class="kw">const</span> <span class="fn">assignToProject</span> = <span class="fn">useCallback</span>((taskId, projectId, newProjectName) => {
+  <span class="kw">if</span> (newProjectName) {
+    <span class="cm">// Create new project and link this task as its first child</span>
+    <span class="kw">const</span> newProjId = <span class="fn">genId</span>();
+    <span class="fn">setTasks</span>(prev => [
+      ...prev.map(t => t.id === taskId ? { ...t, parentId: newProjId } : t),
+      { id: newProjId, text: newProjectName.trim(), bucket: <span class="str">"project"</span>,
+        childIds: [taskId], ... },
+    ]);
+  } <span class="kw">else if</span> (projectId) {
+    <span class="cm">// Link to existing project atomically</span>
+    <span class="fn">setTasks</span>(prev => prev.map(t => {
+      <span class="kw">if</span> (t.id === taskId)    <span class="kw">return</span> { ...t, parentId: projectId };
+      <span class="kw">if</span> (t.id === projectId) <span class="kw">return</span> { ...t, childIds: [...(t.childIds || []), taskId] };
+      <span class="kw">return</span> t;
+    }));
+  }
+}, []);</pre>
+</div>
+
+<!-- ASSIGN UI -->
+<div class="appendix-section" id="code-assign-ui">
+  <div class="back"><a href="#feat-next-enhancements">↑ Next Actions Enhancements</a></div>
+  <div class="code-block-header">
+    <span>Assign to project inline panel — TaskRow JSX</span>
+    <span class="file">src/App.jsx · lines 1390–1430</span>
+  </div>
+  <pre>
+{showAssign && currentBucket === <span class="str">"next"</span> && !task.parentId && (
+  &lt;div style={{ border: `1px solid ${COLORS.project}44`, borderRadius: <span class="num">8</span>, padding: <span class="str">"10px 12px"</span> }}&gt;
+    &lt;div&gt;Assign to Project&lt;/div&gt;
+    &lt;div style={{ display: <span class="str">"flex"</span>, gap: <span class="num">6</span>, flexWrap: <span class="str">"wrap"</span> }}&gt;
+      &lt;select value={assignTarget} onChange={e => <span class="fn">setAssignTarget</span>(e.target.value)}&gt;
+        &lt;option value=<span class="str">"__new__"</span>&gt;+ New project…&lt;/option&gt;
+        {rootProjects.map(p => &lt;option key={p.id} value={p.id}&gt;{p.text}&lt;/option&gt;)}
+      &lt;/select&gt;
+      {assignTarget === <span class="str">"__new__"</span> && (
+        &lt;input value={newProjName} onChange={e => <span class="fn">setNewProjName</span>(e.target.value)}
+               onKeyDown={e => { <span class="kw">if</span> (e.key === <span class="str">"Enter"</span>) <span class="fn">handleAssign</span>(); }} /&gt;
+      )}
+      &lt;button onClick={handleAssign}&gt;Assign&lt;/button&gt;
+      &lt;button onClick={() => <span class="fn">setShowAssign</span>(<span class="kw">false</span>)}&gt;Cancel&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+)}</pre>
+</div>
+
+<!-- GROUP DIVIDER -->
+<div class="appendix-section" id="code-group-divider">
+  <div class="back"><a href="#feat-waterfall">↑ Waterfall &amp; Group-By</a></div>
+  <div class="code-block-header">
+    <span>GroupDivider — section header with count + effort total</span>
+    <span class="file">src/App.jsx · lines 1882–1893</span>
+  </div>
+  <pre>
+<span class="kw">function</span> <span class="fn">GroupDivider</span>({ label, count, effortTotal, isUngrouped }) {
+  <span class="kw">return</span> (
+    &lt;div style={{ display: <span class="str">"flex"</span>, alignItems: <span class="str">"center"</span>, gap: <span class="num">8</span>,
+                  padding: <span class="str">"8px 18px 5px"</span>, borderBottom: `1px solid ${COLORS.border}` }}&gt;
+      &lt;span style={{ fontWeight: <span class="num">600</span>, textTransform: <span class="str">"uppercase"</span> }}&gt;{label}&lt;/span&gt;
+      &lt;span style={{ background: COLORS.surface3, padding: <span class="str">"1px 6px"</span>, borderRadius: <span class="num">8</span> }}&gt;
+        {count}
+      &lt;/span&gt;
+      {effortTotal && (
+        &lt;span style={{ background: COLORS.effortBg, color: COLORS.effort,
+                       border: `1px solid ${COLORS.effort}44` }}&gt;
+          ⏱ {effortTotal}
+        &lt;/span&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<!-- LOCATION MANAGER -->
+<div class="appendix-section" id="code-location-manager">
+  <div class="back"><a href="#feat-locations">↑ Location Manager</a></div>
+  <div class="code-block-header">
+    <span>LocationManager — structure overview</span>
+    <span class="file">src/App.jsx · LocationManager component</span>
+  </div>
+  <pre>
+<span class="kw">function</span> <span class="fn">LocationManager</span>({ locations, tasks, onAdd, onRename, onRemove }) {
+  <span class="kw">const</span> [editingIdx, setEditingIdx] = <span class="fn">useState</span>(<span class="kw">null</span>);
+  <span class="kw">const</span> [removingName, setRemovingName] = <span class="fn">useState</span>(<span class="kw">null</span>);
+  <span class="kw">const</span> [replaceWith, setReplaceWith] = <span class="fn">useState</span>(<span class="str">""</span>);
+
+  <span class="kw">const</span> <span class="fn">usedByCount</span> = (name) => tasks.filter(t => (t.location || []).includes(name)).length;
+
+  <span class="cm">// Each row shows: ● name  [N tasks]  [✎ Rename]  [✕ Remove]
+  // Rename: replaces label with inline input; Enter/Escape; cascades to tasks
+  // Remove: if in-use, shows sub-row with replacement picker + Confirm button</span>
+
+  <span class="cm">// Add new location at bottom</span>
+  <span class="cm">// onAdd() silently ignores duplicates</span>
+}</pre>
+</div>
+
+<!-- EFFORT MANAGER -->
+<div class="appendix-section" id="code-effort-manager">
+  <div class="back"><a href="#feat-effort">↑ Effort Metadata</a></div>
+  <div class="code-block-header">
+    <span>EffortManager — structure overview</span>
+    <span class="file">src/App.jsx · EffortManager component</span>
+  </div>
+  <pre>
+<span class="kw">function</span> <span class="fn">EffortManager</span>({ efforts, tasks, onAdd, onRename, onRemove }) {
+  <span class="cm">// Same structure as LocationManager but simpler:
+  // - No replacement picker on remove (effort is cleared, not substituted)
+  // - Remove shows window.confirm() dialog instead of an inline sub-row
+  // - Rename cascades: setTasks maps t.effort === oldName → newName
+  // - Add: Enter key + "+ Add" button; duplicate silently ignored
+
+  // Default list initialized in GTDManager:
+  // ["2 min","5 min","10 min","30 min","1 hour","2 hours",
+  //  "6 hours","1 day","3 days","1 week","1 month"]</span>
+}</pre>
+</div>
+
+<!-- TAG DISPLAY SETTING -->
+<div class="appendix-section" id="code-tag-display-setting">
+  <div class="back"><a href="#feat-tag-display">↑ Tag Display Mode</a></div>
+  <div class="code-block-header">
+    <span>TagDisplaySetting — Settings panel component</span>
+    <span class="file">src/App.jsx · TagDisplaySetting component</span>
+  </div>
+  <pre>
+<span class="kw">function</span> <span class="fn">TagDisplaySetting</span>({ value, onChange }) {
+  <span class="kw">const</span> opts = [
+    { key: <span class="str">"below"</span>,  label: <span class="str">"Below text"</span>, desc: <span class="str">"Tags on a new line beneath the task name"</span> },
+    { key: <span class="str">"inline"</span>, label: <span class="str">"Inline"</span>,      desc: <span class="str">"Tags between the task name and the chevron"</span> },
+  ];
+  <span class="kw">return</span> (
+    &lt;div style={{ display: <span class="str">"flex"</span>, gap: <span class="num">8</span> }}&gt;
+      {opts.map(opt => {
+        <span class="kw">const</span> active = value === opt.key;
+        <span class="kw">return</span> (
+          &lt;button
+            key={opt.key}
+            onClick={() => <span class="fn">onChange</span>(opt.key)}
+            style={{ border: `1px solid ${active ? COLORS.project : COLORS.border}`,
+                     background: active ? COLORS.project + <span class="str">"22"</span> : COLORS.surface2 }}
+          &gt;
+            &lt;div style={{ fontWeight: <span class="num">600</span> }}&gt;{opt.label}&lt;/div&gt;
+            &lt;div style={{ fontSize: <span class="num">11</span> }}&gt;{opt.desc}&lt;/div&gt;
+          &lt;/button&gt;
+        );
+      })}
+    &lt;/div&gt;
+  );
+}</pre>
+</div>
+
+<!-- ADD PROJECT TASK -->
+<div class="appendix-section" id="code-add-project-task">
+  <div class="back"><a href="#feat-project-add">↑ Project Task Creation</a></div>
+  <div class="code-block-header">
+    <span>addProjectTask — context-aware project/subtask creation</span>
+    <span class="file">src/App.jsx · lines 613–635</span>
+  </div>
+  <pre>
+<span class="kw">const</span> <span class="fn">addProjectTask</span> = () => {
+  <span class="kw">const</span> text = addText.trim();
+  <span class="kw">if</span> (!text) <span class="kw">return</span>;
+  <span class="kw">if</span> (projectParentId === <span class="str">"__new__"</span>) {
+    <span class="cm">// Create a new root project</span>
+    <span class="fn">setTasks</span>(prev => [
+      { id: <span class="fn">genId</span>(), text, bucket: <span class="str">"project"</span>, childIds: [], ... },
+      ...prev,
+    ]);
+  } <span class="kw">else</span> {
+    <span class="cm">// Add as next-action child of an existing project</span>
+    <span class="kw">const</span> childId = <span class="fn">genId</span>();
+    <span class="fn">setTasks</span>(prev => [
+      ...prev.map(t =>
+        t.id === projectParentId
+          ? { ...t, childIds: [...(t.childIds || []), childId] }
+          : t
+      ),
+      { id: childId, text, bucket: <span class="str">"next"</span>, parentId: projectParentId, ... },
+    ]);
+  }
+  <span class="fn">setAddText</span>(<span class="str">""</span>);
+};</pre>
+</div>
+
+</section>
+
+<hr>
+
+<!-- ════════════════════════════════════════
+     APPENDIX B — GIT COMMIT LOG
+     ════════════════════════════════════════ -->
+<section id="appendix-b">
+<h2>Appendix B — Git Commit Log</h2>
+<p style="color:var(--muted);font-size:12px;margin-bottom:32px;">All commits are on the <code>main</code> branch of <code>C:\Programming_Projects\GTDWorkflowApp</code>. Listed oldest-to-newest.</p>
+
+<div class="commit">
+  <div class="commit-hash">058bedd · 2026-04-24</div>
+  <div class="commit-msg">Initial commit: GTD Manager React app with AI Coach</div>
+  <div class="commit-note">The starting point: a single-file React app (<code>App.jsx</code>) with the five GTD buckets, a basic task list, and a working AI coach connected to the Anthropic API. Tasks persist to localStorage. No build tooling yet — the file was written to run as a Claude Artifact.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">81d5059 · 2026-04-24</div>
+  <div class="commit-msg">Add Vite build setup and scaffold React entry point</div>
+  <div class="commit-note">Moved the app from Artifact-only to a standalone Vite project. Added <code>package.json</code>, <code>vite.config.js</code>, <code>index.html</code>, and <code>src/main.jsx</code>. Added the Anthropic API key header required for direct browser-origin fetches (<code>anthropic-dangerous-direct-browser-access</code>). Added <code>.env.example</code> and <code>launch.bat</code> for one-click local startup.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">28e0c25 · 2026-04-24</div>
+  <div class="commit-msg">Add Open WebUI provider support with dynamic model switching</div>
+  <div class="commit-note">Introduced <code>callAI()</code> as a provider-aware replacement for the hardcoded <code>callClaude()</code>. The coach panel header gained a ProviderSelector dropdown. When "Local" is selected, the app fetches available models from the Open WebUI <code>/api/models</code> endpoint and populates a live model list. Provider and model choices persist to localStorage.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">8d73f4c · 2026-04-24</div>
+  <div class="commit-msg">Smart inbox processing: auto-continue, project subtasks, parent links</div>
+  <div class="commit-note">Major overhaul of the inbox processing loop. The AI now uses a structured <code>→ACTION:type|title|nextAction</code> protocol, enabling multi-step decisions (project creation vs. single action) in one reply. After confirming a move, the next inbox item is automatically fed to the AI. Processed items are archived to Inbox History rather than deleted. A PendingActionBar shows the reworded title before commit.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">5cde89e · 2026-04-24</div>
+  <div class="commit-msg">Phase 1: task metadata panel — location, due date, priority fields</div>
+  <div class="commit-note">Added the collapsible chevron panel to every task row. Location (multi-select from a configurable list), Due Date (HTML5 date picker), and Priority (multi-select: Imperative, As Possible, Financial, External) can now be set on any task. Summary chips appear below the task text when the panel is collapsed and any field is set.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">6c37280 · 2026-04-24</div>
+  <div class="commit-msg">Phase 2: location settings manager</div>
+  <div class="commit-note">Added a Settings panel accessible from the sidebar. The LocationManager component lists all locations with usage counts, supports inline rename (cascades to tasks), and provides a remove flow with a replacement picker when the location is in use.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">68ef357 · 2026-04-24</div>
+  <div class="commit-msg">Phase 3: Next Actions waterfall + group-by</div>
+  <div class="commit-note">Introduced <code>waterfallFilter()</code> to hide downstream steps until their parent is complete. Added a Group-By toolbar with Location, Due Date, and Priority options, backed by the <code>groupByField()</code> pure function. Added the <code>GroupDivider</code> component.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">ffc7764 · 2026-04-24</div>
+  <div class="commit-msg">Phase 4: project task creation improvements</div>
+  <div class="commit-note">The add-row in the Projects view became context-aware. A dropdown controls whether the input creates a new root project or a next-action subtask under an existing project. The button label and placeholder adapt accordingly. Selecting a parent updates both the new child's <code>parentId</code> and the parent's <code>childIds</code> array.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">186bf3e · 2026-04-24</div>
+  <div class="commit-msg">Phase 5: HTML5 drag-and-drop in Projects view</div>
+  <div class="commit-note">Replaced the flat Projects list with a recursive <code>ProjectTree</code> component supporting up to 5 levels of nesting. Every task row is draggable. Drop position is computed from mouse Y position (before / inside / after). The pure <code>moveTaskInTree()</code> function handles all structural mutations including circular-reference prevention.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">879e53a · 2026-04-24</div>
+  <div class="commit-msg">Phase 6: AI Project Review flow</div>
+  <div class="commit-note">A "Review Projects" button in the Projects header triggers a sequential AI review of all active projects. The AI uses the <code>projectReview</code> system prompt to assess each project and suggest missing next actions in a parseable <code>→SUGGESTIONS:</code> block. The coach panel shows these as checkboxes; checked items are created as subtasks on confirm.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">053cffd · 2026-04-24</div>
+  <div class="commit-msg">Add Project group-by to Next Actions</div>
+  <div class="commit-note">Added "Project" as a sixth group-by option. The <code>groupByField()</code> function was extended to walk the <code>parentId</code> chain of each Next Action to find its root project name. Tasks with no parent project fall into a "No Project" group. The <code>GroupDivider</code> label was made dynamic to show appropriate fallback text per field type.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">61b3b06 · 2026-04-24</div>
+  <div class="commit-msg">Add Effort metadata field — chip display, selector, project totals, EffortManager in Settings</div>
+  <div class="commit-note">Added an Effort single-select field to every task. Two new pure helpers, <code>effortToMinutes()</code> and <code>minutesToEffortLabel()</code>, power both the per-task chip display and the project-row effort total badge. The EffortManager settings component mirrors LocationManager but uses a simpler remove flow (no replacement needed). The default effort list has eleven entries from "2 min" to "1 month".</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">f98d445 · 2026-04-24</div>
+  <div class="commit-msg">Next Actions: group effort totals in dividers + assign unaffiliated tasks to project</div>
+  <div class="commit-note">Each GroupDivider in Next Actions now shows a cumulative <code>⏱</code> effort badge summed across the group's tasks. Added the "Assign to Project" (📁) button on unparented Next Actions, with an inline panel offering a dropdown of existing projects plus a "New project…" path that creates a new project and links the task simultaneously.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">4de6b06 · 2026-04-24</div>
+  <div class="commit-msg">Next Actions: add Effort group-by option, sorted shortest-to-longest</div>
+  <div class="commit-note">Extended <code>groupByField()</code> with an <code>"effort"</code> branch and updated its sort to use duration-based comparison when the field is effort, rather than alphabetical order. Added "Effort" to the Group-By toolbar. Tasks with no effort set fall into a "No Effort" group.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">6f2abf9 · 2026-04-24</div>
+  <div class="commit-msg">Add inline tag display mode — toggle between below-text and inline in Settings</div>
+  <div class="commit-note">Added <code>tagDisplay</code> state (<code>"below"</code> | <code>"inline"</code>) persisted to localStorage. In "inline" mode, metadata chips are rendered in a flex div between the text column and the action buttons rather than below the task name. A <code>TagDisplaySetting</code> two-button toggle at the top of the Settings panel controls the mode globally.</div>
+</div>
+
+<div class="commit">
+  <div class="commit-hash">988d26a · 2026-04-24</div>
+  <div class="commit-msg">Add inline title editing to expanded metadata panel (all views)</div>
+  <div class="commit-note">The first field in the expanded chevron panel is now an editable "Title" input pre-filled with the task's current text. Local <code>editTitle</code> state tracks the draft; a <code>useEffect</code> syncs it if the text changes externally. The input border turns blue when dirty. Enter saves, Escape reverts. Save/✕ buttons appear only when there is an unsaved change.</div>
+</div>
+
+</section>
+
+</main>
+</div>
+</body>
+</html>
