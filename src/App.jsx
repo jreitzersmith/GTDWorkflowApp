@@ -3,7 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  // Disable auto URL detection so Supabase doesn't consume Google OAuth ?code= params.
+  // We manually exchange Supabase magic-link codes in the auth useEffect instead.
+  { auth: { detectSessionInUrl: false } }
 );
 
 const COLORS = {
@@ -834,18 +837,20 @@ export default function GTDManager() {
       return access_token;
     } catch { return null; }
   });
-  // Capture Google OAuth callback data synchronously during render — before any useEffects
-  // run — so Supabase's ?code= URL detection can't consume our code first.
+  // Capture Google OAuth callback data synchronously during render.
+  // Google callbacks have state starting with 'gtd_'; Supabase magic-link codes don't.
   const [pendingGoogleAuth] = useState(() => {
     try {
       const p = new URLSearchParams(window.location.search);
       const code = p.get('code');
       const state = p.get('state');
+      // Must look like our Google callback (state prefix) — not a Supabase magic link
+      if (!code || !state?.startsWith('gtd_')) return null;
+      // CSRF check: state must match what we stored before the redirect
       const storedState = sessionStorage.getItem('gtd_google_oauth_state');
-      if (!code || !state || !storedState || state !== storedState) return null;
+      if (!storedState || state !== storedState) return null;
       const verifier = sessionStorage.getItem('gtd_google_pkce_verifier');
       if (!verifier) return null;
-      // Consume both immediately so nothing else can race us
       sessionStorage.removeItem('gtd_google_oauth_state');
       sessionStorage.removeItem('gtd_google_pkce_verifier');
       return { code, verifier };
@@ -906,6 +911,15 @@ export default function GTDManager() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthUser(session?.user ?? null);
     });
+    // Manually exchange Supabase magic-link ?code= (detectSessionInUrl is disabled).
+    // Google OAuth codes have state starting with 'gtd_' — skip those here.
+    const _p = new URLSearchParams(window.location.search);
+    const _code = _p.get('code');
+    const _state = _p.get('state');
+    if (_code && !_state?.startsWith('gtd_')) {
+      supabase.auth.exchangeCodeForSession(_code)
+        .then(({ error }) => { if (error) console.error('Supabase code exchange:', error); });
+    }
     return () => subscription.unsubscribe();
   }, []);
 
