@@ -167,7 +167,7 @@ async function doWebSearch(query) {
 // ── Gmail tool (Anthropic tool use) ──────────────────────────────────────────
 const GMAIL_SEARCH_TOOL = {
   name: "gmail_search",
-  description: "Search the user's Gmail inbox for emails. Use this when the user asks about emails, correspondence, commitments made via email, or wants to find messages from a specific sender or about a specific topic. Supports Gmail search operators like from:, to:, subject:, has:attachment, after:, before:.",
+  description: "Search the user's Gmail for emails. Use this when the user asks about emails, correspondence, commitments made via email, or wants to find messages from a specific sender or about a specific topic. Supports Gmail search operators: from:, to:, subject:, has:attachment, after:2024/01/01, before:, is:unread, in:inbox, in:sent, label:. Always use 'in:inbox' (not bare 'inbox') when filtering to the inbox. Results include a 'Gmail-ID' field — use that exact value when calling gmail_label.",
   input_schema: {
     type: "object",
     properties: {
@@ -196,23 +196,27 @@ async function doGmailSearch(query, token) {
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=10`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!listRes.ok) throw new Error(`Gmail API error: ${listRes.status}`);
+  if (!listRes.ok) { const d = await listRes.json(); throw new Error(d.error?.message || `Gmail API ${listRes.status}`); }
   const listData = await listRes.json();
   const messages = listData.messages || [];
   if (!messages.length) return "No emails found matching that query.";
-  const details = await Promise.all(
+  const details = (await Promise.all(
     messages.slice(0, 5).map(async ({ id }) => {
-      const msgRes = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata`
-        + `&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const msg = await msgRes.json();
-      const hdrs = msg.payload?.headers || [];
-      const get = (name) => hdrs.find(h => h.name === name)?.value || '';
-      return `Message-ID: ${id}\nFrom: ${get('From')}\nDate: ${get('Date')}\nSubject: ${get('Subject')}\nSnippet: ${msg.snippet || ''}`;
+      try {
+        const msgRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata`
+          + `&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!msgRes.ok) return null; // message moved/deleted between list and get
+        const msg = await msgRes.json();
+        const hdrs = msg.payload?.headers || [];
+        const get = (name) => hdrs.find(h => h.name === name)?.value || '';
+        return `Gmail-ID: ${id}\nFrom: ${get('From')}\nDate: ${get('Date')}\nSubject: ${get('Subject')}\nSnippet: ${msg.snippet || ''}`;
+      } catch { return null; }
     })
-  );
+  )).filter(Boolean);
+  if (!details.length) return "No emails found matching that query.";
   return `Found ${messages.length} email(s). Top ${details.length} result(s):\n\n${details.join('\n\n---\n\n')}`;
 }
 
@@ -224,7 +228,7 @@ const GMAIL_LIST_LABELS_TOOL = {
 
 const GMAIL_LABEL_TOOL = {
   name: "gmail_label",
-  description: "Apply or remove labels on a Gmail message — e.g. add STARRED, apply a custom label, or mark as read (remove UNREAD). Requires Organize access or higher.",
+  description: "Apply or remove labels on a Gmail message — e.g. add STARRED, apply a custom label, or mark as read (remove UNREAD). The message_id must be the 'Gmail-ID' value from gmail_search results (a hex string like '18f1a2b3c4d5'). Always call gmail_list_labels first to resolve a label name to its ID before calling this tool. Requires Organize access or higher.",
   input_schema: {
     type: "object",
     properties: {
