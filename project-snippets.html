@@ -107,7 +107,7 @@
     <span class="current">📝 Code Snippets</span>
     <a href="project-commits.html">📦 Commit Log</a>
   </div>
-  <span class="updated">Last updated: 2026-04-29</span>
+  <span class="updated">Last updated: 2026-04-30</span>
 </header>
 
 <div class="shell">
@@ -172,6 +172,9 @@
   <a href="#snip-complete-task-rollup">completeTask() — roll-up</a>
   <a href="#snip-handle-rollup-confirm">handleRollupConfirm()</a>
   <a href="#snip-note-rollup-prompt">NoteRollupPrompt</a>
+  <div class="group-label">Integrations</div>
+  <a href="#snip-web-search">Web Search (Tavily)</a>
+  <a href="#snip-gmail-oauth">Gmail OAuth2 PKCE</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -3314,6 +3317,101 @@ if (provider === "claude") {
     Review, Brain Dump, Project Review) have tightly scripted prompts and don't benefit
     from web search. Keeping tools out of those modes avoids unexpected latency and
     keeps the interaction model predictable.
+  </div>
+</div>
+
+
+<div class="snip-card" id="snip-gmail-oauth">
+  <div class="snip-header">
+    <span class="snip-title">Gmail OAuth2 PKCE — StrictMode-safe token exchange</span>
+    <span class="snip-file">src/App.jsx</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// ── PKCE helpers ────────────────────────────────────────────────────
+function generateCodeVerifier() {
+  const array = new Uint8Array(64);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+async function generateCodeChallenge(verifier) {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// ── Supabase: disable auto URL detection ────────────────────────────
+// createClient() runs at module load, before React renders, and scans
+// window.location.search for ?code=. Without this option, Supabase
+// would consume our Google OAuth code immediately.
+const supabase = createClient(url, key, { auth: { detectSessionInUrl: false } });
+
+// ── Synchronous capture (READ-ONLY — no side effects) ───────────────
+// React StrictMode double-invokes useState initializers; any removeItem()
+// on the first call leaves the second call with nothing. Keep this pure.
+const [pendingGoogleAuth] = useState(() => {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const code = p.get('code');
+    const state = p.get('state');
+    // gtd_ prefix discriminates Google callbacks from Supabase magic links
+    if (!code || !state?.startsWith('gtd_')) return null;
+    const stored = JSON.parse(localStorage.getItem('gtd_google_pkce') || 'null');
+    if (!stored || Date.now() - stored.ts > 300000 || state !== stored.state) return null;
+    return { code, verifier: stored.verifier }; // NO removeItem here
+  } catch { return null; }
+});
+
+// ── Token exchange: atomic localStorage claim as StrictMode mutex ───
+// localStorage.getItem('gtd_google_pkce') acts as a one-shot mutex:
+// first StrictMode run claims + removes it; second run finds it gone and exits.
+useEffect(() => {
+  if (!pendingGoogleAuth) return;
+  const pkceRaw = localStorage.getItem('gtd_google_pkce'); // claim
+  if (!pkceRaw) return;                                     // already claimed
+  localStorage.removeItem('gtd_google_pkce');
+  window.history.replaceState({}, document.title, window.location.pathname);
+  const { code, verifier } = pendingGoogleAuth;
+  (async () => {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
+        client_secret: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_SECRET, // required even for Desktop creds
+        code, code_verifier: verifier,
+        grant_type: 'authorization_code',
+        redirect_uri: window.location.origin,
+      }),
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      const expiry = Date.now() + (data.expires_in || 3600) * 1000;
+      localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, expiry }));
+      setGoogleToken(data.access_token);
+      setGmailError(null);
+    } else {
+      setGmailError(`Google error: ${data.error_description || data.error}`);
+    }
+  })();
+}, [pendingGoogleAuth]);</code></pre></div>
+  <div class="snip-note">
+    <strong>Why PKCE?</strong> PKCE (Proof Key for Code Exchange) lets a browser-only app
+    obtain a Google access token without ever sending a static client secret over the
+    network. A random 64-byte verifier is hashed with SHA-256 to produce a challenge sent
+    with the auth request; Google verifies the raw verifier against the stored hash at
+    exchange time. An eavesdropper who intercepts the authorization code can't use it
+    without the verifier.<br><br>
+    <strong>The StrictMode mutex pattern.</strong> React 18 StrictMode double-invokes
+    <code>useEffect</code> callbacks (mount → unmount → remount) in development. Using
+    <code>localStorage.getItem</code> as a one-shot claim — check for the entry, return
+    early if absent, remove it if present — means the second invocation is a no-op.
+    This prevents a second token-exchange request that would fail with
+    <code>invalid_grant</code> (authorization codes are single-use).<br><br>
+    <strong>Desktop app credential.</strong> Google requires <code>client_secret</code>
+    in the token exchange body even for Desktop app OAuth credentials. Web app credentials
+    require a registered redirect URI (e.g. <code>http://localhost:5173</code>); Desktop
+    app credentials don't — making them more convenient for local dev.
   </div>
 </div>
 

@@ -224,7 +224,7 @@
   <a href="project-summary.html" class="active">📄 Feature Summary</a>
   <a href="project-snippets.html">🔬 Code Snippets</a>
   <a href="project-commits.html">📜 Commit Log</a>
-  <span class="updated">Last updated: 2026-04-29</span>
+  <span class="updated">Last updated: 2026-04-30</span>
 </nav>
 
 <div class="layout">
@@ -279,6 +279,12 @@
     <li><a href="#feat-recurring">Recurring Tasks</a></li>
     <li><a href="#feat-import-export">Backup Import / Export</a></li>
   </ul>
+
+  <div class="section-label">Integrations</div>
+  <ul>
+    <li><a href="#feat-web-search">Web Search (Tavily)</a></li>
+    <li><a href="#feat-gmail">Gmail (OAuth2 PKCE)</a></li>
+  </ul>
 </aside>
 
 <!-- MAIN -->
@@ -295,7 +301,7 @@
       <div class="info-item"><div class="label">Styling</div><div class="value">Inline styles only</div></div>
       <div class="info-item"><div class="label">Persistence</div><div class="value">localStorage</div></div>
       <div class="info-item"><div class="label">AI</div><div class="value">Claude Sonnet 4.5 (Anthropic API)</div></div>
-      <div class="info-item"><div class="label">Total commits</div><div class="value">33 across 4 sessions</div></div>
+      <div class="info-item"><div class="label">Total commits</div><div class="value">35+ across 5 sessions</div></div>
     </div>
   </div>
 
@@ -1628,6 +1634,96 @@ Marriott downtown. Confirmation #XYZ123.</pre>
     </p>
     <div class="link-row">
       <a class="link-chip chip-commit" href="project-commits.html#commit-67fb83e">📜 67fb83e — Web search via Tavily tool use</a>
+    </div>
+  </section>
+
+
+  <section class="feat" id="feat-gmail">
+    <div class="feat-header">
+      <span class="feat-icon">📧</span>
+      <span class="feat-title">AI Coach — Gmail Integration (OAuth2 PKCE)</span>
+      <span class="feat-badge badge-new">New</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        The AI Coach can now read the user's Gmail inbox. When Gmail is connected and the
+        user asks a question in Chat mode, Claude can call the <code>gmail_search</code>
+        tool to query Gmail and retrieve message metadata (From, Date, Subject, Snippet)
+        for up to 5 matching messages. The tool is only injected into the tool-use loop
+        when a valid Google access token is present — it's invisible to users who haven't
+        connected Gmail.
+      </p>
+      <p>
+        Authentication uses <strong>OAuth2 PKCE</strong> (Proof Key for Code Exchange), which
+        allows a browser-only app to obtain a Google access token without ever exposing a
+        client secret in the network request. A random 64-byte <em>code verifier</em> is
+        generated via <code>crypto.getRandomValues</code>, hashed with SHA-256 to produce a
+        <em>code challenge</em>, and sent with the authorization request. Google validates the
+        verifier against the hash during the token exchange. A random <code>state</code>
+        parameter prefixed with <code>gtd_</code> provides CSRF protection and discriminates
+        Google callbacks from Supabase magic-link codes.
+      </p>
+      <p>
+        A <strong>Connect Gmail / Disconnect</strong> button lives in the Settings panel.
+        When not connected, any OAuth error (wrong client, expired PKCE, token exchange
+        failure) is displayed inline below the connect button so the user can diagnose the
+        problem without opening DevTools.
+      </p>
+      <h3>Key implementation details</h3>
+      <p>
+        Several tricky problems were solved to make this work reliably:
+      </p>
+      <p>
+        <strong>Supabase ?code= collision.</strong> Supabase v2's <code>createClient</code>
+        runs at module load time — before React renders — and scans
+        <code>window.location.search</code> for a <code>?code=</code> parameter to attempt
+        a PKCE session exchange. This would silently consume our Google OAuth code. Fix:
+        pass <code>{ auth: { detectSessionInUrl: false } }</code> to <code>createClient</code>,
+        then manually call <code>supabase.auth.exchangeCodeForSession(code)</code> in the
+        auth <code>useEffect</code> for codes that <em>don't</em> have a <code>gtd_</code>
+        state prefix (those are Supabase magic-link codes).
+      </p>
+      <p>
+        <strong>React StrictMode purity.</strong> React 18's StrictMode double-invokes
+        <code>useState</code> initializer functions to detect side effects. The first call
+        read and removed the PKCE entry from <code>localStorage</code>; the second call
+        found it gone and returned <code>null</code> — React used the second result as the
+        final state value, so <code>pendingGoogleAuth</code> was always <code>null</code>.
+        Fix: the <code>useState</code> initializer is now pure (read-only, no
+        <code>removeItem</code>). The <code>useEffect</code> that performs the token exchange
+        uses an <em>atomic claim</em> pattern — it calls <code>localStorage.getItem</code>
+        as a mutex: the first StrictMode run claims and removes the entry; the second run
+        finds it gone and exits immediately, preventing a duplicate exchange request.
+      </p>
+      <p>
+        <strong>sessionStorage vs. localStorage.</strong> PKCE data was originally stored in
+        <code>sessionStorage</code>, which browsers can clear across cross-origin navigations
+        (the Google auth redirect). Switched to <code>localStorage</code> with a 5-minute
+        expiry timestamp.
+      </p>
+      <p>
+        <strong>Desktop app credential + client_secret.</strong> Google requires a
+        <code>client_secret</code> in the token exchange request even for Desktop app
+        credentials. The app uses the Desktop app credential type (which does not require
+        registering redirect URIs for localhost) and passes
+        <code>VITE_GOOGLE_DESKTOPCLIENT_SECRET</code> in the token exchange body.
+      </p>
+    </div>
+    <h3>Setup</h3>
+    <p>
+      In <a href="https://console.cloud.google.com/apis/credentials">Google Cloud Console</a>,
+      create a <strong>Desktop app</strong> OAuth 2.0 credential. Copy the client ID and
+      secret into <code>.env</code>:
+    </p>
+    <pre><code>VITE_GOOGLE_DESKTOPCLIENT_ID=&lt;your desktop client id&gt;
+VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
+    <p>
+      Also add your Google account email as a test user in the OAuth consent screen
+      (APIs &amp; Services → OAuth consent screen → Test users) — required while the app
+      is in "Testing" verification status.
+    </p>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-7d52046">📜 7d52046 — Gmail OAuth2 PKCE integration</a>
     </div>
   </section>
 

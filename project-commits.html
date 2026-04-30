@@ -110,7 +110,7 @@
     <a href="project-snippets.html">📝 Code Snippets</a>
     <span class="current">📦 Commit Log</span>
   </div>
-  <span class="updated">Last updated: 2026-04-29 (10 new commits)</span>
+  <span class="updated">Last updated: 2026-04-30 (2 new commits)</span>
 </header>
 
 <div class="shell">
@@ -155,12 +155,15 @@
   <a href="#commit-9000fb5">9000fb5 · Project reassign</a>
   <a href="#commit-450857c">450857c · Resizable panels</a>
   <a href="#commit-66af510">66af510 · Launch script</a>
+  <div class="date-group">April 30</div>
+  <a href="#commit-67fb83e">67fb83e · Web search (Tavily)</a>
+  <a href="#commit-7d52046">7d52046 · Gmail OAuth2 PKCE</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
 <main>
 <h1>Git Commit Log</h1>
-<div class="subtitle">Appendix B · 33 commits on <code>main</code> · C:\Programming_Projects\GTDWorkflowApp · Oldest first</div>
+<div class="subtitle">Appendix B · 35 commits on <code>main</code> · C:\Programming_Projects\GTDWorkflowApp · Oldest first</div>
 
 <h2>April 24 — Project Bootstrap &amp; Core Features</h2>
 
@@ -1101,6 +1104,48 @@
     validation error from the API.
   </div>
   <div class="commit-back"><a href="project-summary.html#feat-web-search">↑ Feature: Web Search</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-7d52046">
+  <div class="commit-meta"><span class="commit-hash">7d52046</span><span class="commit-date">2026-04-30</span></div>
+  <div class="commit-msg">feat: Gmail OAuth2 PKCE integration for AI Coach</div>
+  <div class="commit-body">
+    Added <code>GMAIL_SEARCH_TOOL</code>, <code>generateCodeVerifier()</code>,
+    <code>generateCodeChallenge()</code>, and <code>doGmailSearch()</code> at module level.
+    Token exchange uses a Desktop app credential with <code>client_secret</code>.
+    PKCE data stored in <code>localStorage</code> (not <code>sessionStorage</code>)
+    with a 5-minute expiry and a <code>gtd_</code>-prefixed <code>state</code> param
+    for CSRF protection and Supabase code discrimination.
+    <code>createClient</code> updated with <code>{ auth: { detectSessionInUrl: false } }</code>
+    to prevent Supabase from consuming the Google <code>?code=</code> param at module load
+    time; auth <code>useEffect</code> now manually calls
+    <code>exchangeCodeForSession</code> for non-<code>gtd_</code> codes.
+    <code>pendingGoogleAuth</code> useState initializer is side-effect-free (pure read);
+    token exchange <code>useEffect</code> uses an atomic localStorage claim as a StrictMode
+    double-run guard. Connect/Disconnect button and inline error display added to Settings.
+    <code>.env.example</code> updated with Desktop and Web client vars.
+  </div>
+  <div class="commit-lesson">
+    <strong>React StrictMode double-invokes useState initializers.</strong> Any
+    side effect inside a <code>useState(() =&gt; ...)</code> initializer (like
+    <code>localStorage.removeItem</code>) will run twice in development, with React
+    using the <em>second</em> return value as the final state. Keep initializers
+    pure — read only. Move cleanup into a <code>useEffect</code> and use an atomic
+    "claim and remove" pattern (<code>getItem</code> → guard → <code>removeItem</code>)
+    so the second StrictMode effect invocation exits early without a duplicate
+    side-effect.
+  </div>
+  <div class="commit-lesson">
+    <strong>Supabase v2 PKCE intercepts ?code= at module load time.</strong>
+    <code>createClient()</code> at the top of the file runs before React renders and
+    checks <code>window.location.search</code> immediately. If your app also handles
+    OAuth callbacks via URL params, pass <code>{ auth: { detectSessionInUrl: false } }</code>
+    and manually call <code>exchangeCodeForSession</code> in your auth
+    <code>useEffect</code> — using a discriminating prefix on the <code>state</code>
+    param to tell your callbacks apart.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail">↑ Feature: Gmail Integration</a></div>
 </div>
 
 
