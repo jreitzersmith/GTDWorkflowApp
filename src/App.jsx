@@ -216,6 +216,110 @@ async function doGmailSearch(query, token) {
   return `Found ${messages.length} email(s). Top ${details.length} result(s):\n\n${details.join('\n\n---\n\n')}`;
 }
 
+const GMAIL_LABEL_TOOL = {
+  name: "gmail_label",
+  description: "Apply or remove labels on a Gmail message — e.g. add STARRED, apply a custom label, or mark as read (remove UNREAD). Requires Organize access or higher.",
+  input_schema: {
+    type: "object",
+    properties: {
+      message_id:      { type: "string", description: "Gmail message ID" },
+      add_label_ids:   { type: "array", items: { type: "string" }, description: "Label IDs to add (system: STARRED, IMPORTANT, UNREAD; or custom label IDs)" },
+      remove_label_ids:{ type: "array", items: { type: "string" }, description: "Label IDs to remove (e.g. UNREAD to mark as read, INBOX to archive)" },
+    },
+    required: ["message_id"],
+  },
+};
+
+const GMAIL_COMPOSE_TOOL = {
+  name: "gmail_compose",
+  description: "Create a draft email or reply in Gmail. The draft is saved but NOT sent — the user reviews it first. Requires Compose access or higher.",
+  input_schema: {
+    type: "object",
+    properties: {
+      to:        { type: "string", description: "Recipient email address(es), comma-separated" },
+      subject:   { type: "string", description: "Email subject" },
+      body:      { type: "string", description: "Email body in plain text" },
+      thread_id: { type: "string", description: "Thread ID to reply to — omit for a new email" },
+    },
+    required: ["to", "subject", "body"],
+  },
+};
+
+const GMAIL_SEND_TOOL = {
+  name: "gmail_send",
+  description: "Send an email from the user's Gmail account. Only use when the user explicitly asks to send — not just draft — an email. Requires Send access.",
+  input_schema: {
+    type: "object",
+    properties: {
+      to:        { type: "string", description: "Recipient email address(es), comma-separated" },
+      subject:   { type: "string", description: "Email subject" },
+      body:      { type: "string", description: "Email body in plain text" },
+      thread_id: { type: "string", description: "Thread ID to reply to — omit for a new email" },
+    },
+    required: ["to", "subject", "body"],
+  },
+};
+
+// Display metadata for Gmail scope levels — used in Settings UI
+const GMAIL_SCOPE_OPTS = [
+  { key: 'readonly', label: 'Read only', desc: 'Search and read emails' },
+  { key: 'modify',   label: 'Organize',  desc: '+ label, archive, mark read/unread' },
+  { key: 'compose',  label: 'Compose',   desc: '+ create drafts and replies' },
+  { key: 'send',     label: 'Send',      desc: '+ send emails directly' },
+];
+const GMAIL_SCOPE_DISPLAY = { readonly: 'read only', modify: 'organize', compose: 'compose', send: 'send' };
+
+// Modify message labels (requires gmail.modify scope)
+async function doGmailLabel(messageId, addLabelIds, removeLabelIds, token) {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addLabelIds: addLabelIds || [], removeLabelIds: removeLabelIds || [] }),
+    }
+  );
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  return { success: true, message_id: messageId };
+}
+
+// Build a base64url-encoded RFC 2822 message for the Gmail API
+function buildRawMessage(to, subject, body) {
+  const lines = [`To: ${to}`, `Subject: ${subject}`, 'Content-Type: text/plain; charset=utf-8', '', body];
+  return btoa(unescape(encodeURIComponent(lines.join('\r\n'))))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// Create a draft email (requires gmail.compose scope)
+async function doGmailCompose(to, subject, body, threadId, token) {
+  const raw = buildRawMessage(to, subject, body);
+  const payload = { message: { raw } };
+  if (threadId) payload.message.threadId = threadId;
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const data = await res.json();
+  return { draft_id: data.id, status: 'Draft created \u2014 not yet sent' };
+}
+
+// Send an email (requires gmail.send scope)
+async function doGmailSend(to, subject, body, threadId, token) {
+  const raw = buildRawMessage(to, subject, body);
+  const payload = { raw };
+  if (threadId) payload.threadId = threadId;
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const data = await res.json();
+  return { message_id: data.id, status: 'Email sent successfully' };
+}
+
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 // ── Supabase field mappers (camelCase ↔ snake_case) ──────────────────────────
@@ -827,8 +931,12 @@ export default function GTDManager() {
   });
   const [tagDisplay,  setTagDisplay]  = useState(() => localStorage.getItem("gtd_tag_display") || "below");
   const [showSettings, setShowSettings] = useState(false);
-  // Google / Gmail OAuth token (null = disconnected) + error message for display
+  // Google / Gmail OAuth token (null = disconnected) + access level + error message
   const [gmailError, setGmailError] = useState(null);
+  const [googleScope, setGoogleScope] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_google_token') || 'null')?.scope || null; }
+    catch { return null; }
+  });
   const [googleToken, setGoogleToken] = useState(() => {
     try {
       const stored = localStorage.getItem('gtd_google_token');
@@ -1075,6 +1183,7 @@ export default function GTDManager() {
     const pkceRaw = localStorage.getItem('gtd_google_pkce');
     if (!pkceRaw) return;
     localStorage.removeItem('gtd_google_pkce');
+    const pkceScope = (() => { try { return JSON.parse(pkceRaw).scope || 'readonly'; } catch { return 'readonly'; } })();
     window.history.replaceState({}, document.title, window.location.pathname);
     const { code, verifier } = pendingGoogleAuth;
     console.log('[Gmail OAuth] Exchanging code for token...');
@@ -1096,8 +1205,9 @@ export default function GTDManager() {
         console.log('[Gmail OAuth] Exchange response:', data.access_token ? 'SUCCESS' : data.error);
         if (data.access_token) {
           const expiry = Date.now() + (data.expires_in || 3600) * 1000;
-          localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, expiry }));
+          localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, expiry, scope: pkceScope }));
           setGoogleToken(data.access_token);
+          setGoogleScope(pkceScope);
           setGmailError(null);
         } else {
           const msg = data.error_description || data.error || JSON.stringify(data);
@@ -1111,17 +1221,23 @@ export default function GTDManager() {
     })();
   }, [pendingGoogleAuth]);
 
-  const signInWithGoogle = useCallback(async () => {
+  const signInWithGoogle = useCallback(async (accessLevel = 'readonly') => {
     const verifier = generateCodeVerifier();
     const challenge = await generateCodeChallenge(verifier);
     const state = 'gtd_' + generateCodeVerifier().slice(0, 16);
     // localStorage persists across cross-origin redirects; sessionStorage can be cleared
-    localStorage.setItem('gtd_google_pkce', JSON.stringify({ verifier, state, ts: Date.now() }));
+    localStorage.setItem('gtd_google_pkce', JSON.stringify({ verifier, state, ts: Date.now(), scope: accessLevel }));
+    const scopeMap = {
+      readonly: 'https://www.googleapis.com/auth/gmail.readonly',
+      modify:   'https://www.googleapis.com/auth/gmail.modify',
+      compose:  'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose',
+      send:     'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send',
+    };
     const params = new URLSearchParams({
       client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
       redirect_uri: window.location.origin,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/gmail.readonly',
+      scope: scopeMap[accessLevel] || scopeMap.readonly,
       code_challenge: challenge,
       code_challenge_method: 'S256',
       access_type: 'offline',
@@ -1135,6 +1251,7 @@ export default function GTDManager() {
     localStorage.removeItem('gtd_google_token');
     localStorage.removeItem('gtd_google_pkce');
     setGoogleToken(null);
+    setGoogleScope(null);
     setGmailError(null);
   }, []);
 
@@ -1238,7 +1355,15 @@ export default function GTDManager() {
           if (mode === "chat") {
             const availableTools = [];
             if (import.meta.env.VITE_TAVILY_API_KEY) availableTools.push(...TOOLS);
-            if (googleToken) availableTools.push(GMAIL_SEARCH_TOOL);
+            if (googleToken) {
+              availableTools.push(GMAIL_SEARCH_TOOL);
+              if (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send')
+                availableTools.push(GMAIL_LABEL_TOOL);
+              if (googleScope === 'compose' || googleScope === 'send')
+                availableTools.push(GMAIL_COMPOSE_TOOL);
+              if (googleScope === 'send')
+                availableTools.push(GMAIL_SEND_TOOL);
+            }
             if (availableTools.length > 0) reqBody.tools = availableTools;
           }
           const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1282,6 +1407,26 @@ export default function GTDManager() {
                   tool_use_id: toolUse.id,
                   content: result,
                 });
+              } else if (toolUse.name === "gmail_label") {
+                const result = await doGmailLabel(
+                  toolUse.input.message_id, toolUse.input.add_label_ids,
+                  toolUse.input.remove_label_ids, googleToken
+                );
+                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+              } else if (toolUse.name === "gmail_compose") {
+                setMessages(prev => [...prev, { role: "assistant", text: `✏️ Creating draft...`, isSearchChip: true }]);
+                const result = await doGmailCompose(
+                  toolUse.input.to, toolUse.input.subject, toolUse.input.body,
+                  toolUse.input.thread_id, googleToken
+                );
+                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+              } else if (toolUse.name === "gmail_send") {
+                setMessages(prev => [...prev, { role: "assistant", text: `📤 Sending email...`, isSearchChip: true }]);
+                const result = await doGmailSend(
+                  toolUse.input.to, toolUse.input.subject, toolUse.input.body,
+                  toolUse.input.thread_id, googleToken
+                );
+                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
               }
             }
             apiMessages = [
@@ -1401,7 +1546,7 @@ export default function GTDManager() {
     } finally {
       setLoading(false);
     }
-  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, googleToken]);
+  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, googleToken, googleScope]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
@@ -2243,6 +2388,7 @@ export default function GTDManager() {
               onImport={handleImport}
               onClose={() => setShowSettings(false)}
               googleToken={googleToken}
+              googleScope={googleScope}
               onConnectGmail={signInWithGoogle}
               onDisconnectGmail={disconnectGmail}
               gmailError={gmailError}
@@ -3649,10 +3795,12 @@ function SettingsSection({ label, storageKey, children }) {
   );
 }
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, onConnectGmail, onDisconnectGmail, gmailError }) {
+function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, googleScope, onConnectGmail, onDisconnectGmail, gmailError }) {
   const fileInputRef = useRef(null);
 
   const [importMode, setImportMode] = useState("replace");
+  const [gmailPendingScope, setGmailPendingScope] = useState('readonly');
+  const [gmailChangingScope, setGmailChangingScope] = useState(false);
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -3684,35 +3832,73 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
       <div style={{ flex: 1, overflowY: "auto", padding: "0 24px" }}>
         <SettingsSection label="Google / Gmail" storageKey="gtd_settings_gmail">
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
-            Connect Gmail so the AI coach can search your inbox when answering research questions.
-            Only read access is requested — no emails are sent or modified.
+            Connect Gmail to let the AI coach read and act on your inbox. Choose the access level below.
           </div>
           {googleToken ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 12, color: COLORS.next }}>✓ Gmail connected</span>
-              <button
-                onClick={onDisconnectGmail}
-                style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${COLORS.border2}`,
-                         background: COLORS.surface3, color: COLORS.muted, fontFamily: 'inherit',
-                         fontSize: 11, cursor: 'pointer' }}
-              >Disconnect</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, color: COLORS.next }}>✓ Gmail connected — {GMAIL_SCOPE_DISPLAY[googleScope] || googleScope || 'read only'}</span>
+                {!gmailChangingScope && (<>
+                  <button onClick={() => { setGmailPendingScope(googleScope || 'readonly'); setGmailChangingScope(true); }}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Change</button>
+                  <button onClick={onDisconnectGmail}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Disconnect</button>
+                </>)}
+                {gmailChangingScope && (
+                  <button onClick={onDisconnectGmail}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Disconnect</button>
+                )}
+              </div>
+              {gmailChangingScope && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {GMAIL_SCOPE_OPTS.map(opt => (
+                    <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+                      borderRadius: 6, cursor: 'pointer',
+                      border: `1px solid ${gmailPendingScope === opt.key ? COLORS.accent : COLORS.border2}`,
+                      background: gmailPendingScope === opt.key ? COLORS.surface3 : 'transparent' }}>
+                      <input type="radio" name="gmail_scope_change" value={opt.key}
+                        checked={gmailPendingScope === opt.key}
+                        onChange={() => setGmailPendingScope(opt.key)}
+                        style={{ accentColor: COLORS.accent, cursor: 'pointer' }} />
+                      <span style={{ fontSize: 12, fontWeight: gmailPendingScope === opt.key ? 600 : 400, color: COLORS.text, minWidth: 68 }}>{opt.label}</span>
+                      <span style={{ fontSize: 11, color: COLORS.muted }}>{opt.desc}</span>
+                    </label>
+                  ))}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <button onClick={() => { setGmailChangingScope(false); onConnectGmail(gmailPendingScope); }}
+                      style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${COLORS.accent}`, background: COLORS.accent, color: '#fff', fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}>Reconnect</button>
+                    <button onClick={() => setGmailChangingScope(false)}
+                      style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+              {gmailError && <div style={{ fontSize: 11, color: '#d4845a', lineHeight: 1.4 }}>⚠ {gmailError}</div>}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button
-                onClick={onConnectGmail}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 4 }}>
+                {GMAIL_SCOPE_OPTS.map(opt => (
+                  <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+                    borderRadius: 6, cursor: 'pointer',
+                    border: `1px solid ${gmailPendingScope === opt.key ? COLORS.accent : COLORS.border2}`,
+                    background: gmailPendingScope === opt.key ? COLORS.surface3 : 'transparent' }}>
+                    <input type="radio" name="gmail_scope" value={opt.key}
+                      checked={gmailPendingScope === opt.key}
+                      onChange={() => setGmailPendingScope(opt.key)}
+                      style={{ accentColor: COLORS.accent, cursor: 'pointer' }} />
+                    <span style={{ fontSize: 12, fontWeight: gmailPendingScope === opt.key ? 600 : 400, color: COLORS.text, minWidth: 68 }}>{opt.label}</span>
+                    <span style={{ fontSize: 11, color: COLORS.muted }}>{opt.desc}</span>
+                  </label>
+                ))}
+              </div>
+              <button onClick={() => onConnectGmail(gmailPendingScope)}
                 style={{ padding: '7px 14px', borderRadius: 7, border: `1px solid ${COLORS.border2}`,
                          background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit',
                          fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                         alignSelf: 'flex-start' }}
-              >
+                         alignSelf: 'flex-start' }}>
                 <span style={{ fontSize: 14 }}>G</span> Connect Gmail
               </button>
-              {gmailError && (
-                <div style={{ fontSize: 11, color: '#d4845a', lineHeight: 1.4 }}>
-                  ⚠ {gmailError}
-                </div>
-              )}
+              {gmailError && <div style={{ fontSize: 11, color: '#d4845a', lineHeight: 1.4 }}>⚠ {gmailError}</div>}
             </div>
           )}
         </SettingsSection>
