@@ -127,6 +127,40 @@ For each response say "Got it — add that to your inbox." then immediately ask 
 
 const OPENWEBUI_URL = (import.meta.env.VITE_OPENWEBUI_URL || "http://192.168.0.102:3000").replace(/\/$/, "");
 
+// ── Web search tool (Tavily) — used by AI coach in Chat mode ─────────────────
+const TOOLS = [
+  {
+    name: "web_search",
+    description: "Search the web for current information. Use this when the user asks about something that may require up-to-date facts, recent events, current pricing, product comparisons, or any information that benefits from a live search.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "The search query to look up" },
+      },
+      required: ["query"],
+    },
+  },
+];
+
+async function doWebSearch(query) {
+  const res = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key: import.meta.env.VITE_TAVILY_API_KEY,
+      query,
+      max_results: 5,
+      include_answer: true,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Tavily error: ${data.error || res.status}`);
+  const results = (data.results || []).map((r, i) =>
+    `[${i + 1}] ${r.title}\n${r.url}\n${r.content}`
+  ).join("\n\n");
+  return data.answer ? `Summary: ${data.answer}\n\nSources:\n${results}` : results;
+}
+
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 // ── Supabase field mappers (camelCase ↔ snake_case) ──────────────────────────
@@ -1026,27 +1060,62 @@ export default function GTDManager() {
       let reply;
 
       if (provider === "claude") {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "anthropic-dangerous-direct-browser-access": "true",
-          },
-          body: JSON.stringify({
+        let apiMessages = [...newHistory];
+        let loopCount = 0;
+        while (loopCount < 5) {
+          loopCount++;
+          const reqBody = {
             model: "claude-sonnet-4-6",
-            max_tokens: 1000,
+            max_tokens: 1500,
             system: systemPrompt,
-            messages: newHistory,
-          }),
-        });
-        const data = await res.json();
-        console.log("[Claude API response]", data);
-        if (!res.ok || data.error) {
-          throw new Error(`Anthropic error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
+            messages: apiMessages,
+          };
+          if (mode === "chat" && import.meta.env.VITE_TAVILY_API_KEY) {
+            reqBody.tools = TOOLS;
+          }
+          const res = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
+              "anthropic-version": "2023-06-01",
+              "anthropic-dangerous-direct-browser-access": "true",
+            },
+            body: JSON.stringify(reqBody),
+          });
+          const data = await res.json();
+          console.log("[Claude API response]", data);
+          if (!res.ok || data.error) {
+            throw new Error(`Anthropic error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
+          }
+          if (data.stop_reason === "tool_use") {
+            const toolUseBlocks = data.content.filter(b => b.type === "tool_use");
+            const toolResults = [];
+            for (const toolUse of toolUseBlocks) {
+              if (toolUse.name === "web_search") {
+                const query = toolUse.input.query;
+                setMessages(prev => [...prev, {
+                  role: "assistant", text: `🔍 Searching: "${query}"`, isSearchChip: true,
+                }]);
+                const result = await doWebSearch(query);
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: toolUse.id,
+                  content: result,
+                });
+              }
+            }
+            apiMessages = [
+              ...apiMessages,
+              { role: "assistant", content: data.content },
+              { role: "user", content: toolResults },
+            ];
+          } else {
+            reply = data.content?.find(b => b.type === "text")?.text || "Sorry, something went wrong.";
+            break;
+          }
         }
-        reply = data.content?.[0]?.text || "Sorry, something went wrong.";
+        if (!reply) reply = "Sorry, I was unable to complete the search. Please try again.";
       } else {
         const res = await fetch(`${OPENWEBUI_URL}/api/chat/completions`, {
           method: "POST",
@@ -2970,6 +3039,13 @@ function ActionBtn({ children, onClick, color }) {
 
 function ChatBubble({ msg }) {
   const isUser = msg.role === "user";
+  if (msg.isSearchChip) return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6,
+                  padding: "2px 4px", color: COLORS.muted, fontSize: 11,
+                  fontStyle: "italic" }}>
+      {msg.text}
+    </div>
+  );
   return (
     <div style={{ display: "flex", gap: 7, flexDirection: isUser ? "row-reverse" : "row", maxWidth: "100%" }}>
       <div style={{ width: 22, height: 22, borderRadius: "50%", background: isUser ? COLORS.surface3 : COLORS.inbox, color: isUser ? COLORS.text2 : "#111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isUser ? 9 : 11, fontFamily: "Georgia, serif", flexShrink: 0, marginTop: 1 }}>
