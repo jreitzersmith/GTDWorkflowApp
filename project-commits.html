@@ -1013,6 +1013,28 @@
 </div>
 
 
+<div class="commit-card" id="commit-545edad">
+  <div class="commit-meta"><span class="commit-hash">545edad</span><span class="commit-date">2026-04-30</span></div>
+  <div class="commit-msg">feat: add Supabase auth layer (Phase 2)</div>
+  <div class="commit-body">
+    Installed <code>@supabase/supabase-js</code>. Initialised the Supabase client at module
+    level from env vars. Added auth state (<code>authUser</code>, <code>authLoading</code>)
+    and a <code>useEffect</code> that restores the existing session on mount and subscribes
+    to <code>onAuthStateChange</code> to handle magic-link callbacks automatically. Added a
+    login screen (email + Send login link) that calls <code>signInWithOtp</code>. The main
+    app is gated behind two early returns — loading spinner and login screen — leaving all
+    existing logic unchanged.
+  </div>
+  <div class="commit-lesson">
+    <strong>Early-return auth gate.</strong> Two <code>if (condition) return (...)</code>
+    before the main return keep the gating logic flat and avoid wrapping the entire app tree
+    in a conditional, which would cause unnecessary unmount/remount cycles on auth state
+    changes.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-supabase-auth">↑ Feature: Supabase Auth</a></div>
+</div>
+
+
 </main>
 </div>
 

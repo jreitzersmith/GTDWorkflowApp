@@ -1447,6 +1447,53 @@ Marriott downtown. Confirmation #XYZ123.</pre>
   </section>
 
 
+  <section class="feat" id="feat-supabase-auth">
+    <div class="feat-header">
+      <span class="feat-icon">☁️</span>
+      <span class="feat-title">Supabase Integration — Schema &amp; Auth (Phases 1–2)</span>
+      <span class="feat-badge badge-new">New</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        First two phases of cross-device sync via Supabase (hosted Postgres + auth).
+      </p>
+      <p>
+        <strong>Phase 1 — Database schema.</strong> A <code>tasks</code> table was created in
+        the Supabase project via the Management API (<code>setup_supabase_schema.py</code>).
+        The schema maps directly to the JS task object: scalar fields use native Postgres types;
+        <code>priority</code>, <code>location</code>, <code>child_ids</code>, and
+        <code>recurrence</code> are stored as <code>JSONB</code>. Row Level Security is enabled
+        with four policies (SELECT / INSERT / UPDATE / DELETE) scoped to
+        <code>auth.uid() = user_id</code>, so users can only access their own rows. Indexes on
+        <code>user_id</code>, <code>bucket</code>, and <code>parent_id</code> support fast
+        per-user and per-bucket queries.
+      </p>
+      <p>
+        <strong>Phase 2 — Auth layer.</strong> <code>@supabase/supabase-js</code> is
+        initialised at module level from <code>VITE_SUPABASE_URL</code> and
+        <code>VITE_SUPABASE_ANON_KEY</code>. The <code>GTDManager</code> component gains
+        <code>authUser</code> / <code>authLoading</code> state and a <code>useEffect</code>
+        that calls <code>supabase.auth.getSession()</code> on mount and subscribes to
+        <code>onAuthStateChange</code> to handle the magic-link callback automatically.
+        A login screen (email input + "Send login link" button) is shown when no session
+        exists; <code>supabase.auth.signInWithOtp</code> sends the magic link. The main app
+        renders only when <code>authUser</code> is set — no other app logic is changed.
+      </p>
+    </div>
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Auth gate pattern.</strong> Two early returns before the main
+      <code>return (&lt;div style={s.app}&gt;…)</code> handle the loading and unauthenticated
+      states cleanly without nesting the entire app in a conditional. The
+      <code>onAuthStateChange</code> subscription covers both the initial magic-link redirect
+      and any future session refresh, so no special URL-hash parsing is needed.
+    </p>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-545edad">📜 545edad — Supabase auth layer</a>
+    </div>
+  </section>
+
+
 </main>
 </div>
 

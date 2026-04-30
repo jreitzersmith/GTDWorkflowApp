@@ -3024,6 +3024,55 @@ if (!parent) {
 </div>
 
 
+<div class="snip-card" id="snip-supabase-auth">
+  <div class="snip-header">
+    <span class="snip-title">Supabase Auth Gate</span>
+    <span class="snip-file">src/App.jsx</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Module-level client (anon key — safe in frontend; RLS enforces access)
+import { createClient } from "@supabase/supabase-js";
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+// Inside GTDManager — auth state
+const [authUser,    setAuthUser]    = useState(null);
+const [authLoading, setAuthLoading] = useState(true);
+const [authEmail,   setAuthEmail]   = useState("");
+const [authSent,    setAuthSent]    = useState(false);
+
+const sendMagicLink = useCallback(async () => {
+  if (!authEmail.trim()) return;
+  await supabase.auth.signInWithOtp({ email: authEmail.trim() });
+  setAuthSent(true);
+}, [authEmail]);
+
+// Session restore + magic-link callback
+useEffect(() => {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setAuthUser(session?.user ?? null);
+    setAuthLoading(false);
+  });
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    (_event, session) => { setAuthUser(session?.user ?? null); }
+  );
+  return () => subscription.unsubscribe();
+}, []);
+
+// Auth gate — two early returns before main render
+if (authLoading) return &lt;div&gt;Loading…&lt;/div&gt;;
+if (!authUser)   return &lt;LoginScreen ... /&gt;;  // email input + signInWithOtp
+// ... main app renders here unchanged</code></pre></div>
+  <div class="snip-note">
+    <strong>Why two early returns instead of conditional wrapping.</strong> Wrapping the entire
+    app JSX in <code>{authUser &amp;&amp; &lt;App /&gt;}</code> would cause React to unmount and
+    remount all state on login/logout. Early returns keep the component tree stable and avoid
+    a flash of the empty app during the loading phase.
+  </div>
+</div>
+
+
 </main>
 </div>
 
