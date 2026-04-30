@@ -1820,12 +1820,42 @@ export default function GTDManager() {
                         </div>
                       );
                     })()}
-                    {bucketTasks.map(task => (
-                      <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                        onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                        pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                        onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence} />
-                    ))}
+                    {currentBucket === "done" ? (
+                      <CompletedTree
+                        parentId={null}
+                        depth={0}
+                        allTasks={tasks}
+                        rowProps={{
+                          currentBucket,
+                          moveMenu, setMoveMenu,
+                          onComplete: completeTask,
+                          onDelete: deleteTask,
+                          onMove: moveTask,
+                          onAskAI: askAIAboutTask,
+                          onUpdateTask: updateTask,
+                          pendingAction,
+                          allTasks: tasks,
+                          onNavigate: setCurrentBucket,
+                          locations,
+                          efforts,
+                          onAssignToProject: assignToProject,
+                          tagDisplay,
+                          collapsedNodes,
+                          onToggleCollapse: toggleCollapse,
+                          onToggleCollapseLevel: toggleCollapseLevel,
+                          onOpenDetail: setSelectedTaskId,
+                          selectedTaskId,
+                          onSkipRecurrence: skipRecurrence,
+                        }}
+                      />
+                    ) : (
+                      bucketTasks.map(task => (
+                        <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
+                          onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
+                          pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
+                          onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence} />
+                      ))
+                    )}
                   </>
                 )}
               </div>
@@ -3391,6 +3421,47 @@ function EffortCalibrationManager({ efforts, tasks, calibrationOverrides, onSetO
 function DropLine({ depth }) {
   return (
     <div style={{ height: 2, background: COLORS.project, margin: `1px 18px 1px ${18 + depth * 22}px`, borderRadius: 2, pointerEvents: "none" }} />
+  );
+}
+
+// Read-only hierarchical view for completed tasks.
+// parentId === null  → virtual roots: done tasks whose parent is not also done.
+// parentId !== null  → done children of parentId in childIds order.
+function CompletedTree({ parentId, depth, allTasks, rowProps }) {
+  if (depth > 5) return null;
+
+  let children;
+  if (parentId === null) {
+    const doneIds = new Set(allTasks.filter(t => t.done).map(t => t.id));
+    children = allTasks.filter(t => t.done && (!t.parentId || !doneIds.has(t.parentId)));
+  } else {
+    children = getOrderedChildren(parentId, allTasks).filter(t => t.done);
+  }
+
+  if (!children.length) return null;
+
+  return (
+    <>
+      {children.map(task => (
+        <div key={task.id}>
+          <TaskRow
+            task={task}
+            isSubtask={depth > 0}
+            indentOverride={depth * 22}
+            depth={depth}
+            {...rowProps}
+          />
+          {!rowProps.collapsedNodes?.has(task.id) && (
+            <CompletedTree
+              parentId={task.id}
+              depth={depth + 1}
+              allTasks={allTasks}
+              rowProps={rowProps}
+            />
+          )}
+        </div>
+      ))}
+    </>
   );
 }
 
