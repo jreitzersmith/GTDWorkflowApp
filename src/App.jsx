@@ -210,7 +210,7 @@ async function doGmailSearch(query, token) {
       const msg = await msgRes.json();
       const hdrs = msg.payload?.headers || [];
       const get = (name) => hdrs.find(h => h.name === name)?.value || '';
-      return `From: ${get('From')}\nDate: ${get('Date')}\nSubject: ${get('Subject')}\nSnippet: ${msg.snippet || ''}`;
+      return `Message-ID: ${id}\nFrom: ${get('From')}\nDate: ${get('Date')}\nSubject: ${get('Subject')}\nSnippet: ${msg.snippet || ''}`;
     })
   );
   return `Found ${messages.length} email(s). Top ${details.length} result(s):\n\n${details.join('\n\n---\n\n')}`;
