@@ -2877,6 +2877,55 @@ function SettingsPanel({ ..., onExport, onImport, ... }) {
 </div>
 
 
+
+<div class="snip-card" id="snip-settings-section">
+  <div class="snip-header">
+    <span class="snip-title">SettingsSection — collapsible panel section</span>
+    <a class="link-chip chip-feat" href="project-summary.html#feat-collapsible-settings">⚙ Collapsible Settings</a>
+  </div>
+  <div class="snip-body"><pre><code class="language-jsx">function SettingsSection({ label, storageKey, children }) {
+  const [open, setOpen] = useState(
+    () => localStorage.getItem(storageKey) === "1"   // lazy init — runs once on mount
+  );
+
+  const toggle = () => setOpen(v => {
+    const next = !v;
+    localStorage.setItem(storageKey, next ? "1" : "0");
+    return next;
+  });
+
+  return (
+    &lt;div style={{ borderBottom: `1px solid ${COLORS.border}` }}&gt;
+      &lt;button
+        onClick={toggle}
+        style={{ width: "100%", display: "flex", alignItems: "center",
+                 justifyContent: "space-between", padding: "12px 0",
+                 background: "transparent", border: "none", cursor: "pointer",
+                 color: COLORS.text, fontFamily: "inherit" }}
+      &gt;
+        &lt;span style={{ fontSize: 13, fontWeight: 600 }}&gt;{label}&lt;/span&gt;
+        &lt;span style={{ fontSize: 12, color: COLORS.muted }}&gt;{open ? "▾" : "▸"}&lt;/span&gt;
+      &lt;/button&gt;
+      {open &amp;&amp; &lt;div style={{ paddingBottom: 20 }}&gt;{children}&lt;/div&gt;}
+    &lt;/div&gt;
+  );
+}
+
+// Usage in SettingsPanel:
+&lt;SettingsSection label="Locations" storageKey="gtd_settings_locations"&gt;
+  &lt;LocationManager ... /&gt;
+&lt;/SettingsSection&gt;</code></pre></div>
+  <div class="snip-note">
+    <strong>Lazy <code>useState</code> initialiser + localStorage toggle.</strong>
+    Passing a function to <code>useState</code> defers execution to mount time, so the
+    localStorage read happens exactly once rather than on every render. The toggle writes the new
+    value back synchronously inside the functional updater, keeping state and storage in lockstep.
+    Defaulting to collapsed (<code>=== "1"</code> returns false until explicitly opened) keeps
+    the panel compact without requiring a separate "default" prop.
+  </div>
+</div>
+
+
 </main>
 </div>
 

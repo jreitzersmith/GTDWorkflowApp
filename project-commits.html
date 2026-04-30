@@ -896,6 +896,38 @@
 </div>
 
 
+<div class="commit-card" id="commit-aa3ff32">
+  <div class="commit-meta">
+    <span class="commit-hash">aa3ff32</span>
+    <span class="commit-date">2026-04-29</span>
+  </div>
+  <div class="commit-msg">feat: collapsible settings sections with localStorage persistence</div>
+  <div class="commit-body">
+    Added a <code>SettingsSection</code> component that wraps each of the five Settings panel
+    sections (Tag Display, Locations, Effort Levels, Effort Calibration, Backup &amp; Restore).
+    Each section defaults to collapsed and can be toggled independently. Open/closed state is
+    persisted per section under <code>gtd_settings_*</code> localStorage keys and survives page
+    reloads.<br><br>
+    The scrollable container in <code>SettingsPanel</code> was simplified: the old
+    <code>gap: 32</code> flex layout and individual <code>borderTop</code> divider wrappers were
+    replaced with five <code>&lt;SettingsSection&gt;</code> calls. The inline title
+    <code>&lt;div&gt;</code> was removed from each child component
+    (<code>TagDisplaySetting</code>, <code>LocationManager</code>, <code>EffortManager</code>,
+    <code>EffortCalibrationManager</code>) since the section header now owns the label.
+  </div>
+  <div class="commit-lesson">
+    <strong>Lazy <code>useState</code> initialiser for one-time side effects.</strong>
+    <code>useState(() =&gt; localStorage.getItem(key) === "1")</code> runs the function only on
+    mount, avoiding a storage read on every render. Combined with writing back inside the
+    functional updater, state and localStorage stay in lockstep with no extra
+    <code>useEffect</code> needed. Extracting a small wrapper component also eliminated five
+    repetitive section-header+divider patterns from the parent, making future section additions
+    a single-line change.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-collapsible-settings">↑ Feature: Collapsible Settings Sections</a></div>
+</div>
+
+
 </main>
 </div>
 

@@ -1281,6 +1281,53 @@ Marriott downtown. Confirmation #XYZ123.</pre>
     </div>
   </section>
 
+  <section class="feat" id="feat-collapsible-settings">
+    <div class="feat-header">
+      <span class="feat-icon">⚙</span>
+      <span class="feat-title">Collapsible Settings Sections</span>
+      <span class="feat-badge badge-new">New</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        The Settings panel's five sections — <strong>Tag Display</strong>,
+        <strong>Locations</strong>, <strong>Effort Levels</strong>,
+        <strong>Effort Calibration</strong>, and <strong>Backup &amp; Restore</strong> — are now
+        individually collapsible. Each section header is a clickable row with a
+        <code>▸</code>&nbsp;/&nbsp;<code>▾</code> chevron. All sections default to collapsed on
+        first open, keeping the panel compact until you need something specific. Any combination
+        of sections can be open simultaneously.
+      </p>
+      <p>
+        Open/closed state is persisted independently per section in localStorage under keys
+        <code>gtd_settings_tag_display</code>, <code>gtd_settings_locations</code>,
+        <code>gtd_settings_efforts</code>, <code>gtd_settings_calibration</code>, and
+        <code>gtd_settings_backup</code>. The state survives page reloads and browser restarts.
+      </p>
+    </div>
+
+    <h3>React / JS concepts demonstrated</h3>
+    <p>
+      <strong>Lazy <code>useState</code> initialiser reading localStorage.</strong>
+      <code>SettingsSection</code> initialises its <code>open</code> state with
+      <code>useState(() =&gt; localStorage.getItem(storageKey) === "1")</code>. The function form
+      (lazy initialiser) runs only once on mount, avoiding a re-read on every render.
+    </p>
+    <p>
+      <strong>Component extraction to remove duplication.</strong> Before this change, each
+      section had its own <code>&lt;div style={{ borderTop … }}&gt;</code> wrapper and an inline
+      title <code>&lt;div&gt;</code>. Extracting <code>SettingsSection</code> replaced five
+      repetitive blocks with five identical-shape <code>&lt;SettingsSection label="…"
+      storageKey="…"&gt;</code> wrappers, and the title divs were deleted from the child
+      components since the section header now owns the label.
+    </p>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-settings-section">🔬 SettingsSection component</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-aa3ff32">📜 aa3ff32 — Collapsible settings sections</a>
+    </div>
+  </section>
+
+
 </main>
 </div>
 
