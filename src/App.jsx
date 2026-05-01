@@ -172,6 +172,7 @@ const GMAIL_SEARCH_TOOL = {
     type: "object",
     properties: {
       query: { type: "string", description: "Gmail search query (supports operators: from:, to:, subject:, is:unread, has:attachment, after:2024/01/01, etc.)" },
+      max_results: { type: "integer", description: "Number of emails to return (1-50, default 10). Use a higher value when the user wants to bulk-label or process many messages." },
     },
     required: ["query"],
   },
@@ -191,9 +192,10 @@ async function generateCodeChallenge(verifier) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-async function doGmailSearch(query, token) {
+async function doGmailSearch(query, token, maxResults = 10) {
+  const limit = Math.min(Math.max(1, maxResults), 50);
   const listRes = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=10`,
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${limit}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
   if (!listRes.ok) { const d = await listRes.json(); throw new Error(d.error?.message || `Gmail API ${listRes.status}`); }
@@ -201,7 +203,7 @@ async function doGmailSearch(query, token) {
   const messages = listData.messages || [];
   if (!messages.length) return "No emails found matching that query.";
   const details = (await Promise.all(
-    messages.slice(0, 5).map(async ({ id }) => {
+    messages.map(async ({ id }) => {
       try {
         const msgRes = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata`
@@ -222,7 +224,7 @@ async function doGmailSearch(query, token) {
 
 const GMAIL_LIST_LABELS_TOOL = {
   name: "gmail_list_labels",
-  description: "List all Gmail labels with their IDs and display names. Call this before gmail_label when you need to find the ID for a user-named label (e.g. 'Tax Docs', 'Work'). System labels — STARRED, UNREAD, IMPORTANT, INBOX — are always available without calling this.",
+  description: "List all Gmail labels with their IDs and display names. ALWAYS call this immediately before any gmail_label call that uses a custom label — never reuse a label ID from a previous turn, as labels can be created or deleted between calls. System labels (STARRED, UNREAD, IMPORTANT, INBOX) are always valid without calling this.",
   input_schema: { type: "object", properties: {}, required: [] },
 };
 
@@ -1541,7 +1543,7 @@ export default function GTDManager() {
                 setMessages(prev => [...prev, {
                   role: "assistant", text: `📧 Searching Gmail: "${query}"`, isSearchChip: true,
                 }]);
-                const result = await doGmailSearch(query, googleToken);
+                const result = await doGmailSearch(query, googleToken, toolUse.input.max_results || 10);
                 toolResults.push({
                   type: "tool_result",
                   tool_use_id: toolUse.id,
