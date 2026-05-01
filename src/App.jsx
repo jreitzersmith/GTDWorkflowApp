@@ -1519,11 +1519,11 @@ export default function GTDManager() {
       if (provider === "claude") {
         let apiMessages = [...newHistory];
         let loopCount = 0;
-        while (loopCount < 5) {
+        while (loopCount < 15) {
           loopCount++;
           const reqBody = {
             model: "claude-sonnet-4-6",
-            max_tokens: 1500,
+            max_tokens: 2048,
             system: systemPrompt,
             messages: apiMessages,
           };
@@ -1649,7 +1649,7 @@ export default function GTDManager() {
             break;
           }
         }
-        if (!reply) reply = "Sorry, I was unable to complete the search. Please try again.";
+        if (!reply) reply = "I ran out of steps before finishing — the operation may be too complex for one turn. Try breaking it into smaller requests (e.g. one sender at a time).";
       } else {
         const res = await fetch(`${OPENWEBUI_URL}/api/chat/completions`, {
           method: "POST",
