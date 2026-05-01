@@ -63,12 +63,25 @@ Only emit →ACTION:update, →ACTION:add, or →ACTION:create when the user exp
 
 Before using any task ID, confirm it appears in the current task list. If you cannot find the task, say so explicitly rather than guessing. If an action cannot be completed (missing ID, ambiguous target, invalid field), state clearly what went wrong and what information you need.
 
-Gmail bulk operations — always follow this approach to avoid timeouts:
-1. Search at most 20-25 messages per gmail_search call. If more are needed, search in multiple rounds.
-2. Call gmail_list_labels once to get fresh label IDs before any labelling step.
-3. Use gmail_batch_label with at most 20 message_ids per call. For larger sets make sequential calls (first 20, then next 20, etc.).
-4. Create labels (gmail_create_label) and filters (gmail_create_filter) one at a time.
-5. When the user asks to process many senders at once, handle 3-5 senders per turn and report results before continuing.`,
+Gmail bulk operations — newsletter/promotional cleanup workflow:
+
+Phase 1 — Discovery (do this first, every time):
+1. Call gmail_search with max_results 10-15 to sample the sender's emails.
+2. Examine From addresses, subjects, and snippets. Identify the MOST RESTRICTIVE query that targets only promotional/newsletter content:
+   - Use the exact sending address or subdomain (e.g. from:store-news@amazon.com) — never a bare domain unless all mail from that domain is promotional.
+   - Add has:list-unsubscribe when the sampled emails have an unsubscribe link — this reliably excludes transactional mail (receipts, alerts, password resets).
+   - Add subject keyword filters (subject:(deal OR sale OR offer OR promo)) only when they sharpen scope without over-filtering.
+   - If the same domain sends both promotional and transactional mail, explicitly note what the query will NOT match (e.g. "auto-confirm@amazon.com order receipts are excluded").
+3. Present the proposed query and a plain-English explanation of what it matches and what it excludes. Wait for explicit user confirmation before proceeding.
+
+Phase 2 — Execution (after confirmation):
+4. Call gmail_list_labels once to get fresh label IDs.
+5. If the target label doesn't exist yet, name it and ask the user to confirm before calling gmail_create_label.
+6. Call gmail_bulk_action with the confirmed query + label/archive actions — this processes ALL matching emails regardless of count, no batching needed.
+7. Call gmail_create_filter to catch future matching emails automatically.
+
+Use gmail_batch_label (not gmail_bulk_action) only when labelling a small known set of message IDs already retrieved via gmail_search.
+When the user asks to process many senders at once, handle 3-5 senders per turn and report results before continuing.`,
   process: `You are a GTD inbox processor. For each inbox item given to you:
 
 1. Determine if it's actionable. If not actionable, end with: →ACTION:delete
@@ -340,6 +353,30 @@ const GMAIL_DELETE_FILTER_TOOL = {
   },
 };
 
+const GMAIL_BULK_ACTION_TOOL = {
+  name: "gmail_bulk_action",
+  description: `Apply labels or archive ALL Gmail messages matching a search query — no per-batch limit. Use this for bulk inbox cleanup (e.g. label + archive every promotional email from a sender).
+
+BEFORE calling this tool you MUST:
+1. Sample the sender using gmail_search to identify distinguishing patterns.
+2. Build the most restrictive query possible:
+   - Prefer the specific sending address or subdomain over a bare domain (e.g. 'from:store-news@amazon.com' not 'from:amazon.com').
+   - Add 'has:list-unsubscribe' when the sample emails contain an unsubscribe link — this reliably excludes transactional mail (order receipts, shipping alerts, password resets).
+   - Add subject-keyword filters (e.g. 'subject:(deal OR offer OR sale OR promo)') only when they help narrow scope without over-filtering.
+   - Combine operators to exclude known non-promotional addresses from the same domain.
+3. Show the user the exact query and a plain-English explanation of what it will match AND what it intentionally excludes (e.g. 'will NOT match order confirmations from auto-confirm@amazon.com').
+4. Wait for explicit user confirmation before calling.`,
+  input_schema: {
+    type: "object",
+    properties: {
+      query:             { type: "string",  description: "Gmail search query — must be as restrictive as possible (see tool description)" },
+      add_label_ids:     { type: "array",   items: { type: "string" }, description: "Label IDs to add to every matching message" },
+      remove_label_ids:  { type: "array",   items: { type: "string" }, description: "Label IDs to remove (use INBOX to archive)" },
+    },
+    required: ["query"],
+  },
+};
+
 // Display metadata for Gmail scope levels — used in Settings UI
 const GMAIL_SCOPE_OPTS = [
   { key: 'readonly', label: 'Read only', desc: 'Search and read emails' },
@@ -500,6 +537,50 @@ async function doGmailDeleteFilter(filterId, token) {
   if (res.status === 204 || res.ok) return { status: 'Filter deleted successfully', filter_id: filterId };
   const d = await res.json();
   throw new Error(d.error?.message || `Gmail API ${res.status}`);
+}
+
+// Label/archive ALL messages matching a query — pages through every result, no per-batch limit
+async function doGmailBulkAction(query, addLabelIds, removeLabelIds, token) {
+  // Collect all matching message IDs via paginated messages.list
+  const allIds = [];
+  let pageToken = undefined;
+  do {
+    const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
+    url.searchParams.set('q', query);
+    url.searchParams.set('maxResults', '500');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+    const data = await res.json();
+    (data.messages || []).forEach(m => allIds.push(m.id));
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  if (!allIds.length) return { matched: 0, status: 'No messages found matching that query — nothing was changed.' };
+
+  // Apply changes via batchModify in chunks of 1,000
+  const body = { addLabelIds: addLabelIds || [], removeLabelIds: removeLabelIds || [] };
+  const chunkSize = 1000;
+  let totalSucceeded = 0;
+  const errors = [];
+  for (let i = 0; i < allIds.length; i += chunkSize) {
+    const chunk = allIds.slice(i, i + chunkSize);
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/batchModify', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: chunk, ...body }),
+    });
+    if (res.ok || res.status === 204) {
+      totalSucceeded += chunk.length;
+    } else {
+      const d = await res.json().catch(() => ({}));
+      errors.push(d.error?.message || `Gmail API ${res.status} on chunk starting at index ${i}`);
+    }
+  }
+  if (errors.length) {
+    return { matched: allIds.length, succeeded: totalSucceeded, errors, status: `Partial success: ${totalSucceeded}/${allIds.length} messages updated. Errors: ${errors.join('; ')}` };
+  }
+  return { matched: allIds.length, succeeded: totalSucceeded, status: `All ${totalSucceeded} matching messages updated successfully.` };
 }
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -1547,6 +1628,7 @@ export default function GTDManager() {
                 availableTools.push(GMAIL_LIST_FILTERS_TOOL);
                 availableTools.push(GMAIL_CREATE_FILTER_TOOL);
                 availableTools.push(GMAIL_DELETE_FILTER_TOOL);
+                availableTools.push(GMAIL_BULK_ACTION_TOOL);
               }
               if (googleScope === 'compose' || googleScope === 'send')
                 availableTools.push(GMAIL_COMPOSE_TOOL);
@@ -1648,6 +1730,16 @@ export default function GTDManager() {
                     toolUse.input.message_ids, toolUse.input.add_label_ids,
                     toolUse.input.remove_label_ids, googleToken
                   );
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === "gmail_bulk_action") {
+                setMessages(prev => [...prev, { role: "assistant", text: `🏷️ Bulk action: searching all matching emails…`, isSearchChip: true }]);
+                try {
+                  const result = await doGmailBulkAction(
+                    toolUse.input.query, toolUse.input.add_label_ids,
+                    toolUse.input.remove_label_ids, googleToken
+                  );
+                  setMessages(prev => [...prev, { role: "assistant", text: `✅ Bulk action complete — ${result.succeeded ?? 0} message(s) updated.`, isSearchChip: true }]);
                   toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
                 } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_label") {
