@@ -313,7 +313,7 @@ const GMAIL_LIST_FILTERS_TOOL = {
 
 const GMAIL_CREATE_FILTER_TOOL = {
   name: "gmail_create_filter",
-  description: "Create a Gmail filter that automatically processes all future matching incoming emails. IMPORTANT: Before calling this tool, present the full filter rule to the user in plain English (e.g. 'Emails from newsletter@example.com → apply label Newsletter and skip inbox') and wait for explicit confirmation. Never call this tool without user approval.",
+  description: "Create a Gmail filter that automatically processes all future matching incoming emails. IMPORTANT: Gmail allows at most ONE custom (user-created) label per filter — do not pass multiple custom label IDs in action_add_label_ids. System label IDs (INBOX, STARRED, UNREAD, IMPORTANT) do not count toward this limit. Before calling, present the full filter rule in plain English and wait for explicit user confirmation.",
   input_schema: {
     type: "object",
     properties: {
@@ -1611,39 +1611,53 @@ export default function GTDManager() {
                   content: result,
                 });
               } else if (toolUse.name === "gmail_list_labels") {
-                const result = await doGmailListLabels(googleToken);
-                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
+                try {
+                  const result = await doGmailListLabels(googleToken);
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_create_label") {
-                const result = await doGmailCreateLabel(toolUse.input.name, googleToken);
-                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                try {
+                  const result = await doGmailCreateLabel(toolUse.input.name, googleToken);
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_list_filters") {
-                const result = await doGmailListFilters(googleToken);
-                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
+                try {
+                  const result = await doGmailListFilters(googleToken);
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_create_filter") {
                 setMessages(prev => [...prev, { role: "assistant", text: `🔧 Creating filter...`, isSearchChip: true }]);
-                const result = await doGmailCreateFilter(
-                  toolUse.input.criteria_from, toolUse.input.criteria_to,
-                  toolUse.input.criteria_subject, toolUse.input.criteria_query,
-                  toolUse.input.action_add_label_ids, toolUse.input.action_remove_label_ids,
-                  googleToken
-                );
-                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                try {
+                  const result = await doGmailCreateFilter(
+                    toolUse.input.criteria_from, toolUse.input.criteria_to,
+                    toolUse.input.criteria_subject, toolUse.input.criteria_query,
+                    toolUse.input.action_add_label_ids, toolUse.input.action_remove_label_ids,
+                    googleToken
+                  );
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_delete_filter") {
-                const result = await doGmailDeleteFilter(toolUse.input.filter_id, googleToken);
-                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                try {
+                  const result = await doGmailDeleteFilter(toolUse.input.filter_id, googleToken);
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_batch_label") {
                 setMessages(prev => [...prev, { role: "assistant", text: `🏷️ Labelling ${toolUse.input.message_ids?.length || 0} message(s)...`, isSearchChip: true }]);
-                const result = await doGmailBatchLabel(
-                  toolUse.input.message_ids, toolUse.input.add_label_ids,
-                  toolUse.input.remove_label_ids, googleToken
-                );
-                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                try {
+                  const result = await doGmailBatchLabel(
+                    toolUse.input.message_ids, toolUse.input.add_label_ids,
+                    toolUse.input.remove_label_ids, googleToken
+                  );
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_label") {
-                const result = await doGmailLabel(
-                  toolUse.input.message_id, toolUse.input.add_label_ids,
-                  toolUse.input.remove_label_ids, googleToken
-                );
-                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                try {
+                  const result = await doGmailLabel(
+                    toolUse.input.message_id, toolUse.input.add_label_ids,
+                    toolUse.input.remove_label_ids, googleToken
+                  );
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_compose") {
                 setMessages(prev => [...prev, { role: "assistant", text: `✏️ Creating draft...`, isSearchChip: true }]);
                 const result = await doGmailCompose(
