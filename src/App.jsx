@@ -242,6 +242,20 @@ const GMAIL_LABEL_TOOL = {
   },
 };
 
+const GMAIL_BATCH_LABEL_TOOL = {
+  name: "gmail_batch_label",
+  description: "Apply or remove labels on multiple Gmail messages in a single call. Use this instead of calling gmail_label in a loop whenever you need to label, archive, or modify more than one message. Always call gmail_list_labels first to resolve custom label names to IDs. INBOX in remove_label_ids archives the messages.",
+  input_schema: {
+    type: "object",
+    properties: {
+      message_ids:     { type: "array", items: { type: "string" }, description: "Array of Gmail-ID values from gmail_search results" },
+      add_label_ids:   { type: "array", items: { type: "string" }, description: "Label IDs to add to every message (system: STARRED, IMPORTANT, UNREAD; or custom IDs)" },
+      remove_label_ids:{ type: "array", items: { type: "string" }, description: "Label IDs to remove from every message (e.g. INBOX to archive, UNREAD to mark read)" },
+    },
+    required: ["message_ids"],
+  },
+};
+
 const GMAIL_COMPOSE_TOOL = {
   name: "gmail_compose",
   description: "Create a draft email or reply in Gmail. The draft is saved but NOT sent — the user reviews it first. Requires Compose access or higher.",
@@ -353,6 +367,31 @@ async function doGmailLabel(messageId, addLabelIds, removeLabelIds, token) {
   );
   if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
   return { success: true, message_id: messageId };
+}
+
+// Modify labels on multiple messages in parallel (requires gmail.modify scope)
+async function doGmailBatchLabel(messageIds, addLabelIds, removeLabelIds, token) {
+  const body = { addLabelIds: addLabelIds || [], removeLabelIds: removeLabelIds || [] };
+  const results = await Promise.allSettled(
+    messageIds.map(id =>
+      fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}/modify`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then(async r => {
+        if (!r.ok) { const d = await r.json(); throw new Error(d.error?.message || `Gmail API ${r.status}`); }
+        return id;
+      })
+    )
+  );
+  const succeeded = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+  const failed    = results.filter(r => r.status === 'rejected').map((r, i) => ({ id: messageIds[i], error: r.reason?.message }));
+  return {
+    success_count: succeeded.length,
+    failed_count: failed.length,
+    failed,
+    status: failed.length === 0 ? `All ${succeeded.length} messages updated successfully` : `${succeeded.length} succeeded, ${failed.length} failed`,
+  };
 }
 
 // Build a base64url-encoded RFC 2822 message for the Gmail API
@@ -1496,6 +1535,7 @@ export default function GTDManager() {
               if (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send') {
                 availableTools.push(GMAIL_LIST_LABELS_TOOL);
                 availableTools.push(GMAIL_LABEL_TOOL);
+                availableTools.push(GMAIL_BATCH_LABEL_TOOL);
                 availableTools.push(GMAIL_CREATE_LABEL_TOOL);
                 availableTools.push(GMAIL_LIST_FILTERS_TOOL);
                 availableTools.push(GMAIL_CREATE_FILTER_TOOL);
@@ -1569,6 +1609,13 @@ export default function GTDManager() {
                 toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
               } else if (toolUse.name === "gmail_delete_filter") {
                 const result = await doGmailDeleteFilter(toolUse.input.filter_id, googleToken);
+                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+              } else if (toolUse.name === "gmail_batch_label") {
+                setMessages(prev => [...prev, { role: "assistant", text: `🏷️ Labelling ${toolUse.input.message_ids?.length || 0} message(s)...`, isSearchChip: true }]);
+                const result = await doGmailBatchLabel(
+                  toolUse.input.message_ids, toolUse.input.add_label_ids,
+                  toolUse.input.remove_label_ids, googleToken
+                );
                 toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
               } else if (toolUse.name === "gmail_label") {
                 const result = await doGmailLabel(
