@@ -1548,17 +1548,31 @@ export default function GTDManager() {
             }
             if (availableTools.length > 0) reqBody.tools = availableTools;
           }
-          const res = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-              "anthropic-version": "2023-06-01",
-              "anthropic-dangerous-direct-browser-access": "true",
-            },
-            body: JSON.stringify(reqBody),
-          });
-          const data = await res.json();
+          if (loopCount > 1) {
+            setMessages(prev => [...prev, { role: "assistant", text: `⏳ Thinking... (step ${loopCount})`, isSearchChip: true }]);
+          }
+          const abortCtrl = new AbortController();
+          const abortTimer = setTimeout(() => abortCtrl.abort(), 90000);
+          let res, data;
+          try {
+            res = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "anthropic-dangerous-direct-browser-access": "true",
+              },
+              body: JSON.stringify(reqBody),
+              signal: abortCtrl.signal,
+            });
+            data = await res.json();
+          } catch (fetchErr) {
+            if (fetchErr.name === 'AbortError') throw new Error('Request timed out after 90 seconds — try a simpler request or break it into smaller steps.');
+            throw fetchErr;
+          } finally {
+            clearTimeout(abortTimer);
+          }
           console.log("[Claude API response]", data);
           if (!res.ok || data.error) {
             throw new Error(`Anthropic error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
