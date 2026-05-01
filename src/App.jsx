@@ -61,7 +61,14 @@ To create a new standalone task, end your response with EXACTLY one line:
 The task_id / parent_task_id comes from the [id:...] tag shown on each task in the task list.
 Only emit →ACTION:update, →ACTION:add, or →ACTION:create when the user explicitly asks you to change or create something. Never include them unsolicited. Emit at most one ACTION line per response.
 
-Before using any task ID, confirm it appears in the current task list. If you cannot find the task, say so explicitly rather than guessing. If an action cannot be completed (missing ID, ambiguous target, invalid field), state clearly what went wrong and what information you need.`,
+Before using any task ID, confirm it appears in the current task list. If you cannot find the task, say so explicitly rather than guessing. If an action cannot be completed (missing ID, ambiguous target, invalid field), state clearly what went wrong and what information you need.
+
+Gmail bulk operations — always follow this approach to avoid timeouts:
+1. Search at most 20-25 messages per gmail_search call. If more are needed, search in multiple rounds.
+2. Call gmail_list_labels once to get fresh label IDs before any labelling step.
+3. Use gmail_batch_label with at most 20 message_ids per call. For larger sets make sequential calls (first 20, then next 20, etc.).
+4. Create labels (gmail_create_label) and filters (gmail_create_filter) one at a time.
+5. When the user asks to process many senders at once, handle 3-5 senders per turn and report results before continuing.`,
   process: `You are a GTD inbox processor. For each inbox item given to you:
 
 1. Determine if it's actionable. If not actionable, end with: →ACTION:delete
