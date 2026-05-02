@@ -34,12 +34,10 @@ Before using any task ID, confirm it appears in the current task list. If you ca
    - If the same domain sends both promotional and transactional mail, explicitly note what the query will NOT match (e.g. "auto-confirm@amazon.com order receipts are excluded").
 3. Present the proposed query and a plain-English explanation of what it matches and what it excludes. Wait for explicit user confirmation before proceeding.
 
-### Phase 2 — Execution (after confirmation)
+### Phase 2 — Save to queue (after confirmation)
 
-4. Call `gmail_list_labels` once to get fresh label IDs.
-5. If the target label doesn't exist yet, name it and ask the user to confirm before calling `gmail_create_label`.
-6. Call `gmail_bulk_action` with the confirmed query + label/archive actions — this processes ALL matching emails regardless of count, no batching needed.
-7. Call `gmail_create_filter` to catch future matching emails automatically.
+4. Call `gmail_queue_add` to save the confirmed entry to the user's persistent cleanup queue. Set `create_filter: true` so the Gmail filter and label are both created when the queue runs.
+5. Tell the user the entry has been saved and they can run it now or later from the **Email › Cleanup** tab.
 
 Use `gmail_batch_label` (not `gmail_bulk_action`) only when labelling a small known set of message IDs already retrieved via `gmail_search`.
 When the user asks to process many senders at once, handle 3–5 senders per turn and report results before continuing.
