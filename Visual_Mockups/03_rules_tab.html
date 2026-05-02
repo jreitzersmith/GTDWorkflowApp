@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Email Management — Rules Tab Mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; background: #f5f5f3; color: #1a1a18; }
+  .app { display: flex; height: 620px; border: 0.5px solid #d0cfc8; border-radius: 12px; overflow: hidden; background: #efefed; max-width: 900px; margin: 24px auto; }
+  .sidebar { width: 188px; flex-shrink: 0; background: #e8e8e4; border-right: 0.5px solid #d0cfc8; display: flex; flex-direction: column; padding: 12px 0; }
+  .sidebar-app-label { padding: 0 14px 4px; font-size: 13px; font-weight: 500; color: #888; }
+  .sidebar-section-label { font-size: 10px; font-weight: 500; color: #aaa; letter-spacing: 0.08em; text-transform: uppercase; padding: 0 14px; margin: 14px 0 4px; }
+  .sidebar-divider { height: 0.5px; background: #d0cfc8; margin: 8px 14px 4px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 13px; color: #666; }
+  .nav-item.active { background: #fff; color: #1a1a18; font-weight: 500; }
+  .nav-item .icon { font-size: 13px; width: 16px; text-align: center; }
+  .nav-badge { margin-left: auto; font-size: 10px; background: #dceefb; color: #1a5fa8; border-radius: 99px; padding: 1px 6px; font-weight: 500; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .tab-bar { display: flex; border-bottom: 0.5px solid #d0cfc8; background: #e8e8e4; padding: 0 16px; flex-shrink: 0; }
+  .tab { padding: 10px 14px; font-size: 13px; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -0.5px; }
+  .tab.active { color: #1a1a18; font-weight: 500; border-bottom-color: #1a1a18; }
+  .tab-badge { display: inline-block; font-size: 10px; background: #dceefb; color: #1a5fa8; border-radius: 99px; padding: 1px 5px; margin-left: 4px; font-weight: 500; }
+  .content { flex: 1; overflow-y: auto; background: #fff; }
+  .section { border-bottom: 0.5px solid #efefed; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 10px; }
+  .section-title { font-size: 13px; font-weight: 500; }
+  .section-count { font-size: 11px; color: #aaa; margin-left: 6px; }
+  .chevron { font-size: 11px; color: #aaa; }
+  .btn { font-size: 12px; padding: 5px 10px; border: 0.5px solid #bbb; border-radius: 8px; background: transparent; color: #1a1a18; cursor: pointer; }
+  .btn-sm { font-size: 11px; padding: 3px 8px; }
+  .btn-danger { color: #a32d2d; border-color: #f09595; }
+  .filter-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 16px; border-top: 0.5px solid #efefed; }
+  .filter-body { flex: 1; min-width: 0; }
+  .filter-criteria { font-size: 12px; margin-bottom: 4px; color: #444; }
+  .filter-criteria code { font-family: "SF Mono", "Fira Code", monospace; font-size: 11px; color: #1a5fa8; background: #dceefb; padding: 1px 5px; border-radius: 4px; }
+  .filter-action { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 3px; }
+  .tag { display: inline-flex; align-items: center; font-size: 11px; border-radius: 99px; padding: 2px 8px; }
+  .tag-add    { background: #eaf3de; color: #3b6d11; }
+  .tag-remove { background: #fcebeb; color: #a32d2d; }
+  .tag-skip   { background: #f5f5f3; color: #888; border: 0.5px solid #d0cfc8; }
+  .filter-meta { font-size: 10px; color: #aaa; }
+  .label-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .label-row { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-top: 0.5px solid #efefed; border-right: 0.5px solid #efefed; }
+  .label-row:nth-child(2n) { border-right: none; }
+  .label-pip { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .label-name { font-size: 12px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-app-label">GTD Manager</div>
+    <nav>
+      <div class="nav-item"><span class="icon">📥</span>Inbox</div>
+      <div class="nav-item"><span class="icon">⚡</span>Next Actions</div>
+      <div class="nav-item"><span class="icon">📁</span>Projects</div>
+      <div class="nav-item"><span class="icon">⏳</span>Waiting For</div>
+      <div class="nav-item"><span class="icon">💭</span>Someday / Maybe</div>
+      <div class="nav-item"><span class="icon">⏰</span>Deferred</div>
+      <div class="nav-item"><span class="icon">✅</span>Completed</div>
+    </nav>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">Tools</div>
+    <nav>
+      <div class="nav-item active"><span class="icon">📧</span>Email <span class="nav-badge">50</span></div>
+    </nav>
+  </div>
+
+  <div class="main">
+    <div class="tab-bar">
+      <div class="tab">Inbox <span class="tab-badge">50</span></div>
+      <div class="tab">Cleanup</div>
+      <div class="tab active">Rules</div>
+    </div>
+    <div class="content">
+      <div class="section">
+        <div class="section-header">
+          <div><span class="section-title">Filters</span><span class="section-count">4</span></div>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="filter-row">
+          <div class="filter-body">
+            <div class="filter-criteria">From <code>newsletter@morningbrew.com</code> + <code>has:list-unsubscribe</code></div>
+            <div class="filter-action">
+              <span class="tag tag-add">+ Newsletters/Morning Brew</span>
+              <span class="tag tag-remove">− Inbox</span>
+              <span class="tag tag-skip">skip inbox</span>
+            </div>
+            <div class="filter-meta">Created today</div>
+          </div>
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </div>
+        <div class="filter-row">
+          <div class="filter-body">
+            <div class="filter-criteria">From <code>store-news@amazon.com</code> · Subject contains <code>deal OR offer OR sale</code></div>
+            <div class="filter-action">
+              <span class="tag tag-add">+ Promotions/Amazon</span>
+              <span class="tag tag-remove">− Inbox</span>
+            </div>
+            <div class="filter-meta">Created yesterday</div>
+          </div>
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </div>
+        <div class="filter-row">
+          <div class="filter-body">
+            <div class="filter-criteria">From <code>noreply@github.com</code> · Subject contains <code>dependabot</code></div>
+            <div class="filter-action">
+              <span class="tag tag-add">+ Dev/Dependabot</span>
+              <span class="tag tag-remove">− Inbox</span>
+            </div>
+            <div class="filter-meta">Created Apr 12</div>
+          </div>
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </div>
+        <div class="filter-row">
+          <div class="filter-body">
+            <div class="filter-criteria">From <code>alerts@notion.so</code></div>
+            <div class="filter-action">
+              <span class="tag tag-add">+ Tools/Notion</span>
+              <span class="tag tag-remove">− Inbox</span>
+            </div>
+            <div class="filter-meta">Created Mar 3</div>
+          </div>
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <div><span class="section-title">Labels</span><span class="section-count">10</span></div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="btn btn-sm">+ New label</button>
+            <span class="chevron">▾</span>
+          </div>
+        </div>
+        <div class="label-grid">
+          <div class="label-row"><div class="label-pip" style="background:#378ADD;"></div><div class="label-name">Newsletters/Morning Brew</div></div>
+          <div class="label-row"><div class="label-pip" style="background:#1D9E75;"></div><div class="label-name">Newsletters/The Hustle</div></div>
+          <div class="label-row"><div class="label-pip" style="background:#9FE1CB;"></div><div class="label-name">Promotions/Amazon</div></div>
+          <div class="label-row"><div class="label-pip" style="background:#EF9F27;"></div><div class="label-name">Promotions/Retail</div></div>
+          <div class="label-row"><div class="label-pip" style="background:#7F77DD;"></div><div class="label-name">Dev/Dependabot</div></div>
+          <div class="label-row"><div class="label-pip" style="background:#D4537E;"></div><div class="label-name">Dev/CI Alerts</div></div>
+          <div class="label-row"><div class="label-pip" style="background:#D85A30;"></div><div class="label-name">Finance/Invoices</div></div>
+          <div class="label-row"><div class="label-pip" style="background:#639922;"></div><div class="label-name">Tools/Notion</div></div>
+          <div class="label-row"><div class="label-pip" style="background:#BA7517;"></div><div class="label-name">Tools/GitHub</div></div>
+          <div class="label-row"><div class="label-pip" style="background:#888780;"></div><div class="label-name">_GTD/Processed</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
