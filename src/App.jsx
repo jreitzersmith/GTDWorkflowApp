@@ -3,6 +3,37 @@ import { createClient } from "@supabase/supabase-js";
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ── Supabase gmail_queue helpers ──────────────────────────────────────────
+function queueEntryToRow(entry, userId) {
+  return {
+    id:            entry.id,
+    user_id:       userId,
+    label_name:    entry.labelName,
+    label_id:      entry.labelId || null,
+    query:         entry.query,
+    description:   entry.description || null,
+    archive:       entry.archive !== false,
+    create_filter: entry.createFilter !== false,
+    saved_at:      entry.savedAt || new Date().toISOString(),
+    status:        entry.status || 'pending',
+    run_count:     entry.runCount || null,
+  };
+}
+function rowToQueueEntry(row) {
+  return {
+    id:           row.id,
+    savedAt:      row.saved_at,
+    labelName:    row.label_name,
+    labelId:      row.label_id || null,
+    query:        row.query,
+    description:  row.description || null,
+    archive:      row.archive,
+    createFilter: row.create_filter,
+    status:       row.status || 'pending',
+    runCount:     row.run_count || null,
+  };
+}
+
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -1651,6 +1682,21 @@ export default function GTDManager() {
   useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
   useEffect(() => { localStorage.setItem("gtd_email_tab", emailTab); }, [emailTab]);
   useEffect(() => { localStorage.setItem("gtd_gmail_queue", JSON.stringify(gmailQueue)); }, [gmailQueue]);
+
+  // Load gmail_queue from Supabase on auth ready, merge with any localStorage entries
+  useEffect(() => {
+    if (!authUser || !supabaseReady) return;
+    supabase.from('gmail_queue').select('*').eq('user_id', authUser.id).then(({ data, error }) => {
+      if (error) { console.error('gmail_queue load error', error); return; }
+      if (!data || data.length === 0) return;
+      const fromServer = data.map(rowToQueueEntry);
+      setGmailQueue(prev => {
+        const serverIds = new Set(fromServer.map(e => e.id));
+        const localOnly = prev.filter(e => !serverIds.has(e.id));
+        return [...fromServer, ...localOnly];
+      });
+    });
+  }, [authUser, supabaseReady]); // eslint-disable-line
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
   useEffect(() => { setSelectedTaskId(null); }, [currentBucket]);
 
@@ -1880,6 +1926,11 @@ export default function GTDManager() {
                     status: 'pending',
                   };
                   setGmailQueue(prev => [...prev, entry]);
+                  if (authUser) {
+                    supabase.from('gmail_queue').upsert(queueEntryToRow(entry, authUser.id)).then(({ error }) => {
+                      if (error) console.error('gmail_queue upsert error', error);
+                    });
+                  }
                   toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify({ status: 'Saved to cleanup queue', id: entry.id }) });
                 } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_label") {
@@ -2911,6 +2962,7 @@ export default function GTDManager() {
               tasks={tasks}
               processEmailWithAI={processEmailWithAI}
               openCoachChat={openCoachChat}
+              authUser={authUser}
             />
           ) : (
             <>
@@ -5328,7 +5380,7 @@ function formatEmailDate(dateStr) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, tasks, processEmailWithAI, openCoachChat }) {
+function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, tasks, processEmailWithAI, openCoachChat, authUser }) {
   const [inboxEmails, setInboxEmails] = useState([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError] = useState(null);
@@ -5425,7 +5477,13 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
       if (entry.createFilter) {
         await doGmailCreateFilter(null, null, null, entry.query, addIds, removeIds, googleToken).catch(() => {});
       }
-      setGmailQueue(prev => prev.map(q => q.id === entry.id ? { ...q, status: 'done', runCount: result.succeeded } : q));
+      const updatedEntry = { ...entry, status: 'done', runCount: result.succeeded ?? 0 };
+      setGmailQueue(prev => prev.map(q => q.id === entry.id ? updatedEntry : q));
+      if (authUser) {
+        supabase.from('gmail_queue').upsert(queueEntryToRow(updatedEntry, authUser.id)).then(({ error }) => {
+          if (error) console.error('gmail_queue run update error', error);
+        });
+      }
       setQueueStatus(s => ({ ...s, [entry.id]: { running: false, result: `${result.succeeded ?? 0} updated` } }));
     } catch (e) {
       // Translate common API error codes into actionable messages
@@ -5664,7 +5722,14 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
                     )}
                     {!qs.running && !isDone && !qs.error && <span style={{ fontSize: 10, color: COLORS.muted, padding: '2px 7px', background: COLORS.surface2, borderRadius: 99, border: `1px solid ${COLORS.border}` }}>pending</span>}
                     <button style={btnSm} disabled={qs.running} onClick={() => runQueueEntry(entry)}>{isDone ? 'Re-run' : 'Run'}</button>
-                    <button style={btnSmDanger} disabled={qs.running} onClick={() => setGmailQueue(prev => prev.filter(e => e.id !== entry.id))}>Remove</button>
+                    <button style={btnSmDanger} disabled={qs.running} onClick={() => {
+                        setGmailQueue(prev => prev.filter(e => e.id !== entry.id));
+                        if (authUser) {
+                          supabase.from('gmail_queue').delete().match({ id: entry.id, user_id: authUser.id }).then(({ error }) => {
+                            if (error) console.error('gmail_queue delete error', error);
+                          });
+                        }
+                      }}>Remove</button>
                   </div>
                 </div>
               );
