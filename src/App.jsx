@@ -1346,6 +1346,7 @@ export default function GTDManager() {
   const [gmailQueue, setGmailQueue] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_gmail_queue") || "[]"); } catch { return []; }
   });
+  const [gmailUnreadCount, setGmailUnreadCount] = useState(null);
   // Google / Gmail OAuth token (null = disconnected) + access level + error message
   const [gmailError, setGmailError] = useState(null);
   const [googleScope, setGoogleScope] = useState(() => {
@@ -1697,6 +1698,17 @@ export default function GTDManager() {
       });
     });
   }, [authUser, supabaseReady]); // eslint-disable-line
+
+  // Fetch unread inbox count whenever the Gmail token changes
+  useEffect(() => {
+    if (!googleToken) { setGmailUnreadCount(null); return; }
+    fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread%20in:inbox&maxResults=1', {
+      headers: { Authorization: `Bearer ${googleToken}` },
+    })
+      .then(r => r.json())
+      .then(d => setGmailUnreadCount(d.resultSizeEstimate ?? null))
+      .catch(() => setGmailUnreadCount(null));
+  }, [googleToken]);
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
   useEffect(() => { setSelectedTaskId(null); }, [currentBucket]);
 
@@ -2900,8 +2912,8 @@ export default function GTDManager() {
           >
             <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.inbox, flexShrink: 0 }} />
             <span style={{ flex: 1, fontSize: 13, color: currentView === "email" ? COLORS.text : COLORS.text2 }}>📧 Email</span>
-            {gmailQueue.length > 0 && (
-              <span style={{ fontSize: 11, background: COLORS.surface3, color: COLORS.muted, padding: "1px 7px", borderRadius: 10 }}>{gmailQueue.length}</span>
+            {gmailUnreadCount != null && gmailUnreadCount > 0 && (
+              <span style={{ fontSize: 11, background: COLORS.inbox + "22", color: COLORS.inbox, padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{gmailUnreadCount}</span>
             )}
           </div>
         </div>
