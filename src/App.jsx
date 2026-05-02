@@ -5391,6 +5391,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
   const [gmailLabels, setGmailLabels] = useState([]);
   const [gmailFilters, setGmailFilters] = useState([]);
   const [rulesLoading, setRulesLoading] = useState(false);
+  const [rulesError, setRulesError] = useState(null);
   const [queueStatus, setQueueStatus] = useState({});
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [labelsOpen, setLabelsOpen] = useState(true);
@@ -5430,6 +5431,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
 
   const loadRules = async () => {
     setRulesLoading(true);
+    setRulesError(null);
     try {
       const [labels, filters] = await Promise.all([
         doGmailFetchLabelsRaw(googleToken),
@@ -5488,9 +5490,21 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
       const addIds = [labelId].filter(Boolean);
       const removeIds = entry.archive ? ['INBOX'] : [];
       const result = await doGmailBulkAction(entry.query, addIds, removeIds, googleToken);
-      if (entry.createFilter) {
-        await doGmailCreateFilter(null, null, null, entry.query, addIds, removeIds, googleToken).catch(() => {});
+
+      // Collect any warnings (partial bulk failure, filter creation failure)
+      const warnings = [];
+      if (result.errors && result.errors.length > 0) {
+        warnings.push(`${result.succeeded ?? 0}/${result.matched ?? '?'} messages updated (some chunks failed)`);
       }
+
+      if (entry.createFilter) {
+        try {
+          await doGmailCreateFilter(null, null, null, entry.query, addIds, removeIds, googleToken);
+        } catch (filterErr) {
+          warnings.push(`Filter not created: ${filterErr.message}`);
+        }
+      }
+
       const updatedEntry = { ...entry, status: 'done', runCount: result.succeeded ?? 0 };
       setGmailQueue(prev => prev.map(q => q.id === entry.id ? updatedEntry : q));
       if (authUser) {
@@ -5498,7 +5512,11 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
           if (error) console.error('gmail_queue run update error', error);
         });
       }
-      setQueueStatus(s => ({ ...s, [entry.id]: { running: false, result: `${result.succeeded ?? 0} updated` } }));
+      const countLabel = result.errors?.length
+        ? `${result.succeeded ?? 0}/${result.matched ?? '?'} updated`
+        : `${result.succeeded ?? 0} updated`;
+      const resultMsg = warnings.length ? `${countLabel} ⚠ ${warnings.join('; ')}` : countLabel;
+      setQueueStatus(s => ({ ...s, [entry.id]: { running: false, result: resultMsg } }));
     } catch (e) {
       // Translate common API error codes into actionable messages
       let msg = e.message || 'Unknown error';
@@ -5572,10 +5590,15 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
                 <>
                   <button style={btnSmDanger} onClick={async () => {
                     const ids = [...checkedIds];
-                    await doGmailBatchLabel(ids, [], ['INBOX'], googleToken).catch(() => {});
-                    setInboxEmails(prev => prev.filter(e => !checkedIds.has(e.id)));
-                    setCheckedIds(new Set());
-                    if (checkedIds.has(selectedId)) setSelectedId(null);
+                    if (googleScope !== 'full') { setInboxError('Archive requires Gmail write access — reconnect in Settings.'); return; }
+                    try {
+                      await doGmailBatchLabel(ids, [], ['INBOX'], googleToken);
+                      setInboxEmails(prev => prev.filter(e => !checkedIds.has(e.id)));
+                      setCheckedIds(new Set());
+                      if (checkedIds.has(selectedId)) setSelectedId(null);
+                    } catch (e) {
+                      setInboxError(`Archive failed: ${e.message}`);
+                    }
                   }}>Archive ({checkedIds.size})</button>
                   <button style={btnPrimary} onClick={() => {
                     const email = emailDetail || inboxEmails.find(e => e.id === [...checkedIds][0]);
@@ -5655,9 +5678,14 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
                     </button>
                     <button style={{ ...btn(), textAlign: 'left' }}
                       onClick={async () => {
-                        await doGmailBatchLabel([selectedId], [], ['INBOX'], googleToken).catch(() => {});
-                        setInboxEmails(prev => prev.filter(e => e.id !== selectedId));
-                        setSelectedId(null);
+                        if (googleScope !== 'full') { setInboxError('Archive requires Gmail write access — reconnect in Settings.'); return; }
+                        try {
+                          await doGmailBatchLabel([selectedId], [], ['INBOX'], googleToken);
+                          setInboxEmails(prev => prev.filter(e => e.id !== selectedId));
+                          setSelectedId(null);
+                        } catch (e) {
+                          setInboxError(`Archive failed: ${e.message}`);
+                        }
                       }}>
                       Archive
                     </button>
@@ -5756,6 +5784,12 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
       {emailTab === 'rules' && (
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {rulesLoading && <div style={{ padding: 20, textAlign: 'center', color: COLORS.muted, fontSize: 13 }}>Loading…</div>}
+          {rulesError && (
+            <div style={{ margin: '8px 14px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, fontSize: 12, color: '#b91c1c', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>⚠ {rulesError}</span>
+              <button onClick={() => setRulesError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b91c1c', fontWeight: 700, padding: '0 4px' }}>×</button>
+            </div>
+          )}
 
           {/* Filters */}
           {!rulesLoading && (
@@ -5799,8 +5833,13 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
                       </div>
                     </div>
                     <button style={btnSmDanger} onClick={async () => {
-                      await doGmailDeleteFilter(f.id, googleToken).catch(() => {});
-                      setGmailFilters(prev => prev.filter(x => x.id !== f.id));
+                      if (googleScope !== 'full') { setRulesError('Deleting filters requires Gmail write access — reconnect in Settings.'); return; }
+                      try {
+                        await doGmailDeleteFilter(f.id, googleToken);
+                        setGmailFilters(prev => prev.filter(x => x.id !== f.id));
+                      } catch (e) {
+                        setRulesError(`Delete failed: ${e.message}`);
+                      }
                     }}>Delete</button>
                   </div>
                 );
