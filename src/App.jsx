@@ -2116,6 +2116,13 @@ export default function GTDManager() {
     setTimeout(() => chatInputRef.current?.focus(), 100);
   }, [setCoachMode, setChatInput, chatInputRef]);
 
+  // Prefill the coach chat with a raw prompt (no email wrapper) — used by cleanup workflow buttons
+  const openCoachChat = useCallback((prompt) => {
+    setCoachMode("chat");
+    setChatInput(prompt);
+    setTimeout(() => chatInputRef.current?.focus(), 100);
+  }, [setCoachMode, setChatInput, chatInputRef]);
+
   // ── Mode A: Task-completeness review ────────────────────────────────────
   const reviewProject = useCallback(async (project, idx, total) => {
     setCurrentBucket("project");
@@ -2899,6 +2906,7 @@ export default function GTDManager() {
               setEmailTab={setEmailTab}
               tasks={tasks}
               processEmailWithAI={processEmailWithAI}
+              openCoachChat={openCoachChat}
             />
           ) : (
             <>
@@ -5316,7 +5324,7 @@ function formatEmailDate(dateStr) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, tasks, processEmailWithAI }) {
+function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, tasks, processEmailWithAI, openCoachChat }) {
   const [inboxEmails, setInboxEmails] = useState([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError] = useState(null);
@@ -5583,15 +5591,15 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
             </div>
             <div style={{ margin: '0 16px 14px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: '10px 14px' }}>
               <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.6, marginBottom: 10 }}>
-                The AI will sample up to 25 emails, identify newsletter and promotional senders, build a targeted search query for each, and ask for confirmation before saving to the queue.
+                The AI will sample your inbox, build a targeted search query for each sender, and ask for confirmation. Once confirmed, it will create the label (if needed) and save to the queue with a Gmail filter so future emails are labeled automatically.
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {[
-                  ['Find newsletters', 'Search my inbox and identify newsletter subscriptions. For each one, build the most restrictive search query, show me what you found, and ask for confirmation before saving to the queue.'],
-                  ['Find promotional emails', 'Search my inbox for promotional and marketing emails from online retailers and services. Build targeted search queries, show me what you found with what will be excluded (like order receipts), and ask for confirmation before saving each one to the queue.'],
-                  ['Find specific sender…', 'I want to clean up emails from a specific sender. Ask me which sender to look into, then sample their emails, build the most restrictive query possible, and explain what it will and won\'t match before asking me to confirm.'],
+                  ['Find and Label Newsletters', `Search my inbox and identify newsletter subscriptions. For each one:\n1. Sample the emails and build the most restrictive query (prefer exact sending address + has:list-unsubscribe).\n2. Show me what the query will match and explicitly note any emails from the same sender it will NOT match (e.g. transactional alerts).\n3. Ask for confirmation.\n4. Once I confirm, use gmail_queue_add with create_filter set to true so the label and Gmail filter are both created when the queue runs.`],
+                  ['Find and Label Promotional Emails', `Search my inbox for promotional and marketing emails from online retailers and services. For each sender:\n1. Sample their emails and build the most restrictive query (prefer exact subdomain + has:list-unsubscribe; add subject keywords only to sharpen scope).\n2. Clearly state what the query will NOT match — especially order receipts, shipping confirmations, or account alerts from the same domain.\n3. Ask for confirmation.\n4. Once I confirm, use gmail_queue_add with create_filter set to true so the label and Gmail filter are both created when the queue runs.`],
+                  ['Find specific sender…', `I want to label and filter emails from a specific sender. Ask me which sender to look into, then:\n1. Sample their emails and build the most restrictive query possible.\n2. Explain what it will and won't match.\n3. Ask me to confirm.\n4. Once confirmed, use gmail_queue_add with create_filter set to true so the label and Gmail filter are both created when the queue runs.`],
                 ].map(([label, prompt]) => (
-                  <button key={label} style={btnSm} onClick={() => processEmailWithAI({ from: '', subject: '', date: '', body: prompt, snippet: prompt })}>
+                  <button key={label} style={btnSm} onClick={() => openCoachChat(prompt)}>
                     {label} ↗
                   </button>
                 ))}
