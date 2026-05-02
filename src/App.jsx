@@ -5658,8 +5658,12 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
                   c.subject && { label: `subject:${c.subject}` },
                   c.query   && { label: c.query },
                 ].filter(Boolean);
-                const addChips    = (a.addLabelIds    || []).map(id => ({ label: `+ ${id}`, color: COLORS.next,    bg: COLORS.nextBg }));
-                const removeChips = (a.removeLabelIds || []).map(id => ({ label: `− ${id}`, color: '#e05555',      bg: '#2a1010' }));
+                const resolveLabelId = id => {
+                  const match = gmailLabels.find(l => l.id === id);
+                  return match ? match.name : id;
+                };
+                const addChips    = (a.addLabelIds    || []).map(id => ({ label: `+ ${resolveLabelId(id)}`, color: COLORS.next,   bg: COLORS.nextBg }));
+                const removeChips = (a.removeLabelIds || []).map(id => ({ label: `− ${resolveLabelId(id)}`, color: '#e05555',     bg: '#2a1010' }));
                 return (
                   <div key={f.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 16px', borderTop: `1px solid ${COLORS.border}` }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
