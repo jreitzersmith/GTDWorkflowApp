@@ -5464,8 +5464,9 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
       // Resolve label ID if not stored
       let labelId = entry.labelId;
       if (!labelId) {
+        const normName = s => s.trim().toLowerCase();
         const labels = await doGmailFetchLabelsRaw(googleToken);
-        const match = labels.find(l => l.name === entry.labelName);
+        const match = labels.find(l => normName(l.name) === normName(entry.labelName));
         if (match) {
           labelId = match.id;
         } else {
@@ -5473,18 +5474,23 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
             const created = await doGmailCreateLabel(entry.labelName, googleToken);
             labelId = created.label_id;
           } catch (createErr) {
-            // Gmail returns 409 if label already exists (e.g. created manually or nested path conflict)
-            // Re-fetch labels and try again before giving up
+            // Gmail returns 409 if label already exists (e.g. created manually, nested path, or casing diff)
+            // Re-fetch with case-insensitive match before giving up
             if (createErr.message && (createErr.message.toLowerCase().includes('exist') || createErr.message.toLowerCase().includes('conflict') || createErr.message.includes('409'))) {
               const retryLabels = await doGmailFetchLabelsRaw(googleToken);
-              const retryMatch = retryLabels.find(l => l.name === entry.labelName);
-              if (retryMatch) { labelId = retryMatch.id; }
-              else { throw new Error(`Could not find or create label "${entry.labelName}" — ${createErr.message}`); }
+              const retryMatch = retryLabels.find(l => normName(l.name) === normName(entry.labelName));
+              if (retryMatch) {
+                labelId = retryMatch.id;
+              } else {
+                // Still can't find it — skip label resolution and proceed without a label ID
+                // so the bulk action can still run (labelling step will be skipped)
+                console.warn(`Could not resolve label "${entry.labelName}" after conflict — proceeding without label`);
+              }
             } else {
               throw createErr;
             }
           }
-          setGmailQueue(prev => prev.map(q => q.id === entry.id ? { ...q, labelId } : q));
+          if (labelId) setGmailQueue(prev => prev.map(q => q.id === entry.id ? { ...q, labelId } : q));
         }
       }
       const addIds = [labelId].filter(Boolean);
