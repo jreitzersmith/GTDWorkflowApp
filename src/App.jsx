@@ -81,7 +81,9 @@ Phase 2 — Execution (after confirmation):
 7. Call gmail_create_filter to catch future matching emails automatically.
 
 Use gmail_batch_label (not gmail_bulk_action) only when labelling a small known set of message IDs already retrieved via gmail_search.
-When the user asks to process many senders at once, handle 3-5 senders per turn and report results before continuing.`,
+When the user asks to process many senders at once, handle 3-5 senders per turn and report results before continuing.
+
+After the user confirms a query and label in Phase 1, call gmail_queue_add to save the entry to their persistent cleanup queue. Tell the user it has been saved and they can run it now or later from the Email > Cleanup tab.`,
   process: `You are a GTD inbox processor. For each inbox item given to you:
 
 1. Determine if it's actionable. If not actionable, end with: →ACTION:delete
@@ -377,6 +379,23 @@ BEFORE calling this tool you MUST:
   },
 };
 
+const GMAIL_QUEUE_ADD_TOOL = {
+  name: "gmail_queue_add",
+  description: "Save a confirmed newsletter/promotional cleanup entry to the user's bulk action queue. Only call this AFTER the user has explicitly confirmed the search query and label. The queue persists across sessions so the user can run bulk actions later.",
+  input_schema: {
+    type: "object",
+    properties: {
+      label_name:    { type: "string",  description: "Human-readable label name (e.g. 'Newsletters/Morning Brew')" },
+      label_id:      { type: "string",  description: "Gmail label ID if already created; omit if the label doesn't exist yet" },
+      query:         { type: "string",  description: "The confirmed, most-restrictive Gmail search query" },
+      description:   { type: "string",  description: "Plain-English explanation of what the query matches and what it intentionally excludes" },
+      archive:       { type: "boolean", description: "Whether to remove from INBOX (default true)" },
+      create_filter: { type: "boolean", description: "Whether to create a Gmail filter after running (default true)" },
+    },
+    required: ["label_name", "query", "description"],
+  },
+};
+
 // Display metadata for Gmail scope levels — used in Settings UI
 const GMAIL_SCOPE_OPTS = [
   { key: 'readonly', label: 'Read only', desc: 'Search and read emails' },
@@ -581,6 +600,87 @@ async function doGmailBulkAction(query, addLabelIds, removeLabelIds, token) {
     return { matched: allIds.length, succeeded: totalSucceeded, errors, status: `Partial success: ${totalSucceeded}/${allIds.length} messages updated. Errors: ${errors.join('; ')}` };
   }
   return { matched: allIds.length, succeeded: totalSucceeded, status: `All ${totalSucceeded} matching messages updated successfully.` };
+}
+
+// ── Email Management helper functions ────────────────────────────────────────
+
+// Recursively extract the first plain-text part from a Gmail message payload
+function extractGmailPlainText(payload) {
+  if (!payload) return '';
+  if (payload.mimeType === 'text/plain' && payload.body?.data) {
+    try {
+      return decodeURIComponent(escape(atob(payload.body.data.replace(/-/g, '+').replace(/_/g, '/'))));
+    } catch { return ''; }
+  }
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      const text = extractGmailPlainText(part);
+      if (text) return text;
+    }
+  }
+  return '';
+}
+
+// Fetch up to 50 inbox messages as structured objects (for the Email Management inbox tab)
+async function doGmailFetchInbox(token, maxResults = 50) {
+  const limit = Math.min(maxResults, 50);
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=in:inbox&maxResults=${limit}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const data = await res.json();
+  const messages = data.messages || [];
+  if (!messages.length) return [];
+  const details = await Promise.all(messages.map(async ({ id }) => {
+    try {
+      const msgRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata` +
+        `&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!msgRes.ok) return null;
+      const msg = await msgRes.json();
+      const hdrs = msg.payload?.headers || [];
+      const get = name => hdrs.find(h => h.name === name)?.value || '';
+      const fromRaw = get('From');
+      const nameMatch = fromRaw.match(/^"?(.+?)"?\s*<.+>$/);
+      const fromName = nameMatch ? nameMatch[1] : fromRaw.replace(/<.*>/, '').trim() || fromRaw;
+      const fromEmail = (fromRaw.match(/<(.+?)>/) || [])[1] || fromRaw;
+      const isUnread = (msg.labelIds || []).includes('UNREAD');
+      return { id, from: fromRaw, fromName, fromEmail, date: get('Date'), subject: get('Subject'), snippet: msg.snippet || '', isUnread, labelIds: msg.labelIds || [] };
+    } catch { return null; }
+  }));
+  return details.filter(Boolean);
+}
+
+// Fetch full message body for the detail panel
+async function doGmailGetMessageBody(id, token) {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const msg = await res.json();
+  const hdrs = msg.payload?.headers || [];
+  const get = name => hdrs.find(h => h.name === name)?.value || '';
+  return {
+    id,
+    from: get('From'), to: get('To'), subject: get('Subject'), date: get('Date'),
+    body: extractGmailPlainText(msg.payload).trim(),
+    snippet: msg.snippet || '',
+    labelIds: msg.labelIds || [],
+  };
+}
+
+// Fetch all filters as structured objects (for the Rules tab)
+async function doGmailFetchFilters(token) {
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/filters', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const data = await res.json();
+  return data.filter || [];
 }
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -1194,6 +1294,12 @@ export default function GTDManager() {
   });
   const [tagDisplay,  setTagDisplay]  = useState(() => localStorage.getItem("gtd_tag_display") || "below");
   const [showSettings, setShowSettings] = useState(false);
+  // Email Management view state
+  const [currentView, setCurrentView] = useState("gtd"); // "gtd" | "email"
+  const [emailTab, setEmailTab] = useState(() => localStorage.getItem("gtd_email_tab") || "inbox");
+  const [gmailQueue, setGmailQueue] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_gmail_queue") || "[]"); } catch { return []; }
+  });
   // Google / Gmail OAuth token (null = disconnected) + access level + error message
   const [gmailError, setGmailError] = useState(null);
   const [googleScope, setGoogleScope] = useState(() => {
@@ -1528,6 +1634,8 @@ export default function GTDManager() {
   useEffect(() => { localStorage.setItem("gtd_efforts",             JSON.stringify(efforts));             }, [efforts]);
   useEffect(() => { localStorage.setItem("gtd_effort_calibration", JSON.stringify(calibrationOverrides)); }, [calibrationOverrides]);
   useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
+  useEffect(() => { localStorage.setItem("gtd_email_tab", emailTab); }, [emailTab]);
+  useEffect(() => { localStorage.setItem("gtd_gmail_queue", JSON.stringify(gmailQueue)); }, [gmailQueue]);
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
   useEffect(() => { setSelectedTaskId(null); }, [currentBucket]);
 
@@ -1629,6 +1737,7 @@ export default function GTDManager() {
                 availableTools.push(GMAIL_CREATE_FILTER_TOOL);
                 availableTools.push(GMAIL_DELETE_FILTER_TOOL);
                 availableTools.push(GMAIL_BULK_ACTION_TOOL);
+                availableTools.push(GMAIL_QUEUE_ADD_TOOL);
               }
               if (googleScope === 'compose' || googleScope === 'send')
                 availableTools.push(GMAIL_COMPOSE_TOOL);
@@ -1741,6 +1850,22 @@ export default function GTDManager() {
                   );
                   setMessages(prev => [...prev, { role: "assistant", text: `✅ Bulk action complete — ${result.succeeded ?? 0} message(s) updated.`, isSearchChip: true }]);
                   toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === "gmail_queue_add") {
+                try {
+                  const entry = {
+                    id: genId(),
+                    savedAt: new Date().toISOString(),
+                    labelName:    toolUse.input.label_name,
+                    labelId:      toolUse.input.label_id || null,
+                    query:        toolUse.input.query,
+                    description:  toolUse.input.description,
+                    archive:      toolUse.input.archive !== false,
+                    createFilter: toolUse.input.create_filter !== false,
+                    status: 'pending',
+                  };
+                  setGmailQueue(prev => [...prev, entry]);
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify({ status: 'Saved to cleanup queue', id: entry.id }) });
                 } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_label") {
                 try {
@@ -1970,6 +2095,15 @@ export default function GTDManager() {
   const startBrainDump = () => {
     switchCoachMode("dump", "Let's surface everything in your head and get it into your inbox.\n\n**Starting with work:** What professional tasks, deadlines, or commitments have been on your mind that aren't written down anywhere?");
   };
+
+  // Prefill the coach chat with email content so the user can process it into tasks
+  const processEmailWithAI = useCallback((email) => {
+    const body = email.body ? email.body.slice(0, 1200) : email.snippet;
+    const prompt = `Please review this email and identify any action items, commitments, or tasks I should add to my GTD system. For each item found, suggest the best bucket (Next Actions, Projects, Waiting For, etc.) and offer to create it.\n\nFrom: ${email.from}\nSubject: ${email.subject}\nDate: ${email.date}\n\n${body}`;
+    setCoachMode("chat");
+    setChatInput(prompt);
+    setTimeout(() => chatInputRef.current?.focus(), 100);
+  }, [setCoachMode, setChatInput, chatInputRef]);
 
   // ── Mode A: Task-completeness review ────────────────────────────────────
   const reviewProject = useCallback(async (project, idx, total) => {
@@ -2681,8 +2815,22 @@ export default function GTDManager() {
 
         <div style={s.bucketList}>
           {Object.entries(BUCKETS).map(([key, cfg]) => (
-            <BucketItem key={key} bkey={key} cfg={cfg} count={counts[key]} active={currentBucket === key} onClick={() => setCurrentBucket(key)} />
+            <BucketItem key={key} bkey={key} cfg={cfg} count={counts[key]} active={currentBucket === key && currentView === "gtd"} onClick={() => { setCurrentBucket(key); setCurrentView("gtd"); setShowSettings(false); }} />
           ))}
+
+          {/* ── Tools section separator ── */}
+          <div style={{ margin: "10px 14px 4px", borderTop: `1px solid ${COLORS.border}` }} />
+          <div style={{ padding: "0 16px 4px", fontSize: 10, color: COLORS.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Tools</div>
+          <div
+            onClick={() => { setCurrentView("email"); setShowSettings(false); }}
+            style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "email" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "email" ? COLORS.inbox : "transparent"}`, transition: "background 0.1s" }}
+          >
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.inbox, flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 13, color: currentView === "email" ? COLORS.text : COLORS.text2 }}>📧 Email</span>
+            {gmailQueue.length > 0 && (
+              <span style={{ fontSize: 11, background: COLORS.surface3, color: COLORS.muted, padding: "1px 7px", borderRadius: 10 }}>{gmailQueue.length}</span>
+            )}
+          </div>
         </div>
 
         <div style={s.sidebarActions}>
@@ -2705,7 +2853,18 @@ export default function GTDManager() {
         <div style={s.taskRow}>
         {/* TASK PANEL */}
         <div style={s.taskPanel}>
-          {showSettings ? (
+          {currentView === "email" ? (
+            <EmailManagementView
+              googleToken={googleToken}
+              googleScope={googleScope}
+              gmailQueue={gmailQueue}
+              setGmailQueue={setGmailQueue}
+              emailTab={emailTab}
+              setEmailTab={setEmailTab}
+              tasks={tasks}
+              processEmailWithAI={processEmailWithAI}
+            />
+          ) : showSettings ? (
             <SettingsPanel
               locations={locations}
               tasks={tasks}
@@ -3118,7 +3277,7 @@ export default function GTDManager() {
         </div>{/* end mainLeft */}
 
         {/* TASK DETAIL PANEL — full height alongside both task list and coach */}
-        {selectedTaskId && (() => {
+        {selectedTaskId && currentView !== "email" && (() => {
           const selTask = tasks.find(t => t.id === selectedTaskId);
           return selTask ? (
             <>
@@ -5111,6 +5270,449 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
           style={{ flex: 1, padding: '6px 0', borderRadius: 7, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}
         >🗑 Delete</button>
       </div>
+    </div>
+  );
+}
+
+// ── Email Management View ─────────────────────────────────────────────────────
+
+function avatarInitials(name) {
+  const parts = (name || '').trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return (name || '?').slice(0, 2).toUpperCase();
+}
+
+const AVATAR_COLORS = [
+  { bg: '#1e2a3a', text: '#5a8fd4' }, { bg: '#1a2a1e', text: '#5ab878' },
+  { bg: '#2a1e14', text: '#d4845a' }, { bg: '#1e1a2a', text: '#9a8ad4' },
+  { bg: '#2a1e1a', text: '#d4765a' }, { bg: '#152520', text: '#6ec6a8' },
+];
+function avatarColor(name) {
+  let h = 0;
+  for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+function formatEmailDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return d.toLocaleDateString([], { weekday: 'short' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, tasks, processEmailWithAI }) {
+  const [inboxEmails, setInboxEmails] = useState([]);
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const [inboxError, setInboxError] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [checkedIds, setCheckedIds] = useState(new Set());
+  const [emailDetail, setEmailDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [gmailLabels, setGmailLabels] = useState([]);
+  const [gmailFilters, setGmailFilters] = useState([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [queueStatus, setQueueStatus] = useState({});
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [labelsOpen, setLabelsOpen] = useState(true);
+
+  // Load inbox on mount / when switching to inbox tab
+  useEffect(() => {
+    if (emailTab === 'inbox' && googleToken && inboxEmails.length === 0 && !inboxLoading) {
+      loadInbox();
+    }
+  }, [emailTab, googleToken]); // eslint-disable-line
+
+  // Load rules when switching to rules tab
+  useEffect(() => {
+    if (emailTab === 'rules' && googleToken && !rulesLoading && gmailLabels.length === 0) {
+      loadRules();
+    }
+  }, [emailTab, googleToken]); // eslint-disable-line
+
+  // Fetch full message body when email is selected
+  useEffect(() => {
+    if (!selectedId || !googleToken) { setEmailDetail(null); return; }
+    setDetailLoading(true);
+    setEmailDetail(null);
+    doGmailGetMessageBody(selectedId, googleToken)
+      .then(setEmailDetail)
+      .catch(e => setEmailDetail({ error: e.message }))
+      .finally(() => setDetailLoading(false));
+  }, [selectedId, googleToken]);
+
+  const loadInbox = async () => {
+    setInboxLoading(true);
+    setInboxError(null);
+    try { setInboxEmails(await doGmailFetchInbox(googleToken, 50)); }
+    catch (e) { setInboxError(e.message); }
+    finally { setInboxLoading(false); }
+  };
+
+  const loadRules = async () => {
+    setRulesLoading(true);
+    try {
+      const [labelsRaw, filters] = await Promise.all([
+        doGmailListLabels(googleToken),
+        doGmailFetchFilters(googleToken),
+      ]);
+      const parsed = (() => { try { return JSON.parse(labelsRaw).labels || []; } catch { return []; } })();
+      setGmailLabels(parsed.filter(l => !l.type || l.type === 'user'));
+      setGmailFilters(filters);
+    } catch (e) { console.error('Rules load error', e); }
+    finally { setRulesLoading(false); }
+  };
+
+  const toggleCheck = (id) => setCheckedIds(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  const runQueueEntry = async (entry) => {
+    setQueueStatus(s => ({ ...s, [entry.id]: { running: true } }));
+    try {
+      // Resolve label ID if not stored
+      let labelId = entry.labelId;
+      if (!labelId) {
+        const raw = await doGmailListLabels(googleToken);
+        const labels = (() => { try { return JSON.parse(raw).labels || []; } catch { return []; } })();
+        const match = labels.find(l => l.name === entry.labelName);
+        if (match) labelId = match.id;
+        else {
+          const created = await doGmailCreateLabel(entry.labelName, googleToken);
+          labelId = created.label_id;
+          setGmailQueue(prev => prev.map(q => q.id === entry.id ? { ...q, labelId } : q));
+        }
+      }
+      const addIds = [labelId].filter(Boolean);
+      const removeIds = entry.archive ? ['INBOX'] : [];
+      const result = await doGmailBulkAction(entry.query, addIds, removeIds, googleToken);
+      if (entry.createFilter) {
+        await doGmailCreateFilter(null, null, null, entry.query, addIds, removeIds, googleToken).catch(() => {});
+      }
+      setGmailQueue(prev => prev.map(q => q.id === entry.id ? { ...q, status: 'done', runCount: result.succeeded } : q));
+      setQueueStatus(s => ({ ...s, [entry.id]: { running: false, result: `${result.succeeded} archived` } }));
+    } catch (e) {
+      setQueueStatus(s => ({ ...s, [entry.id]: { running: false, error: e.message } }));
+    }
+  };
+
+  const runAllQueue = () => {
+    gmailQueue.filter(e => e.status !== 'done').forEach(runQueueEntry);
+  };
+
+  const tabStyle = (t) => ({
+    padding: '9px 14px', fontSize: 13, cursor: 'pointer',
+    color: emailTab === t ? COLORS.text : COLORS.text2,
+    fontWeight: emailTab === t ? 500 : 400,
+    borderBottom: `2px solid ${emailTab === t ? COLORS.inbox : 'transparent'}`,
+    marginBottom: -1,
+  });
+
+  const btn = (extra = {}) => ({
+    fontSize: 12, padding: '5px 10px', borderRadius: 7,
+    border: `1px solid ${COLORS.border}`, background: 'transparent',
+    color: COLORS.text2, fontFamily: 'inherit', cursor: 'pointer', ...extra,
+  });
+
+  const btnPrimary = btn({ background: COLORS.inboxBg, color: COLORS.inbox, borderColor: COLORS.inbox });
+  const btnSm = btn({ fontSize: 11, padding: '3px 8px' });
+  const btnSmDanger = btn({ fontSize: 11, padding: '3px 8px', color: '#e05555', borderColor: '#5a2020' });
+
+  if (!googleToken) {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: COLORS.text2 }}>
+        <div style={{ fontSize: 32 }}>📧</div>
+        <div style={{ fontSize: 14, color: COLORS.text2 }}>Connect Gmail to use Email Management</div>
+        <div style={{ fontSize: 12, color: COLORS.muted }}>Go to Settings → Gmail to connect your account</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Tab bar */}
+      <div style={{ display: 'flex', borderBottom: `1px solid ${COLORS.border}`, background: COLORS.surface, padding: '0 16px', flexShrink: 0 }}>
+        {['inbox', 'cleanup', 'rules'].map(t => (
+          <div key={t} style={tabStyle(t)} onClick={() => setEmailTab(t)}>
+            {t === 'inbox' ? `Inbox${inboxEmails.length ? ` (${inboxEmails.length})` : ''}` : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'cleanup' && gmailQueue.length > 0 && (
+              <span style={{ marginLeft: 5, fontSize: 10, background: COLORS.surface3, color: COLORS.muted, padding: '1px 6px', borderRadius: 10 }}>{gmailQueue.length}</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Inbox Tab ── */}
+      {emailTab === 'inbox' && (
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          {/* Email list */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Toolbar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0, background: COLORS.surface }}>
+              <span style={{ flex: 1, fontSize: 12, color: COLORS.muted }}>
+                {inboxLoading ? 'Loading…' : inboxError ? `Error: ${inboxError}` : `${inboxEmails.length} messages${checkedIds.size ? ` · ${checkedIds.size} selected` : ''}`}
+              </span>
+              <button style={btnSm} onClick={loadInbox} disabled={inboxLoading}>↻ Refresh</button>
+              {checkedIds.size > 0 && (
+                <>
+                  <button style={btnSmDanger} onClick={async () => {
+                    const ids = [...checkedIds];
+                    await doGmailBatchLabel(ids, [], ['INBOX'], googleToken).catch(() => {});
+                    setInboxEmails(prev => prev.filter(e => !checkedIds.has(e.id)));
+                    setCheckedIds(new Set());
+                    if (checkedIds.has(selectedId)) setSelectedId(null);
+                  }}>Archive ({checkedIds.size})</button>
+                  <button style={btnPrimary} onClick={() => {
+                    const email = emailDetail || inboxEmails.find(e => e.id === [...checkedIds][0]);
+                    if (email) processEmailWithAI(email);
+                  }}>Process with AI ↗</button>
+                </>
+              )}
+            </div>
+
+            {/* List */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {inboxLoading && (
+                <div style={{ padding: 24, textAlign: 'center', color: COLORS.muted, fontSize: 13 }}>Loading inbox…</div>
+              )}
+              {!inboxLoading && inboxEmails.length === 0 && !inboxError && (
+                <div style={{ padding: 24, textAlign: 'center', color: COLORS.muted, fontSize: 13 }}>Inbox is empty</div>
+              )}
+              {inboxEmails.map(email => {
+                const isSelected = selectedId === email.id;
+                const isChecked = checkedIds.has(email.id);
+                const av = avatarColor(email.fromName);
+                return (
+                  <div
+                    key={email.id}
+                    onClick={() => setSelectedId(isSelected ? null : email.id)}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '9px 14px', borderBottom: `1px solid ${COLORS.border}`, cursor: 'pointer', background: isSelected ? COLORS.projectBg : 'transparent', transition: 'background 0.1s' }}
+                  >
+                    {/* Checkbox */}
+                    <div
+                      onClick={e => { e.stopPropagation(); toggleCheck(email.id); }}
+                      style={{ width: 14, height: 14, borderRadius: 3, border: `1px solid ${isChecked ? COLORS.project : COLORS.border}`, background: isChecked ? COLORS.project : 'transparent', flexShrink: 0, marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                    >
+                      {isChecked && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1, marginTop: -1 }}>✓</span>}
+                    </div>
+                    {/* Avatar */}
+                    <div style={{ width: 26, height: 26, borderRadius: '50%', background: av.bg, color: av.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 500, flexShrink: 0 }}>
+                      {avatarInitials(email.fromName)}
+                    </div>
+                    {/* Content */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6, marginBottom: 1 }}>
+                        <span style={{ fontSize: 13, fontWeight: email.isUnread ? 600 : 400, color: COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '55%' }}>{email.fromName}</span>
+                        <span style={{ fontSize: 11, color: COLORS.muted, flexShrink: 0 }}>{formatEmailDate(email.date)}</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: email.isUnread ? COLORS.text : COLORS.text2, fontWeight: email.isUnread ? 500 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 1 }}>{email.subject || '(no subject)'}</div>
+                      <div style={{ fontSize: 11, color: COLORS.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{email.snippet}</div>
+                    </div>
+                    {email.isUnread && <div style={{ width: 6, height: 6, borderRadius: '50%', background: COLORS.project, flexShrink: 0, marginTop: 6 }} />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Detail panel */}
+          {selectedId && (
+            <div style={{ width: 300, flexShrink: 0, borderLeft: `1px solid ${COLORS.border}`, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: COLORS.surface }}>
+              {detailLoading && <div style={{ padding: 16, color: COLORS.muted, fontSize: 13 }}>Loading…</div>}
+              {emailDetail?.error && <div style={{ padding: 16, color: '#e05555', fontSize: 12 }}>Error: {emailDetail.error}</div>}
+              {emailDetail && !emailDetail.error && (
+                <>
+                  <div style={{ padding: '12px 14px 10px', borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, marginBottom: 8, color: COLORS.text }}>{emailDetail.subject || '(no subject)'}</div>
+                    <div style={{ fontSize: 11, color: COLORS.text2, lineHeight: 1.7 }}>
+                      <div><span style={{ color: COLORS.muted }}>From: </span>{emailDetail.from}</div>
+                      {emailDetail.to && <div><span style={{ color: COLORS.muted }}>To: </span>{emailDetail.to}</div>}
+                      <div><span style={{ color: COLORS.muted }}>Date: </span>{emailDetail.date}</div>
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px', fontSize: 12, color: COLORS.text2, lineHeight: 1.65, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {emailDetail.body || emailDetail.snippet || '(no content)'}
+                  </div>
+                  <div style={{ padding: '10px 14px', borderTop: `1px solid ${COLORS.border}`, display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                    <button style={{ ...btn(), textAlign: 'left', background: COLORS.inboxBg, color: COLORS.inbox, borderColor: COLORS.inbox, fontWeight: 500 }}
+                      onClick={() => processEmailWithAI(emailDetail)}>
+                      Process with AI ↗
+                    </button>
+                    <button style={{ ...btn(), textAlign: 'left' }}
+                      onClick={async () => {
+                        await doGmailBatchLabel([selectedId], [], ['INBOX'], googleToken).catch(() => {});
+                        setInboxEmails(prev => prev.filter(e => e.id !== selectedId));
+                        setSelectedId(null);
+                      }}>
+                      Archive
+                    </button>
+                    <button style={{ ...btn(), textAlign: 'left', color: COLORS.muted }} onClick={() => setSelectedId(null)}>Close</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Cleanup Tab ── */}
+      {emailTab === 'cleanup' && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {/* Discovery section */}
+          <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 8px' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>Newsletter discovery</div>
+                <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}>Sample your inbox and identify promotional senders</div>
+              </div>
+            </div>
+            <div style={{ margin: '0 16px 14px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: '10px 14px' }}>
+              <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.6, marginBottom: 10 }}>
+                The AI will sample up to 25 emails, identify newsletter and promotional senders, build a targeted search query for each, and ask for confirmation before saving to the queue.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[
+                  ['Find newsletters', 'Search my inbox and identify newsletter subscriptions. For each one, build the most restrictive search query, show me what you found, and ask for confirmation before saving to the queue.'],
+                  ['Find promotional emails', 'Search my inbox for promotional and marketing emails from online retailers and services. Build targeted search queries, show me what you found with what will be excluded (like order receipts), and ask for confirmation before saving each one to the queue.'],
+                  ['Find specific sender…', 'I want to clean up emails from a specific sender. Ask me which sender to look into, then sample their emails, build the most restrictive query possible, and explain what it will and won\'t match before asking me to confirm.'],
+                ].map(([label, prompt]) => (
+                  <button key={label} style={btnSm} onClick={() => processEmailWithAI({ from: '', subject: '', date: '', body: prompt, snippet: prompt })}>
+                    {label} ↗
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Queue section */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', borderBottom: `1px solid ${COLORS.border}` }}>
+              <span style={{ fontSize: 12, color: COLORS.muted }}>Bulk action queue · {gmailQueue.length} saved</span>
+              {gmailQueue.some(e => e.status !== 'done') && (
+                <button style={btnSm} onClick={runAllQueue}>Run all</button>
+              )}
+            </div>
+            {gmailQueue.length === 0 && (
+              <div style={{ padding: '20px 16px', fontSize: 12, color: COLORS.muted, textAlign: 'center' }}>
+                No entries yet — use the discovery buttons above or ask the AI coach to scan your inbox.
+              </div>
+            )}
+            {gmailQueue.map(entry => {
+              const qs = queueStatus[entry.id] || {};
+              const isDone = entry.status === 'done';
+              return (
+                <div key={entry.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: `1px solid ${COLORS.border}`, opacity: isDone ? 0.65 : 1 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS.project, flexShrink: 0, marginTop: 5 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text, marginBottom: 2 }}>{entry.labelName}</div>
+                    <div style={{ fontSize: 11, color: COLORS.project, fontFamily: 'monospace', marginBottom: 3, wordBreak: 'break-all' }}>{entry.query}</div>
+                    <div style={{ fontSize: 11, color: COLORS.text2, lineHeight: 1.5 }}>{entry.description}</div>
+                    <div style={{ fontSize: 10, color: COLORS.muted, marginTop: 3 }}>
+                      {new Date(entry.savedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} · {entry.archive ? 'archive' : 'label only'}{entry.createFilter ? ' + create filter' : ''}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end', flexShrink: 0 }}>
+                    {qs.running && <span style={{ fontSize: 10, color: COLORS.waiting, padding: '2px 7px', background: COLORS.waitingBg, borderRadius: 99 }}>running…</span>}
+                    {!qs.running && isDone && <span style={{ fontSize: 10, color: COLORS.next, padding: '2px 7px', background: COLORS.nextBg, borderRadius: 99 }}>{entry.runCount ?? qs.result ?? 'done'}</span>}
+                    {!qs.running && qs.error && <span style={{ fontSize: 10, color: '#e05555', padding: '2px 7px', background: '#2a1010', borderRadius: 99 }}>error</span>}
+                    {!qs.running && !isDone && <span style={{ fontSize: 10, color: COLORS.muted, padding: '2px 7px', background: COLORS.surface2, borderRadius: 99, border: `1px solid ${COLORS.border}` }}>pending</span>}
+                    <button style={btnSm} disabled={qs.running} onClick={() => runQueueEntry(entry)}>{isDone ? 'Re-run' : 'Run'}</button>
+                    <button style={btnSmDanger} disabled={qs.running} onClick={() => setGmailQueue(prev => prev.filter(e => e.id !== entry.id))}>Remove</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Rules Tab ── */}
+      {emailTab === 'rules' && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {rulesLoading && <div style={{ padding: 20, textAlign: 'center', color: COLORS.muted, fontSize: 13 }}>Loading…</div>}
+
+          {/* Filters */}
+          {!rulesLoading && (
+            <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: 'pointer' }} onClick={() => setFiltersOpen(v => !v)}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>
+                  Filters <span style={{ fontSize: 11, color: COLORS.muted, fontWeight: 400 }}>{gmailFilters.length}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button style={btnSm} onClick={e => { e.stopPropagation(); loadRules(); }}>↻</button>
+                  <span style={{ fontSize: 11, color: COLORS.muted }}>{filtersOpen ? '▾' : '▸'}</span>
+                </div>
+              </div>
+              {filtersOpen && gmailFilters.map(f => {
+                const c = f.criteria || {};
+                const a = f.action || {};
+                const criteriaChips = [
+                  c.from    && { label: `from:${c.from}` },
+                  c.to      && { label: `to:${c.to}` },
+                  c.subject && { label: `subject:${c.subject}` },
+                  c.query   && { label: c.query },
+                ].filter(Boolean);
+                const addChips    = (a.addLabelIds    || []).map(id => ({ label: `+ ${id}`, color: COLORS.next,    bg: COLORS.nextBg }));
+                const removeChips = (a.removeLabelIds || []).map(id => ({ label: `− ${id}`, color: '#e05555',      bg: '#2a1010' }));
+                return (
+                  <div key={f.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 16px', borderTop: `1px solid ${COLORS.border}` }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 5 }}>
+                        {criteriaChips.map((ch, i) => (
+                          <span key={i} style={{ fontSize: 11, background: COLORS.projectBg, color: COLORS.project, padding: '1px 6px', borderRadius: 4, fontFamily: 'monospace' }}>{ch.label}</span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {[...addChips, ...removeChips].map((ch, i) => (
+                          <span key={i} style={{ fontSize: 11, background: ch.bg, color: ch.color, padding: '2px 8px', borderRadius: 99 }}>{ch.label}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <button style={btnSmDanger} onClick={async () => {
+                      await doGmailDeleteFilter(f.id, googleToken).catch(() => {});
+                      setGmailFilters(prev => prev.filter(x => x.id !== f.id));
+                    }}>Delete</button>
+                  </div>
+                );
+              })}
+              {filtersOpen && gmailFilters.length === 0 && !rulesLoading && (
+                <div style={{ padding: '10px 16px', fontSize: 12, color: COLORS.muted }}>No filters found.</div>
+              )}
+            </div>
+          )}
+
+          {/* Labels */}
+          {!rulesLoading && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: 'pointer' }} onClick={() => setLabelsOpen(v => !v)}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>
+                  Labels <span style={{ fontSize: 11, color: COLORS.muted, fontWeight: 400 }}>{gmailLabels.length}</span>
+                </div>
+                <span style={{ fontSize: 11, color: COLORS.muted }}>{labelsOpen ? '▾' : '▸'}</span>
+              </div>
+              {labelsOpen && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                  {gmailLabels.map((label, i) => (
+                    <div key={label.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 16px', borderTop: `1px solid ${COLORS.border}`, borderRight: i % 2 === 0 ? `1px solid ${COLORS.border}` : 'none' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: label.color?.backgroundColor || COLORS.muted, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: COLORS.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label.name}</span>
+                    </div>
+                  ))}
+                  {gmailLabels.length === 0 && (
+                    <div style={{ gridColumn: '1/-1', padding: '10px 16px', fontSize: 12, color: COLORS.muted }}>No user labels found.</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
