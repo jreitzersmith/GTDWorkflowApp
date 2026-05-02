@@ -5464,10 +5464,24 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
       if (!labelId) {
         const labels = await doGmailFetchLabelsRaw(googleToken);
         const match = labels.find(l => l.name === entry.labelName);
-        if (match) labelId = match.id;
-        else {
-          const created = await doGmailCreateLabel(entry.labelName, googleToken);
-          labelId = created.label_id;
+        if (match) {
+          labelId = match.id;
+        } else {
+          try {
+            const created = await doGmailCreateLabel(entry.labelName, googleToken);
+            labelId = created.label_id;
+          } catch (createErr) {
+            // Gmail returns 409 if label already exists (e.g. created manually or nested path conflict)
+            // Re-fetch labels and try again before giving up
+            if (createErr.message && (createErr.message.toLowerCase().includes('exist') || createErr.message.toLowerCase().includes('conflict') || createErr.message.includes('409'))) {
+              const retryLabels = await doGmailFetchLabelsRaw(googleToken);
+              const retryMatch = retryLabels.find(l => l.name === entry.labelName);
+              if (retryMatch) { labelId = retryMatch.id; }
+              else { throw new Error(`Could not find or create label "${entry.labelName}" — ${createErr.message}`); }
+            } else {
+              throw createErr;
+            }
+          }
           setGmailQueue(prev => prev.map(q => q.id === entry.id ? { ...q, labelId } : q));
         }
       }
