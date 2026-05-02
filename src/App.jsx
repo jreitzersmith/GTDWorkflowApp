@@ -2864,18 +2864,7 @@ export default function GTDManager() {
         <div style={s.taskRow}>
         {/* TASK PANEL */}
         <div style={s.taskPanel}>
-          {currentView === "email" ? (
-            <EmailManagementView
-              googleToken={googleToken}
-              googleScope={googleScope}
-              gmailQueue={gmailQueue}
-              setGmailQueue={setGmailQueue}
-              emailTab={emailTab}
-              setEmailTab={setEmailTab}
-              tasks={tasks}
-              processEmailWithAI={processEmailWithAI}
-            />
-          ) : showSettings ? (
+          {showSettings ? (
             <SettingsPanel
               locations={locations}
               tasks={tasks}
@@ -2899,6 +2888,17 @@ export default function GTDManager() {
               onConnectGmail={signInWithGoogle}
               onDisconnectGmail={disconnectGmail}
               gmailError={gmailError}
+            />
+          ) : currentView === "email" ? (
+            <EmailManagementView
+              googleToken={googleToken}
+              googleScope={googleScope}
+              gmailQueue={gmailQueue}
+              setGmailQueue={setGmailQueue}
+              emailTab={emailTab}
+              setEmailTab={setEmailTab}
+              tasks={tasks}
+              processEmailWithAI={processEmailWithAI}
             />
           ) : (
             <>
