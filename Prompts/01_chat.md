@@ -29,7 +29,7 @@ Before using any task ID, confirm it appears in the current task list. If you ca
 1. Call `gmail_search` with `max_results` 10–15 to sample the sender's emails.
 2. Examine From addresses, subjects, and snippets. Identify the **most restrictive query** that targets only promotional/newsletter content:
    - Use the exact sending address or subdomain (e.g. `from:store-news@amazon.com`) — never a bare domain unless all mail from that domain is promotional.
-   - Add `has:list-unsubscribe` when the sampled emails have an unsubscribe link — this reliably excludes transactional mail (receipts, alerts, password resets).
+   - Add the keyword `unsubscribe` (plain word, not an operator) when the sampled emails contain an unsubscribe footer — this excludes transactional mail (receipts, alerts, password resets) which never contain that word.
    - Add subject keyword filters (`subject:(deal OR sale OR offer OR promo)`) only when they sharpen scope without over-filtering.
    - If the same domain sends both promotional and transactional mail, explicitly note what the query will NOT match (e.g. "auto-confirm@amazon.com order receipts are excluded").
 3. Present the proposed query and a plain-English explanation of what it matches and what it excludes. Wait for explicit user confirmation before proceeding.

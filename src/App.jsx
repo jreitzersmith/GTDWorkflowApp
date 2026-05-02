@@ -69,7 +69,7 @@ Phase 1 — Discovery (do this first, every time):
 1. Call gmail_search with max_results 10-15 to sample the sender's emails.
 2. Examine From addresses, subjects, and snippets. Identify the MOST RESTRICTIVE query that targets only promotional/newsletter content:
    - Use the exact sending address or subdomain (e.g. from:store-news@amazon.com) — never a bare domain unless all mail from that domain is promotional.
-   - Add has:list-unsubscribe when the sampled emails have an unsubscribe link — this reliably excludes transactional mail (receipts, alerts, password resets).
+   - Add the keyword unsubscribe (plain word, not an operator) when the sampled emails contain an unsubscribe footer — this excludes transactional mail (receipts, alerts, password resets) which never contain that word.
    - Add subject keyword filters (subject:(deal OR sale OR offer OR promo)) only when they sharpen scope without over-filtering.
    - If the same domain sends both promotional and transactional mail, explicitly note what the query will NOT match (e.g. "auto-confirm@amazon.com order receipts are excluded").
 3. Present the proposed query and a plain-English explanation of what it matches and what it excludes. Wait for explicit user confirmation before proceeding.
@@ -363,7 +363,7 @@ BEFORE calling this tool you MUST:
 1. Sample the sender using gmail_search to identify distinguishing patterns.
 2. Build the most restrictive query possible:
    - Prefer the specific sending address or subdomain over a bare domain (e.g. 'from:store-news@amazon.com' not 'from:amazon.com').
-   - Add 'has:list-unsubscribe' when the sample emails contain an unsubscribe link — this reliably excludes transactional mail (order receipts, shipping alerts, password resets).
+   - Add the keyword 'unsubscribe' (plain word, not an operator) when the sample emails contain an unsubscribe footer — this excludes transactional mail (order receipts, shipping alerts, password resets) which never contain that word.
    - Add subject-keyword filters (e.g. 'subject:(deal OR offer OR sale OR promo)') only when they help narrow scope without over-filtering.
    - Combine operators to exclude known non-promotional addresses from the same domain.
 3. Show the user the exact query and a plain-English explanation of what it will match AND what it intentionally excludes (e.g. 'will NOT match order confirmations from auto-confirm@amazon.com').
@@ -5595,8 +5595,8 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {[
-                  ['Find and Label Newsletters', `Search my inbox and identify newsletter subscriptions. For each one:\n1. Sample the emails and build the most restrictive query (prefer exact sending address + has:list-unsubscribe).\n2. Show me what the query will match and explicitly note any emails from the same sender it will NOT match (e.g. transactional alerts).\n3. Ask for confirmation.\n4. Once I confirm, use gmail_queue_add with create_filter set to true so the label and Gmail filter are both created when the queue runs.`],
-                  ['Find and Label Promotional Emails', `Search my inbox for promotional and marketing emails from online retailers and services. For each sender:\n1. Sample their emails and build the most restrictive query (prefer exact subdomain + has:list-unsubscribe; add subject keywords only to sharpen scope).\n2. Clearly state what the query will NOT match — especially order receipts, shipping confirmations, or account alerts from the same domain.\n3. Ask for confirmation.\n4. Once I confirm, use gmail_queue_add with create_filter set to true so the label and Gmail filter are both created when the queue runs.`],
+                  ['Find and Label Newsletters', `Search my inbox and identify newsletter subscriptions. For each one:\n1. Sample the emails and build the most restrictive query (prefer exact sending address; add the keyword "unsubscribe" if the sample emails contain an unsubscribe footer, since transactional mail never does).\n2. Show me what the query will match and explicitly note any emails from the same sender it will NOT match (e.g. transactional alerts).\n3. Ask for confirmation.\n4. Once I confirm, use gmail_queue_add with create_filter set to true so the label and Gmail filter are both created when the queue runs.`],
+                  ['Find and Label Promotional Emails', `Search my inbox for promotional and marketing emails from online retailers and services. For each sender:\n1. Sample their emails and build the most restrictive query (prefer exact subdomain; add the keyword "unsubscribe" if the sample emails contain an unsubscribe footer; add subject keywords only to sharpen scope further).\n2. Clearly state what the query will NOT match — especially order receipts, shipping confirmations, or account alerts from the same domain.\n3. Ask for confirmation.\n4. Once I confirm, use gmail_queue_add with create_filter set to true so the label and Gmail filter are both created when the queue runs.`],
                   ['Find specific sender…', `I want to label and filter emails from a specific sender. Ask me which sender to look into, then:\n1. Sample their emails and build the most restrictive query possible.\n2. Explain what it will and won't match.\n3. Ask me to confirm.\n4. Once confirmed, use gmail_queue_add with create_filter set to true so the label and Gmail filter are both created when the queue runs.`],
                 ].map(([label, prompt]) => (
                   <button key={label} style={btnSm} onClick={() => openCoachChat(prompt)}>
