@@ -1925,7 +1925,7 @@ export default function GTDManager() {
                     createFilter: toolUse.input.create_filter !== false,
                     status: 'pending',
                   };
-                  setGmailQueue(prev => [...prev, entry]);
+                  setGmailQueue(prev => [entry, ...prev]);
                   if (authUser) {
                     supabase.from('gmail_queue').upsert(queueEntryToRow(entry, authUser.id)).then(({ error }) => {
                       if (error) console.error('gmail_queue upsert error', error);
