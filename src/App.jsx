@@ -406,6 +406,7 @@ const GMAIL_SCOPE_OPTS = [
 const GMAIL_SCOPE_DISPLAY = { readonly: 'read only', modify: 'organize', compose: 'compose', send: 'send' };
 
 // Fetch all label names + IDs (requires gmail.modify scope or higher)
+// Returns a formatted string for AI tool use.
 async function doGmailListLabels(token) {
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
     headers: { Authorization: `Bearer ${token}` },
@@ -416,6 +417,16 @@ async function doGmailListLabels(token) {
     .map(l => `${l.name} (ID: ${l.id})`)
     .join('\n');
   return labels || 'No labels found.';
+}
+
+// Fetch all labels as raw objects — for UI use (Rules tab, queue runner).
+async function doGmailFetchLabelsRaw(token) {
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const data = await res.json();
+  return data.labels || [];
 }
 
 // Modify message labels (requires gmail.modify scope)
@@ -5356,12 +5367,11 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
   const loadRules = async () => {
     setRulesLoading(true);
     try {
-      const [labelsRaw, filters] = await Promise.all([
-        doGmailListLabels(googleToken),
+      const [labels, filters] = await Promise.all([
+        doGmailFetchLabelsRaw(googleToken),
         doGmailFetchFilters(googleToken),
       ]);
-      const parsed = (() => { try { return JSON.parse(labelsRaw).labels || []; } catch { return []; } })();
-      setGmailLabels(parsed.filter(l => !l.type || l.type === 'user'));
+      setGmailLabels(labels.filter(l => !l.type || l.type === 'user'));
       setGmailFilters(filters);
     } catch (e) { console.error('Rules load error', e); }
     finally { setRulesLoading(false); }
@@ -5379,8 +5389,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
       // Resolve label ID if not stored
       let labelId = entry.labelId;
       if (!labelId) {
-        const raw = await doGmailListLabels(googleToken);
-        const labels = (() => { try { return JSON.parse(raw).labels || []; } catch { return []; } })();
+        const labels = await doGmailFetchLabelsRaw(googleToken);
         const match = labels.find(l => l.name === entry.labelName);
         if (match) labelId = match.id;
         else {
