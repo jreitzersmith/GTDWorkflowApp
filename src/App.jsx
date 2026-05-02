@@ -1700,13 +1700,14 @@ export default function GTDManager() {
   }, [authUser, supabaseReady]); // eslint-disable-line
 
   // Fetch unread inbox count whenever the Gmail token changes
+  // Use labels/INBOX endpoint — messagesUnread is exact; resultSizeEstimate on messages.list is unreliable
   useEffect(() => {
     if (!googleToken) { setGmailUnreadCount(null); return; }
-    fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread%20in:inbox&maxResults=1', {
+    fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX', {
       headers: { Authorization: `Bearer ${googleToken}` },
     })
       .then(r => r.json())
-      .then(d => setGmailUnreadCount(d.resultSizeEstimate ?? null))
+      .then(d => setGmailUnreadCount(d.messagesUnread ?? null))
       .catch(() => setGmailUnreadCount(null));
   }, [googleToken]);
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
