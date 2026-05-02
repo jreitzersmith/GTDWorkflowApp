@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -584,6 +586,7 @@ async function doGmailBulkAction(query, addLabelIds, removeLabelIds, token) {
     const data = await res.json();
     (data.messages || []).forEach(m => allIds.push(m.id));
     pageToken = data.nextPageToken;
+    if (pageToken) await sleep(250); // avoid rate-limit between pages
   } while (pageToken);
 
   if (!allIds.length) return { matched: 0, status: 'No messages found matching that query — nothing was changed.' };
@@ -606,6 +609,7 @@ async function doGmailBulkAction(query, addLabelIds, removeLabelIds, token) {
       const d = await res.json().catch(() => ({}));
       errors.push(d.error?.message || `Gmail API ${res.status} on chunk starting at index ${i}`);
     }
+    if (i + chunkSize < allIds.length) await sleep(200); // avoid rate-limit between chunks
   }
   if (errors.length) {
     return { matched: allIds.length, succeeded: totalSucceeded, errors, status: `Partial success: ${totalSucceeded}/${allIds.length} messages updated. Errors: ${errors.join('; ')}` };
@@ -5392,6 +5396,15 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
   });
 
   const runQueueEntry = async (entry) => {
+    // Check token expiry before touching the API
+    try {
+      const stored = JSON.parse(localStorage.getItem('gtd_google_token') || '{}');
+      if (!stored.expiry || Date.now() > stored.expiry) {
+        setQueueStatus(s => ({ ...s, [entry.id]: { error: 'Gmail session expired — please reconnect in Settings.' } }));
+        return;
+      }
+    } catch { /* ignore parse errors, let the API call fail naturally */ }
+
     setQueueStatus(s => ({ ...s, [entry.id]: { running: true } }));
     try {
       // Resolve label ID if not stored
@@ -5413,9 +5426,16 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
         await doGmailCreateFilter(null, null, null, entry.query, addIds, removeIds, googleToken).catch(() => {});
       }
       setGmailQueue(prev => prev.map(q => q.id === entry.id ? { ...q, status: 'done', runCount: result.succeeded } : q));
-      setQueueStatus(s => ({ ...s, [entry.id]: { running: false, result: `${result.succeeded} archived` } }));
+      setQueueStatus(s => ({ ...s, [entry.id]: { running: false, result: `${result.succeeded ?? 0} updated` } }));
     } catch (e) {
-      setQueueStatus(s => ({ ...s, [entry.id]: { running: false, error: e.message } }));
+      // Translate common API error codes into actionable messages
+      let msg = e.message || 'Unknown error';
+      if (msg.includes('401') || msg.toLowerCase().includes('invalid credentials') || msg.toLowerCase().includes('unauthorized')) {
+        msg = 'Gmail session expired — please reconnect in Settings.';
+      } else if (msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too many')) {
+        msg = 'Rate limited by Gmail — wait a minute and try again.';
+      }
+      setQueueStatus(s => ({ ...s, [entry.id]: { running: false, error: msg } }));
     }
   };
 
@@ -5637,8 +5657,12 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end', flexShrink: 0 }}>
                     {qs.running && <span style={{ fontSize: 10, color: COLORS.waiting, padding: '2px 7px', background: COLORS.waitingBg, borderRadius: 99 }}>running…</span>}
                     {!qs.running && isDone && <span style={{ fontSize: 10, color: COLORS.next, padding: '2px 7px', background: COLORS.nextBg, borderRadius: 99 }}>{entry.runCount ?? qs.result ?? 'done'}</span>}
-                    {!qs.running && qs.error && <span style={{ fontSize: 10, color: '#e05555', padding: '2px 7px', background: '#2a1010', borderRadius: 99 }}>error</span>}
-                    {!qs.running && !isDone && <span style={{ fontSize: 10, color: COLORS.muted, padding: '2px 7px', background: COLORS.surface2, borderRadius: 99, border: `1px solid ${COLORS.border}` }}>pending</span>}
+                    {!qs.running && qs.error && (
+                      <span style={{ fontSize: 10, color: '#e05555', padding: '2px 7px', background: '#2a1010', borderRadius: 6, maxWidth: 180, whiteSpace: 'normal', lineHeight: 1.4, textAlign: 'right' }} title={qs.error}>
+                        ⚠ {qs.error}
+                      </span>
+                    )}
+                    {!qs.running && !isDone && !qs.error && <span style={{ fontSize: 10, color: COLORS.muted, padding: '2px 7px', background: COLORS.surface2, borderRadius: 99, border: `1px solid ${COLORS.border}` }}>pending</span>}
                     <button style={btnSm} disabled={qs.running} onClick={() => runQueueEntry(entry)}>{isDone ? 'Re-run' : 'Run'}</button>
                     <button style={btnSmDanger} disabled={qs.running} onClick={() => setGmailQueue(prev => prev.filter(e => e.id !== entry.id))}>Remove</button>
                   </div>
