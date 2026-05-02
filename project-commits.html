@@ -110,7 +110,7 @@
     <a href="project-snippets.html">📝 Code Snippets</a>
     <span class="current">📦 Commit Log</span>
   </div>
-  <span class="updated">Last updated: 2026-04-30 (2 new commits)</span>
+  <span class="updated">Last updated: May 1, 2026</span>
 </header>
 
 <div class="shell">
@@ -158,6 +158,27 @@
   <div class="date-group">April 30</div>
   <a href="#commit-67fb83e">67fb83e · Web search (Tavily)</a>
   <a href="#commit-7d52046">7d52046 · Gmail OAuth2 PKCE</a>
+  <div class="date-group">May 1 — Gmail Tools &amp; Email View</div>
+  <a href="#commit-2815aae">2815aae · Gmail scope selector</a>
+  <a href="#commit-64a3085">64a3085 · gmail_list_labels tool</a>
+  <a href="#commit-d05226a">d05226a · fix: Message-ID in search</a>
+  <a href="#commit-ac63122">ac63122 · Gmail filters + create-label</a>
+  <a href="#commit-da93969">da93969 · Gmail search max_results</a>
+  <a href="#commit-c6179beb">c617… · gmail_batch_label tool</a>
+  <a href="#commit-8081419">8081419 · fix: loop limit + max_tokens</a>
+  <a href="#commit-dfc7252">dfc7252 · fix: AbortController timeout</a>
+  <a href="#commit-6bb80e7">6bb80e7 · fix: enforce Gmail batching</a>
+  <a href="#commit-be95201">be95201 · fix: is_error tool results</a>
+  <a href="#commit-185b801">185b801 · feat: gmail_bulk_action</a>
+  <a href="#commit-cb2c0ac">cb2c0ac · docs: Visual_Mockups dir</a>
+  <a href="#commit-d2e4d44">d2e4d44 · feat: Email Management view</a>
+  <a href="#commit-85f5a90">85f5a90 · fix: label IDs to names</a>
+  <a href="#commit-3a38e65">3a38e65 · fix: doGmailFetchLabelsRaw</a>
+  <a href="#commit-ffd0a50">ffd0a50 · fix: settings from email view</a>
+  <a href="#commit-5afdfd1">5afdfd1 · feat: cleanup direct prompts</a>
+  <a href="#commit-ba1df53">ba1df53 · docs: update 01_chat.md</a>
+  <a href="#commit-4e94b90">4e94b90 · fix: Gmail query keyword</a>
+  <a href="#commit-db6346e">db6346e · fix: queue runner expiry</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -1147,6 +1168,444 @@
   </div>
   <div class="commit-back"><a href="project-summary.html#feat-gmail">↑ Feature: Gmail Integration</a></div>
 </div>
+
+
+<h2>May 1 — Gmail Tools Expansion</h2>
+
+<div class="commit-card" id="commit-2815aae">
+  <div class="commit-meta"><span class="commit-hash">2815aae</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">feat: Gmail scope selector (read / organise / compose / send)</div>
+  <div class="commit-body">
+    Added a scope dropdown to the Gmail Settings section so the user can choose how much
+    access to grant Google: <strong>Read</strong> (search and view messages only),
+    <strong>Organise</strong> (read plus label and filter management — the level needed for
+    Inbox Cleanup), <strong>Compose</strong> (organise plus drafting), and
+    <strong>Send</strong> (full access). The selected scope is stored in localStorage and
+    passed to the OAuth authorization URL as the <code>scope</code> parameter. Changing it
+    requires re-authenticating.
+  </div>
+  <div class="commit-lesson">
+    <strong>OAuth scopes — principle of least privilege.</strong> Requesting only the access
+    you actually need reduces the permissions shown in Google's consent screen, which
+    increases user trust and reduces the blast radius if the access token is ever leaked.
+    The scope is a space-separated string of Google API permission URLs; granting a broader
+    scope always includes narrower ones.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-64a3085">
+  <div class="commit-meta"><span class="commit-hash">64a3085</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">feat: gmail_list_labels tool for label ID discovery</div>
+  <div class="commit-body">
+    Added a <code>gmail_list_labels</code> tool to the Gmail tool set. Returns the full
+    list of label objects (<code>id</code>, <code>name</code>, <code>type</code>) from
+    the Gmail API. Without this, the AI had no way to know which label IDs existed — it
+    could create labels by name but couldn't pass a valid ID to <code>batchModify</code>.
+    The AI is instructed to call this tool first when it needs to reference an existing
+    label by ID.
+  </div>
+  <div class="commit-lesson">
+    <strong>Discovery before action.</strong> Many APIs identify resources by an opaque ID
+    (not their display name). The safe pattern is always list-then-act: fetch the current
+    resource list, find the matching ID, then pass that ID to the mutation endpoint.
+    Hard-coding or guessing IDs is fragile — they differ between accounts and can change.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-d05226a">
+  <div class="commit-meta"><span class="commit-hash">d05226a</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">fix: include Message-ID header in gmail_search results</div>
+  <div class="commit-body">
+    The <code>gmail_search</code> tool was returning only From, Date, Subject, and Snippet
+    for each message. Added the <code>Message-ID</code> header to the per-message metadata
+    fetch. This allows the AI to reference specific messages in follow-up operations
+    (e.g. labelling a specific message by ID rather than a fuzzy query).
+  </div>
+  <div class="commit-lesson">
+    <strong>Expose IDs in tool results.</strong> Any time an AI tool returns a list of
+    resources, include their stable IDs alongside the human-readable fields. The AI reads
+    the display fields to understand context and uses the ID field to act. Without the ID,
+    the AI must make a second search call just to retrieve it — adding latency and a
+    possible mismatch.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-ac63122">
+  <div class="commit-meta"><span class="commit-hash">ac63122</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">feat: Gmail filters + create-label with user approval step</div>
+  <div class="commit-body">
+    Added <code>gmail_create_filter</code> and <code>gmail_create_label</code> tools.
+    Gmail filters are rules that automatically apply a label, archive, or delete future
+    messages matching a query — the persistent complement to a one-time bulk action.
+    Both tools require the user to explicitly confirm the proposed query and label before
+    the API call is made. The AI presents a summary and waits; the confirmation is handled
+    via a modal in the UI.
+  </div>
+  <div class="commit-lesson">
+    <strong>Irreversible actions need a confirmation gate.</strong> Labelling existing
+    messages can be undone. Creating a filter is harder to reverse — it silently affects
+    all future matching mail. The approval step is placed between the AI's proposal and the
+    API call, giving the user a chance to review the query before it becomes a permanent
+    rule. This pattern ("plan → confirm → execute") is common in agentic systems to prevent
+    accidental automation.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-da93969">
+  <div class="commit-meta"><span class="commit-hash">da93969</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">feat: Gmail search max_results param + fresh label ID enforcement</div>
+  <div class="commit-body">
+    Added an optional <code>max_results</code> parameter to <code>gmail_search</code>
+    (default 5, max 20). Also tightened the system prompt to instruct the AI to always
+    call <code>gmail_list_labels</code> immediately before any operation that needs a label
+    ID — never reusing an ID from earlier in the conversation, since labels can be created
+    or deleted mid-session.
+  </div>
+  <div class="commit-lesson">
+    <strong>Stale IDs in long conversations.</strong> In a single chat session, the user
+    might create a label, delete it, and create another with the same name. The new label
+    will have a different ID. Instructing the AI to always fetch fresh IDs — rather than
+    caching the result from 10 messages ago — eliminates a whole class of "label not found"
+    errors without requiring the app to track session state.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-c6179beb">
+  <div class="commit-meta"><span class="commit-hash">c6179beb</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">feat: gmail_batch_label tool for reliable bulk label operations</div>
+  <div class="commit-body">
+    Added <code>gmail_batch_label</code> — a tool that runs <code>users.messages.modify</code>
+    in parallel for a list of message IDs using <code>Promise.allSettled</code>. Unlike
+    <code>batchModify</code>, which silently skips failed messages, this approach returns
+    a per-message success/failure count, so the AI can report exactly how many messages
+    were labelled and how many failed.
+  </div>
+  <div class="commit-lesson">
+    <strong>Promise.allSettled vs Promise.all.</strong> <code>Promise.all</code> short-circuits
+    on the first rejection — if one message fails, you lose the results of all the others.
+    <code>Promise.allSettled</code> always waits for every promise and returns an array of
+    <code>{ status: "fulfilled" | "rejected", value | reason }</code> objects. For bulk
+    operations where partial success is acceptable, <code>allSettled</code> is almost
+    always the right choice.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-8081419">
+  <div class="commit-meta"><span class="commit-hash">8081419</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">fix: raise tool-use loop limit to 15 and increase max_tokens</div>
+  <div class="commit-body">
+    The tool-use loop cap was increased from 5 to 15 iterations, and <code>max_tokens</code>
+    was raised from 1,500 to 4,096. Gmail cleanup workflows can require: list labels →
+    search messages → create label → batch label → create filter — that is already 5 tool
+    calls before any text reply. Complex sessions with back-and-forth were hitting the old
+    cap and stopping mid-task.
+  </div>
+  <div class="commit-lesson">
+    <strong>Agentic loop limits are a safety rail, not a performance target.</strong>
+    Setting them too low breaks legitimate multi-step workflows. Setting them too high risks
+    runaway API costs if the model gets stuck. The right value is: longest realistic
+    workflow + a small buffer. Monitor actual loop depths in practice and tune accordingly.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-dfc7252">
+  <div class="commit-meta"><span class="commit-hash">dfc7252</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">fix: AbortController timeout + thinking chips in tool-use loop</div>
+  <div class="commit-body">
+    Wrapped every <code>fetch</code> call inside the tool-use loop with an
+    <code>AbortController</code> and a 90-second timeout. Before this fix, a slow AI
+    response or a stalled Tavily/Gmail request could freeze the UI indefinitely with no
+    feedback. Also added "thinking…" spinner chips between tool calls so the user can
+    see the loop is still running.
+  </div>
+  <div class="commit-lesson">
+    <strong>AbortController — cancelling fetch requests.</strong>
+    <code>const controller = new AbortController();</code> creates a controller.
+    <code>const id = setTimeout(() =&gt; controller.abort(), 90000);</code> schedules a
+    cancellation. Pass <code>signal: controller.signal</code> to <code>fetch()</code>.
+    If the timeout fires first, <code>fetch</code> rejects with an
+    <code>AbortError</code>. Remember to call <code>clearTimeout(id)</code> if the
+    request completes normally — otherwise the abort fires after the fact and produces
+    a confusing error in the console.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-6bb80e7">
+  <div class="commit-meta"><span class="commit-hash">6bb80e7</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">fix: enforce Gmail batching in system prompt</div>
+  <div class="commit-body">
+    The AI was sometimes applying labels one message at a time (individual
+    <code>modify</code> calls) instead of using <code>gmail_batch_label</code> or
+    <code>gmail_bulk_action</code>. Added an explicit instruction to the Gmail system
+    prompt: "For any operation affecting more than 5 messages, always use
+    <code>gmail_batch_label</code> or <code>gmail_bulk_action</code> — never loop
+    over individual modify calls." This reduced Gmail API usage by up to 100x for
+    large inbox cleanup sessions.
+  </div>
+  <div class="commit-lesson">
+    <strong>System prompt constraints as behaviour guardrails.</strong> LLMs naturally
+    choose the most "obvious" implementation — which is often the least efficient one. If
+    there is a batch endpoint available, explicitly instruct the AI to prefer it and
+    explain when. The instruction belongs in the system prompt (always present) not the
+    user message (not always present).
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-be95201">
+  <div class="commit-meta"><span class="commit-hash">be95201</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">fix: Gmail tool errors returned as is_error tool results</div>
+  <div class="commit-body">
+    Previously, if a Gmail API call threw inside a tool handler, the JavaScript exception
+    bubbled up and crashed the entire tool-use loop. Changed all Gmail tool handlers to
+    catch errors and return <code>{ type: "tool_result", is_error: true, content: errorMessage }</code>
+    instead. The AI receives the error description, can explain it to the user, and can
+    decide whether to retry or abort — the loop itself keeps running.
+  </div>
+  <div class="commit-lesson">
+    <strong>In an agentic loop, errors are data.</strong> A tool-use loop is a conversation
+    between the app and the AI. If a tool fails and the AI doesn't know about it, it will
+    either hallucinate success or repeat the same failing call. Returning <code>is_error:
+    true</code> with the error message gives the AI the information it needs to handle the
+    failure intelligently — exactly as if the command had printed an error to stdout.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-185b801">
+  <div class="commit-meta"><span class="commit-hash">185b801</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">feat: gmail_bulk_action tool for unlimited inbox cleanup</div>
+  <div class="commit-body">
+    Added <code>gmail_bulk_action</code> — the most powerful Gmail tool. It accepts a
+    Gmail search query, an action (<code>label</code>, <code>archive</code>,
+    <code>trash</code>, or <code>markRead</code>), and an optional label name. It then:
+    (1) paginates through all matching messages in batches of 500, (2) applies the change
+    in chunks of 1,000 via <code>batchModify</code>, with polite <code>sleep()</code>
+    delays between chunks to avoid rate limits. There is no upper bound on the number of
+    messages — it will process the entire inbox if needed.
+  </div>
+  <div class="commit-lesson">
+    <strong>Pagination with do…while and nextPageToken.</strong> The Gmail list endpoint
+    returns at most 500 results per call. If there are more, it includes a
+    <code>nextPageToken</code> in the response. A <code>do…while (pageToken)</code> loop
+    naturally handles this: the first iteration always runs (no token yet), and subsequent
+    iterations run only while there is a token to follow. This is the standard cursor
+    pagination pattern used by almost every large-dataset API.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-gmail-tools">↑ Feature: Gmail Tools Expansion</a></div>
+</div>
+
+
+<h2>May 1 — Email Management View</h2>
+
+<div class="commit-card" id="commit-cb2c0ac">
+  <div class="commit-meta"><span class="commit-hash">cb2c0ac</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">docs: add Visual_Mockups and Prompts directories</div>
+  <div class="commit-body">
+    Added <code>Visual_Mockups/</code> (HTML wireframes for the Email view tabs) and
+    <code>Prompts/</code> (markdown files recording the planning prompts used to design
+    and build the Email view) to the repo. Neither directory affects the running app —
+    they are reference artefacts for future development and documentation.
+  </div>
+  <div class="commit-lesson">
+    <strong>Commit design artefacts alongside code.</strong> Storing mockups and prompts in
+    the repo means they are versioned, searchable, and available to anyone (or any AI agent)
+    working on the project later. They provide the "why" context that commit messages alone
+    don't capture.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-d2e4d44">
+  <div class="commit-meta"><span class="commit-hash">d2e4d44</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">feat: Email Management view (Inbox / Cleanup / Rules tabs)</div>
+  <div class="commit-body">
+    Added the <code>EmailManagementView</code> component and wired it into the sidebar
+    as a new "📧 Email" nav item. The component has three tabs: <strong>Inbox</strong>
+    (message list with avatars, unread indicators, checkboxes, detail panel, and
+    "Process with AI" button), <strong>Cleanup</strong> (persistent queue of bulk-action
+    rules saved by the AI), and <strong>Rules</strong> (list of existing Gmail filters and
+    labels with delete capability). Tab selection and queue contents persist to localStorage.
+  </div>
+  <div class="commit-lesson">
+    <strong>Conditional rendering to swap entire views.</strong>
+    <code>currentView === "email"</code> in the main render switches the entire right-hand
+    panel between the GTD task list and the email view. This is simpler than routing
+    (no URL changes needed for a local app) and cheaper than keeping both mounted — only
+    the active view renders and makes API calls.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-85f5a90">
+  <div class="commit-meta"><span class="commit-hash">85f5a90</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">fix: resolve label IDs to names in Rules tab filter action chips</div>
+  <div class="commit-body">
+    The Rules tab was displaying raw label IDs (e.g. <code>Label_1234567</code>) in filter
+    action chips instead of the human-readable label name. Added a lookup step that maps
+    IDs to names using the label list fetched alongside filters. System labels (INBOX,
+    SPAM, TRASH, UNREAD) are mapped to friendly names from a hardcoded constant; user
+    labels are looked up from the API response.
+  </div>
+  <div class="commit-lesson">
+    <strong>Always translate IDs to names before displaying them.</strong> APIs use IDs for
+    stability and performance; users need names to understand what they're looking at. The
+    translation layer — a simple <code>labelsMap.get(id) || id</code> lookup — is cheap
+    and should live as close to the render as possible, so the rest of the code can work
+    in ID-space for correctness.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-3a38e65">
+  <div class="commit-meta"><span class="commit-hash">3a38e65</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">fix: add doGmailFetchLabelsRaw for UI label loading</div>
+  <div class="commit-body">
+    The existing <code>doGmailFetchLabels</code> function formatted labels as a string for
+    the AI tool result. The Rules tab UI needed the raw array of label objects to build the
+    ID-to-name map. Added <code>doGmailFetchLabelsRaw()</code> that returns the
+    <code>labels</code> array directly, without stringifying. Both functions call the same
+    Gmail API endpoint — they differ only in what they return.
+  </div>
+  <div class="commit-lesson">
+    <strong>Don't over-transform data at the fetch layer.</strong> Stringifying data for
+    the AI tool result is the right move for tool use, but it throws away structure that the
+    UI needs. Having two thin wrappers around the same fetch — one that returns raw data,
+    one that formats for display — is better than trying to parse the formatted string back
+    into an object later.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-ffd0a50">
+  <div class="commit-meta"><span class="commit-hash">ffd0a50</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">fix: settings panel now opens correctly from the email view</div>
+  <div class="commit-body">
+    The Settings button in the sidebar was wired to toggle a <code>showSettings</code>
+    state flag, but the main render checked <code>showSettings</code> only inside the
+    GTD task panel branch. When <code>currentView === "email"</code>, the flag was set
+    but nothing rendered. Fixed by moving the <code>showSettings</code> check to run
+    before the <code>currentView</code> branch, so it takes priority from any view.
+  </div>
+  <div class="commit-lesson">
+    <strong>Order of conditional checks matters.</strong> In a series of <code>if /
+    else if</code> branches, earlier checks shadow later ones. Global UI — like settings
+    panels, modals, and notifications — should be checked before per-view conditions so
+    they can appear regardless of which view is active. This is a common gotcha when
+    adding a new top-level view to an existing app.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-5afdfd1">
+  <div class="commit-meta"><span class="commit-hash">5afdfd1</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">feat: cleanup buttons use direct prompts with label + filter creation</div>
+  <div class="commit-body">
+    The "Run" button on each Cleanup queue entry now sends a structured prompt directly
+    to the AI coach with the entry's query, label name, and a request to: (1) run
+    <code>gmail_bulk_action</code> to label all matching messages, then (2) run
+    <code>gmail_create_filter</code> to protect future messages. The AI executes both
+    steps in a single tool-use loop session. Previously, the queue runner called the
+    Gmail API directly, bypassing the AI and losing the ability to handle errors
+    intelligently.
+  </div>
+  <div class="commit-lesson">
+    <strong>Let the AI handle error recovery, not your code.</strong> Calling the Gmail
+    API directly in the queue runner meant writing error handling, retry logic, and
+    user-facing messages for every possible failure mode. Routing through the AI means
+    it can read the error, explain it in plain English, and decide whether to retry or
+    suggest an alternative — the app only needs to display what the AI says.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-ba1df53">
+  <div class="commit-meta"><span class="commit-hash">ba1df53</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">docs: update 01_chat.md to reflect queue-based cleanup flow</div>
+  <div class="commit-body">
+    Updated the <code>Prompts/01_chat.md</code> documentation file to describe the
+    queue-based cleanup workflow: discovery phase (AI proposes query, user confirms),
+    queue storage, and execution via the "Run" buttons. The previous version described
+    an earlier direct-API approach that was superseded by the AI-routed approach in
+    the previous commit.
+  </div>
+  <div class="commit-lesson">
+    <strong>Keep design docs in sync with code.</strong> Docs that describe superseded
+    behaviour are worse than no docs — they actively mislead anyone reading them later.
+    Committing a doc update alongside the feature change that made it stale is a good
+    habit: the git history then shows exactly when and why the design changed.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-4e94b90">
+  <div class="commit-meta"><span class="commit-hash">4e94b90</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">fix: replace invalid has:list-unsubscribe with plain keyword "unsubscribe"</div>
+  <div class="commit-body">
+    Default cleanup suggestions were using the Gmail search operator
+    <code>has:list-unsubscribe</code>, which is not a valid Gmail search operator (it was
+    confused with <code>list:*</code> or <code>unsubscribe</code> keyword search).
+    Gmail silently returned zero results for these queries. Replaced with the plain
+    keyword <code>unsubscribe</code>, which matches messages containing that word — a
+    practical proxy for newsletters since almost all include an unsubscribe link.
+  </div>
+  <div class="commit-lesson">
+    <strong>Test your search queries against real data before shipping them.</strong>
+    Gmail's search syntax is powerful but inconsistent — some operators that look valid
+    simply don't work or are silently no-ops. When building features that generate
+    queries programmatically (especially via AI), always validate with a real account
+    that has known test messages before treating the result as correct.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+
+<div class="commit-card" id="commit-db6346e">
+  <div class="commit-meta"><span class="commit-hash">db6346e</span><span class="commit-date">2026-05-01</span></div>
+  <div class="commit-msg">fix: queue runner token expiry check, rate-limit delays, better error messages</div>
+  <div class="commit-body">
+    Three quality-of-life fixes to the Cleanup queue runner: (1) reads stored token expiry
+    from localStorage before touching the Gmail API and surfaces a clear "session expired"
+    message immediately rather than waiting for a 401; (2) added <code>sleep()</code> delays
+    between consecutive queue entry runs to avoid Gmail rate limits when running all entries
+    at once; (3) translated HTTP error codes (401, 429) and terse API messages into
+    plain-English sentences shown inline on each queue card.
+  </div>
+  <div class="commit-lesson">
+    <strong>Check preconditions before starting work.</strong> Validating that a token exists
+    and hasn't expired before the first API call is cheaper and clearer than catching a 401
+    halfway through. The same principle applies to disk space, network connectivity, and
+    required config values — fail fast with a useful message rather than letting the work
+    start and fail mysteriously mid-task.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
 
 
 </main>

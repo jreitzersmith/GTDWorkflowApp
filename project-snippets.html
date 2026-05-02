@@ -107,7 +107,7 @@
     <span class="current">📝 Code Snippets</span>
     <a href="project-commits.html">📦 Commit Log</a>
   </div>
-  <span class="updated">Last updated: 2026-04-30</span>
+  <span class="updated">Last updated: May 1, 2026</span>
 </header>
 
 <div class="shell">
@@ -175,6 +175,9 @@
   <div class="group-label">Integrations</div>
   <a href="#snip-web-search">Web Search (Tavily)</a>
   <a href="#snip-gmail-oauth">Gmail OAuth2 PKCE</a>
+  <div class="group-label">Gmail &amp; Email</div>
+  <a href="#snip-gmail-bulk">Bulk Gmail Action — pagination</a>
+  <a href="#snip-email-queue-runner">Queue Runner — token expiry</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -3414,6 +3417,95 @@ useEffect(() => {
     app credentials don't — making them more convenient for local dev.
   </div>
 </div>
+
+
+<div class="snip-card" id="snip-gmail-bulk">
+  <div class="snip-header">
+    <span class="snip-title">Bulk Gmail Action — paginated fetch + chunked batchModify</span>
+    <a class="link-chip chip-feat" href="project-summary.html#feat-gmail-tools">🛠️ Gmail Tools Expansion</a>
+  </div>
+  <div class="snip-body"><pre><code class="language-javascript">// Collect ALL matching message IDs by following nextPageToken
+const allIds = [];
+let pageToken = undefined;
+do {
+  const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
+  url.searchParams.set('q', query);
+  url.searchParams.set('maxResults', '500');
+  if (pageToken) url.searchParams.set('pageToken', pageToken);
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const data = await res.json();
+  (data.messages || []).forEach(m => allIds.push(m.id));
+  pageToken = data.nextPageToken;
+  if (pageToken) await sleep(250); // avoid rate-limit between pages
+} while (pageToken);
+
+// Apply changes in chunks of 1,000 (Gmail API limit per batchModify call)
+const chunkSize = 1000;
+for (let i = 0; i &lt; allIds.length; i += chunkSize) {
+  const chunk = allIds.slice(i, i + chunkSize);
+  await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/batchModify', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids: chunk, addLabelIds, removeLabelIds }),
+  });
+  if (i + chunkSize &lt; allIds.length) await sleep(200);
+}</code></pre></div>
+  <div class="snip-note">
+    <strong>Two separate loops — one to collect, one to act.</strong> Separating the
+    "collect all IDs" phase from the "apply changes" phase means you always know exactly
+    how many messages will be affected before you touch any of them. The <code>do…while</code>
+    loop with <code>nextPageToken</code> is the standard Gmail API pagination pattern — the
+    first request never has a token; every subsequent one does. The <code>sleep(250)</code>
+    between pages and <code>sleep(200)</code> between modify chunks are polite rate-limit
+    guards: Gmail enforces per-second quotas and will return 429 if you fire requests too fast.
+    Chunking at 1,000 is a hard API limit — <code>batchModify</code> rejects requests with
+    more than 1,000 IDs.
+  </div>
+</div>
+
+
+<div class="snip-card" id="snip-email-queue-runner">
+  <div class="snip-header">
+    <span class="snip-title">Queue Runner — token expiry guard + error translation</span>
+    <a class="link-chip chip-feat" href="project-summary.html#feat-email-view">📬 Email Management View</a>
+  </div>
+  <div class="snip-body"><pre><code class="language-javascript">const runQueueEntry = async (entry) => {
+  // Check token expiry BEFORE touching the API
+  try {
+    const stored = JSON.parse(localStorage.getItem('gtd_google_token') || '{}');
+    if (!stored.expiry || Date.now() > stored.expiry) {
+      setQueueStatus(s => ({ ...s, [entry.id]: { error: 'Gmail session expired — please reconnect in Settings.' } }));
+      return;
+    }
+  } catch { /* ignore parse errors */ }
+
+  setQueueStatus(s => ({ ...s, [entry.id]: { running: true } }));
+  try {
+    // ... resolve label, run bulk action, create filter ...
+  } catch (e) {
+    // Translate opaque API error codes into actionable messages
+    let msg = e.message || 'Unknown error';
+    if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
+      msg = 'Gmail session expired — please reconnect in Settings.';
+    } else if (msg.includes('429') || msg.toLowerCase().includes('rate limit')) {
+      msg = 'Rate limited by Gmail — wait a minute and try again.';
+    }
+    setQueueStatus(s => ({ ...s, [entry.id]: { error: msg } }));
+  }
+};</code></pre></div>
+  <div class="snip-note">
+    <strong>Check expiry before the API call, not after.</strong> A 401 from the API is
+    caught in the generic error handler anyway, but checking the stored expiry first gives
+    a much clearer message immediately — no round-trip needed. The pattern
+    <code>setQueueStatus(s => ({ ...s, [entry.id]: { ... } }))</code> is a functional
+    state updater that merges one entry into the existing status map without clobbering the
+    others — <code>...s</code> spreads all existing keys, then <code>[entry.id]: {...}</code>
+    overwrites just this one entry. Error translation converts HTTP status codes and
+    terse API strings into sentences a non-developer can act on.
+  </div>
+</div>
+
 
 
 </main>

@@ -224,7 +224,7 @@
   <a href="project-summary.html" class="active">📄 Feature Summary</a>
   <a href="project-snippets.html">🔬 Code Snippets</a>
   <a href="project-commits.html">📜 Commit Log</a>
-  <span class="updated">Last updated: 2026-04-30</span>
+  <span class="updated">Last updated: May 1, 2026</span>
 </nav>
 
 <div class="layout">
@@ -285,6 +285,13 @@
     <li><a href="#feat-web-search">Web Search (Tavily)</a></li>
     <li><a href="#feat-gmail">Gmail (OAuth2 PKCE)</a></li>
   </ul>
+
+  <div class="section-label">Email &amp; Gmail</div>
+  <ul>
+    <li><a href="#feat-gmail-tools">AI Coach — Gmail Tools Expansion</a></li>
+    <li><a href="#feat-email-view">Email Management View</a></li>
+  </ul>
+
 </aside>
 
 <!-- MAIN -->
@@ -1724,6 +1731,119 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
     </p>
     <div class="link-row">
       <a class="link-chip chip-commit" href="project-commits.html#commit-7d52046">📜 7d52046 — Gmail OAuth2 PKCE integration</a>
+    </div>
+  </section>
+
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-gmail-tools">
+    <div class="feat-header">
+      <span class="feat-icon">🛠️</span>
+      <span class="feat-title">AI Coach — Gmail Tools Expansion (Labels, Filters, Bulk Actions)</span>
+      <span class="feat-badge badge-new">New — May 1</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>After the basic Gmail search was connected, a full suite of email management tools was added to the AI Coach. The AI can now: create and list Gmail labels, create and delete filters (rules that automatically label/archive future emails), batch-label many emails at once, and run bulk cleanup operations that process every matching email in the inbox — no matter how many thousands there are.</p>
+      <p>Rather than building a separate UI for every Gmail operation, these capabilities are exposed directly to the AI as "tools" it can call. The user describes what they want in plain English ("label all newsletters from Morning Brew and create a filter for future ones"), and the AI figures out the sequence of API calls needed. This keeps the UI simple while making the system very powerful.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React / JS Concept: Tool use / agentic loops</h4>
+      <p>The AI doesn't just answer — it calls functions, gets results, and calls more functions until the job is done. The loop runs up to 15 iterations, checking <code>stop_reason === "tool_use"</code> on each pass. This is the same pattern as the web search loop, extended to many more tools.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React / JS Concept: AbortController</h4>
+      <p>A browser API that lets you cancel a <code>fetch</code> request mid-flight. Used here with a 90-second timeout: <code>const controller = new AbortController(); setTimeout(() =&gt; controller.abort(), 90000);</code>. The <code>signal</code> is passed to <code>fetch</code>; if the timeout fires first the request is cancelled and an error is thrown. This prevents the app from freezing indefinitely waiting for a slow AI response.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React / JS Concept: Promise.allSettled</h4>
+      <p>Like <code>Promise.all</code> but instead of failing if one promise rejects, it returns the result of every promise — success or failure. Used in batch-label to fire all Gmail modify requests in parallel and count successes vs. failures. If one message fails, the others still complete.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React / JS Concept: Pagination</h4>
+      <p>The Gmail API returns results in pages of up to 500. <code>doGmailBulkAction</code> loops, following <code>nextPageToken</code>, until it has collected every matching message ID before applying changes. Without this, a bulk operation on a large inbox would silently stop at 500 messages.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React / JS Concept: Error as tool result</h4>
+      <p>Instead of crashing when a Gmail API call fails inside the tool-use loop, errors are returned as <code>{ type: "tool_result", is_error: true, content: errorMessage }</code>. This lets the AI see what went wrong and adapt — for example, retrying with a different label name or explaining the problem to the user.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The tool-use loop is like a shell script that calls <code>gcloud</code> or <code>aws</code> CLI commands in a loop — the script decides what to run next based on the output of the last call. The AI is the decision-maker; the tools are the CLI binaries. Pagination is exactly like <code>aws s3 ls --page-size 1000</code> with a cursor loop. <code>Promise.allSettled</code> is like running a batch of background jobs with <code>&amp;</code> and collecting their exit codes with <code>wait</code>.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-gmail-bulk">🔬 Bulk Gmail Action — pagination + batchModify</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-2815aae">📜 2815aae — Gmail scope selector</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-64a3085">📜 64a3085 — gmail_list_labels tool</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-d05226a">📜 d05226a — fix: Message-ID in search results</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-ac63122">📜 ac63122 — Gmail filters + create-label</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-da93969">📜 da93969 — Gmail search max_results param</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-c6179beb">📜 c617… — gmail_batch_label tool</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-8081419">📜 8081419 — fix: raise tool-use loop limit</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-dfc7252">📜 dfc7252 — fix: AbortController timeout</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-6bb80e7">📜 6bb80e7 — fix: enforce Gmail batching in prompt</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-be95201">📜 be95201 — fix: Gmail tool errors as is_error</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-185b801">📜 185b801 — feat: gmail_bulk_action tool</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-email-view">
+    <div class="feat-header">
+      <span class="feat-icon">📬</span>
+      <span class="feat-title">Email Management View (Inbox / Cleanup / Rules tabs)</span>
+      <span class="feat-badge badge-new">New — May 1</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>A full email management interface was added as a new "📧 Email" item in the sidebar, separate from the GTD task buckets. It has three tabs:</p>
+      <p><strong>Inbox</strong> — shows the 50 most recent Gmail messages with avatars, unread indicators, checkboxes for bulk selection, a detail panel that loads the full email body, and a "Process with AI" button that opens the AI coach pre-filled with the email content.</p>
+      <p><strong>Cleanup</strong> — a persistent bulk-action queue where the AI saves confirmed newsletter/promotional cleanup rules. Each queue entry can be run on demand or all at once. Running an entry labels all matching emails, creates a Gmail filter for future messages, and shows success/error status inline.</p>
+      <p><strong>Rules</strong> — shows all existing Gmail filters and labels, with the ability to delete filters directly from the UI.</p>
+      <p>The cleanup workflow is split into two phases: discovery (AI samples emails, proposes a restrictive query, gets user confirmation) and execution (the queue runner applies changes). This decoupling means the user can plan cleanup on a slow connection and run it later. The queue persists in localStorage so it survives page refreshes.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React / JS Concept: Conditional rendering based on state</h4>
+      <p><code>currentView === "email"</code> swaps the entire main panel between GTD tasks and the email view. The settings panel check was moved to run first so it works from any view — a good example of ordering conditional checks to handle cross-cutting concerns.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React / JS Concept: useCallback</h4>
+      <p>Wraps functions that are passed as props to child components. Without it, a new function reference is created on every render, which can cause child components to re-render unnecessarily. <code>useCallback(fn, [deps])</code> returns the same function reference as long as none of the listed dependencies change.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React / JS Concept: localStorage for persistence across page loads</h4>
+      <p>The cleanup queue (<code>gtd_gmail_queue</code>) and the last-selected tab (<code>gtd_email_tab</code>) survive page refreshes by being read at component init (via a lazy <code>useState</code> initialiser) and written on every change. This is the same pattern used for task data and panel sizes throughout the app.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React / JS Concept: Token expiry guard</h4>
+      <p>Before running a queue entry, the code reads the stored expiry timestamp from localStorage and bails with a clear error message if the session has expired, rather than letting the API call fail silently with a cryptic 401. Checking preconditions close to the action (not at login time) catches expiry that happens while the app is open.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The cleanup queue is like a Nagios job queue or an Ansible playbook staging area — you define the operations up front, then execute them when ready. The token expiry guard is like checking <code>Kerberos TGT</code> expiry before running a privileged job, rather than discovering mid-job that you've been logged out. Prop drilling is the React equivalent of passing variables down through nested function calls — cumbersome but visible and debuggable.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-email-queue-runner">🔬 Queue Runner — token expiry guard + error translation</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-d2e4d44">📜 d2e4d44 — feat: Email Management view</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-85f5a90">📜 85f5a90 — fix: label IDs to names in Rules tab</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-3a38e65">📜 3a38e65 — fix: doGmailFetchLabelsRaw for UI</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-ffd0a50">📜 ffd0a50 — fix: settings panel from email view</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-5afdfd1">📜 5afdfd1 — feat: cleanup buttons with direct prompts</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-4e94b90">📜 4e94b90 — fix: replace invalid Gmail query filter</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-db6346e">📜 db6346e — fix: queue runner token expiry + error messages</a>
     </div>
   </section>
 
