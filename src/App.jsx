@@ -5408,6 +5408,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
   const [rulesLoading, setRulesLoading] = useState(false);
   const [rulesError, setRulesError] = useState(null);
   const [queueStatus, setQueueStatus] = useState({});
+  const [runAllProgress, setRunAllProgress] = useState({ running: false, current: 0, total: 0 });
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [labelsOpen, setLabelsOpen] = useState(true);
 
@@ -5554,8 +5555,16 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
     }
   };
 
-  const runAllQueue = () => {
-    gmailQueue.filter(e => e.status !== 'done').forEach(runQueueEntry);
+  const runAllQueue = async () => {
+    const pending = gmailQueue.filter(e => e.status !== 'done');
+    if (pending.length === 0) return;
+    setRunAllProgress({ running: true, current: 0, total: pending.length });
+    for (let i = 0; i < pending.length; i++) {
+      setRunAllProgress(p => ({ ...p, current: i + 1 }));
+      await runQueueEntry(pending[i]);
+      if (i < pending.length - 1) await sleep(1500);
+    }
+    setRunAllProgress({ running: false, current: 0, total: 0 });
   };
 
   const tabStyle = (t) => ({
@@ -5765,7 +5774,15 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', borderBottom: `1px solid ${COLORS.border}` }}>
               <span style={{ fontSize: 12, color: COLORS.muted }}>Bulk action queue · {gmailQueue.length} saved</span>
               {gmailQueue.some(e => e.status !== 'done') && (
-                <button style={btnSm} onClick={runAllQueue}>Run all</button>
+                <button
+                  style={{ ...btnSm, opacity: runAllProgress.running ? 0.6 : 1, cursor: runAllProgress.running ? 'default' : 'pointer' }}
+                  onClick={runAllQueue}
+                  disabled={runAllProgress.running}
+                >
+                  {runAllProgress.running
+                    ? `Running ${runAllProgress.current} of ${runAllProgress.total}…`
+                    : 'Run all'}
+                </button>
               )}
             </div>
             {gmailQueue.length === 0 && (
