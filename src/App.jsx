@@ -5624,6 +5624,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
   const [runAllProgress, setRunAllProgress] = useState({ running: false, current: 0, total: 0 });
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [labelsOpen, setLabelsOpen] = useState(true);
+  const [labelFilter, setLabelFilter] = useState('');
 
   // Load inbox on mount / when switching to inbox tab
   useEffect(() => {
@@ -6115,7 +6116,9 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
 
           {/* Labels */}
           {!rulesLoading && (() => {
-            const sortedLabels = [...gmailLabels].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+            const allSorted = [...gmailLabels].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+            const filterTerm = labelFilter.trim().toLowerCase();
+            const sortedLabels = filterTerm ? allSorted.filter(l => l.name.toLowerCase().includes(filterTerm)) : allSorted;
             // Group by first character (uppercase), non-alpha goes under '#'
             const groups = {};
             sortedLabels.forEach(label => {
@@ -6129,15 +6132,34 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: 'pointer' }} onClick={() => setLabelsOpen(v => !v)}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>
-                    Labels <span style={{ fontSize: 11, color: COLORS.muted, fontWeight: 400 }}>{gmailLabels.length}</span>
+                    Labels{' '}
+                    <span style={{ fontSize: 11, color: COLORS.muted, fontWeight: 400 }}>
+                      {filterTerm ? `${sortedLabels.length} of ${gmailLabels.length}` : gmailLabels.length}
+                    </span>
                   </div>
                   <span style={{ fontSize: 11, color: COLORS.muted }}>{labelsOpen ? '▾' : '▸'}</span>
                 </div>
                 {labelsOpen && (
                   <>
-                    {/* Letter quicklinks */}
-                    {letters.length > 1 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, padding: '6px 16px 8px', borderTop: `1px solid ${COLORS.border}` }}>
+                    {/* Filter input */}
+                    <div style={{ padding: '6px 16px 8px', borderTop: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input
+                        type="text"
+                        value={labelFilter}
+                        onChange={e => setLabelFilter(e.target.value)}
+                        placeholder="Filter labels…"
+                        style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '5px 9px', fontFamily: 'inherit', fontSize: 12, color: COLORS.text, outline: 'none' }}
+                      />
+                      {labelFilter && (
+                        <button onClick={() => setLabelFilter('')}
+                          style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    {/* Letter quicklinks — only shown when not filtering */}
+                    {!filterTerm && letters.length > 1 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, padding: '4px 16px 8px' }}>
                         {letters.map(letter => (
                           <button key={letter} onClick={() => document.getElementById(`label-group-${letter}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
                             style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.4 }}>
@@ -6148,10 +6170,12 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
                     )}
                     {/* Label groups */}
                     <div>
-                      {letters.map(letter => {
+                      {sortedLabels.length === 0 && filterTerm ? (
+                        <div style={{ padding: '12px 16px', fontSize: 12, color: COLORS.muted }}>No labels match "{labelFilter}"</div>
+                      ) : letters.map(letter => {
                         const groupLabels = groups[letter];
                         return (
-                          <div key={letter} id={`label-group-${letter}`}>
+                          <div key={letter} id={filterTerm ? undefined : `label-group-${letter}`}>
                             {/* Letter divider */}
                             <div style={{ padding: '4px 16px', background: COLORS.surface2, borderTop: `1px solid ${COLORS.border}`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 600, color: COLORS.muted, letterSpacing: '0.06em' }}>
                               {letter}
