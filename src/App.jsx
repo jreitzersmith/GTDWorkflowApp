@@ -5884,29 +5884,68 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
           )}
 
           {/* Labels */}
-          {!rulesLoading && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: 'pointer' }} onClick={() => setLabelsOpen(v => !v)}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>
-                  Labels <span style={{ fontSize: 11, color: COLORS.muted, fontWeight: 400 }}>{gmailLabels.length}</span>
+          {!rulesLoading && (() => {
+            const sortedLabels = [...gmailLabels].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+            // Group by first character (uppercase), non-alpha goes under '#'
+            const groups = {};
+            sortedLabels.forEach(label => {
+              const ch = label.name[0]?.toUpperCase() || '#';
+              const key = /[A-Z]/.test(ch) ? ch : '#';
+              if (!groups[key]) groups[key] = [];
+              groups[key].push(label);
+            });
+            const letters = Object.keys(groups).sort((a, b) => a === '#' ? 1 : b === '#' ? -1 : a.localeCompare(b));
+            return (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: 'pointer' }} onClick={() => setLabelsOpen(v => !v)}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>
+                    Labels <span style={{ fontSize: 11, color: COLORS.muted, fontWeight: 400 }}>{gmailLabels.length}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: COLORS.muted }}>{labelsOpen ? '▾' : '▸'}</span>
                 </div>
-                <span style={{ fontSize: 11, color: COLORS.muted }}>{labelsOpen ? '▾' : '▸'}</span>
-              </div>
-              {labelsOpen && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-                  {gmailLabels.map((label, i) => (
-                    <div key={label.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 16px', borderTop: `1px solid ${COLORS.border}`, borderRight: i % 2 === 0 ? `1px solid ${COLORS.border}` : 'none' }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: label.color?.backgroundColor || COLORS.muted, flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, color: COLORS.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label.name}</span>
+                {labelsOpen && (
+                  <>
+                    {/* Letter quicklinks */}
+                    {letters.length > 1 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, padding: '6px 16px 8px', borderTop: `1px solid ${COLORS.border}` }}>
+                        {letters.map(letter => (
+                          <button key={letter} onClick={() => document.getElementById(`label-group-${letter}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
+                            style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.4 }}>
+                            {letter}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {/* Label groups */}
+                    <div>
+                      {letters.map(letter => {
+                        const groupLabels = groups[letter];
+                        return (
+                          <div key={letter} id={`label-group-${letter}`}>
+                            {/* Letter divider */}
+                            <div style={{ padding: '4px 16px', background: COLORS.surface2, borderTop: `1px solid ${COLORS.border}`, borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 600, color: COLORS.muted, letterSpacing: '0.06em' }}>
+                              {letter}
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                              {groupLabels.map((label, i) => (
+                                <div key={label.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 16px', borderTop: `1px solid ${COLORS.border}`, borderRight: i % 2 === 0 ? `1px solid ${COLORS.border}` : 'none' }}>
+                                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: label.color?.backgroundColor || COLORS.muted, flexShrink: 0 }} />
+                                  <span style={{ fontSize: 12, color: COLORS.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {gmailLabels.length === 0 && (
+                        <div style={{ padding: '10px 16px', fontSize: 12, color: COLORS.muted }}>No user labels found.</div>
+                      )}
                     </div>
-                  ))}
-                  {gmailLabels.length === 0 && (
-                    <div style={{ gridColumn: '1/-1', padding: '10px 16px', fontSize: 12, color: COLORS.muted }}>No user labels found.</div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
