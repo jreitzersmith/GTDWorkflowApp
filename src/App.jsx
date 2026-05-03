@@ -667,17 +667,18 @@ function extractGmailPlainText(payload) {
   return '';
 }
 
-// Fetch up to 50 inbox messages as structured objects (for the Email Management inbox tab)
-async function doGmailFetchInbox(token, maxResults = 50) {
-  const limit = Math.min(maxResults, 50);
-  const res = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=in:inbox&maxResults=${limit}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+// Fetch inbox messages as structured objects (for the Email Management inbox tab)
+// Returns { emails, nextPageToken } — pass pageToken to load the next page
+async function doGmailFetchInbox(token, pageToken = null) {
+  const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
+  url.searchParams.set('q', 'in:inbox');
+  url.searchParams.set('maxResults', '50');
+  if (pageToken) url.searchParams.set('pageToken', pageToken);
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
   const data = await res.json();
   const messages = data.messages || [];
-  if (!messages.length) return [];
+  if (!messages.length) return { emails: [], nextPageToken: null };
   const details = await Promise.all(messages.map(async ({ id }) => {
     try {
       const msgRes = await fetch(
@@ -697,7 +698,7 @@ async function doGmailFetchInbox(token, maxResults = 50) {
       return { id, from: fromRaw, fromName, fromEmail, date: get('Date'), subject: get('Subject'), snippet: msg.snippet || '', isUnread, labelIds: msg.labelIds || [] };
     } catch { return null; }
   }));
-  return details.filter(Boolean);
+  return { emails: details.filter(Boolean), nextPageToken: data.nextPageToken || null };
 }
 
 // Fetch full message body for the detail panel
@@ -5397,6 +5398,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
   const [inboxEmails, setInboxEmails] = useState([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError] = useState(null);
+  const [inboxNextPageToken, setInboxNextPageToken] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [checkedIds, setCheckedIds] = useState(new Set());
   const [emailDetail, setEmailDetail] = useState(null);
@@ -5434,10 +5436,14 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
       .finally(() => setDetailLoading(false));
   }, [selectedId, googleToken]);
 
-  const loadInbox = async () => {
+  const loadInbox = async (pageToken = null) => {
     setInboxLoading(true);
-    setInboxError(null);
-    try { setInboxEmails(await doGmailFetchInbox(googleToken, 50)); }
+    if (!pageToken) setInboxError(null);
+    try {
+      const { emails, nextPageToken } = await doGmailFetchInbox(googleToken, pageToken);
+      setInboxEmails(prev => pageToken ? [...prev, ...emails] : emails);
+      setInboxNextPageToken(nextPageToken);
+    }
     catch (e) { setInboxError(e.message); }
     finally { setInboxLoading(false); }
   };
@@ -5604,7 +5610,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
               <span style={{ flex: 1, fontSize: 12, color: COLORS.muted }}>
                 {inboxLoading ? 'Loading…' : inboxError ? `Error: ${inboxError}` : `${inboxEmails.length} messages${checkedIds.size ? ` · ${checkedIds.size} selected` : ''}`}
               </span>
-              <button style={btnSm} onClick={loadInbox} disabled={inboxLoading}>↻ Refresh</button>
+              <button style={btnSm} onClick={() => { setInboxNextPageToken(null); loadInbox(null); }} disabled={inboxLoading}>↻ Refresh</button>
               {checkedIds.size > 0 && (
                 <>
                   <button style={btnSmDanger} onClick={async () => {
@@ -5669,6 +5675,14 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
                   </div>
                 );
               })}
+              {/* Load More */}
+              {inboxNextPageToken && (
+                <div style={{ padding: '12px 14px', borderTop: `1px solid ${COLORS.border}`, textAlign: 'center' }}>
+                  <button style={btnSm} onClick={() => loadInbox(inboxNextPageToken)} disabled={inboxLoading}>
+                    {inboxLoading ? 'Loading…' : `Load more`}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
