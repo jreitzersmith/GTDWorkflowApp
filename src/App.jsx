@@ -3,6 +3,34 @@ import { createClient } from "@supabase/supabase-js";
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ── AI Usage tracking helpers ──────────────────────────────────────
+function createEmptyUsageStats() {
+  return {
+    totalInputTokens: 0, totalOutputTokens: 0, totalRequests: 0,
+    byMode: {},
+    byProvider: {
+      claude: { inputTokens: 0, outputTokens: 0, requests: 0, costUsd: 0 },
+      ollama: { inputTokens: 0, outputTokens: 0, requests: 0, savedUsd: 0 },
+    },
+    history: [],
+  };
+}
+function calcCost(inputTokens, outputTokens) {
+  return (inputTokens / 1_000_000) * 3 + (outputTokens / 1_000_000) * 15;
+}
+function fmtTokens(n) {
+  if (!n) return '0';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
+  return String(n);
+}
+function fmtCost(usd) {
+  if (!usd) return '$0.00';
+  if (usd < 0.01) return '<$0.01';
+  return '$' + usd.toFixed(2);
+}
+
+
 // ── Supabase gmail_queue helpers ──────────────────────────────────────────
 function queueEntryToRow(entry, userId) {
   return {
@@ -1341,6 +1369,12 @@ export default function GTDManager() {
   });
   const [tagDisplay,  setTagDisplay]  = useState(() => localStorage.getItem("gtd_tag_display") || "below");
   const [showSettings, setShowSettings] = useState(false);
+  const [showUsage, setShowUsage] = useState(false);
+  const [aiUsageStats, setAiUsageStats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_ai_usage') || 'null') || createEmptyUsageStats(); }
+    catch { return createEmptyUsageStats(); }
+  });
+  const [sessionUsage, setSessionUsage] = useState({ inputTokens: 0, outputTokens: 0, requests: 0, costUsd: 0 });
   // Email Management view state
   const [currentView, setCurrentView] = useState("gtd"); // "gtd" | "email"
   const [emailTab, setEmailTab] = useState(() => localStorage.getItem("gtd_email_tab") || "inbox");
@@ -1682,6 +1716,7 @@ export default function GTDManager() {
   useEffect(() => { localStorage.setItem("gtd_efforts",             JSON.stringify(efforts));             }, [efforts]);
   useEffect(() => { localStorage.setItem("gtd_effort_calibration", JSON.stringify(calibrationOverrides)); }, [calibrationOverrides]);
   useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
+  useEffect(() => { localStorage.setItem('gtd_ai_usage', JSON.stringify(aiUsageStats)); }, [aiUsageStats]);
   useEffect(() => { localStorage.setItem("gtd_email_tab", emailTab); }, [emailTab]);
   useEffect(() => { localStorage.setItem("gtd_gmail_queue", JSON.stringify(gmailQueue)); }, [gmailQueue]);
 
@@ -1775,6 +1810,43 @@ export default function GTDManager() {
     if (provider === "local") fetchModels();
   }, [provider, fetchModels]);
 
+  const recordUsage = useCallback((inputTokens, outputTokens, durationMs, mode, prov) => {
+    const cost = prov === 'claude' ? calcCost(inputTokens, outputTokens) : 0;
+    const saved = prov === 'ollama' ? calcCost(inputTokens, outputTokens) : 0;
+    setSessionUsage(prev => ({
+      inputTokens: prev.inputTokens + inputTokens,
+      outputTokens: prev.outputTokens + outputTokens,
+      requests: prev.requests + 1,
+      costUsd: prev.costUsd + cost,
+    }));
+    setAiUsageStats(prev => {
+      const mk = mode || 'chat';
+      const ms = prev.byMode[mk] || { inputTokens: 0, outputTokens: 0, requests: 0 };
+      const ps = prev.byProvider[prov] || { inputTokens: 0, outputTokens: 0, requests: 0 };
+      const histEntry = { ts: new Date().toISOString(), mode: mk, provider: prov, inputTokens, outputTokens, durationMs };
+      const history = [histEntry, ...(prev.history || [])].slice(0, 500);
+      return {
+        ...prev,
+        totalInputTokens: (prev.totalInputTokens || 0) + inputTokens,
+        totalOutputTokens: (prev.totalOutputTokens || 0) + outputTokens,
+        totalRequests: (prev.totalRequests || 0) + 1,
+        byMode: { ...prev.byMode, [mk]: { inputTokens: ms.inputTokens + inputTokens, outputTokens: ms.outputTokens + outputTokens, requests: ms.requests + 1 } },
+        byProvider: {
+          ...prev.byProvider,
+          [prov]: {
+            ...ps,
+            inputTokens: ps.inputTokens + inputTokens,
+            outputTokens: ps.outputTokens + outputTokens,
+            requests: ps.requests + 1,
+            costUsd: (ps.costUsd || 0) + cost,
+            savedUsd: (ps.savedUsd || 0) + saved,
+          },
+        },
+        history,
+      };
+    });
+  }, []);
+
   const callAI = useCallback(async (userMsg, mode, history) => {
     // Inject calibration context only for modes that suggest effort estimates
     const calibCtx = (mode === "process" || mode === "projectMetadata")
@@ -1824,6 +1896,7 @@ export default function GTDManager() {
           if (loopCount > 1) {
             setMessages(prev => [...prev, { role: "assistant", text: `⏳ Thinking... (step ${loopCount})`, isSearchChip: true }]);
           }
+          const reqStart = Date.now();
           const abortCtrl = new AbortController();
           const abortTimer = setTimeout(() => abortCtrl.abort(), 90000);
           let res, data;
@@ -1850,6 +1923,7 @@ export default function GTDManager() {
           if (!res.ok || data.error) {
             throw new Error(`Anthropic error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
           }
+          if (data.usage) recordUsage(data.usage.input_tokens || 0, data.usage.output_tokens || 0, Date.now() - reqStart, mode, 'claude');
           if (data.stop_reason === "tool_use") {
             const toolUseBlocks = data.content.filter(b => b.type === "tool_use");
             const toolResults = [];
@@ -1983,6 +2057,7 @@ export default function GTDManager() {
         }
         if (!reply) reply = "I ran out of steps before finishing — the operation may be too complex for one turn. Try breaking it into smaller requests (e.g. one sender at a time).";
       } else {
+        const ollamaStart = Date.now();
         const res = await fetch(`${OPENWEBUI_URL}/api/chat/completions`, {
           method: "POST",
           headers: {
@@ -2002,6 +2077,7 @@ export default function GTDManager() {
         if (!res.ok || data.error) {
           throw new Error(`Open WebUI error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
         }
+        if (data.usage) recordUsage(data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0, Date.now() - ollamaStart, mode, 'ollama');
         reply = data.choices?.[0]?.message?.content || "Sorry, something went wrong.";
       }
 
@@ -2926,8 +3002,9 @@ export default function GTDManager() {
           <SidebarBtn onClick={startBrainDump}>🧠 Brain Dump</SidebarBtn>
         </div>
 
-        <div style={{ padding: "8px 10px", borderTop: `1px solid ${COLORS.border}` }}>
-          <SidebarBtn onClick={() => setShowSettings(v => !v)}>⚙ Settings</SidebarBtn>
+        <div style={{ padding: "8px 10px", borderTop: `1px solid ${COLORS.border}`, display: "flex", gap: 6 }}>
+          <div style={{ flex: 1 }}><SidebarBtn onClick={() => { setShowSettings(v => !v); setShowUsage(false); }}>⚙ Settings</SidebarBtn></div>
+          <div style={{ flex: 1 }}><SidebarBtn onClick={() => { setShowUsage(v => !v); setShowSettings(false); }}>📊 Usage</SidebarBtn></div>
         </div>
       </div>
       <ResizeHandle onMouseDown={sidebarDragDown} direction="h" />
@@ -2964,6 +3041,12 @@ export default function GTDManager() {
               onConnectGmail={signInWithGoogle}
               onDisconnectGmail={disconnectGmail}
               gmailError={gmailError}
+            />
+          ) : showUsage ? (
+            <UsagePanel
+              stats={aiUsageStats}
+              onClear={() => setAiUsageStats(createEmptyUsageStats())}
+              onClose={() => setShowUsage(false)}
             />
           ) : currentView === "email" ? (
             <EmailManagementView
@@ -3361,6 +3444,11 @@ export default function GTDManager() {
               disabled={loading}
               style={{ width: 34, height: 34, background: loading ? COLORS.surface3 : COLORS.inbox, color: "#111", border: "none", borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
             >↑</button>
+          </div>
+          {/* Usage footer strip */}
+          <div style={{ padding: '3px 14px', borderTop: `1px solid ${COLORS.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, color: COLORS.muted, flexShrink: 0, gap: 8 }}>
+            <span>Session · ↑ {fmtTokens(sessionUsage.inputTokens)} in · ↓ {fmtTokens(sessionUsage.outputTokens)} out · {sessionUsage.requests} req</span>
+            {sessionUsage.costUsd > 0 && <span style={{ color: COLORS.text2 }}>{fmtCost(sessionUsage.costUsd)}</span>}
           </div>
         </div>{/* end coachPanel */}
         </div>{/* end mainLeft */}
@@ -4379,6 +4467,131 @@ function SettingsSection({ label, storageKey, children }) {
     </div>
   );
 }
+
+// ── Usage Panel ───────────────────────────────────────────────────
+const MODE_LABELS = {
+  chat: 'Chat', process: 'Process Inbox', weeklyReview: 'Weekly Review',
+  brainDump: 'Brain Dump', projectReview: 'Project Review', projectMetadata: 'Project Metadata',
+};
+
+function UsagePanel({ stats, onClear, onClose }) {
+  const s = stats || createEmptyUsageStats();
+  const totalCost = (s.byProvider?.claude?.costUsd || 0);
+  const totalSaved = (s.byProvider?.ollama?.savedUsd || 0);
+  const claudeIn = s.byProvider?.claude?.inputTokens || 0;
+  const claudeOut = s.byProvider?.claude?.outputTokens || 0;
+  const claudeReq = s.byProvider?.claude?.requests || 0;
+  const ollamaIn = s.byProvider?.ollama?.inputTokens || 0;
+  const ollamaOut = s.byProvider?.ollama?.outputTokens || 0;
+  const ollamaReq = s.byProvider?.ollama?.requests || 0;
+
+  const avgTokSec = (() => {
+    if (!s.history || s.history.length === 0) return null;
+    const valid = s.history.filter(h => h.durationMs > 0 && h.outputTokens > 0);
+    if (valid.length === 0) return null;
+    const avg = valid.reduce((a, h) => a + (h.outputTokens / (h.durationMs / 1000)), 0) / valid.length;
+    return avg.toFixed(1);
+  })();
+
+  const sectionHd = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: '0.07em', textTransform: 'uppercase', margin: '20px 0 8px' };
+  const stat = (label, value, sub) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '5px 0', borderBottom: `1px solid ${COLORS.border}` }}>
+      <span style={{ fontSize: 12, color: COLORS.text }}>{label}</span>
+      <span style={{ fontSize: 12, color: COLORS.text2 }}>{value}{sub && <span style={{ fontSize: 10, color: COLORS.muted, marginLeft: 4 }}>{sub}</span>}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px 10px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: 16, fontWeight: 300 }}>📊 AI Usage</div>
+          <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>Lifetime token usage and cost tracking</div>
+        </div>
+        <button onClick={onClose} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>✕ Close</button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 24px' }}>
+
+        {/* Lifetime totals */}
+        <div style={sectionHd}>Lifetime Totals</div>
+        {stat('Total requests', (s.totalRequests || 0).toLocaleString())}
+        {stat('Input tokens', fmtTokens(s.totalInputTokens || 0), `(${(s.totalInputTokens || 0).toLocaleString()})`)}
+        {stat('Output tokens', fmtTokens(s.totalOutputTokens || 0), `(${(s.totalOutputTokens || 0).toLocaleString()})`)}
+        {avgTokSec && stat('Avg output speed', `${avgTokSec} tok/s`)}
+
+        {/* By provider */}
+        <div style={sectionHd}>By Provider</div>
+        <div style={{ background: COLORS.surface2, borderRadius: 8, overflow: 'hidden', border: `1px solid ${COLORS.border}` }}>
+          {/* Claude */}
+          <div style={{ padding: '10px 14px', borderBottom: `1px solid ${COLORS.border}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>Claude (Anthropic)</span>
+              <span style={{ fontSize: 13, color: COLORS.inbox, fontWeight: 600 }}>{fmtCost(totalCost)}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 11, color: COLORS.muted }}>
+              <span>{claudeReq.toLocaleString()} requests</span>
+              <span>↑ {fmtTokens(claudeIn)} in</span>
+              <span>↓ {fmtTokens(claudeOut)} out</span>
+            </div>
+          </div>
+          {/* Ollama */}
+          <div style={{ padding: '10px 14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>Local LLM (Ollama)</span>
+              <span style={{ fontSize: 11, color: COLORS.next, fontWeight: 600 }}>Free · saved {fmtCost(totalSaved)}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 11, color: COLORS.muted }}>
+              <span>{ollamaReq.toLocaleString()} requests</span>
+              <span>↑ {fmtTokens(ollamaIn)} in</span>
+              <span>↓ {fmtTokens(ollamaOut)} out</span>
+            </div>
+            {totalSaved > 0 && (
+              <div style={{ marginTop: 6, fontSize: 11, color: COLORS.next }}>
+                💰 You saved {fmtCost(totalSaved)} by using a local model instead of Claude
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* By mode */}
+        <div style={sectionHd}>By Mode</div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead>
+            <tr style={{ color: COLORS.muted }}>
+              <th style={{ textAlign: 'left', padding: '4px 0', borderBottom: `1px solid ${COLORS.border}`, fontWeight: 500 }}>Mode</th>
+              <th style={{ textAlign: 'right', padding: '4px 0', borderBottom: `1px solid ${COLORS.border}`, fontWeight: 500 }}>Requests</th>
+              <th style={{ textAlign: 'right', padding: '4px 0', borderBottom: `1px solid ${COLORS.border}`, fontWeight: 500 }}>Input</th>
+              <th style={{ textAlign: 'right', padding: '4px 0', borderBottom: `1px solid ${COLORS.border}`, fontWeight: 500 }}>Output</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(s.byMode || {}).sort((a, b) => b[1].requests - a[1].requests).map(([mode, ms]) => (
+              <tr key={mode}>
+                <td style={{ padding: '5px 0', borderBottom: `1px solid ${COLORS.border}`, color: COLORS.text }}>{MODE_LABELS[mode] || mode}</td>
+                <td style={{ padding: '5px 0', borderBottom: `1px solid ${COLORS.border}`, textAlign: 'right', color: COLORS.text2 }}>{ms.requests}</td>
+                <td style={{ padding: '5px 0', borderBottom: `1px solid ${COLORS.border}`, textAlign: 'right', color: COLORS.text2 }}>{fmtTokens(ms.inputTokens)}</td>
+                <td style={{ padding: '5px 0', borderBottom: `1px solid ${COLORS.border}`, textAlign: 'right', color: COLORS.text2 }}>{fmtTokens(ms.outputTokens)}</td>
+              </tr>
+            ))}
+            {Object.keys(s.byMode || {}).length === 0 && (
+              <tr><td colSpan={4} style={{ padding: '12px 0', color: COLORS.muted, textAlign: 'center' }}>No usage recorded yet</td></tr>
+            )}
+          </tbody>
+        </table>
+
+        {/* Clear */}
+        <div style={{ marginTop: 28, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
+          <button
+            onClick={() => { if (window.confirm('Clear all lifetime usage statistics? This cannot be undone.')) onClear(); }}
+            style={{ padding: '7px 14px', borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}
+          >🗑 Clear all stats</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, googleScope, onConnectGmail, onDisconnectGmail, gmailError }) {
   const fileInputRef = useRef(null);
