@@ -224,7 +224,7 @@
   <a href="project-summary.html" class="active">📄 Feature Summary</a>
   <a href="project-snippets.html">🔬 Code Snippets</a>
   <a href="project-commits.html">📜 Commit Log</a>
-  <span class="updated">Last updated: May 1, 2026</span>
+  <span class="updated">Last updated: May 3, 2026</span>
 </nav>
 
 <div class="layout">
@@ -290,6 +290,12 @@
   <ul>
     <li><a href="#feat-gmail-tools">AI Coach — Gmail Tools Expansion</a></li>
     <li><a href="#feat-email-view">Email Management View</a></li>
+  </ul>
+
+  <div class="section-label">May 3 — New</div>
+  <ul>
+    <li><a href="#feat-email-polish">Email View Polish</a></li>
+    <li><a href="#feat-ai-usage">AI Usage Tracking</a></li>
   </ul>
 
 </aside>
@@ -1844,6 +1850,159 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-commit" href="project-commits.html#commit-5afdfd1">📜 5afdfd1 — feat: cleanup buttons with direct prompts</a>
       <a class="link-chip chip-commit" href="project-commits.html#commit-4e94b90">📜 4e94b90 — fix: replace invalid Gmail query filter</a>
       <a class="link-chip chip-commit" href="project-commits.html#commit-db6346e">📜 db6346e — fix: queue runner token expiry + error messages</a>
+    </div>
+  </section>
+
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-email-polish">
+    <div class="feat-header">
+      <span class="feat-icon">📬</span>
+      <span class="feat-title">Email Management — Polish &amp; Reliability (May 1–3)</span>
+      <span class="feat-badge badge-new">New — May 3</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>
+        A focused sweep of the Email Management view after the initial release addressed reliability,
+        UX consistency, and cross-device access. Eight commits across two days:
+      </p>
+      <p>
+        <strong>Supabase queue sync.</strong> The cleanup queue now persists to a
+        <code>gmail_queue</code> Supabase table so it survives across devices.
+        Two field-mapper helpers (<code>queueEntryToRow</code> / <code>rowToQueueEntry</code>)
+        handle camelCase ↔ snake_case translation. Each mutation site (add, run, remove)
+        fires its own upsert/delete independently; <code>localStorage</code> is retained
+        as an offline fallback.
+      </p>
+      <p>
+        <strong>Label resolution robustness.</strong> Three commits tighten the queue runner's
+        label lookup: the 409-conflict recovery retries with a re-fetch; all comparisons
+        now use <code>trim().toLowerCase()</code> normalisation; and when a label still can't
+        be resolved the runner logs a warning and proceeds with archive-only (rather than
+        throwing and aborting the whole run).
+      </p>
+      <p>
+        <strong>Error propagation.</strong> All silent <code>.catch(() =&gt; {})</code>
+        calls were removed. Partial bulk failures report <code>N/M updated</code>;
+        archive and filter-delete operations now have scope guards that surface a
+        clear error when the token lacks write access.
+      </p>
+      <p>
+        <strong>UX improvements.</strong> New entries appear at the top of the queue (newest first).
+        The sidebar badge switched from queue length to unread inbox count (using the
+        exact <code>labels/INBOX</code> endpoint, not the unreliable estimate). The inbox
+        tab gained cursor-based pagination (Load More button). The labels list in the
+        Rules tab is now sorted A–Z with letter dividers, quicklink pills, and a live
+        filter search input. Run All became sequential (one entry at a time, 1.5 s gap)
+        with a live progress counter to avoid Gmail rate limits.
+      </p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: async/await in event handlers + sequential loops</h4>
+      <p>Changing <code>runAllQueue</code> from <code>forEach</code> to an <code>async</code> function with a <code>for</code> loop + <code>await</code> is the key fix for rate limiting. A <code>for</code> loop respects <code>await</code>; <code>forEach</code> does not — it fires all iterations synchronously and ignores returned Promises. Use <code>for...of</code> or an indexed <code>for</code> whenever you need sequential async work.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: cursor-based pagination</h4>
+      <p>The Gmail API returns a <code>nextPageToken</code> string when more results exist. Store it in state; pass it as a parameter to load the next page; append to the list rather than replacing it. The token being non-null is the only signal you need to decide whether to show "Load More" — no separate <code>hasMore</code> boolean required.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: controlled input + array .filter() in render</h4>
+      <p>The label filter search box uses a controlled <code>input</code> (<code>value={labelFilter}</code>, <code>onChange</code> sets state). The filtered list is derived in the render function with <code>.filter()</code> — it is not stored in state. This is the idiomatic React approach: store only the raw input, derive everything else. React re-runs the render on every keystroke, so the filtered view is always in sync.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: Supabase client-side SDK</h4>
+      <p>The <code>@supabase/supabase-js</code> client wraps HTTP calls to your Supabase project. <code>supabase.from('gmail_queue').upsert(row)</code> inserts or updates a row (matching on primary key). <code>.delete().match({ id, user_id })</code> removes a row. These calls are fire-and-forget at each mutation site — unlike the task sync which uses a diff-based <code>useEffect</code>, the queue fires Supabase calls at the exact point the JS state changes.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Sequential queue execution with rate-limit delays is like throttling a batch job with <code>xargs -P 1</code> (one at a time) plus a <code>sleep 1.5</code> between iterations — as opposed to <code>xargs -P 10</code> which fires ten at once and hammers an API. The scope guard before archive is like checking that a service account has write permissions before running a privileged command, rather than discovering mid-job that the token is read-only.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-run-all-queue">🔬 runAllQueue — sequential with sleep</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-label-filter">🔬 Label filter — controlled input + .filter()</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-a873175">📜 a873175 — Supabase queue sync</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-87cfc87">📜 87cfc87 — label 409 conflict recovery</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-4dbebe3">📜 4dbebe3 — error propagation sweep</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-facd066">📜 facd066 — case-insensitive label matching</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-9024024">📜 9024024 — queue newest first</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-301834f">📜 301834f — unread count badge</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-ea9199d">📜 ea9199d — exact unread count endpoint</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-98a7fe1">📜 98a7fe1 — paginated inbox</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-5eff8a4">📜 5eff8a4 — A-Z labels with quicklinks</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-055dfa7">📜 055dfa7 — sequential Run All</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-8c6ac55">📜 8c6ac55 — label filter search</a>
+    </div>
+  </section>
+
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-ai-usage">
+    <div class="feat-header">
+      <span class="feat-icon">📊</span>
+      <span class="feat-title">AI Usage Tracking — Lifetime Stats, Cost &amp; Usage Panel</span>
+      <span class="feat-badge badge-new">New — May 3</span>
+    </div>
+
+    <div class="feat-desc">
+      <p>
+        Every AI call now captures token counts from the response body and accumulates them
+        into a persistent usage record. Both Claude (Anthropic) and Ollama responses expose
+        a <code>usage</code> object; the <code>recordUsage()</code> callback reads it immediately
+        after each successful API call.
+      </p>
+      <p>
+        <strong>What is tracked:</strong> input tokens, output tokens, request count, duration,
+        mode (Chat / Process / Review / etc.), and provider. Lifetime stats are stored in
+        <code>localStorage</code> under <code>gtd_ai_usage</code> and survive page refreshes.
+        Session stats reset on each page load and are shown in a thin strip below the AI
+        chat input: <em>Session · ↑ 12.3k in · ↓ 4.1k out · 7 req</em>.
+      </p>
+      <p>
+        <strong>Cost calculation:</strong> Claude usage is priced at claude-sonnet-4-6 rates
+        ($3 / 1M input tokens, $15 / 1M output tokens). Ollama usage shows "money saved" —
+        the equivalent cost if it had been sent to Claude instead. This makes the value of
+        running a local model visible.
+      </p>
+      <p>
+        <strong>Usage panel:</strong> A "📊 Usage" button beside "⚙ Settings" opens a full
+        panel with: lifetime totals, per-provider breakdown (cost for Claude, savings for Ollama),
+        per-mode table (which AI modes you use most), average output speed in tokens/second,
+        and a "Clear all stats" button. The panel replaces the main content area without
+        unmounting it — the same conditional-render pattern used for Settings.
+      </p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: useCallback with stable dependencies</h4>
+      <p><code>recordUsage</code> is wrapped in <code>useCallback(fn, [])</code> with an empty dependency array. This works because it only calls <code>setSessionUsage</code> and <code>setAiUsageStats</code> — React state setters are guaranteed stable references and never need to appear in a dependency array. The result: <code>recordUsage</code> is created once at mount and never recreated, so listing it as a dependency in <code>callAI</code>'s <code>useCallback</code> is safe and won't cause spurious re-creations.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: localStorage persistence pattern</h4>
+      <p>The pattern is the same used throughout the app: lazy <code>useState</code> initialiser reads from localStorage on mount (<code>JSON.parse(localStorage.getItem('gtd_ai_usage') || 'null') || createEmptyUsageStats()</code>); a <code>useEffect([aiUsageStats])</code> writes back on every change. The <code>|| createEmptyUsageStats()</code> fallback handles the first run (no stored value) and corrupt stored JSON cleanly.</p>
+    </div>
+
+    <div class="box box-concept">
+      <h4>React Concept: lifting state up / session vs. lifetime</h4>
+      <p>Two separate state variables serve two different purposes: <code>aiUsageStats</code> is lifetime data (persisted, cumulative, shared with the Usage panel); <code>sessionUsage</code> is ephemeral (reset on page load, shown only in the footer strip). Keeping them separate avoids computing "session total = lifetime - previous lifetime" on every render, which would require storing the previous lifetime value too. Same data, different lifetime, different state.</p>
+    </div>
+
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>This is like reading byte counts from a network interface counter and accumulating them in a log file. The <code>usage</code> field in the API response is the per-call delta; <code>aiUsageStats</code> is the running total in the log. <code>sessionUsage</code> is like the bytes since last interface reset. The cost calculation is like billing a chargeback based on GB transferred — multiply the unit count by the price per unit.</p>
+    </div>
+
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-record-usage">🔬 recordUsage callback</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-usage-panel">🔬 UsagePanel component</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-6e5707f">📜 6e5707f — AI usage tracking</a>
     </div>
   </section>
 

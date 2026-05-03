@@ -107,7 +107,7 @@
     <span class="current">📝 Code Snippets</span>
     <a href="project-commits.html">📦 Commit Log</a>
   </div>
-  <span class="updated">Last updated: May 1, 2026</span>
+  <span class="updated">Last updated: May 3, 2026</span>
 </header>
 
 <div class="shell">
@@ -178,6 +178,11 @@
   <div class="group-label">Gmail &amp; Email</div>
   <a href="#snip-gmail-bulk">Bulk Gmail Action — pagination</a>
   <a href="#snip-email-queue-runner">Queue Runner — token expiry</a>
+  <div class="group-label">May 3 — New</div>
+  <a href="#snip-run-all-queue">runAllQueue — sequential + sleep</a>
+  <a href="#snip-label-filter">Label filter — controlled input</a>
+  <a href="#snip-record-usage">recordUsage callback</a>
+  <a href="#snip-usage-panel">UsagePanel component</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -3504,6 +3509,245 @@ for (let i = 0; i &lt; allIds.length; i += chunkSize) {
     overwrites just this one entry. Error translation converts HTTP status codes and
     terse API strings into sentences a non-developer can act on.
   </div>
+</div>
+
+
+
+<hr>
+<h2>May 3 — Sequential Queue, Label Filter, AI Usage Tracking</h2>
+
+<!-- runAllQueue -->
+<div class="snippet" id="snip-run-all-queue">
+  <div class="snip-header">
+    <span class="snip-title">runAllQueue — sequential async loop with sleep() and progress indicator</span>
+    <span class="snip-file">App.jsx · EmailManagementView · ~line 5772</span>
+    <span class="snip-back"><a href="project-summary.html#feat-email-polish">↑ Email Polish</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// sleep helper defined at the top of the file:
+// const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// runAllProgress tracks { running, current, total } for the button label
+const [runAllProgress, setRunAllProgress] = useState({ running: false, current: 0, total: 0 });
+
+const runAllQueue = async () => {
+  // Only process entries that haven't been run yet
+  const pending = gmailQueue.filter(e => e.status !== 'done');
+  if (pending.length === 0) return;
+
+  setRunAllProgress({ running: true, current: 0, total: pending.length });
+
+  for (let i = 0; i &lt; pending.length; i++) {
+    // Update counter BEFORE running so the button shows "Running 1 of 3…"
+    setRunAllProgress(p => ({ ...p, current: i + 1 }));
+
+    await runQueueEntry(pending[i]);   // wait for this entry to fully complete
+
+    // Wait 1.5 s between entries to avoid Gmail rate limits
+    if (i &lt; pending.length - 1) await sleep(1500);
+  }
+
+  setRunAllProgress({ running: false, current: 0, total: 0 });
+};
+
+// Button JSX — live progress counter, disabled while running
+{gmailQueue.some(e => e.status !== 'done') && (
+  &lt;button
+    disabled={runAllProgress.running}
+    onClick={runAllQueue}
+    style={{ opacity: runAllProgress.running ? 0.6 : 1 }}
+  &gt;
+    {runAllProgress.running
+      ? `Running ${runAllProgress.current} of ${runAllProgress.total}…`
+      : 'Run all'}
+  &lt;/button&gt;
+)}</code></pre></div>
+  <div class="annotation"><strong>Why for loop instead of forEach?</strong> <code>Array.forEach</code> does not await returned Promises — it fires all callbacks synchronously and moves on. A <code>for</code> loop with <code>await</code> pauses at each iteration until the Promise resolves. This makes the loop sequential: entry 2 doesn't start until entry 1 finishes. The <code>sleep(1500)</code> gap between entries gives the Gmail API breathing room and prevents 429 rate-limit errors. <code>sleep</code> works because it returns a Promise that resolves after a <code>setTimeout</code> — awaiting it is the same as awaiting any other async operation.</div>
+</div>
+
+<!-- label filter -->
+<div class="snippet" id="snip-label-filter">
+  <div class="snip-header">
+    <span class="snip-title">Label filter search — controlled input + Array.filter() in render</span>
+    <span class="snip-file">App.jsx · EmailManagementView · ~line 5627</span>
+    <span class="snip-back"><a href="project-summary.html#feat-email-polish">↑ Email Polish</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// State: the raw filter string — this is the ONLY new state needed
+const [labelFilter, setLabelFilter] = useState('');
+
+// In the render (no useEffect, no separate filteredLabels state):
+const allSorted = [...gmailLabels].sort((a, b) =>
+  a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+);
+const filterTerm = labelFilter.trim().toLowerCase();
+// .filter() runs on every render — fast enough for ~hundreds of labels
+const sortedLabels = filterTerm
+  ? allSorted.filter(l => l.name.toLowerCase().includes(filterTerm))
+  : allSorted;
+
+// Controlled input — value comes from state, every keystroke updates state
+&lt;input
+  type="text"
+  value={labelFilter}
+  onChange={e => setLabelFilter(e.target.value)}
+  placeholder="Filter labels…"
+/&gt;
+{/* Clear button only shown when filter is non-empty */}
+{labelFilter &amp;&amp; (
+  &lt;button onClick={() => setLabelFilter('')}&gt;✕&lt;/button&gt;
+)}
+
+// Count label adapts to filtering
+&lt;span&gt;
+  {filterTerm
+    ? `${sortedLabels.length} of ${gmailLabels.length}`
+    : gmailLabels.length}
+&lt;/span&gt;
+
+// When filtering, suppress scroll anchors on letter groups
+// (jumping to letter A when only 3 results show makes no sense)
+&lt;div id={filterTerm ? undefined : `label-group-${letter}`}&gt;</code></pre></div>
+  <div class="annotation"><strong>Derived state, not stored state.</strong> <code>sortedLabels</code> is computed directly in the render function from <code>gmailLabels</code> (the source) and <code>labelFilter</code> (the filter string). It is NOT stored in a <code>useState</code>. Storing derived values in state causes bugs: you have to remember to keep them in sync with their sources, and you risk stale values. Compute derived values in render — React re-runs the render on every state change, so the derived value is always fresh.</div>
+</div>
+
+<!-- recordUsage -->
+<div class="snippet" id="snip-record-usage">
+  <div class="snip-header">
+    <span class="snip-title">recordUsage — useCallback with stable state-setter dependencies</span>
+    <span class="snip-file">App.jsx · GTDManager · ~line 1813</span>
+    <span class="snip-back"><a href="project-summary.html#feat-ai-usage">↑ AI Usage Tracking</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Pricing constants for claude-sonnet-4-6
+// $3 per million input tokens, $15 per million output tokens
+function calcCost(inputTokens, outputTokens) {
+  return (inputTokens / 1_000_000) * 3 + (outputTokens / 1_000_000) * 15;
+}
+
+// recordUsage is stable (empty deps array) because it only calls state setters,
+// which React guarantees are stable references across renders.
+const recordUsage = useCallback((inputTokens, outputTokens, durationMs, mode, prov) => {
+  const cost  = prov === 'claude' ? calcCost(inputTokens, outputTokens) : 0;
+  const saved = prov === 'ollama' ? calcCost(inputTokens, outputTokens) : 0;
+
+  // Session counter (resets on page load) — shown in the footer strip
+  setSessionUsage(prev => ({
+    inputTokens:  prev.inputTokens  + inputTokens,
+    outputTokens: prev.outputTokens + outputTokens,
+    requests:     prev.requests     + 1,
+    costUsd:      prev.costUsd      + cost,
+  }));
+
+  // Lifetime stats (persisted to localStorage via useEffect)
+  setAiUsageStats(prev => {
+    const mk = mode || 'chat';
+    const ms = prev.byMode[mk] || { inputTokens: 0, outputTokens: 0, requests: 0 };
+    const ps = prev.byProvider[prov] || { inputTokens: 0, outputTokens: 0, requests: 0 };
+    const histEntry = { ts: new Date().toISOString(), mode: mk, provider: prov,
+                        inputTokens, outputTokens, durationMs };
+    return {
+      ...prev,
+      totalInputTokens:  (prev.totalInputTokens  || 0) + inputTokens,
+      totalOutputTokens: (prev.totalOutputTokens || 0) + outputTokens,
+      totalRequests:     (prev.totalRequests     || 0) + 1,
+      byMode: { ...prev.byMode,
+        [mk]: { inputTokens: ms.inputTokens + inputTokens,
+                outputTokens: ms.outputTokens + outputTokens,
+                requests: ms.requests + 1 } },
+      byProvider: { ...prev.byProvider,
+        [prov]: { ...ps,
+                  inputTokens:  ps.inputTokens  + inputTokens,
+                  outputTokens: ps.outputTokens + outputTokens,
+                  requests:     ps.requests     + 1,
+                  costUsd:  (ps.costUsd  || 0) + cost,
+                  savedUsd: (ps.savedUsd || 0) + saved } },
+      history: [histEntry, ...(prev.history || [])].slice(0, 500),
+    };
+  });
+}, []); // empty deps — only calls stable state setters
+
+// Called immediately after each successful API response:
+// Claude branch:
+if (data.usage) recordUsage(data.usage.input_tokens || 0, data.usage.output_tokens || 0,
+                            Date.now() - reqStart, mode, 'claude');
+// Ollama branch:
+if (data.usage) recordUsage(data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0,
+                            Date.now() - ollamaStart, mode, 'ollama');</code></pre></div>
+  <div class="annotation"><strong>Why empty dependency array is safe here.</strong> <code>useCallback(fn, [])</code> creates the function once and never recreates it. This is only valid when the function doesn't read any props or state values directly — it only calls <code>setSessionUsage</code> and <code>setAiUsageStats</code>. React guarantees that <code>setState</code> functions are the same reference on every render, so they don't need to be listed as dependencies. If <code>recordUsage</code> read <code>tasks</code> or <code>provider</code> directly, those would need to be in the dependency array.</div>
+</div>
+
+<!-- UsagePanel -->
+<div class="snippet" id="snip-usage-panel">
+  <div class="snip-header">
+    <span class="snip-title">UsagePanel — lifetime stats, per-provider breakdown, per-mode table</span>
+    <span class="snip-file">App.jsx · UsagePanel component · ~line 4468</span>
+    <span class="snip-back"><a href="project-summary.html#feat-ai-usage">↑ AI Usage Tracking</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Helper formatters (module level — pure functions, no React)
+function fmtTokens(n) {
+  if (!n) return '0';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'k';
+  return String(n);
+}
+function fmtCost(usd) {
+  if (!usd)     return '$0.00';
+  if (usd < 0.01) return '&lt;$0.01';
+  return '$' + usd.toFixed(2);
+}
+
+// Usage state initialiser — read from localStorage on mount
+const [aiUsageStats, setAiUsageStats] = useState(() => {
+  try { return JSON.parse(localStorage.getItem('gtd_ai_usage') || 'null')
+              || createEmptyUsageStats(); }
+  catch { return createEmptyUsageStats(); }
+});
+// Persist on every change (same pattern as tasks, locations, etc.)
+useEffect(() => {
+  localStorage.setItem('gtd_ai_usage', JSON.stringify(aiUsageStats));
+}, [aiUsageStats]);
+
+// UsagePanel component (simplified structure)
+function UsagePanel({ stats, onClear, onClose }) {
+  const s = stats || createEmptyUsageStats();
+  const totalCost  = s.byProvider?.claude?.costUsd  || 0;
+  const totalSaved = s.byProvider?.ollama?.savedUsd || 0;
+
+  // Average output speed from history entries
+  const avgTokSec = (() => {
+    const valid = (s.history || []).filter(h => h.durationMs > 0 &amp;&amp; h.outputTokens > 0);
+    if (!valid.length) return null;
+    const avg = valid.reduce((a, h) => a + h.outputTokens / (h.durationMs / 1000), 0) / valid.length;
+    return avg.toFixed(1);
+  })();
+
+  return (
+    &lt;div&gt;
+      {/* Header with Close button */}
+      {/* Lifetime totals section */}
+      {/* By Provider — Claude (cost) and Ollama (money saved) */}
+      {/* By Mode — table sorted by request count */}
+      &lt;table&gt;
+        &lt;thead&gt;&lt;tr&gt;&lt;th&gt;Mode&lt;/th&gt;&lt;th&gt;Requests&lt;/th&gt;&lt;th&gt;Input&lt;/th&gt;&lt;th&gt;Output&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+        &lt;tbody&gt;
+          {Object.entries(s.byMode || {})
+            .sort((a, b) => b[1].requests - a[1].requests)  // most-used mode first
+            .map(([mode, ms]) => (
+              &lt;tr key={mode}&gt;
+                &lt;td&gt;{MODE_LABELS[mode] || mode}&lt;/td&gt;
+                &lt;td&gt;{ms.requests}&lt;/td&gt;
+                &lt;td&gt;{fmtTokens(ms.inputTokens)}&lt;/td&gt;
+                &lt;td&gt;{fmtTokens(ms.outputTokens)}&lt;/td&gt;
+              &lt;/tr&gt;
+            ))}
+        &lt;/tbody&gt;
+      &lt;/table&gt;
+      {/* Clear button — confirm before wiping */}
+      &lt;button onClick={() => {
+        if (window.confirm('Clear all lifetime usage statistics?')) onClear();
+      }}&gt;🗑 Clear all stats&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</code></pre></div>
+  <div class="annotation"><strong>localStorage persistence pattern.</strong> The same three-line pattern used for tasks, efforts, and locations: (1) lazy <code>useState</code> initialiser reads from localStorage on mount — the function runs exactly once; (2) a <code>useEffect([aiUsageStats])</code> writes back on every change. The <code>|| createEmptyUsageStats()</code> fallback handles the first run (nothing stored yet) and silently recovers from corrupt JSON. Keep this pattern in muscle memory — it's the idiomatic React way to persist any state that should survive a page refresh.</div>
 </div>
 
 

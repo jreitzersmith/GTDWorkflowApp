@@ -110,7 +110,7 @@
     <a href="project-snippets.html">📝 Code Snippets</a>
     <span class="current">📦 Commit Log</span>
   </div>
-  <span class="updated">Last updated: May 1, 2026</span>
+  <span class="updated">Last updated: May 3, 2026</span>
 </header>
 
 <div class="shell">
@@ -179,6 +179,19 @@
   <a href="#commit-ba1df53">ba1df53 · docs: update 01_chat.md</a>
   <a href="#commit-4e94b90">4e94b90 · fix: Gmail query keyword</a>
   <a href="#commit-db6346e">db6346e · fix: queue runner expiry</a>
+  <div class="date-group">May 1–3 — Email Polish &amp; AI Usage</div>
+  <a href="#commit-a873175">a873175 · feat: Supabase queue sync</a>
+  <a href="#commit-87cfc87">87cfc87 · fix: label 409 conflict</a>
+  <a href="#commit-4dbebe3">4dbebe3 · fix: error propagation</a>
+  <a href="#commit-facd066">facd066 · fix: case-insensitive labels</a>
+  <a href="#commit-9024024">9024024 · feat: queue newest first</a>
+  <a href="#commit-301834f">301834f · feat: unread count badge</a>
+  <a href="#commit-ea9199d">ea9199d · fix: exact unread count</a>
+  <a href="#commit-98a7fe1">98a7fe1 · feat: paginated inbox</a>
+  <a href="#commit-5eff8a4">5eff8a4 · feat: A-Z labels list</a>
+  <a href="#commit-055dfa7">055dfa7 · fix: sequential Run All</a>
+  <a href="#commit-6e5707f">6e5707f · feat: AI usage tracking</a>
+  <a href="#commit-8c6ac55">8c6ac55 · feat: label filter search</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -1603,6 +1616,190 @@
     required config values — fail fast with a useful message rather than letting the work
     start and fail mysteriously mid-task.
   </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+
+<hr>
+<h2>May 1–3 — Email Polish, Supabase Queue Sync &amp; AI Usage Tracking</h2>
+
+<!-- a873175 -->
+<div class="commit-entry" id="commit-a873175">
+  <div class="commit-top">
+    <span class="commit-hash">a873175</span>
+    <span class="commit-date">2026-05-01</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: persist gmail_queue to Supabase for cross-device sync</div>
+  <div class="commit-body">
+    The cleanup queue was previously only stored in <code>localStorage</code>, meaning it disappeared when switching devices. This commit adds a <code>gmail_queue</code> Supabase table as the second source of truth. Two module-level helpers — <code>queueEntryToRow()</code> and <code>rowToQueueEntry()</code> — handle the camelCase ↔ snake_case translation between JS objects and Postgres rows (the same pattern used for tasks). On auth ready, the queue is loaded from Supabase and merged with any local-only entries. Queue entries are upserted on add, updated after a successful run, and deleted when the user removes them. <code>localStorage</code> sync is retained as an offline fallback.
+  </div>
+  <div class="commit-lesson"><strong>React / JS concept — Supabase client-side SDK:</strong> The <code>supabase.from('gmail_queue').upsert()</code> pattern is the same as the tasks sync. A <code>useEffect</code> keyed on <code>[authUser, supabaseReady]</code> fires the initial load. Each mutation site (add, run, remove) fires its own upsert/delete independently — no diff needed because the queue is modified intentionally, not by bulk state transitions.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+<!-- 87cfc87 -->
+<div class="commit-entry" id="commit-87cfc87">
+  <div class="commit-top">
+    <span class="commit-hash">87cfc87</span>
+    <span class="commit-date">2026-05-02</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: handle label-already-exists conflict in queue runner</div>
+  <div class="commit-body">
+    When the queue runner tried to create a Gmail label that already existed (created manually, or a nested label like <code>Newsletters/LinkedIn</code>), the Gmail API returned a 409 conflict error and the run failed entirely. The fix wraps <code>doGmailCreateLabel</code> in a try/catch: if the error message contains "exist", "conflict", or "409", the code immediately re-fetches all labels and searches by name. If found, the existing label ID is used. If still not found after the retry, a clear error is thrown with the label name in the message.
+  </div>
+  <div class="commit-lesson"><strong>Pattern — optimistic-create with conflict recovery:</strong> Try to create the resource; if you get a conflict error, look up the existing one. This is cheaper than always fetching first (which costs an extra API call on the happy path) and more robust than assuming the create will succeed. The same pattern applies to database inserts, DNS record creation, and many other "create-or-find" operations.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+<!-- 4dbebe3 -->
+<div class="commit-entry" id="commit-4dbebe3">
+  <div class="commit-top">
+    <span class="commit-hash">4dbebe3</span>
+    <span class="commit-date">2026-05-02</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: improved error propagation across Email Management view</div>
+  <div class="commit-body">
+    A sweep of all fire-and-forget <code>.catch(() =&gt; {})</code> calls that were silently swallowing errors. Changes across five areas: (1) queue runner now reports partial bulk failures as <code>N/M updated</code> instead of showing full success; (2) filter creation failures appear as a warning in the status chip rather than being discarded; (3) inbox archive (bulk and single) now has a scope guard — if the token has only read access the error surfaces in the toolbar; (4) filter delete in the Rules tab has the same guard plus a dismissable error banner; (5) a new <code>rulesError</code> state drives that banner, cleared automatically on each <code>loadRules</code> call.
+  </div>
+  <div class="commit-lesson"><strong>Pattern — scope guard before mutation:</strong> Checking <code>googleScope !== 'full'</code> right before a write operation (not at login time) is the correct place for this guard. The user may have connected with read-only scope; they may even have downgraded scope without logging out. Fail fast with a message that tells them exactly how to fix it (<em>"reconnect in Settings"</em>) rather than letting the API call fail with an opaque 403.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+<!-- facd066 -->
+<div class="commit-entry" id="commit-facd066">
+  <div class="commit-top">
+    <span class="commit-hash">facd066</span>
+    <span class="commit-date">2026-05-02</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: case-insensitive label name matching in queue runner</div>
+  <div class="commit-body">
+    Nested Gmail labels like <code>Newsletters/LinkedIn</code> sometimes don't match exactly due to capitalisation differences between what the AI saved and what Gmail returns. A one-line normaliser, <code>const normName = s =&gt; s.trim().toLowerCase()</code>, is applied to both sides of every label name comparison — the initial fetch lookup, the 409-conflict retry, and the cache update. As a graceful fallback, if the label still can't be resolved after all retries, the queue runner logs a warning and proceeds without a label ID (the bulk archive still runs; only the labelling step is skipped).
+  </div>
+  <div class="commit-lesson"><strong>Pattern — normalise before comparing strings:</strong> Always <code>trim().toLowerCase()</code> user-facing or API-sourced strings before equality checks. One hidden space or one capital letter will silently break a lookup. The normaliser is a one-liner and costs almost nothing. Apply it everywhere you compare strings you didn't generate yourself.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+<!-- 9024024 -->
+<div class="commit-entry" id="commit-9024024">
+  <div class="commit-top">
+    <span class="commit-hash">9024024</span>
+    <span class="commit-date">2026-05-02</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: new cleanup queue entries appear at top (newest first)</div>
+  <div class="commit-body">
+    A one-character change: <code>[...prev, entry]</code> (append) became <code>[entry, ...prev]</code> (prepend). New entries added by the AI coach now appear at the top of the Cleanup queue list, so the most recently saved rule is immediately visible without scrolling. Older entries remain below in their original order.
+  </div>
+  <div class="commit-lesson"><strong>React concept — array spread order:</strong> In React, the UI reflects whatever order your array is in. Prepending with <code>[newItem, ...prev]</code> is just as cheap as appending — JavaScript spread doesn't copy the array, it reads it in order when the new array is created. Which end you add to determines what the user sees first. Make the choice deliberate.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+<!-- 301834f -->
+<div class="commit-entry" id="commit-301834f">
+  <div class="commit-top">
+    <span class="commit-hash">301834f</span>
+    <span class="commit-date">2026-05-02</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: Email nav badge shows unread inbox count instead of queue length</div>
+  <div class="commit-body">
+    The sidebar badge next to "📧 Email" previously showed how many entries were in the cleanup queue — useful for the developer but confusing for everyday use. It now shows unread Gmail inbox count (amber-colored, hidden when zero). A new <code>gmailUnreadCount</code> state is fetched via the Gmail messages API whenever the token changes. The queue count badge was moved to the Cleanup tab header where it belongs.
+  </div>
+  <div class="commit-lesson"><strong>React concept — useEffect keyed on a token:</strong> <code>useEffect(() =&gt; { ... }, [googleToken])</code> re-runs the fetch whenever the token changes — on login, on token refresh, or on disconnect. When the token is null (not connected), it immediately sets the count to null (which hides the badge). This is the correct way to wire up any data fetch that depends on a credential.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+<!-- ea9199d -->
+<div class="commit-entry" id="commit-ea9199d">
+  <div class="commit-top">
+    <span class="commit-hash">ea9199d</span>
+    <span class="commit-date">2026-05-02</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: use labels/INBOX endpoint for exact unread count</div>
+  <div class="commit-body">
+    The <code>messages.list</code> API's <code>resultSizeEstimate</code> field is documented as an approximation and can be wildly incorrect for large mailboxes. Switched to <code>GET /gmail/v1/users/me/labels/INBOX</code>, which returns a <code>messagesUnread</code> field that is exact. One endpoint, one field, reliable number.
+  </div>
+  <div class="commit-lesson"><strong>Pattern — read the docs, use the right endpoint:</strong> The first implementation used the search API's estimated count because it was already being called. The correct approach is to use the dedicated metadata endpoint that exists specifically for this purpose. When something is inaccurate, look for an API endpoint that returns exactly what you need rather than trying to derive it from a general-purpose one.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+<!-- 98a7fe1 -->
+<div class="commit-entry" id="commit-98a7fe1">
+  <div class="commit-top">
+    <span class="commit-hash">98a7fe1</span>
+    <span class="commit-date">2026-05-02</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: paginated inbox with Load More button</div>
+  <div class="commit-body">
+    The inbox tab previously loaded a fixed 50 messages. <code>doGmailFetchInbox</code> now accepts an optional <code>pageToken</code> and returns <code>{ emails, nextPageToken }</code>. The <code>loadInbox(pageToken)</code> function appends to the existing list when a token is provided, or replaces it on refresh. A "Load more" button appears at the bottom of the email list when <code>inboxNextPageToken</code> is non-null. Refresh resets the token and reloads from page one.
+  </div>
+  <div class="commit-lesson"><strong>React concept — cursor-based pagination:</strong> The Gmail API (like most modern APIs) uses opaque page tokens rather than page numbers. The pattern is: store the token in state; append to the list when loading a subsequent page; replace the list when refreshing. The "Load More" button is only shown when the token is non-null — the data itself tells the UI whether more pages exist. No separate <code>hasMore</code> boolean is needed.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+<!-- 5eff8a4 -->
+<div class="commit-entry" id="commit-5eff8a4">
+  <div class="commit-top">
+    <span class="commit-hash">5eff8a4</span>
+    <span class="commit-date">2026-05-03</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: alphabetized labels list with letter dividers and A-Z quicklinks</div>
+  <div class="commit-body">
+    The Rules tab labels section was a flat unsorted grid. It now sorts all labels case-insensitively A–Z and groups them by first letter, with a bold letter divider row before each group. Non-alphabetic labels (starting with numbers or symbols) are grouped under <code>#</code>. A row of pill buttons at the top of the open section lets you jump to any letter group with a smooth scroll. Letters with no labels are omitted from the quicklink bar. All of this is computed in an immediately-invoked function expression (IIFE) directly inside the JSX render — no extra state needed.
+  </div>
+  <div class="commit-lesson"><strong>React concept — IIFE in JSX for derived display data:</strong> When you need temporary variables to prepare display data (sorted arrays, grouped objects, letter lists) but don't want to promote them to component state or move them outside JSX, an IIFE (<code>{(() =&gt; { const x = ...; return &lt;div&gt;...&lt;/div&gt;; })()}</code>) is a clean inline solution. It runs on every render, which is fine for cheap computations like sorting and grouping a few hundred labels.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+<!-- 055dfa7 -->
+<div class="commit-entry" id="commit-055dfa7">
+  <div class="commit-top">
+    <span class="commit-hash">055dfa7</span>
+    <span class="commit-date">2026-05-03</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: sequential Run All queue with rate-limit protection and progress indicator</div>
+  <div class="commit-body">
+    "Run all" previously fired all queue entries simultaneously with <code>forEach(runQueueEntry)</code>. With multiple entries each triggering a bulk Gmail operation followed by a filter create, this hammered the Gmail API and frequently hit rate limits. The fix converts <code>runAllQueue</code> to an <code>async</code> function with a <code>for</code> loop: each entry is <code>await</code>ed before the next one starts, with a 1500 ms <code>sleep()</code> gap between entries (the existing <code>sleep</code> helper already in the file). A <code>runAllProgress</code> state drives a live counter on the button: <em>"Running 2 of 5…"</em> — the button is disabled while running and returns to "Run all" when done.
+  </div>
+  <div class="commit-lesson"><strong>JS concept — async/await in event handlers:</strong> Changing a function from synchronous to async just requires adding <code>async</code> before it and <code>await</code> before each async call. A <code>for</code> loop with <code>await</code> runs iterations sequentially; <code>forEach</code> does not await and runs everything at once. This distinction matters any time you need to respect rate limits, maintain ordering, or report progress. The <code>sleep(ms)</code> helper (<code>const sleep = ms =&gt; new Promise(r =&gt; setTimeout(r, ms))</code>) turns a timer into an awaitable delay.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
+</div>
+
+<!-- 6e5707f -->
+<div class="commit-entry" id="commit-6e5707f">
+  <div class="commit-top">
+    <span class="commit-hash">6e5707f</span>
+    <span class="commit-date">2026-05-03</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: AI usage tracking — lifetime stats, cost, money-saved, footer strip, Usage panel</div>
+  <div class="commit-body">
+    Adds comprehensive AI token and cost tracking. Three module-level helpers are added: <code>createEmptyUsageStats()</code> (the initial state shape), <code>calcCost(in, out)</code> (applies claude-sonnet-4-6 pricing: $3/Mtok in, $15/Mtok out), and formatting helpers <code>fmtTokens</code> / <code>fmtCost</code>. A <code>recordUsage</code> callback (wrapped in <code>useCallback</code>) is called after every Claude and Ollama response using the <code>usage</code> field that both APIs return in their response bodies. Lifetime stats are persisted to <code>localStorage</code> under <code>gtd_ai_usage</code>. Session totals are tracked in a separate <code>sessionUsage</code> state (reset on page load) and shown in a thin footer strip below the AI chat input. A full <strong>Usage panel</strong> is accessible via a new "📊 Usage" button beside "⚙ Settings" — it shows lifetime totals, a per-provider breakdown (cost for Claude, money-saved estimate for Ollama), and a per-mode table. A "Clear all stats" button lets the user reset.
+  </div>
+  <div class="commit-lesson"><strong>React concept — useCallback with dependencies:</strong> <code>recordUsage</code> calls <code>setSessionUsage</code> and <code>setAiUsageStats</code> — both are React state setters, which are stable references and don't need to be in the dependency array. This means <code>recordUsage</code> itself is stable and won't cause <code>callAI</code> (which lists it as a dep) to be recreated on every render. Understanding which values are stable (state setters, refs) vs. unstable (state values, derived values) is key to writing correct dependency arrays.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-ai-usage">↑ Feature: AI Usage Tracking</a></div>
+</div>
+
+<!-- 8c6ac55 -->
+<div class="commit-entry" id="commit-8c6ac55">
+  <div class="commit-top">
+    <span class="commit-hash">8c6ac55</span>
+    <span class="commit-date">2026-05-03</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: label filter search input in Rules tab</div>
+  <div class="commit-body">
+    Adds a live search box above the labels grid in the Rules tab. A <code>labelFilter</code> state string is controlled by a text input. On each render, <code>allSorted.filter(l =&gt; l.name.toLowerCase().includes(filterTerm))</code> produces a filtered subset; the letter grouping, quicklinks, and "N of M" count all react to the filter automatically. When a search term is active, letter-anchor IDs are suppressed (scrolling to a letter in a filtered set makes no sense). A clear (✕) button appears when the filter is non-empty. No debounce is needed — filtering a few hundred label strings in memory is instant.
+  </div>
+  <div class="commit-lesson"><strong>React concept — controlled input + array filter in render:</strong> <code>labelFilter</code> is a controlled input: <code>value={labelFilter}</code> and <code>onChange={e =&gt; setLabelFilter(e.target.value)}</code>. Every keystroke updates state and triggers a re-render. The filtered array is computed directly in JSX — it is derived state, not stored state. This is the correct React pattern: store the raw value (the filter string), derive everything else from it in the render function. No separate "filteredLabels" state is needed.</div>
   <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
 </div>
 
