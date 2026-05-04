@@ -1447,6 +1447,10 @@ export default function GTDManager() {
   const [supabaseReady, setSupabaseReady] = useState(false);
   // tracks previous tasks snapshot for write-sync diffing
   const prevTasksRef = useRef(null);
+  // gates settings write-sync — flipped true after initial load/migration completes
+  const settingsReadyRef = useRef(false);
+  // debounce timer for settings upsert
+  const settingsDebounceRef = useRef(null);
   // 'synced' | 'offline'
   const [syncStatus, setSyncStatus] = useState('synced');
 
@@ -1518,6 +1522,47 @@ export default function GTDManager() {
       });
   }, [authUser]);
 
+  // Supabase read: fetch user_settings once auth resolves; auto-migrate localStorage if empty
+  useEffect(() => {
+    if (!authUser) return;
+    supabase
+      .from('user_settings')
+      .select('*')
+      .eq('user_id', authUser.id)
+      .single()
+      .then(({ data, error }) => {
+        // PGRST116 = no rows returned — treat as "not yet migrated"
+        if (error && error.code !== 'PGRST116') {
+          console.error('Settings load error:', error);
+          settingsReadyRef.current = true;
+          return;
+        }
+        if (data) {
+          // Server wins — overwrite local state
+          if (Array.isArray(data.locations)) setLocations(data.locations);
+          if (Array.isArray(data.efforts)) setEfforts(data.efforts);
+          if (data.calibration_overrides && typeof data.calibration_overrides === 'object')
+            setCalibrationOverrides(data.calibration_overrides);
+          settingsReadyRef.current = true;
+        } else {
+          // Supabase empty — migrate from localStorage
+          const localLocations = (() => { try { return JSON.parse(localStorage.getItem('gtd_locations') || 'null') || ["Home","Work","Phone","Computer"]; } catch { return ["Home","Work","Phone","Computer"]; } })();
+          const localEfforts   = (() => { try { return JSON.parse(localStorage.getItem('gtd_efforts')   || 'null') || DEFAULT_EFFORTS; } catch { return DEFAULT_EFFORTS; } })();
+          const localCalib     = (() => { try { return JSON.parse(localStorage.getItem('gtd_effort_calibration') || 'null') || {}; } catch { return {}; } })();
+          supabase.from('user_settings').insert({
+            user_id: authUser.id,
+            locations: localLocations,
+            efforts: localEfforts,
+            calibration_overrides: localCalib,
+          }).then(({ error: e2 }) => {
+            if (e2) console.error('Settings migration failed:', e2);
+            else console.log('Settings migrated to Supabase');
+            settingsReadyRef.current = true;
+          });
+        }
+      });
+  }, [authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Supabase write: diff tasks on every change and sync inserts/updates/deletes
   useEffect(() => {
     if (!authUser || !supabaseReady) { prevTasksRef.current = tasks; return; }
@@ -1562,6 +1607,27 @@ export default function GTDManager() {
         });
     }
   }, [tasks, authUser, supabaseReady]);
+
+  // Supabase write: debounced upsert of settings whenever locations/efforts/calibration change
+  useEffect(() => {
+    if (!authUser || !settingsReadyRef.current) return;
+    clearTimeout(settingsDebounceRef.current);
+    settingsDebounceRef.current = setTimeout(() => {
+      supabase.from('user_settings')
+        .upsert({
+          user_id: authUser.id,
+          locations,
+          efforts,
+          calibration_overrides: calibrationOverrides,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+        .then(({ error }) => {
+          if (error) console.error('Settings sync error:', error);
+          else setSyncStatus('synced');
+        });
+    }, 1500);
+    return () => clearTimeout(settingsDebounceRef.current);
+  }, [locations, efforts, calibrationOverrides, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Phase 6 — offline resilience: flush pending writes when connectivity returns
   useEffect(() => {
