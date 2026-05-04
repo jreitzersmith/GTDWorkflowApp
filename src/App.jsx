@@ -1734,9 +1734,11 @@ export default function GTDManager() {
       console.warn('[Gmail OAuth] Refresh failed:', data.error);
       localStorage.removeItem('gtd_google_token');
       setGoogleToken(null);
+      setGmailError('Gmail session expired — please reconnect.');
       return null;
     } catch (e) {
       console.warn('[Gmail OAuth] Refresh network error:', e.message);
+      setGmailError('Could not refresh Gmail session — check your connection.');
       return null;
     }
   }, []);
