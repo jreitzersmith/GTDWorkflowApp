@@ -5680,6 +5680,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [labelsOpen, setLabelsOpen] = useState(true);
   const [labelFilter, setLabelFilter] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
 
   // Load inbox on mount / when switching to inbox tab
   useEffect(() => {
@@ -6115,14 +6116,38 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
             <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: 'pointer' }} onClick={() => setFiltersOpen(v => !v)}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>
-                  Filters <span style={{ fontSize: 11, color: COLORS.muted, fontWeight: 400 }}>{gmailFilters.length}</span>
+                  Filters <span style={{ fontSize: 11, color: COLORS.muted, fontWeight: 400 }}>
+                    {filterSearch.trim() ? `${gmailFilters.filter(f => { const t = filterSearch.trim().toLowerCase(); const c = f.criteria || {}; return [c.from, c.to, c.subject, c.query].some(v => v?.toLowerCase().includes(t)); }).length} of ${gmailFilters.length}` : gmailFilters.length}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button style={btnSm} onClick={e => { e.stopPropagation(); loadRules(); }}>↻</button>
                   <span style={{ fontSize: 11, color: COLORS.muted }}>{filtersOpen ? '▾' : '▸'}</span>
                 </div>
               </div>
-              {filtersOpen && gmailFilters.map(f => {
+              {filtersOpen && (
+                <div style={{ padding: '6px 16px 8px', borderTop: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="text"
+                    value={filterSearch}
+                    onChange={e => setFilterSearch(e.target.value)}
+                    placeholder="Filter by from, subject, query…"
+                    style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '5px 9px', fontFamily: 'inherit', fontSize: 12, color: COLORS.text, outline: 'none' }}
+                  />
+                  {filterSearch && (
+                    <button onClick={() => setFilterSearch('')}
+                      style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+              )}
+              {filtersOpen && (() => {
+                const term = filterSearch.trim().toLowerCase();
+                const visible = term
+                  ? gmailFilters.filter(f => { const c = f.criteria || {}; return [c.from, c.to, c.subject, c.query].some(v => v?.toLowerCase().includes(term)); })
+                  : gmailFilters;
+                return visible.map(f => {
                 const c = f.criteria || {};
                 const a = f.action || {};
                 const criteriaChips = [
@@ -6162,10 +6187,15 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
                     }}>Delete</button>
                   </div>
                 );
-              })}
+              }); })()}
               {filtersOpen && gmailFilters.length === 0 && !rulesLoading && (
                 <div style={{ padding: '10px 16px', fontSize: 12, color: COLORS.muted }}>No filters found.</div>
               )}
+              {filtersOpen && gmailFilters.length > 0 && filterSearch.trim() && (() => {
+                const term = filterSearch.trim().toLowerCase();
+                const count = gmailFilters.filter(f => { const c = f.criteria || {}; return [c.from, c.to, c.subject, c.query].some(v => v?.toLowerCase().includes(term)); }).length;
+                return count === 0 ? <div style={{ padding: '10px 16px', fontSize: 12, color: COLORS.muted }}>No filters match "{filterSearch}"</div> : null;
+              })()}
             </div>
           )}
 
