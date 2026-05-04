@@ -1393,7 +1393,7 @@ export default function GTDManager() {
       const stored = localStorage.getItem('gtd_google_token');
       if (!stored) return null;
       const { access_token, expiry } = JSON.parse(stored);
-      if (Date.now() > expiry) { localStorage.removeItem('gtd_google_token'); return null; }
+      if (Date.now() > expiry) return null; // keep stored data — refresh_token still usable
       return access_token;
     } catch { return null; }
   });
@@ -1656,7 +1656,7 @@ export default function GTDManager() {
         console.log('[Gmail OAuth] Exchange response:', data.access_token ? 'SUCCESS' : data.error);
         if (data.access_token) {
           const expiry = Date.now() + (data.expires_in || 3600) * 1000;
-          localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, expiry, scope: pkceScope }));
+          localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token ?? null, expiry, scope: pkceScope }));
           setGoogleToken(data.access_token);
           setGoogleScope(pkceScope);
           setGmailError(null);
@@ -1705,6 +1705,59 @@ export default function GTDManager() {
     setGoogleScope(null);
     setGmailError(null);
   }, []);
+
+  // Silently exchange a stored refresh_token for a new access_token.
+  const refreshGoogleToken = useCallback(async () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
+      if (!stored?.refresh_token) return null;
+      const res = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
+          client_secret: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_SECRET,
+          refresh_token: stored.refresh_token,
+          grant_type: 'refresh_token',
+        }),
+      });
+      const data = await res.json();
+      if (data.access_token) {
+        const expiry = Date.now() + (data.expires_in || 3600) * 1000;
+        // refresh_token is not re-issued on refresh — keep the existing one
+        localStorage.setItem('gtd_google_token', JSON.stringify({ ...stored, access_token: data.access_token, expiry }));
+        setGoogleToken(data.access_token);
+        console.log('[Gmail OAuth] Token refreshed silently, expires in', data.expires_in, 's');
+        return data.access_token;
+      }
+      // Refresh failed (revoked, expired refresh token, etc.) — clear everything
+      console.warn('[Gmail OAuth] Refresh failed:', data.error);
+      localStorage.removeItem('gtd_google_token');
+      setGoogleToken(null);
+      return null;
+    } catch (e) {
+      console.warn('[Gmail OAuth] Refresh network error:', e.message);
+      return null;
+    }
+  }, []);
+
+  // On mount: if the access token was expired at startup but a refresh_token is stored, refresh silently.
+  useEffect(() => {
+    if (googleToken) return;
+    const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
+    if (stored?.refresh_token) refreshGoogleToken();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Proactive refresh: schedule a token refresh 5 min before it expires so the session never goes stale.
+  useEffect(() => {
+    if (!googleToken) return;
+    const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
+    if (!stored?.expiry || !stored?.refresh_token) return;
+    const msUntilRefresh = stored.expiry - Date.now() - 5 * 60 * 1000;
+    if (msUntilRefresh <= 0) { refreshGoogleToken(); return; }
+    const timer = setTimeout(() => refreshGoogleToken(), msUntilRefresh);
+    return () => clearTimeout(timer);
+  }, [googleToken, refreshGoogleToken]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
