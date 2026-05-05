@@ -2233,3 +2233,34 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-commit" href="project-commits.html#commit-11a4e28">&#x1F4DC; 11a4e28 &#8212; DRY cleanup</a>
     </div>
   </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-error-boundaries">
+    <div class="feat-header">
+      <span class="feat-icon">🛡️</span>
+      <span class="feat-title">Error Boundaries</span>
+      <span class="feat-badge badge-refactor">Refactor — May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Three <code>ErrorBoundary</code> wrappers added around the app&#8217;s major independent UI panels, plus an outer catch-all in <code>main.jsx</code>. Before this change, a rendering crash anywhere in the component tree would produce a blank white screen with no recovery path. Now each panel fails independently: a crash in the AI Coach panel leaves the task list fully operational, and vice versa.</p>
+      <ul>
+        <li><strong>Task Panel</strong> — wraps the main content area (GTD list, Settings, Usage, Email, Calendar views).</li>
+        <li><strong>AI Coach panel</strong> — wraps the chat/process/review area at the bottom of the left column.</li>
+        <li><strong>Task Detail Panel</strong> — wraps the side panel opened by clicking a task title.</li>
+        <li><strong>AppErrorBoundary (main.jsx)</strong> — full-screen fallback if GTDManager itself fails on initial render.</li>
+      </ul>
+      <p>Each boundary displays the panel label, the error message, and a Try Again button that resets the boundary&#8217;s error state without a full page reload.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: why class components are still needed</h4>
+      <p>Error boundaries require two lifecycle methods — <code>static getDerivedStateFromError(error)</code> (converts the thrown error into state) and <code>componentDidCatch(error, info)</code> (logs it) — that are only available on class components. There is no hook equivalent. This is the one case in a modern React codebase where you still write a class. The component is small (~30 lines) and its interface is simple: wrap children, catch errors, render fallback. The reusable <code>label</code> prop means one class definition covers all three boundary sites.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>An Error Boundary is like a process supervisor (systemd, supervisord). Without one, a crashing child process takes down the parent. With one, the supervisor catches the crash, logs it, and either restarts the process or keeps the rest of the system running. The Try Again button is the equivalent of <code>systemctl restart</code> — it resets the failed unit without rebooting the whole host.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-error-boundary">&#x1F52C; ErrorBoundary class component</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-09a7f30">&#x1F4DC; 09a7f30 &#8212; Error Boundaries</a>
+    </div>
+  </section>

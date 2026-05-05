@@ -1950,3 +1950,13 @@
   <div class="commit-lesson"><strong>Write patch scripts to /tmp, then cp to Windows mounts.</strong> Python&#8217;s <code>open(path, 'w')</code> truncates files over ~200KB when writing directly to the Windows CIFS mount used by the Cowork sandbox. The reliable pattern: apply all changes in memory, write the result to a <code>/tmp</code> path, then <code>subprocess cp /tmp/patched /mount/path</code>. The cp handles buffering correctly where Python&#8217;s file write does not.</div>
   <div class="commit-back"><a href="project-summary.html#refactor-dry-cleanup">&#8593; Refactor: DRY Cleanup</a></div>
 </div>
+
+<div class="commit-entry" id="commit-09a7f30">
+  <div class="commit-hash">09a7f30</div>
+  <div class="commit-msg">feat: add Error Boundaries to major UI panels</div>
+  <div class="commit-body">
+    Added a reusable <code>ErrorBoundary</code> class component at module level in <code>App.jsx</code>, wrapping three independent UI regions: the <strong>Task Panel</strong> (main content area — GTD list, Settings, Email, Calendar views), the <strong>AI Coach panel</strong>, and the <strong>Task Detail Panel</strong>. Each boundary shows a labelled crash message, the error text, and a Try Again button that resets the boundary&#8217;s state. A separate <code>AppErrorBoundary</code> was added to <code>main.jsx</code> as the outermost catch-all, showing a full-screen fallback if <code>GTDManager</code> itself fails to render. Added <code>Component</code> to the existing React named imports.
+  </div>
+  <div class="commit-lesson"><strong>Class components are still required for Error Boundaries.</strong> React&#8217;s error boundary API (<code>static getDerivedStateFromError</code> + <code>componentDidCatch</code>) is only available on class components — there is no hook equivalent. This is one of the few remaining reasons to write a class component in a modern React codebase. The new JSX transform means <code>React</code> no longer needs to be in scope for JSX, but <code>Component</code> still needs to be imported explicitly for class inheritance.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-error-boundaries">&#8593; Refactor: Error Boundaries</a></div>
+</div>
