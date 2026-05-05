@@ -111,15 +111,15 @@ const SYSTEM_PROMPTS = {
 To update an existing task, end your response with EXACTLY one line:
 →ACTION:update|<task_id>|field:value[|field:value...]
 
-Updatable fields: due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · actualEffort:<label> · bucket:<inbox|next|project|waiting|someday> · title:<new name> · priority:<p1,p2> · location:<loc1,loc2> · recur:<frequency>:<interval>[:<days>] or recur:off · notes:<text — use \\n for line breaks, must be the last field>
+Updatable fields: due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · actualEffort:<label> · bucket:<inbox|next|project|waiting|someday> · title:<new name> · priority:<p1,p2> · location:<loc1,loc2> · recur:<frequency>:<interval>[:<days>][:<until:YYYY-MM-DD>] or recur:off · notes:<text — use \\n for line breaks, must be the last field>
 
-Recurrence format: frequency is daily/weekly/monthly/yearly; interval is a number. For weekly on specific days add comma-separated abbreviations: mon,tue,wed,thu,fri,sat,sun (e.g. recur:weekly:1:mon,fri). Use recur:off to remove recurrence.
+Recurrence format: frequency is daily/weekly/monthly/yearly; interval is a number. For weekly on specific days add comma-separated abbreviations: mon,tue,wed,thu,fri,sat,sun (e.g. recur:weekly:1:mon,fri). To set an end date add it as the last segment (e.g. recur:weekly:1:mon,fri:2026-06-30). Use recur:off to remove recurrence.
 
 To add a new task as a child of an existing project or task, end your response with EXACTLY one line:
-→ACTION:add|<task title>|parent:<parent_task_id>[|bucket:next][|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|location:<loc1,loc2>][|recur:<frequency>:<interval>[:<days>]]
+→ACTION:add|<task title>|parent:<parent_task_id>[|bucket:next][|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|location:<loc1,loc2>][|recur:<frequency>:<interval>[:<days>][:<until:YYYY-MM-DD>]]
 
 To create a new standalone task, end your response with EXACTLY one line:
-→ACTION:create|<task title>|bucket:<inbox|next|someday|waiting>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|location:<loc1,loc2>][|recur:<frequency>:<interval>[:<days>]]
+→ACTION:create|<task title>|bucket:<inbox|next|someday|waiting>[|due:YYYY-MM-DD][|dueTime:HH:MM][|defer:YYYY-MM-DD][|effort:<label>][|location:<loc1,loc2>][|recur:<frequency>:<interval>[:<days>][:<until:YYYY-MM-DD>]]
 
 The task_id / parent_task_id comes from the [id:...] tag shown on each task in the task list.
 Only emit →ACTION:update, →ACTION:add, or →ACTION:create when the user explicitly asks you to change or create something. Never include them unsolicited. Emit at most one ACTION line per response.
@@ -137,12 +137,13 @@ The user can also open the Calendar tool (📅 Calendar in the sidebar) to view 
 When Google Calendar is connected, you can also manage calendar events directly:
 
 To create a new calendar event, end your response with EXACTLY one line:
-→ACTION:calendar_create|<event title>|date:YYYY-MM-DD[|startTime:HH:MM][|endTime:HH:MM][|description:<text>][|taskId:<task_id>]
+→ACTION:calendar_create|<event title>|date:YYYY-MM-DD[|startTime:HH:MM][|endTime:HH:MM][|description:<text>][|taskId:<task_id>][|attendees:email1@x.com,email2@y.com][|sendUpdates:all]
 If the user asks to add something to the calendar but doesn't specify a time, ask for a time first. If they say "all day" or don't respond, omit startTime/endTime (creates an all-day event). Use taskId only if the event corresponds to a specific task (links calendarEventId on the task).
+Use attendees to add guests. Use sendUpdates:all only when the user explicitly says "invite" — this sends invitation emails from your Google account. Omitting sendUpdates silently adds attendees without notifying them.
 
-To update an existing calendar event (reschedule or rename), end your response with EXACTLY one line:
-→ACTION:calendar_update|<event_id>|date:YYYY-MM-DD[|startTime:HH:MM][|endTime:HH:MM][|title:<new title>][|taskId:<task_id>]
-event_id comes from the [id:...] shown next to each calendar event in the context.
+To update an existing calendar event (reschedule, rename, or add attendees), end your response with EXACTLY one line:
+→ACTION:calendar_update|<event_id>|[date:YYYY-MM-DD][|startTime:HH:MM][|endTime:HH:MM][|title:<new title>][|taskId:<task_id>][|attendees:email@x.com][|sendUpdates:all]
+event_id comes from the [id:...] shown next to each calendar event in the context. Use attendees to add a guest to an existing event (existing guests are preserved). Use sendUpdates:all only when the user says "invite".
 
 To delete a calendar event, end your response with EXACTLY one line:
 →ACTION:calendar_delete|<event_id>
@@ -815,7 +816,62 @@ async function doCalendarFetchEvents(token, timeMin, timeMax) {
 }
 
 // Create a calendar event — pass date as 'YYYY-MM-DD' for all-day, or include startTime/endTime ('HH:MM') for timed
-async function doCalendarCreateEvent(token, { summary, description, date, startTime, endTime }) {
+// Build an RFC 5545 RRULE string from a task recurrence object.
+// Returns null if no recurrence is provided.
+function buildRRULE(recurrence, untilDate) {
+  if (!recurrence) return null;
+  const DAY_NAMES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+  const freqMap = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY' };
+  const freq = freqMap[recurrence.frequency] || 'WEEKLY';
+  let rule = `RRULE:FREQ=${freq}`;
+  if (recurrence.interval && recurrence.interval > 1) rule += `;INTERVAL=${recurrence.interval}`;
+  if (recurrence.weekDays?.length) {
+    rule += `;BYDAY=${recurrence.weekDays.map(d => DAY_NAMES[d]).join(',')}`;
+  }
+  if (untilDate) rule += `;UNTIL=${untilDate.replace(/-/g, '')}T235959Z`;
+  return rule;
+}
+
+// Return the nearest calendar date (YYYY-MM-DD) matching one of the recurrence weekDays.
+// Falls back to today when no weekDays are specified.
+function firstOccurrenceDate(recurrence) {
+  if (!recurrence?.weekDays?.length) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  const today = new Date();
+  const todayDay = today.getDay();
+  const days = recurrence.weekDays.slice().sort((a, b) => a - b);
+  const nextDay = days.find(d => d >= todayDay) ?? days[0];
+  const diff = nextDay >= todayDay ? nextDay - todayDay : 7 - todayDay + nextDay;
+  const first = new Date(today);
+  first.setDate(today.getDate() + diff);
+  return first.toISOString().slice(0, 10);
+}
+
+// Parse a Google Calendar RRULE string into a recurrence object.
+// Handles FREQ, INTERVAL, BYDAY, and UNTIL.
+function parseRRULE(rruleStr) {
+  const rule = rruleStr.replace(/^RRULE:/, '');
+  const parts = Object.fromEntries(rule.split(';').map(p => { const i = p.indexOf('='); return [p.slice(0,i), p.slice(i+1)]; }));
+  const freqMap = { DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly', YEARLY: 'yearly' };
+  const DAY_IDX  = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+  const rec = {
+    frequency: freqMap[parts.FREQ] || 'weekly',
+    interval: parseInt(parts.INTERVAL) || 1,
+    rescheduleFrom: 'dueDate',
+    sendToInbox: false,
+  };
+  if (parts.BYDAY) {
+    rec.weekDays = parts.BYDAY.split(',').map(d => DAY_IDX[d.replace(/^[+-]?\d*/, '')]).filter(n => n !== undefined);
+  }
+  if (parts.UNTIL) {
+    const u = parts.UNTIL.replace(/T.*$/, '');
+    rec.until = `${u.slice(0,4)}-${u.slice(4,6)}-${u.slice(6,8)}`;
+  }
+  return rec;
+}
+
+async function doCalendarCreateEvent(token, { summary, description, date, startTime, endTime, recurrence, attendees, sendUpdates }) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const body = (startTime && endTime)
     ? { summary, description: description || '',
@@ -824,23 +880,109 @@ async function doCalendarCreateEvent(token, { summary, description, date, startT
     : { summary, description: description || '',
         start: { date },
         end:   { date } };
-  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  if (recurrence?.length) body.recurrence = recurrence;
+  if (attendees?.length) body.attendees = attendees;
+  const notifyParam = sendUpdates === 'all' ? 'all' : 'none';
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=${notifyParam}`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
   return parseApiResponse(res, 'Calendar API');
 }
 
+// Delete a calendar event with "from this event on" behaviour for recurring events:
+// - If the given event is an instance of a recurring series, truncate the master
+//   event's RRULE so the series ends the day before this occurrence.
+// - If the given event IS the master recurring event, delete the whole series.
+// - If the event is non-recurring, perform a plain DELETE.
+// Returns { masterEventId, cutoffDateStr } for recurring cases, null otherwise.
+// Callers use the return value to clean up their local calendarEvents state.
 async function doCalendarDeleteEvent(token, eventId) {
-  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok && res.status !== 204) { const d = await res.json().catch(() => ({})); throw new Error(d.error?.message || `Calendar API ${res.status}`); }
+  const headers = { Authorization: `Bearer ${token}` };
+
+  // GET the event to determine if it's a recurring instance
+  const evRes = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    { headers }
+  );
+  if (!evRes.ok) {
+    // Fallback: plain DELETE
+    const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, { method: 'DELETE', headers });
+    if (!r.ok && r.status !== 204) { const d = await r.json().catch(() => ({})); throw new Error(d.error?.message || `Calendar API ${r.status}`); }
+    return null;
+  }
+  const ev = await evRes.json();
+
+  if (ev.recurringEventId) {
+    // ── Instance of a recurring event: truncate series at this point ──────
+    const masterEventId = ev.recurringEventId;
+    const instanceDate  = ev.originalStartTime?.date
+      || ev.originalStartTime?.dateTime?.slice(0, 10)
+      || ev.start?.date
+      || ev.start?.dateTime?.slice(0, 10);
+
+    if (!instanceDate) {
+      // Can't determine date — fall back to single-instance delete
+      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, { method: 'DELETE', headers });
+      if (!r.ok && r.status !== 204) { const d = await r.json().catch(() => ({})); throw new Error(d.error?.message || `Calendar API ${r.status}`); }
+      return null;
+    }
+
+    // Compute UNTIL = day before this instance (end-of-day UTC)
+    const cutoffDate = new Date(instanceDate + 'T00:00:00Z');
+    cutoffDate.setUTCDate(cutoffDate.getUTCDate() - 1);
+    const untilStr = cutoffDate.toISOString().slice(0, 10).replace(/-/g, '') + 'T235959Z';
+
+    // GET the master event to read its current recurrence rules
+    const masterRes = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(masterEventId)}`,
+      { headers }
+    );
+    const master = await parseApiResponse(masterRes, 'Calendar API');
+
+    const seriesStart = master.start?.date || master.start?.dateTime?.slice(0, 10);
+    if (seriesStart && instanceDate <= seriesStart) {
+      // Deleting the first occurrence — remove the whole series
+      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(masterEventId)}`, { method: 'DELETE', headers });
+      if (!r.ok && r.status !== 204) { const d = await r.json().catch(() => ({})); throw new Error(d.error?.message || `Calendar API ${r.status}`); }
+      return { masterEventId, cutoffDateStr: null };
+    }
+
+    // Truncate the RRULE (strip any existing UNTIL/COUNT, add new UNTIL)
+    const currentRules = master.recurrence || [];
+    const newRules = currentRules.map(r => {
+      if (!r.startsWith('RRULE:')) return r;
+      return r.replace(/;UNTIL=[^;]*/g, '').replace(/;COUNT=[^;]*/g, '') + `;UNTIL=${untilStr}`;
+    });
+    const patchRes = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(masterEventId)}`,
+      { method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ recurrence: newRules }) }
+    );
+    await parseApiResponse(patchRes, 'Calendar API');
+    return { masterEventId, cutoffDateStr: instanceDate };
+
+  } else if (ev.recurrence) {
+    // ── Master recurring event: delete the entire series ───────────────────
+    const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, { method: 'DELETE', headers });
+    if (!r.ok && r.status !== 204) { const d = await r.json().catch(() => ({})); throw new Error(d.error?.message || `Calendar API ${r.status}`); }
+    return { masterEventId: eventId, cutoffDateStr: null };
+
+  } else {
+    // ── Non-recurring event: plain DELETE ─────────────────────────────────
+    const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, { method: 'DELETE', headers });
+    if (!r.ok && r.status !== 204) { const d = await r.json().catch(() => ({})); throw new Error(d.error?.message || `Calendar API ${r.status}`); }
+    return null;
+  }
 }
 
-async function doCalendarUpdateEvent(token, eventId, { summary, date, startTime, endTime }) {
+// doCalendarUpdateEvent: if attendees are provided, first GETs the existing event
+// to retrieve current attendees, merges the new ones in, then PATCHes.
+// Google's PATCH replaces the attendees array, so a full merge is required.
+async function doCalendarUpdateEvent(token, eventId, { summary, date, startTime, endTime, attendees, sendUpdates }) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const patch = {};
   if (summary) patch.summary = summary;
@@ -853,11 +995,26 @@ async function doCalendarUpdateEvent(token, eventId, { summary, date, startTime,
       patch.end   = { date };
     }
   }
-  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(patch),
-  });
+  if (attendees?.length) {
+    // Fetch existing event to merge attendees (PATCH replaces, not appends)
+    const existing = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).then(r => r.json()).catch(() => ({}));
+    const existingEmails = new Set((existing.attendees || []).map(a => a.email));
+    const merged = [...(existing.attendees || []),
+      ...attendees.filter(a => !existingEmails.has(a.email))];
+    patch.attendees = merged;
+  }
+  const notifyParam = sendUpdates === 'all' ? 'all' : 'none';
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}?sendUpdates=${notifyParam}`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }
+  );
   return parseApiResponse(res, 'Calendar API');
 }
 
@@ -903,10 +1060,11 @@ const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 // Returns null when val is 'off', otherwise returns a recurrence config object.
 function parseRecurrenceValue(val) {
   if (val === 'off') return null;
-  const [freq, intStr, daysStr] = val.split(':');
+  const [freq, intStr, daysStr, untilStr] = val.split(':');
   const interval = parseInt(intStr) || 1;
   const rec = { frequency: freq, interval, rescheduleFrom: 'dueDate', sendToInbox: false };
   if (daysStr) rec.weekDays = daysStr.split(',').map(d => DAY_MAP[d.toLowerCase()]).filter(n => n !== undefined);
+  if (untilStr && /^\d{4}-\d{2}-\d{2}$/.test(untilStr)) rec.until = untilStr;
   return rec;
 }
 
@@ -967,6 +1125,7 @@ function taskToDb(task, userId) {
     priority:      task.priority      ?? [],
     location:      task.location      ?? [],
     due_date:      task.dueDate       ?? null,
+    due_time:      task.dueTime       ?? null,
     effort:        task.effort        ?? null,
     actual_effort: task.actualEffort  ?? null,
     defer_until:   task.deferUntil    ?? null,
@@ -989,6 +1148,7 @@ function dbToTask(row) {
     priority:     row.priority      ?? [],
     location:     row.location      ?? [],
     dueDate:      row.due_date      ?? null,
+    dueTime:      row.due_time       ?? null,
     effort:       row.effort        ?? null,
     actualEffort: row.actual_effort ?? null,
     deferUntil:   row.defer_until   ?? null,
@@ -1097,6 +1257,7 @@ function extractUpdateAction(text) {
     if (key === 'priority')     changes.priority     = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'location')     changes.location     = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') changes.recurrence = parseRecurrenceValue(val);
+    if (key === 'dueTime') changes.dueTime = val;
   });
   if (notesRaw !== null) changes.notes = notesRaw.replace(/\\n/g, '\n');
 
@@ -1122,6 +1283,7 @@ function extractAddAction(text) {
     if (key === 'effort')   fields.effort     = val;
     if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
+    if (key === 'dueTime') fields.dueTime = val;
   });
   if (!fields.parentId || !title) return null;
   return { title, ...fields };
@@ -1146,6 +1308,7 @@ function extractCreateAction(text) {
     if (key === 'effort')   fields.effort     = val;
     if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
+    if (key === 'dueTime') fields.dueTime = val;
   });
   if (!title || !fields.bucket) return null;
   return { title, ...fields };
@@ -1167,6 +1330,9 @@ function extractCalendarCreateAction(text) {
     if (key === 'endTime')     fields.endTime     = val;
     if (key === 'description') fields.description = val;
     if (key === 'taskId')      fields.taskId      = val;
+    if (key === 'attendees')   fields.attendees   = val.split(',').map(e => ({ email: e.trim() })).filter(e => e.email);
+    if (key === 'sendUpdates') fields.sendUpdates = val;
+    if (key === 'recur')        fields.recurrence = parseRecurrenceValue(val);
   });
   if (!title || !fields.date) return null;
   return { title, ...fields };
@@ -1188,6 +1354,8 @@ function extractCalendarUpdateAction(text) {
     if (key === 'endTime')     fields.endTime     = val;
     if (key === 'title')       fields.title       = val;
     if (key === 'taskId')      fields.taskId      = val;
+    if (key === 'attendees')   fields.attendees   = val.split(',').map(e => ({ email: e.trim() })).filter(e => e.email);
+    if (key === 'sendUpdates') fields.sendUpdates = val;
   });
   if (!eventId) return null;
   return { eventId, ...fields };
@@ -1862,6 +2030,14 @@ export default function GTDManager() {
   // calendarEvents declared first so setCalendarEvents is available to pass to the hook
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [calendarTab, setCalendarTab] = useState(() => localStorage.getItem('gtd_calendar_tab') || 'month');
+  const [skippedCalendarIds, setSkippedCalendarIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('gtd_cal_skipped') || '[]')); }
+    catch { return new Set(); }
+  });
+  const [seenCalendarEventIds, setSeenCalendarEventIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('gtd_cal_seen_events') || '[]')); }
+    catch { return new Set(); }
+  });
   const [calendarSuggestions, setCalendarSuggestions] = useState([]); // [{ text, checked, bucket }]
   const [calendarSuggestionsReady, setCalendarSuggestionsReady] = useState(false);
   const { googleToken, googleScope, calendarEnabled, gmailError,
@@ -1876,6 +2052,7 @@ export default function GTDManager() {
   const [actualEffortPrompt, setActualEffortPrompt] = useState(null); // { taskId, taskText, estimatedEffort }
   const [pendingRollup, setPendingRollup] = useState(null);           // { taskId, taskText, notes, parentId, parentText }
   const [pendingDeferCheck, setPendingDeferCheck] = useState(null);    // { taskId, taskText, deferredChildren }
+  const [pendingNewEventContext, setPendingNewEventContext] = useState(null); // { recurrence, firstOccDate }
   const [dragId,             setDragId]             = useState(null);
   const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
   const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
@@ -1965,17 +2142,22 @@ export default function GTDManager() {
           if (Array.isArray(data.efforts)) setEfforts(data.efforts);
           if (data.calibration_overrides && typeof data.calibration_overrides === 'object')
             setCalibrationOverrides(data.calibration_overrides);
+          if (Array.isArray(data.cal_skipped_tasks)) setSkippedCalendarIds(new Set(data.cal_skipped_tasks));
+          if (Array.isArray(data.cal_seen_events))   setSeenCalendarEventIds(new Set(data.cal_seen_events));
           settingsReadyRef.current = true;
         } else {
           // Supabase empty — migrate from localStorage
           const localLocations = (() => { try { return JSON.parse(localStorage.getItem('gtd_locations') || 'null') || ["Home","Work","Phone","Computer"]; } catch { return ["Home","Work","Phone","Computer"]; } })();
           const localEfforts   = (() => { try { return JSON.parse(localStorage.getItem('gtd_efforts')   || 'null') || DEFAULT_EFFORTS; } catch { return DEFAULT_EFFORTS; } })();
           const localCalib     = (() => { try { return JSON.parse(localStorage.getItem('gtd_effort_calibration') || 'null') || {}; } catch { return {}; } })();
+          const localSkipped = (() => { try { return JSON.parse(localStorage.getItem('gtd_cal_skipped') || '[]'); } catch { return []; } })();
           supabase.from('user_settings').insert({
             user_id: authUser.id,
             locations: localLocations,
             efforts: localEfforts,
             calibration_overrides: localCalib,
+            cal_skipped_tasks: localSkipped,
+            cal_seen_events: [],
           }).then(({ error: e2 }) => {
             if (e2) console.error('Settings migration failed:', e2);
             settingsReadyRef.current = true;
@@ -2040,6 +2222,8 @@ export default function GTDManager() {
           locations,
           efforts,
           calibration_overrides: calibrationOverrides,
+          cal_skipped_tasks: [...skippedCalendarIds],
+          cal_seen_events:   [...seenCalendarEventIds],
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         .then(({ error }) => {
@@ -2048,7 +2232,15 @@ export default function GTDManager() {
         });
     }, 1500);
     return () => clearTimeout(settingsDebounceRef.current);
-  }, [locations, efforts, calibrationOverrides, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [locations, efforts, calibrationOverrides, skippedCalendarIds, seenCalendarEventIds, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fallback: keep localStorage in sync for unauthenticated sessions
+  useEffect(() => {
+    if (!authUser) localStorage.setItem('gtd_cal_skipped',     JSON.stringify([...skippedCalendarIds]));
+  }, [skippedCalendarIds, authUser]);
+  useEffect(() => {
+    if (!authUser) localStorage.setItem('gtd_cal_seen_events', JSON.stringify([...seenCalendarEventIds]));
+  }, [seenCalendarEventIds, authUser]);
 
   // Phase 6 — offline resilience: flush pending writes when connectivity returns
   useEffect(() => {
@@ -2178,7 +2370,7 @@ export default function GTDManager() {
       if (!items.length) return `${label}: empty`;
       const lines = items.map(t => {
         const meta = [];
-        if (t.dueDate)          meta.push(`due:${t.dueDate}`);
+        if (t.dueDate)          meta.push(`due:${t.dueDate}${t.dueTime ? ' ' + t.dueTime : ''}`);
         if (t.originalDueDate)  meta.push(`original-due:${t.originalDueDate}`);
         if (t.completedDate)    meta.push(`completed:${t.completedDate}`);
         if (t.deferUntil)       meta.push(`defer-until:${t.deferUntil}`);
@@ -2192,7 +2384,8 @@ export default function GTDManager() {
           const days = r.weekDays?.length
             ? `:${r.weekDays.map(d => ["sun","mon","tue","wed","thu","fri","sat"][d]).join(",")}`
             : "";
-          meta.push(`recur:${r.frequency}:${r.interval || 1}${days}`);
+          const until = r.until ? `:${r.until}` : "";
+          meta.push(`recur:${r.frequency}:${r.interval || 1}${days}${until}`);
         }
         const idTag = `[id:${t.id}] `;
         return meta.length ? `- ${idTag}${t.text} [${meta.join("] [")}]` : `- ${idTag}${t.text}`;
@@ -2481,6 +2674,12 @@ export default function GTDManager() {
                 toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
               }
             }
+            // Ensure every tool_use block has a result (empty content triggers Anthropic 400)
+            for (const tu of toolUseBlocks) {
+              if (!toolResults.find(r => r.tool_use_id === tu.id)) {
+                toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: "(no result)" });
+              }
+            }
             apiMessages = [
               ...apiMessages,
               { role: "assistant", content: data.content },
@@ -2564,18 +2763,39 @@ export default function GTDManager() {
           } else {
             const create = extractCreateAction(reply);
             if (create) {
-              const { title, bucket, dueDate = null, deferUntil = null,
+              const { title, bucket, dueDate = null, dueTime = null, deferUntil = null,
                       effort = null, location = [], recurrence = null } = create;
               const newId = genId();
               const newTask = {
                 id: newId, text: title, bucket, done: false, created: Date.now(),
-                priority: [], location, dueDate, effort, actualEffort: null,
+                priority: [], location, dueDate, dueTime, effort, actualEffort: null,
                 deferUntil, notes: null, recurrence,
               };
               setTasks(prev => [newTask, ...prev]);
               updateChip = { taskName: title, fields: ["created in " + bucket] };
             }
           }
+        }
+      }
+
+      // Handle →NEWEVENT_TASK — lightweight format for calendar-event prep tasks
+      if (!updateChip && pendingNewEventContext) {
+        const netMatch = reply.match(/→NEWEVENT_TASK\|([^|\n]+)\|([^|\n]*)\|([\s\S]*)/);
+        if (netMatch) {
+          const netTitle = netMatch[1].trim();
+          const netTime  = netMatch[2].trim();
+          const netNotes = netMatch[3].trim();
+          const { recurrence: evRecur, firstOccDate } = pendingNewEventContext;
+          const newId2 = genId();
+          setTasks(prev => [{
+            id: newId2, text: netTitle, bucket: 'next', done: false, created: Date.now(),
+            priority: [], location: [], dueDate: firstOccDate || null,
+            dueTime: /^\d{1,2}:\d{2}$/.test(netTime) ? netTime : null,
+            effort: null, actualEffort: null, deferUntil: null,
+            notes: netNotes || null, recurrence: evRecur || null,
+          }, ...prev]);
+          updateChip = { taskName: netTitle, fields: ["created in next"] };
+          setPendingNewEventContext(null);
         }
       }
 
@@ -2588,6 +2808,8 @@ export default function GTDManager() {
             const ev = await doCalendarCreateEvent(googleToken, {
               summary: calCreate.title, description: calCreate.description || '',
               date: calCreate.date, startTime: calCreate.startTime, endTime: calCreate.endTime,
+              attendees: calCreate.attendees, sendUpdates: calCreate.sendUpdates,
+              recurrence: calCreate.recurrence || null,
             });
             setCalendarEvents(prev => [...prev, ev]);
             if (calCreate.taskId) {
@@ -2608,6 +2830,7 @@ export default function GTDManager() {
             const ev = await doCalendarUpdateEvent(googleToken, calUpdate.eventId, {
               summary: calUpdate.title, date: calUpdate.date,
               startTime: calUpdate.startTime, endTime: calUpdate.endTime,
+              attendees: calUpdate.attendees, sendUpdates: calUpdate.sendUpdates,
             });
             setCalendarEvents(prev => prev.map(e => e.id === ev.id ? ev : e));
             if (calUpdate.taskId) {
@@ -2617,9 +2840,24 @@ export default function GTDManager() {
           } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
         } else if (calDelete) {
           try {
-            await doCalendarDeleteEvent(googleToken, calDelete.eventId);
-            setCalendarEvents(prev => prev.filter(e => e.id !== calDelete.eventId));
-            setTasks(prev => prev.map(t => t.calendarEventId === calDelete.eventId ? { ...t, calendarEventId: null } : t));
+            const delResult = await doCalendarDeleteEvent(googleToken, calDelete.eventId);
+            if (delResult) {
+              const { masterEventId, cutoffDateStr } = delResult;
+              setCalendarEvents(prev => prev.filter(e => {
+                const eId = e.recurringEventId || e.id;
+                if (eId !== masterEventId && e.id !== masterEventId) return true;
+                if (cutoffDateStr === null) return false;
+                const eStart = e.start?.date || e.start?.dateTime?.slice(0, 10);
+                return eStart && eStart < cutoffDateStr;
+              }));
+              setTasks(prev => prev.map(t =>
+                (t.calendarEventId === calDelete.eventId || t.calendarEventId === masterEventId)
+                  ? { ...t, calendarEventId: null } : t
+              ));
+            } else {
+              setCalendarEvents(prev => prev.filter(e => e.id !== calDelete.eventId));
+              setTasks(prev => prev.map(t => t.calendarEventId === calDelete.eventId ? { ...t, calendarEventId: null } : t));
+            }
             updateChip = { taskName: 'Calendar event', fields: ['deleted from Google Calendar'] };
           } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
         }
@@ -2645,7 +2883,7 @@ export default function GTDManager() {
     } finally {
       setLoading(false);
     }
-  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, googleToken, googleScope, calendarEnabled, setCalendarEvents]);
+  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, googleToken, googleScope, calendarEnabled, setCalendarEvents, pendingNewEventContext, setPendingNewEventContext]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
@@ -2659,8 +2897,9 @@ export default function GTDManager() {
     setCoachMode(mode);
     setChatHistory([]);
     setPendingAction(null);
+    setPendingNewEventContext(null);
     setMessages([{ role: "assistant", text: introMsg }]);
-  }, []);
+  }, [setPendingNewEventContext]);
 
   const processNextInboxItem = useCallback(async (task) => {
     setPendingAction(null);
@@ -2749,8 +2988,9 @@ export default function GTDManager() {
     setTimeout(() => chatInputRef.current?.focus(), 100);
   }, [setCoachMode, setChatInput, chatInputRef]);
 
-  // Process a Google Calendar event with AI — calls Claude directly and populates checkbox suggestions
-  const processCalendarEventWithAI = useCallback(async (event) => {
+  // Process a Google Calendar event with AI
+  // forNewEvent=true — multi-turn guided flow to create a prep task
+  const processCalendarEventWithAI = useCallback(async (event, forNewEvent = false) => {
     const title = event.summary || '(No title)';
     const startStr = event.start?.dateTime
       ? new Date(event.start.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
@@ -2758,9 +2998,29 @@ export default function GTDManager() {
     const endStr = event.end?.dateTime
       ? new Date(event.end.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
       : '';
+    let recurrenceLine = null;
+    let recurSyntax = null;
+    if (event.recurrence?.length) {
+      const rruleStr = event.recurrence.find(r => r.startsWith('RRULE:'));
+      if (rruleStr) {
+        const parsed = parseRRULE(rruleStr);
+        const RD = ['sun','mon','tue','wed','thu','fri','sat'];
+        const freqLabel = { daily:'Daily', weekly:'Weekly', monthly:'Monthly', yearly:'Yearly' }[parsed.frequency] || parsed.frequency;
+        const daysLabel  = parsed.weekDays?.length ? ` on ${parsed.weekDays.map(d => RD[d]).join(',')}` : '';
+        const untilLabel = parsed.until ? ` until ${parsed.until}` : '';
+        const intLabel   = parsed.interval > 1 ? ` every ${parsed.interval}` : '';
+        recurSyntax = [
+          `recur:${parsed.frequency}:${parsed.interval || 1}`,
+          parsed.weekDays?.length ? parsed.weekDays.map(d => RD[d]).join(',') : null,
+          parsed.until || null,
+        ].filter(Boolean).join(':');
+        recurrenceLine = `Recurrence: ${freqLabel}${intLabel}${daysLabel}${untilLabel} [${recurSyntax}]`;
+      }
+    }
     const lines = [
       `Title: ${title}`,
       `Date/Time: ${startStr}${endStr ? ` → ${endStr}` : ''}`,
+      recurrenceLine,
       event.location ? `Location: ${event.location}` : null,
       event.description ? `Description: ${event.description.replace(/<[^>]*>/g, '').slice(0, 500)}` : null,
     ].filter(Boolean).join('\n');
@@ -2768,15 +3028,43 @@ export default function GTDManager() {
     setCoachMode("chat");
     setCalendarSuggestionsReady(false);
     setCalendarSuggestions([]);
-    setMessages(prev => [...prev, { role: "user", text: `📅 Reviewing calendar event: **"${title}"**` }]);
 
-    const reply = await callAI(lines, "calendarEvent", []);
-    if (reply) {
-      const suggestions = extractSuggestions(reply);
-      setCalendarSuggestions(suggestions.map(text => ({ text, checked: true, bucket: 'inbox' })));
-      setCalendarSuggestionsReady(true);
+    if (forNewEvent) {
+      const evRecurrence = recurSyntax ? parseRecurrenceValue(recurSyntax) : null;
+      const firstOccDate = event.start?.dateTime
+        ? new Date(event.start.dateTime).toISOString().slice(0, 10)
+        : (event.start?.date || null);
+      setPendingNewEventContext({ recurrence: evRecurrence, firstOccDate });
+      const eventStartTime = event.start?.dateTime
+        ? new Date(event.start.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+        : null;
+      const guideParts = [
+        `📅 New calendar event detected:`,
+        lines,
+        ``,
+        `Please assess whether the user needs to prepare for this event.`,
+        ``,
+        `If a preparation task makes sense, offer to create one. When confirmed:`,
+        `1. Ask what topics/items to cover in prep.`,
+        `2. Ask how long prep takes and what buffer time they want before the event` + (eventStartTime ? ` (event starts at ${eventStartTime})` : '') + `.`,
+        ``,
+        `Once you have the details, end your response with EXACTLY this line (no other ACTION lines):`,
+        `→NEWEVENT_TASK|<task title>|<HH:MM start time for prep>|<notes describing what to cover>`,
+        ``,
+        `Calc start time: event start minus prep duration minus buffer. Do NOT use →ACTION:create.`,
+      ];
+      setMessages(prev => [...prev, { role: "user", text: `📅 New event: **"${title}"**` }]);
+      await callAI(guideParts.join('\n'), "chat", []);
+    } else {
+      setMessages(prev => [...prev, { role: "user", text: `📅 Reviewing calendar event: **"${title}"**` }]);
+      const reply = await callAI(lines, "calendarEvent", []);
+      if (reply) {
+        const suggestions = extractSuggestions(reply);
+        setCalendarSuggestions(suggestions.map(text => ({ text, checked: true, bucket: 'inbox' })));
+        setCalendarSuggestionsReady(true);
+      }
     }
-  }, [callAI]);
+  }, [callAI, setPendingNewEventContext]);
 
   // Accept selected calendar suggestions — create tasks and clear the bar
   const acceptCalendarSuggestions = useCallback(() => {
@@ -3618,6 +3906,10 @@ export default function GTDManager() {
               onConnectCalendar={connectCalendar}
               onOpenDetail={setSelectedTaskId}
               selectedTaskId={selectedTaskId}
+              skippedCalendarIds={skippedCalendarIds}
+              setSkippedCalendarIds={setSkippedCalendarIds}
+              seenCalendarEventIds={seenCalendarEventIds}
+              setSeenCalendarEventIds={setSeenCalendarEventIds}
             />
           ) : (
             <>
@@ -4455,19 +4747,27 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
 
           {/* Due Date */}
           <div>
-            <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>Due Date</div>
-            <input
-              type="date"
-              value={taskDueDate}
-              onChange={e => onUpdateTask(task.id, { dueDate: e.target.value || null })}
-              style={{ background: COLORS.surface3, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
-            />
-            {taskDueDate && (
-              <button
-                onClick={() => onUpdateTask(task.id, { dueDate: null })}
-                style={{ marginLeft: 6, padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
-              >✕</button>
-            )}
+            <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 5 }}>Due Date &amp; Time</div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <input
+                type="date"
+                value={taskDueDate}
+                onChange={e => onUpdateTask(task.id, { dueDate: e.target.value || null })}
+                style={{ background: COLORS.surface3, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
+              />
+              <input
+                type="time"
+                value={task.dueTime || ""}
+                onChange={e => onUpdateTask(task.id, { dueTime: e.target.value || null })}
+                style={{ background: COLORS.surface3, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
+              />
+              {(taskDueDate || task.dueTime) && (
+                <button
+                  onClick={() => onUpdateTask(task.id, { dueDate: null, dueTime: null })}
+                  style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+                >✕</button>
+              )}
+            </div>
           </div>
 
           {/* Defer Until */}
@@ -5280,9 +5580,9 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
             Connect Google Calendar to view events, add tasks as calendar events, and let the AI suggest tasks from your calendar.
           </div>
-          <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 10, lineHeight: 1.4, padding: '7px 10px', background: COLORS.surface2, borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+          {!calendarEnabled && <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 10, lineHeight: 1.4, padding: '7px 10px', background: COLORS.surface2, borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
             ⚠ Before connecting, enable the <strong style={{ color: COLORS.text2 }}>Google Calendar API</strong> in your Google Cloud Console project and add the <code style={{ fontSize: 10, background: COLORS.surface3, padding: '1px 4px', borderRadius: 3 }}>calendar.events</code> scope to your OAuth consent screen.
-          </div>
+          </div>}
           {calendarEnabled ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, color: COLORS.next }}>✓ Calendar connected</span>
@@ -6113,6 +6413,15 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
                     </div>
                   </div>
                 )}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                  <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Until</span>
+                  <input
+                    type="date"
+                    value={rec.until || ""}
+                    onChange={e => onUpdate(task.id, { recurrence: { ...rec, until: e.target.value || undefined } })}
+                    style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
+                  />
+                </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
                   <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Base on</span>
                   <select
@@ -6984,7 +7293,7 @@ function buildMonthGrid(year, month) {
   return grid;
 }
 
-function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, setCalendarTab, tasks, setTasks, calendarEvents, setCalendarEvents, processCalendarEventWithAI, onConnectCalendar, onOpenDetail, selectedTaskId }) {
+function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, setCalendarTab, tasks, setTasks, calendarEvents, setCalendarEvents, processCalendarEventWithAI, onConnectCalendar, onOpenDetail, selectedTaskId, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [navDate, setNavDate] = useState(new Date());
@@ -6992,20 +7301,40 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [addConfirmId, setAddConfirmId] = useState(null); // task id pending calendar add confirm
   const [addStatus, setAddStatus] = useState({}); // taskId → 'loading' | 'done' | string(error)
-  const [skippedCalendarIds, setSkippedCalendarIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('gtd_cal_skipped') || '[]')); }
-    catch { return new Set(); }
-  });
-  const handleIgnoreTask = (taskId) => {
-    setSkippedCalendarIds(prev => {
-      const next = new Set(prev);
-      next.add(taskId);
-      localStorage.setItem('gtd_cal_skipped', JSON.stringify([...next]));
-      return next;
-    });
-  };
+
+  const handleIgnoreTask = useCallback((taskId) => {
+    setSkippedCalendarIds(prev => { const next = new Set(prev); next.add(taskId); return next; });
+  }, [setSkippedCalendarIds]);
+
+  const handleMarkEventSeen = useCallback((ev) => {
+    const key = ev.recurringEventId || ev.id;
+    setSeenCalendarEventIds(prev => { const next = new Set(prev); next.add(key); return next; });
+  }, [setSeenCalendarEventIds]);
+
+  const handleReviewNewEvent = useCallback((ev) => {
+    handleMarkEventSeen(ev);
+    processCalendarEventWithAI(ev, true);
+  }, [handleMarkEventSeen, processCalendarEventWithAI]);
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
+
+  // Detect calendar events that have no linked task and haven't been reviewed/skipped yet.
+  // Deduplicated by master recurring event ID so a recurring series appears only once.
+  const pendingNewCalendarEvents = useMemo(() => {
+    const linkedIds = new Set(tasks.filter(t => t.calendarEventId).map(t => t.calendarEventId));
+    const horizon = new Date(today); horizon.setDate(today.getDate() + 30);
+    const seenMasters = new Set();
+    return calendarEvents.filter(ev => {
+      const evStart = calEventStart(ev);
+      if (!evStart || evStart < today || evStart > horizon) return false;
+      const masterKey = ev.recurringEventId || ev.id;
+      if (seenCalendarEventIds.has(masterKey)) return false;
+      if (linkedIds.has(ev.id) || (ev.recurringEventId && linkedIds.has(ev.recurringEventId))) return false;
+      if (seenMasters.has(masterKey)) return false;
+      seenMasters.add(masterKey);
+      return true;
+    }).sort((a, b) => calEventStart(a) - calEventStart(b));
+  }, [calendarEvents, tasks, seenCalendarEventIds, today]);
 
   // Fetch events for a 60-day window centered on a given date
   const fetchEvents = useCallback(async (center) => {
@@ -7059,9 +7388,24 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
   const handleDeleteEvent = async (ev) => {
     if (!googleToken) return;
     try {
-      await doCalendarDeleteEvent(googleToken, ev.id);
-      setCalendarEvents(prev => prev.filter(e => e.id !== ev.id));
-      setTasks(prev => prev.map(t => t.calendarEventId === ev.id ? { ...t, calendarEventId: null } : t));
+      const result = await doCalendarDeleteEvent(googleToken, ev.id);
+      if (result) {
+        const { masterEventId, cutoffDateStr } = result;
+        setCalendarEvents(prev => prev.filter(e => {
+          const eId = e.recurringEventId || e.id;
+          if (eId !== masterEventId && e.id !== masterEventId) return true;
+          if (cutoffDateStr === null) return false;                    // delete all instances
+          const eStart = e.start?.date || e.start?.dateTime?.slice(0, 10);
+          return eStart && eStart < cutoffDateStr;                     // keep past instances
+        }));
+        setTasks(prev => prev.map(t =>
+          (t.calendarEventId === ev.id || t.calendarEventId === masterEventId)
+            ? { ...t, calendarEventId: null } : t
+        ));
+      } else {
+        setCalendarEvents(prev => prev.filter(e => e.id !== ev.id));
+        setTasks(prev => prev.map(t => t.calendarEventId === ev.id ? { ...t, calendarEventId: null } : t));
+      }
     } catch (e) { setError(`Delete failed: ${e.message}`); }
   };
 
@@ -7077,7 +7421,13 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
   const handleConfirmAdd = async (task) => {
     setAddStatus(prev => ({ ...prev, [task.id]: 'loading' }));
     try {
-      const ev = await doCalendarCreateEvent(googleToken, { summary: task.text, description: `GTD task added from your task manager.`, date: task.dueDate });
+      const rrule = buildRRULE(task.recurrence, task.recurrence?.until || null);
+      const startDate = task.recurrence ? firstOccurrenceDate(task.recurrence) : task.dueDate;
+      const ev = await doCalendarCreateEvent(googleToken, {
+        summary: task.text, description: `GTD task added from your task manager.`,
+        date: startDate,
+        ...(rrule ? { recurrence: [rrule] } : {}),
+      });
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, calendarEventId: ev.id } : t));
       setCalendarEvents(prev => [...prev, ev]);
       setAddStatus(prev => ({ ...prev, [task.id]: 'done' }));
@@ -7176,6 +7526,15 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
       {error && <div style={{ padding: '8px 16px', fontSize: 12, color: '#d4845a' }}>⚠ {error}</div>}
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
+        {/* Calendar → Tasks: new events without linked tasks */}
+        {pendingNewCalendarEvents.length > 0 && (
+          <CalendarNewEventsSection
+            events={pendingNewCalendarEvents}
+            onReview={handleReviewNewEvent}
+            onSkip={handleMarkEventSeen}
+          />
+        )}
+
         {/* Tasks → Calendar section */}
         {pendingTasks.length > 0 && (
           <CalendarPendingTasksSection
@@ -7237,6 +7596,49 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
 }
 
 // ── Calendar sub-components ──────────────────────────────────────────────────
+
+function CalendarNewEventsSection({ events, onReview, onSkip }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+      <div
+        onClick={() => setOpen(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', cursor: 'pointer', background: COLORS.surface2 }}
+      >
+        <span style={{ fontSize: 11, color: COLORS.calendar, fontWeight: 600 }}>
+          🗓 New calendar events — no linked task ({events.length})
+        </span>
+        <span style={{ fontSize: 11, color: COLORS.muted, marginLeft: 'auto' }}>{open ? '▾' : '▸'}</span>
+      </div>
+      {open && (
+        <div style={{ padding: '4px 0' }}>
+          {events.map(ev => {
+            const s = calEventStart(ev);
+            const dateStr = s ? s.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+            const timeStr = isAllDayEvent(ev) ? 'All day' : s ? s.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+            return (
+              <div key={ev.recurringEventId || ev.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderBottom: `1px solid ${COLORS.border}22` }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.summary || '(No title)'}</span>
+                  <span style={{ fontSize: 11, color: COLORS.muted, marginLeft: 8 }}>{dateStr}{timeStr ? ' · ' + timeStr : ''}</span>
+                  {ev.recurringEventId && <span style={{ fontSize: 10, color: COLORS.muted, marginLeft: 6 }}>↺ recurring</span>}
+                </div>
+                <button
+                  onClick={() => onReview(ev)}
+                  style={{ padding: '3px 10px', borderRadius: 5, border: `1px solid ${COLORS.calendar}`, background: COLORS.calendar + '22', color: COLORS.calendar, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >Review with AI</button>
+                <button
+                  onClick={() => onSkip(ev)}
+                  style={{ padding: '3px 10px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+                >Skip</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function CalendarPendingTasksSection({ tasks, addConfirmId, addStatus, onRequestAdd, onConfirmAdd, onCancelAdd, onOpenDetail, selectedTaskId, skippedIds, onIgnore }) {
   const [open, setOpen] = useState(true);
