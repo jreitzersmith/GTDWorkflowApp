@@ -4856,3 +4856,63 @@ const { reviewProjectIdx, setReviewProjectIdx,
   <div class="annotation"><strong>Hooks as logical namespaces.</strong> This hook contains no effects or derived values — it is purely a state namespace. That is still a valid use of a custom hook: grouping five related state slices under a single name makes it clear they belong together, keeps <code>GTDManager</code>'s declaration section shorter, and sets up a clean extraction point when this feature is eventually moved to its own file. The callbacks that act on this state (<code>reviewProject</code>, <code>advanceProjectReview</code>, etc.) still live in <code>GTDManager</code> for now because they depend on <code>tasks</code>, <code>callAI</code>, and other state that has not yet been extracted.</div>
   <div class="snip-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hook Extraction</a></div>
 </div>
+<div class="snip-entry" id="snip-review-dedup">
+  <div class="snip-header">
+    <span class="snip-title">Project review — duplicate suppression (prompt + client filter)</span>
+    <span class="snip-file">App.jsx — SYSTEM_PROMPTS.projectReview + reviewProject callback</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Layer 1 — system prompt instruction (abbreviated):
+// "IMPORTANT: Do not suggest any action that already appears in the current
+//  subtasks list, even if the wording differs slightly. Only suggest genuinely
+//  new actions not already captured."
+
+// Layer 2 — client-side filter inside reviewProject callback:
+const reply = await callAI(prompt, "projectReview", []);
+if (reply) {
+  // Build a set of existing child task texts for O(1) lookup
+  const existingTexts = new Set(children.map(t => t.text.trim().toLowerCase()));
+
+  const suggestions = extractSuggestions(reply)
+    // Remove any suggestion that exactly matches (case-insensitive) an existing subtask
+    .filter(text => !existingTexts.has(text.trim().toLowerCase()));
+
+  setReviewSuggestions(suggestions.map(text => ({ text, checked: true })));
+  setReviewProjectIdx(idx);
+  setReviewReady(true);
+}</code></pre></div>
+  <div class="annotation"><strong>Why both layers?</strong> The prompt change handles paraphrases — the AI reads the instruction and avoids "Schedule dentist" when "Call dentist" already exists. The client filter handles exact repeats — cases where the AI ignores the instruction entirely. The filter uses a <code>Set</code> for O(1) membership checks: even with hundreds of subtasks, <code>existingTexts.has(text)</code> is instant. Lowercasing both sides makes the comparison case-insensitive without a regex.</div>
+  <div class="snip-back"><a href="project-summary.html#fix-project-review">&#8593; Fix: Project Review Improvements</a></div>
+</div>
+
+<div class="snip-entry" id="snip-skip-review">
+  <div class="snip-header">
+    <span class="snip-title">skipProjectReview + skipMetadataReview — advance without applying</span>
+    <span class="snip-file">App.jsx — GTDManager callbacks + ProjectReviewBar / MetadataReviewBar</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Skip callback — task mode (no tasks added)
+const skipProjectReview = useCallback(() => {
+  setReviewSuggestions([]);
+  setReviewReady(false);
+  const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+  const nextIdx = reviewProjectIdx + 1;
+  if (nextIdx >= rootProjects.length) {
+    setMessages(prev => [...prev, { role: "assistant", text: `🎉 All projects reviewed!...` }]);
+    setCoachMode("chat");
+  } else {
+    reviewProject(rootProjects[nextIdx], nextIdx, rootProjects.length);
+  }
+}, [reviewProjectIdx, tasks, reviewProject]);
+
+// Skip button in ProjectReviewBar (same pattern in MetadataReviewBar)
+&lt;button
+  onClick={onSkip}
+  style={{ padding: "4px 12px", borderRadius: 6,
+           border: `1px solid ${COLORS.border}`,
+           background: "transparent", color: COLORS.muted,
+           fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+&gt;
+  {isLast ? "Skip (Finish)" : "Skip →"}
+&lt;/button&gt;</code></pre></div>
+  <div class="annotation"><strong>Skip vs. Next share the same advance logic.</strong> The only difference between <code>skipProjectReview</code> and <code>advanceProjectReview</code> is that the skip version omits the <code>setTasks</code> call that adds checked suggestions. Everything else — clearing state, computing <code>nextIdx</code>, deciding whether to loop or finish — is identical. The skip button is styled in muted grey (<code>COLORS.muted</code> / <code>COLORS.border</code>) so it reads as clearly secondary to the primary action without being hidden.</div>
+  <div class="snip-back"><a href="project-summary.html#fix-project-review">&#8593; Fix: Project Review Improvements</a></div>
+</div>

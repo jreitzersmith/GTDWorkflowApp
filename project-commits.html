@@ -2060,3 +2060,32 @@
   <div class="commit-lesson"><strong>Strip state from the root component incrementally.</strong> Extracting hooks one domain at a time is safer than a big-bang split. Each hook can be validated in isolation (settings still persist? usage panel still updates?), and <code>GTDManager</code> shrinks in measurable steps. The remaining entangled state (task sync, AI chat, calendar) follows the same pattern once the simpler domains are clean.</div>
   <div class="commit-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hook Extraction</a></div>
 </div>
+<!-- 75e7d1a -->
+<div class="commit-entry" id="commit-75e7d1a">
+  <div class="commit-top">
+    <span class="commit-hash">75e7d1a</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: project review — deduplicate task suggestions, add metadata skip</div>
+  <div class="commit-body">
+    Two fixes. <strong>Deduplication:</strong> <code>SYSTEM_PROMPTS.projectReview</code> gains an explicit instruction forbidding suggestions that already appear in the subtask list; <code>reviewProject</code> adds a client-side filter using a lowercased <code>Set</code> of existing child texts as a safety net. <strong>Metadata skip:</strong> <code>skipMetadataReview</code> callback added — identical to <code>advanceMetadataReview</code> but without the <code>updateTask</code> calls; <code>MetadataReviewBar</code> gains an <code>onSkip</code> prop and a secondary-styled Skip button in the footer.
+  </div>
+  <div class="commit-lesson"><strong>Prompt instructions and client guards are complementary, not redundant.</strong> The prompt change handles semantic near-duplicates (the AI reads context and avoids them). The client filter handles cases where the AI ignores the instruction. Each layer catches failures the other misses — using both is cheaper than debugging a user-visible duplicate that slipped through a single layer.</div>
+  <div class="commit-back"><a href="project-summary.html#fix-project-review">&#8593; Fix: Project Review Improvements</a></div>
+</div>
+
+<!-- 9b37c54 -->
+<div class="commit-entry" id="commit-9b37c54">
+  <div class="commit-top">
+    <span class="commit-hash">9b37c54</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: add Skip button to project review task mode</div>
+  <div class="commit-body">
+    Mirrors the metadata-mode skip added in the previous commit. <code>skipProjectReview</code> callback clears <code>reviewSuggestions</code> and advances the index without calling <code>setTasks</code>. <code>ProjectReviewBar</code> gains <code>onSkip</code> prop and a secondary Skip button beside the primary Next button. Label is "Skip &#x2192;" for non-final projects and "Skip (Finish)" on the last one.
+  </div>
+  <div class="commit-lesson"><strong>Consistency across parallel UI surfaces matters.</strong> Once a pattern (skip button) is established in one review mode, users expect it everywhere the same flow appears. Asymmetric UI — where metadata review has a skip but task review doesn&#8217;t — creates confusion and makes the app feel unfinished. When you add a control to one surface of a parallel pair, immediately check whether the other surface needs it too.</div>
+  <div class="commit-back"><a href="project-summary.html#fix-project-review">&#8593; Fix: Project Review Improvements</a></div>
+</div>

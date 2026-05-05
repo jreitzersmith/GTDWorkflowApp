@@ -2422,3 +2422,33 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-commit" href="project-commits.html#commit-d467236">&#x1F4DC; d467236 &#8212; hook extraction</a>
     </div>
   </section>
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="fix-project-review">
+    <div class="feat-header">
+      <span class="feat-icon">🔍</span>
+      <span class="feat-title">Project Review — Duplicate Suppression &amp; Skip Buttons</span>
+      <span class="feat-badge badge-fix">Fix &#8212; May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Three improvements to the AI Project Review flow:</p>
+      <ul>
+        <li><strong>Task mode — duplicate suppression:</strong> the AI was sometimes re-suggesting next actions that already existed as subtasks of the project (especially on repeat reviews). Fixed with two layers: the <code>projectReview</code> system prompt now explicitly instructs the AI not to suggest actions already present in the subtask list; and after the AI responds, a client-side filter removes any suggestion whose text case-insensitively matches an existing child task. The prompt change handles paraphrases; the filter catches exact repeats the prompt might miss.</li>
+        <li><strong>Task mode — Skip button:</strong> a secondary "Skip &#x2192;" button now appears beside "Add N &amp; Next &#x2192;" in the suggestions bar. Clicking it advances to the next project without adding any tasks. On the final project it reads "Skip (Finish)". Useful when a project is already well-covered and no suggestions are relevant.</li>
+        <li><strong>Metadata mode — Skip button:</strong> the same Skip button was added to the metadata review bar, allowing a project's metadata to be bypassed without applying any suggestions.</li>
+      </ul>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: two-layer validation</h4>
+      <p>Fixing the duplicate bug required both a prompt change and a client-side filter — neither alone is sufficient. The prompt change is the primary defence: it tells the AI what not to do. The filter is the safety net: it catches cases where the AI ignores the instruction or uses slightly different wording. This two-layer approach (server-side instruction + client-side guard) is a general pattern in defensive programming. Never trust a single line of defence when the cost of a failure (a confusing duplicate suggestion appearing in the UI) is higher than the cost of the redundant check.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The prompt instruction is the firewall rule: it tells the upstream system what traffic to block. The client-side filter is the application-layer check: even if something slips through the firewall, it gets caught before it reaches the user. Defence in depth — the same principle that puts both a firewall and an intrusion detection system in front of a server. Each layer has different failure modes, so both together are more reliable than either alone.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-review-dedup">&#x1F52C; duplicate suppression — prompt + client filter</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-skip-review">&#x1F52C; skipProjectReview + skipMetadataReview callbacks</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-75e7d1a">&#x1F4DC; 75e7d1a &#8212; dedup + metadata skip</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-9b37c54">&#x1F4DC; 9b37c54 &#8212; task mode skip</a>
+    </div>
+  </section>
