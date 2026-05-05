@@ -1555,6 +1555,263 @@ function ResizeHandle({ onMouseDown, direction = 'h' }) {
   );
 }
 
+
+// ── useSupabaseAuth ──────────────────────────────────────────────────────────
+// Manages Supabase authentication: session restore, magic-link exchange,
+// and auth state change listener. Owns authUser, authLoading, authEmail, authSent.
+function useSupabaseAuth() {
+  const [authUser,    setAuthUser]    = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authEmail,   setAuthEmail]   = useState('');
+  const [authSent,    setAuthSent]    = useState(false);
+
+  const sendMagicLink = useCallback(async () => {
+    if (!authEmail.trim()) return;
+    await supabase.auth.signInWithOtp({ email: authEmail.trim() });
+    setAuthSent(true);
+  }, [authEmail]);
+
+  // Restore session on mount; listen for magic-link callback; exchange Supabase
+  // ?code= param (detectSessionInUrl is disabled — we handle it manually here).
+  // Google OAuth codes have state starting with 'gtd_' — those are skipped.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+    });
+    const _p = new URLSearchParams(window.location.search);
+    const _code = _p.get('code');
+    const _state = _p.get('state');
+    if (_code && !_state?.startsWith('gtd_')) {
+      supabase.auth.exchangeCodeForSession(_code)
+        .then(({ error }) => { if (error) console.error('Supabase code exchange:', error); });
+    }
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink };
+}
+
+// ── useGoogleAuth ─────────────────────────────────────────────────────────────
+// Manages Google OAuth: token storage, PKCE exchange, silent refresh, and the
+// five connect/disconnect callbacks. Accepts setCalendarEvents so disconnectCalendar
+// can clear calendar view state that lives in GTDManager.
+function useGoogleAuth({ setCalendarEvents }) {
+  const [googleToken, setGoogleToken] = useState(() => {
+    try {
+      const stored = localStorage.getItem('gtd_google_token');
+      if (!stored) return null;
+      const { access_token, expiry } = JSON.parse(stored);
+      if (Date.now() > expiry) return null; // keep stored data — refresh_token still usable
+      return access_token;
+    } catch { return null; }
+  });
+  const [googleScope, setGoogleScope] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_google_token') || 'null')?.scope || null; }
+    catch { return null; }
+  });
+  const [calendarEnabled, setCalendarEnabled] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_google_token') || 'null')?.calendarEnabled || false; }
+    catch { return false; }
+  });
+  const [gmailError, setGmailError] = useState(null);
+  // Capture Google OAuth callback data synchronously during render.
+  // Google callbacks have state starting with 'gtd_'; Supabase magic-link codes don't.
+  // READ-ONLY: no side effects here — React StrictMode double-invokes useState
+  // initializers, so any removeItem() in the first call would leave the second
+  // call empty, causing React to use null as the state value. Cleanup is in
+  // the useEffect below, which uses an atomic claim pattern.
+  const [pendingGoogleAuth] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const code = p.get('code');
+      const state = p.get('state');
+      if (!code || !state?.startsWith('gtd_')) return null;
+      const stored = JSON.parse(localStorage.getItem('gtd_google_pkce') || 'null');
+      if (!stored || Date.now() - stored.ts > 300000 || state !== stored.state) return null;
+      return { code, verifier: stored.verifier };
+    } catch { return null; }
+  });
+
+  // Google OAuth — exchange code for token
+  // Atomic claim: localStorage.getItem('gtd_google_pkce') acts as a mutex.
+  // React StrictMode runs effects twice; the second run finds the entry already
+  // removed by the first run and exits, preventing a double exchange.
+  useEffect(() => {
+    if (!pendingGoogleAuth) return;
+    const pkceRaw = localStorage.getItem('gtd_google_pkce');
+    if (!pkceRaw) return;
+    localStorage.removeItem('gtd_google_pkce');
+    const pkceData = (() => { try { return JSON.parse(pkceRaw); } catch { return {}; } })();
+    const pkceScope = pkceData.scope || 'readonly';
+    const pkceCalendarEnabled = pkceData.calendarEnabled || false;
+    window.history.replaceState({}, document.title, window.location.pathname);
+    const { code, verifier } = pendingGoogleAuth;
+    (async () => {
+      try {
+        const res = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
+            client_secret: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_SECRET,
+            code,
+            code_verifier: verifier,
+            grant_type: 'authorization_code',
+            redirect_uri: window.location.origin,
+          }),
+        });
+        const data = await res.json();
+        if (data.access_token) {
+          const expiry = Date.now() + (data.expires_in || 3600) * 1000;
+          localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token ?? null, expiry, scope: pkceScope, calendarEnabled: pkceCalendarEnabled }));
+          setGoogleToken(data.access_token);
+          setGoogleScope(pkceScope);
+          setCalendarEnabled(pkceCalendarEnabled);
+          setGmailError(null);
+        } else {
+          const msg = data.error_description || data.error || JSON.stringify(data);
+          console.error('[Google OAuth] Token exchange failed:', data);
+          setGmailError(`Google error: ${msg}`);
+        }
+      } catch (e) {
+        console.error('[Google OAuth] Fetch error:', e);
+        setGmailError(`Network error: ${e.message}`);
+      }
+    })();
+  }, [pendingGoogleAuth]);
+
+  const signInWithGoogle = useCallback(async (accessLevel = 'readonly') => {
+    const verifier = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
+    const state = 'gtd_' + generateCodeVerifier().slice(0, 16);
+    localStorage.setItem('gtd_google_pkce', JSON.stringify({ verifier, state, ts: Date.now(), scope: accessLevel }));
+    const scopeMap = {
+      readonly: 'https://www.googleapis.com/auth/gmail.readonly',
+      modify:   'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic',
+      compose:  'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.settings.basic',
+      send:     'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.settings.basic',
+    };
+    const params = new URLSearchParams({
+      client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
+      redirect_uri: window.location.origin,
+      response_type: 'code',
+      scope: scopeMap[accessLevel] || scopeMap.readonly,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  }, []);
+
+  const disconnectGmail = useCallback(() => {
+    localStorage.removeItem('gtd_google_token');
+    localStorage.removeItem('gtd_google_pkce');
+    setGoogleToken(null);
+    setGoogleScope(null);
+    setCalendarEnabled(false);
+    setGmailError(null);
+  }, []);
+
+  // Connect Google Calendar — re-auths with calendar.events scope, preserving any existing Gmail scope
+  const connectCalendar = useCallback(async () => {
+    const verifier = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
+    const state = 'gtd_' + generateCodeVerifier().slice(0, 16);
+    const gmailScopeMap = {
+      readonly: 'https://www.googleapis.com/auth/gmail.readonly',
+      modify:   'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic',
+      compose:  'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.settings.basic',
+      send:     'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.settings.basic',
+    };
+    const gmailScopeStr = googleScope ? (gmailScopeMap[googleScope] || gmailScopeMap.readonly) : '';
+    const scopeStr = [gmailScopeStr, CALENDAR_SCOPE].filter(Boolean).join(' ');
+    localStorage.setItem('gtd_google_pkce', JSON.stringify({ verifier, state, ts: Date.now(), scope: googleScope || 'readonly', calendarEnabled: true }));
+    const params = new URLSearchParams({
+      client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
+      redirect_uri: window.location.origin,
+      response_type: 'code',
+      scope: scopeStr,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  }, [googleScope]);
+
+  // Disconnect calendar only (keep Gmail token intact)
+  const disconnectCalendar = useCallback(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
+      if (stored) { stored.calendarEnabled = false; localStorage.setItem('gtd_google_token', JSON.stringify(stored)); }
+    } catch {}
+    setCalendarEnabled(false);
+    setCalendarEvents([]);
+  }, [setCalendarEvents]);
+
+  // Silently exchange a stored refresh_token for a new access_token.
+  const refreshGoogleToken = useCallback(async () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
+      if (!stored?.refresh_token) return null;
+      const res = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
+          client_secret: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_SECRET,
+          refresh_token: stored.refresh_token,
+          grant_type: 'refresh_token',
+        }),
+      });
+      const data = await res.json();
+      if (data.access_token) {
+        const expiry = Date.now() + (data.expires_in || 3600) * 1000;
+        localStorage.setItem('gtd_google_token', JSON.stringify({ ...stored, access_token: data.access_token, expiry }));
+        setGoogleToken(data.access_token);
+        return data.access_token;
+      }
+      console.warn('[Gmail OAuth] Refresh failed:', data.error);
+      localStorage.removeItem('gtd_google_token');
+      setGoogleToken(null);
+      setGmailError('Gmail session expired — please reconnect.');
+      return null;
+    } catch (e) {
+      console.warn('[Gmail OAuth] Refresh network error:', e.message);
+      setGmailError('Could not refresh Gmail session — check your connection.');
+      return null;
+    }
+  }, []);
+
+  // On mount: if the access token was expired at startup but a refresh_token is stored, refresh silently.
+  useEffect(() => {
+    if (googleToken) return;
+    const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
+    if (stored?.refresh_token) refreshGoogleToken();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Proactive refresh: schedule a token refresh 5 min before it expires so the session never goes stale.
+  useEffect(() => {
+    if (!googleToken) return;
+    const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
+    if (!stored?.expiry || !stored?.refresh_token) return;
+    const msUntilRefresh = stored.expiry - Date.now() - 5 * 60 * 1000;
+    if (msUntilRefresh <= 0) { refreshGoogleToken(); return; }
+    const timer = setTimeout(() => refreshGoogleToken(), msUntilRefresh);
+    return () => clearTimeout(timer);
+  }, [googleToken, refreshGoogleToken]);
+
+  return { googleToken, googleScope, calendarEnabled, gmailError,
+           signInWithGoogle, disconnectGmail, connectCalendar, disconnectCalendar, refreshGoogleToken };
+}
+
 export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
@@ -1601,47 +1858,15 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_gmail_queue") || "[]"); } catch { return []; }
   });
   const [gmailUnreadCount, setGmailUnreadCount] = useState(null);
-  // Google / Gmail OAuth token (null = disconnected) + access level + error message
-  const [gmailError, setGmailError] = useState(null);
-  const [googleScope, setGoogleScope] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('gtd_google_token') || 'null')?.scope || null; }
-    catch { return null; }
-  });
-  // Google Calendar state
-  const [calendarEnabled, setCalendarEnabled] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('gtd_google_token') || 'null')?.calendarEnabled || false; }
-    catch { return false; }
-  });
+  // ── Google Auth hook ──────────────────────────────────────────────
+  // calendarEvents declared first so setCalendarEvents is available to pass to the hook
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [calendarTab, setCalendarTab] = useState(() => localStorage.getItem('gtd_calendar_tab') || 'month');
   const [calendarSuggestions, setCalendarSuggestions] = useState([]); // [{ text, checked, bucket }]
   const [calendarSuggestionsReady, setCalendarSuggestionsReady] = useState(false);
-  const [googleToken, setGoogleToken] = useState(() => {
-    try {
-      const stored = localStorage.getItem('gtd_google_token');
-      if (!stored) return null;
-      const { access_token, expiry } = JSON.parse(stored);
-      if (Date.now() > expiry) return null; // keep stored data — refresh_token still usable
-      return access_token;
-    } catch { return null; }
-  });
-  // Capture Google OAuth callback data synchronously during render.
-  // Google callbacks have state starting with 'gtd_'; Supabase magic-link codes don't.
-  // READ-ONLY: no side effects here — React StrictMode double-invokes useState
-  // initializers, so any removeItem() in the first call would leave the second
-  // call empty, causing React to use null as the state value. Cleanup is in
-  // the useEffect below, which uses an atomic claim pattern.
-  const [pendingGoogleAuth] = useState(() => {
-    try {
-      const p = new URLSearchParams(window.location.search);
-      const code = p.get('code');
-      const state = p.get('state');
-      if (!code || !state?.startsWith('gtd_')) return null;
-      const stored = JSON.parse(localStorage.getItem('gtd_google_pkce') || 'null');
-      if (!stored || Date.now() - stored.ts > 300000 || state !== stored.state) return null;
-      return { code, verifier: stored.verifier };
-    } catch { return null; }
-  });
+  const { googleToken, googleScope, calendarEnabled, gmailError,
+          signInWithGoogle, disconnectGmail, connectCalendar, disconnectCalendar,
+          refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
   const [nextGroupBy, setNextGroupBy] = useState("none");
   const [projectParentId, setProjectParentId] = useState("__new__");
   // Set of task IDs whose children are currently hidden in the Projects view.
@@ -1660,16 +1885,7 @@ export default function GTDManager() {
   const [metadataSuggestions,setMetadataSuggestions] = useState([]);  // [{ taskId, taskText, fields: {effort?,dueDate?,deferUntil?}, overrides: {...}, accepted: bool }]
 
   // ── Auth ───────────────────────────────────────────────────────────────
-  const [authUser,    setAuthUser]    = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authEmail,   setAuthEmail]   = useState("");
-  const [authSent,    setAuthSent]    = useState(false);
-
-  const sendMagicLink = useCallback(async () => {
-    if (!authEmail.trim()) return;
-    await supabase.auth.signInWithOtp({ email: authEmail.trim() });
-    setAuthSent(true);
-  }, [authEmail]);
+  const { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink } = useSupabaseAuth();
 
   // true once the initial Supabase read (or migration) has completed
   const [supabaseReady, setSupabaseReady] = useState(false);
@@ -1691,27 +1907,6 @@ export default function GTDManager() {
   useEffect(() => {
     localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
   }, [tasks]);
-
-  // Auth: restore session on mount, listen for magic-link callback
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setAuthUser(session?.user ?? null);
-      setAuthLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthUser(session?.user ?? null);
-    });
-    // Manually exchange Supabase magic-link ?code= (detectSessionInUrl is disabled).
-    // Google OAuth codes have state starting with 'gtd_' — skip those here.
-    const _p = new URLSearchParams(window.location.search);
-    const _code = _p.get('code');
-    const _state = _p.get('state');
-    if (_code && !_state?.startsWith('gtd_')) {
-      supabase.auth.exchangeCodeForSession(_code)
-        .then(({ error }) => { if (error) console.error('Supabase code exchange:', error); });
-    }
-    return () => subscription.unsubscribe();
-  }, []);
 
   // Supabase read: fetch tasks once auth resolves; auto-migrate localStorage if empty
   useEffect(() => {
@@ -1914,182 +2109,6 @@ export default function GTDManager() {
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [authUser, supabaseReady]);
-
-  // Google OAuth — exchange code for token
-  // Atomic claim: localStorage.getItem('gtd_google_pkce') acts as a mutex.
-  // React StrictMode runs effects twice; the second run finds the entry already
-  // removed by the first run and exits, preventing a double exchange.
-  useEffect(() => {
-    if (!pendingGoogleAuth) return;
-    // Claim the PKCE entry — exit if already claimed by a prior run
-    const pkceRaw = localStorage.getItem('gtd_google_pkce');
-    if (!pkceRaw) return;
-    localStorage.removeItem('gtd_google_pkce');
-    const pkceData = (() => { try { return JSON.parse(pkceRaw); } catch { return {}; } })();
-    const pkceScope = pkceData.scope || 'readonly';
-    const pkceCalendarEnabled = pkceData.calendarEnabled || false;
-    window.history.replaceState({}, document.title, window.location.pathname);
-    const { code, verifier } = pendingGoogleAuth;
-    (async () => {
-      try {
-        const res = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
-            client_secret: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_SECRET,
-            code,
-            code_verifier: verifier,
-            grant_type: 'authorization_code',
-            redirect_uri: window.location.origin,
-          }),
-        });
-        const data = await res.json();
-        if (data.access_token) {
-          const expiry = Date.now() + (data.expires_in || 3600) * 1000;
-          localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token ?? null, expiry, scope: pkceScope, calendarEnabled: pkceCalendarEnabled }));
-          setGoogleToken(data.access_token);
-          setGoogleScope(pkceScope);
-          setCalendarEnabled(pkceCalendarEnabled);
-          setGmailError(null);
-        } else {
-          const msg = data.error_description || data.error || JSON.stringify(data);
-          console.error('[Google OAuth] Token exchange failed:', data);
-          setGmailError(`Google error: ${msg}`);
-        }
-      } catch (e) {
-        console.error('[Google OAuth] Fetch error:', e);
-        setGmailError(`Network error: ${e.message}`);
-      }
-    })();
-  }, [pendingGoogleAuth]);
-
-  const signInWithGoogle = useCallback(async (accessLevel = 'readonly') => {
-    const verifier = generateCodeVerifier();
-    const challenge = await generateCodeChallenge(verifier);
-    const state = 'gtd_' + generateCodeVerifier().slice(0, 16);
-    // localStorage persists across cross-origin redirects; sessionStorage can be cleared
-    localStorage.setItem('gtd_google_pkce', JSON.stringify({ verifier, state, ts: Date.now(), scope: accessLevel }));
-    const scopeMap = {
-      readonly: 'https://www.googleapis.com/auth/gmail.readonly',
-      modify:   'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic',
-      compose:  'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.settings.basic',
-      send:     'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.settings.basic',
-    };
-    const params = new URLSearchParams({
-      client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
-      redirect_uri: window.location.origin,
-      response_type: 'code',
-      scope: scopeMap[accessLevel] || scopeMap.readonly,
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-      access_type: 'offline',
-      prompt: 'consent',
-      state,
-    });
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-  }, []);
-
-  const disconnectGmail = useCallback(() => {
-    localStorage.removeItem('gtd_google_token');
-    localStorage.removeItem('gtd_google_pkce');
-    setGoogleToken(null);
-    setGoogleScope(null);
-    setCalendarEnabled(false);
-    setGmailError(null);
-  }, []);
-
-  // Connect Google Calendar — re-auths with calendar.events scope, preserving any existing Gmail scope
-  const connectCalendar = useCallback(async () => {
-    const verifier = generateCodeVerifier();
-    const challenge = await generateCodeChallenge(verifier);
-    const state = 'gtd_' + generateCodeVerifier().slice(0, 16);
-    const gmailScopeMap = {
-      readonly: 'https://www.googleapis.com/auth/gmail.readonly',
-      modify:   'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic',
-      compose:  'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.settings.basic',
-      send:     'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.settings.basic',
-    };
-    const gmailScopeStr = googleScope ? (gmailScopeMap[googleScope] || gmailScopeMap.readonly) : '';
-    const scopeStr = [gmailScopeStr, CALENDAR_SCOPE].filter(Boolean).join(' ');
-    localStorage.setItem('gtd_google_pkce', JSON.stringify({ verifier, state, ts: Date.now(), scope: googleScope || 'readonly', calendarEnabled: true }));
-    const params = new URLSearchParams({
-      client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
-      redirect_uri: window.location.origin,
-      response_type: 'code',
-      scope: scopeStr,
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-      access_type: 'offline',
-      prompt: 'consent',
-      state,
-    });
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-  }, [googleScope]);
-
-  // Disconnect calendar only (keep Gmail token intact)
-  const disconnectCalendar = useCallback(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
-      if (stored) { stored.calendarEnabled = false; localStorage.setItem('gtd_google_token', JSON.stringify(stored)); }
-    } catch {}
-    setCalendarEnabled(false);
-    setCalendarEvents([]);
-  }, []);
-
-  // Silently exchange a stored refresh_token for a new access_token.
-  const refreshGoogleToken = useCallback(async () => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
-      if (!stored?.refresh_token) return null;
-      const res = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
-          client_secret: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_SECRET,
-          refresh_token: stored.refresh_token,
-          grant_type: 'refresh_token',
-        }),
-      });
-      const data = await res.json();
-      if (data.access_token) {
-        const expiry = Date.now() + (data.expires_in || 3600) * 1000;
-        // refresh_token is not re-issued on refresh — keep the existing one
-        localStorage.setItem('gtd_google_token', JSON.stringify({ ...stored, access_token: data.access_token, expiry }));
-        setGoogleToken(data.access_token);
-        return data.access_token;
-      }
-      // Refresh failed (revoked, expired refresh token, etc.) — clear everything
-      console.warn('[Gmail OAuth] Refresh failed:', data.error);
-      localStorage.removeItem('gtd_google_token');
-      setGoogleToken(null);
-      setGmailError('Gmail session expired — please reconnect.');
-      return null;
-    } catch (e) {
-      console.warn('[Gmail OAuth] Refresh network error:', e.message);
-      setGmailError('Could not refresh Gmail session — check your connection.');
-      return null;
-    }
-  }, []);
-
-  // On mount: if the access token was expired at startup but a refresh_token is stored, refresh silently.
-  useEffect(() => {
-    if (googleToken) return;
-    const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
-    if (stored?.refresh_token) refreshGoogleToken();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Proactive refresh: schedule a token refresh 5 min before it expires so the session never goes stale.
-  useEffect(() => {
-    if (!googleToken) return;
-    const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
-    if (!stored?.expiry || !stored?.refresh_token) return;
-    const msUntilRefresh = stored.expiry - Date.now() - 5 * 60 * 1000;
-    if (msUntilRefresh <= 0) { refreshGoogleToken(); return; }
-    const timer = setTimeout(() => refreshGoogleToken(), msUntilRefresh);
-    return () => clearTimeout(timer);
-  }, [googleToken, refreshGoogleToken]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
