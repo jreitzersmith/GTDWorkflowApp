@@ -4572,3 +4572,287 @@ const disconnectCalendar = useCallback(() => {
   <div class="annotation"><strong>Passing a setter as a parameter.</strong> <code>calendarEvents</code> belongs in <code>GTDManager</code> because the Calendar view and other parts of the component read it directly. But <code>disconnectCalendar</code> (which lives in the hook) needs to clear it on disconnect. Passing <code>setCalendarEvents</code> as a hook parameter solves this cleanly: the hook gets the update capability without owning the state. The caller must declare that state before the hook call — hence the hoisting of <code>calendarEvents</code> above the <code>useGoogleAuth</code> line.</div>
   <div class="snip-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hooks</a></div>
 </div>
+
+
+<div class="snip-entry" id="snip-pending-new-event">
+  <div class="snip-header">
+    <span class="snip-title">pendingNewEventContext — staging area for guided event prep</span>
+    <span class="snip-file">App.jsx — GTDManager state + callAI handler</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// State declared in GTDManager — holds structured fields for a new calendar event
+// while the AI multi-turn conversation collects the natural-language parts.
+const [pendingNewEventContext, setPendingNewEventContext] = useState(null);
+// Shape: { title, date, startTime, endTime, recurrence, firstOccDate } | null
+
+// When the user clicks "Review" on a new (future) calendar event:
+const processCalendarEventWithAI = useCallback(async (event, forNewEvent = false) => {
+  if (forNewEvent) {
+    // Store the structured fields NOW, before the AI conversation starts.
+    // The AI only needs to supply: task title, time preference, notes.
+    setPendingNewEventContext({
+      title: event.summary,
+      date: event.start?.date || event.start?.dateTime?.slice(0,10),
+      startTime: event.start?.dateTime?.slice(11,16) || null,
+      recurrence: event.recurrence || null,
+      firstOccDate: event.start?.date || event.start?.dateTime?.slice(0,10),
+    });
+  }
+  // ... AI call proceeds as a guided conversation
+}, [callAI]);
+
+// When the AI responds with →NEWEVENT_TASK|title|HH:MM|notes :
+// The handler reads from pendingNewEventContext — it doesn't re-ask the AI
+// for the recurrence rule or date, those are already in the staging object.
+const handleNewEventTask = (title, time, notes) => {
+  const ctx = pendingNewEventContext;
+  if (!ctx) return;
+  const newTask = {
+    id: genId(),
+    text: title,
+    bucket: 'next',
+    dueDate: ctx.date,
+    dueTime: time || ctx.startTime,
+    recurrence: ctx.recurrence ? parseRecurrenceFromGCal(ctx.recurrence) : null,
+    notes: notes || null,
+    // ... other defaults
+  };
+  setTasks(prev => [newTask, ...prev]);
+  setPendingNewEventContext(null); // clear the staging area
+};</code></pre></div>
+  <div class="annotation"><strong>The staging-area pattern.</strong> <code>pendingNewEventContext</code> is set the moment the user clicks Review and holds all the machine-readable fields (ISO date, recurrence rule) for the duration of the AI conversation. When the AI&#8217;s final action arrives, the handler merges the AI&#8217;s three natural-language values with the staged structured data. The staging object is cleared immediately after — if the user switches coach modes, <code>switchCoachMode</code> also calls <code>setPendingNewEventContext(null)</code> so stale context never leaks into a later session.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-due-time-newevent">&#8593; Feature: dueTime &amp; Guided Event Prep</a></div>
+</div>
+
+<div class="snip-entry" id="snip-recurring-ack">
+  <div class="snip-header">
+    <span class="snip-title">recurringAcknowledgedMap — timestamp-based resurfacing</span>
+    <span class="snip-file">App.jsx — GTDManager state + CalendarManagementView render</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Map from recurring event master ID → acknowledgement record.
+// Persisted to localStorage and Supabase user_settings.
+const [recurringAcknowledgedMap, setRecurringAcknowledgedMap] = useState({});
+// Shape: { [masterId]: { acknowledgedAt: number, title: string, recurrenceDesc: string } }
+
+// Configurable threshold — how many days until an acknowledged event resurfaces.
+const [recurringReviewDays, setRecurringReviewDays] = useState(7);
+
+// ── Acknowledging an event ─────────────────────────────────────────────────
+const handleMarkEventSeen = useCallback((ev) => {
+  const key = ev.recurringEventId || ev.id; // use the master series ID
+  setRecurringAcknowledgedMap(prev => ({
+    ...prev,
+    [key]: { acknowledgedAt: Date.now(), title: ev.summary, recurrenceDesc: ev.recurrenceDesc || '' },
+  }));
+}, [setRecurringAcknowledgedMap]);
+
+// ── Deriving visibility on each render ────────────────────────────────────
+// No timer, no explicit "un-suppress" action.
+// An event is suppressed when: acknowledged AND within the threshold window.
+const thresholdMs = recurringReviewDays * 24 * 60 * 60 * 1000;
+
+const pendingRecurring = calendarEvents.filter(ev => {
+  const key = ev.recurringEventId || ev.id;
+  const ack = recurringAcknowledgedMap[key];
+  if (!ack) return true;                          // never acknowledged → show it
+  return (Date.now() - ack.acknowledgedAt) > thresholdMs; // past threshold → resurface
+});</code></pre></div>
+  <div class="annotation"><strong>Derive, don&#8217;t store.</strong> There is no <code>isSuppressed</code> boolean for each event. Instead, suppression is computed fresh on every render by subtracting the stored timestamp from the current time. This means the event automatically &#8220;un-suppresses&#8221; the moment the threshold elapses — without any timer firing or any explicit state update. It&#8217;s always correct because it reads the live clock on each render rather than trusting a stale stored flag.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-recurring-review">&#8593; Feature: Recurring Event Review</a></div>
+</div>
+
+<div class="snip-entry" id="snip-inbox-bulk-bar">
+  <div class="snip-header">
+    <span class="snip-title">InboxBulkBar — multi-select toolbar with project picker</span>
+    <span class="snip-file">App.jsx — module-level component</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// In GTDManager — a Set of selected task IDs, updated by checkbox onChange handlers.
+const [inboxSelectedIds, setInboxSelectedIds] = useState(new Set());
+
+// Each Inbox TaskRow receives onSelect and isSelected props:
+&lt;TaskRow
+  onSelect={(id, checked) =&gt; setInboxSelectedIds(prev =&gt; {
+    const next = new Set(prev);   // immutable copy — React needs a new reference
+    if (checked) next.add(id);
+    else next.delete(id);
+    return next;
+  })}
+  isSelected={inboxSelectedIds.has(task.id)}
+/&gt;
+
+// The InboxBulkBar appears when the selection is non-empty:
+{inboxSelectedIds.size &gt; 0 &amp;&amp; (
+  &lt;InboxBulkBar
+    selectedCount={inboxSelectedIds.size}
+    allTasks={tasks}
+    onAssign={(projectId, newProjectName) =&gt;
+      bulkAssignToProject(inboxSelectedIds, projectId, newProjectName)}
+    onClear={() =&gt; setInboxSelectedIds(new Set())}
+  /&gt;
+)}
+
+// bulkAssignToProject — assigns all selected tasks to an existing or new project.
+// Sets parentId only; does NOT change each task's bucket (they stay in inbox/next/etc.)
+const bulkAssignToProject = useCallback((selectedIds, projectId, newProjectName) =&gt; {
+  const ids = [...selectedIds];
+  if (newProjectName) {
+    const newProjId = genId();
+    setTasks(prev =&gt; {
+      const updated = prev.map(t =&gt;
+        ids.includes(t.id) ? { ...t, parentId: newProjId } : t   // parentId only
+      );
+      return [...updated, { id: newProjId, text: newProjectName.trim(),
+        bucket: 'project', childIds: ids, /* ...defaults */ }];
+    });
+  } else if (projectId) {
+    setTasks(prev =&gt; prev.map(t =&gt; {
+      if (ids.includes(t.id)) return { ...t, parentId: projectId }; // parentId only
+      if (t.id === projectId) {
+        const toAdd = ids.filter(id =&gt; !(t.childIds || []).includes(id));
+        return toAdd.length ? { ...t, childIds: [...(t.childIds||[]), ...toAdd] } : t;
+      }
+      return t;
+    }));
+  }
+  setInboxSelectedIds(new Set()); // clear selection after assign
+}, []);</code></pre></div>
+  <div class="annotation"><strong>Immutable Set updates.</strong> JavaScript Sets are mutable objects — calling <code>prev.add(id)</code> on the existing Set mutates it in place, which React does not detect as a state change (same object reference). The fix is <code>new Set(prev)</code> which creates a fresh Set containing all the existing entries, then you modify the copy. React sees a new reference and re-renders. This is the same reason you always spread arrays (<code>[...prev, newItem]</code>) rather than pushing onto them.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-inbox-bulk-project">&#8593; Feature: Inbox Bulk Selection &amp; Project Grouping</a></div>
+</div>
+
+<div class="snip-entry" id="snip-eligible-projects">
+  <div class="snip-header">
+    <span class="snip-title">eligibleProjects filter — top-level active projects only</span>
+    <span class="snip-file">App.jsx — TaskDetailPanel component</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Build the list of projects the task can be assigned to.
+// excludedIds contains the task itself and all its descendants (prevents cycles).
+const excludedIds = getDescendantIds(task.id, allTasks);
+
+// CORRECT — three guards:
+// 1. bucket === "project"   : only actual projects, not tasks that happen to have parentId
+// 2. !t.parentId            : only ROOT-level projects (not sub-projects nested under another)
+// 3. !t.done                : skip completed projects — they shouldn't receive new work
+// 4. !excludedIds.has(t.id) : skip self and descendants (prevents circular parent references)
+const eligibleProjects = allTasks.filter(
+  t =&gt; t.bucket === "project" &amp;&amp; !t.parentId &amp;&amp; !t.done &amp;&amp; !excludedIds.has(t.id)
+);
+
+// Bug that was fixed: the original filter was missing !t.parentId and !t.done.
+// Sub-projects (projects nested inside another project) were leaking into the list.
+// A second bug (in bulkAssignToProject) set bucket:"project" on child tasks,
+// which caused inbox tasks to appear as selectable projects in this dropdown.
+// Both are now fixed: sub-projects are excluded, and child tasks keep their original bucket.</code></pre></div>
+  <div class="annotation"><strong>Filter predicates compound.</strong> Each guard in the filter removes a different class of invalid option. Removing any one of them breaks a specific scenario: without <code>!t.parentId</code>, sub-projects leak in; without <code>!t.done</code>, completed projects appear; without <code>!excludedIds.has(t.id)</code>, the task could become its own parent (a cycle that breaks the tree). Writing explicit, named predicates makes the intent clear and each failure mode easy to diagnose.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-inbox-bulk-project">&#8593; Feature: Inbox Bulk Selection &amp; Project Grouping</a></div>
+</div>
+<div class="snip-entry" id="snip-use-app-settings">
+  <div class="snip-header">
+    <span class="snip-title">useAppSettings — settings state + localStorage sync</span>
+    <span class="snip-file">App.jsx — module-level hook</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">const DEFAULT_EFFORTS = ["2 min", "5 min", "10 min", "30 min", "1 hour", "2 hours",
+  "6 hours", "1 day", "3 days", "1 week", "1 month"];
+
+function useAppSettings() {
+  const [locations, setLocations] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_locations") || "null")
+            || ["Home", "Work", "Phone", "Computer"]; }
+    catch { return ["Home", "Work", "Phone", "Computer"]; }
+  });
+  const [efforts, setEfforts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_efforts") || "null") || DEFAULT_EFFORTS; }
+    catch { return DEFAULT_EFFORTS; }
+  });
+  // calibrationOverrides: { [effortLabel]: overrideLabel | null }
+  const [calibrationOverrides, setCalibrationOverrides] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_effort_calibration") || "null") || {}; }
+    catch { return {}; }
+  });
+  const [tagDisplay, setTagDisplay] = useState(
+    () => localStorage.getItem("gtd_tag_display") || "below"
+  );
+
+  useEffect(() => { localStorage.setItem("gtd_locations",          JSON.stringify(locations)); }, [locations]);
+  useEffect(() => { localStorage.setItem("gtd_efforts",            JSON.stringify(efforts)); }, [efforts]);
+  useEffect(() => { localStorage.setItem("gtd_effort_calibration", JSON.stringify(calibrationOverrides)); }, [calibrationOverrides]);
+  useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
+
+  return { locations, setLocations, efforts, setEfforts,
+           calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay };
+}
+
+// Usage in GTDManager — replaces 14 lines of state + 4 effect declarations:
+const { locations, setLocations, efforts, setEfforts,
+        calibrationOverrides, setCalibrationOverrides,
+        tagDisplay, setTagDisplay } = useAppSettings();</code></pre></div>
+  <div class="annotation"><strong>Module-level constant, not inline.</strong> <code>DEFAULT_EFFORTS</code> was originally declared with <code>const</code> inside <code>GTDManager</code>, which re-created the array on every render. Moving it outside any function makes it a true constant — allocated once at module load. It also means the Supabase settings-migration path (which also needs the default list) can reference it without prop-drilling or duplication.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hook Extraction</a></div>
+</div>
+
+<div class="snip-entry" id="snip-use-ai-usage-tracking">
+  <div class="snip-header">
+    <span class="snip-title">useAIUsageTracking — token accounting + recordUsage callback</span>
+    <span class="snip-file">App.jsx — module-level hook</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">function useAIUsageTracking() {
+  const [aiUsageStats, setAiUsageStats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_ai_usage') || 'null')
+            || createEmptyUsageStats(); }
+    catch { return createEmptyUsageStats(); }
+  });
+  const [sessionUsage, setSessionUsage] = useState(
+    { inputTokens: 0, outputTokens: 0, requests: 0, costUsd: 0 }
+  );
+
+  useEffect(() => {
+    localStorage.setItem('gtd_ai_usage', JSON.stringify(aiUsageStats));
+  }, [aiUsageStats]);
+
+  const recordUsage = useCallback((inputTokens, outputTokens, durationMs, mode, prov) => {
+    const cost  = prov === 'claude' ? calcCost(inputTokens, outputTokens) : 0;
+    const saved = prov === 'ollama' ? calcCost(inputTokens, outputTokens) : 0;
+    setSessionUsage(prev => ({ ...prev, inputTokens: prev.inputTokens + inputTokens,
+      outputTokens: prev.outputTokens + outputTokens, requests: prev.requests + 1,
+      costUsd: prev.costUsd + cost }));
+    setAiUsageStats(prev => {
+      const mk = mode || 'chat';
+      // ... accumulate byMode, byProvider, history
+    });
+  }, []); // stable — only calls module-level calcCost and state setters
+
+  return { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage };
+}</code></pre></div>
+  <div class="annotation"><strong>Empty dependency array is correct here.</strong> <code>recordUsage</code> has <code>useCallback(fn, [])</code> — it never re-creates. This is safe because the function body only calls <code>calcCost</code> (a module-level pure function) and the two state setter functions returned by <code>useState</code> (which React guarantees are stable references). It does not close over any state value directly — it receives all inputs as arguments. When a <code>useCallback</code> only reads its arguments and calls stable setters, an empty dep array is not a bug, it is correct.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hook Extraction</a></div>
+</div>
+
+<div class="snip-entry" id="snip-use-project-review">
+  <div class="snip-header">
+    <span class="snip-title">useProjectReview — project review flow state</span>
+    <span class="snip-file">App.jsx — module-level hook</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">function useProjectReview() {
+  const [reviewProjectIdx,    setReviewProjectIdx]    = useState(0);
+  const [reviewSuggestions,   setReviewSuggestions]   = useState([]);
+  const [reviewReady,         setReviewReady]         = useState(false);
+  const [reviewMode,          setReviewMode]          = useState(null);
+  const [metadataSuggestions, setMetadataSuggestions] = useState([]);
+
+  return {
+    reviewProjectIdx,    setReviewProjectIdx,
+    reviewSuggestions,   setReviewSuggestions,
+    reviewReady,         setReviewReady,
+    reviewMode,          setReviewMode,
+    metadataSuggestions, setMetadataSuggestions,
+  };
+}
+
+// Usage in GTDManager — replaces 5 useState declarations:
+const { reviewProjectIdx, setReviewProjectIdx,
+        reviewSuggestions, setReviewSuggestions,
+        reviewReady, setReviewReady,
+        reviewMode, setReviewMode,
+        metadataSuggestions, setMetadataSuggestions } = useProjectReview();</code></pre></div>
+  <div class="annotation"><strong>Hooks as logical namespaces.</strong> This hook contains no effects or derived values — it is purely a state namespace. That is still a valid use of a custom hook: grouping five related state slices under a single name makes it clear they belong together, keeps <code>GTDManager</code>'s declaration section shorter, and sets up a clean extraction point when this feature is eventually moved to its own file. The callbacks that act on this state (<code>reviewProject</code>, <code>advanceProjectReview</code>, etc.) still live in <code>GTDManager</code> for now because they depend on <code>tasks</code>, <code>callAI</code>, and other state that has not yet been extracted.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hook Extraction</a></div>
+</div>

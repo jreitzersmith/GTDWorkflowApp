@@ -224,7 +224,7 @@
   <a href="project-summary.html" class="active">📄 Feature Summary</a>
   <a href="project-snippets.html">🔬 Code Snippets</a>
   <a href="project-commits.html">📜 Commit Log</a>
-  <span class="updated">Last updated: May 4, 2026</span>
+  <span class="updated">Last updated: May 5, 2026</span>
 </nav>
 
 <div class="layout">
@@ -306,6 +306,20 @@
     <li><a href="#feat-calendar">Google Calendar</a></li>
     <li><a href="#feat-calendar-actions">Calendar — Delete, Reschedule &amp; AI Actions</a></li>
     <li><a href="#feat-variance">Due-Date Variance Tracking</a></li>
+  </ul>
+
+  <div class="section-label">May 5 &#8212; Refactors</div>
+  <ul>
+    <li><a href="#refactor-dry-cleanup">DRY Cleanup</a></li>
+    <li><a href="#refactor-error-boundaries">Error Boundaries</a></li>
+    <li><a href="#refactor-custom-hooks">Custom Hooks</a></li>
+  </ul>
+
+  <div class="section-label">May 5 &#8212; New</div>
+  <ul>
+    <li><a href="#feat-due-time-newevent">dueTime &amp; Guided Event Prep</a></li>
+    <li><a href="#feat-recurring-review">Recurring Event Review</a></li>
+    <li><a href="#feat-inbox-bulk-project">Inbox Bulk Selection &amp; Project Grouping</a></li>
   </ul>
 
 </aside>
@@ -2291,5 +2305,120 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-supabase-auth">&#x1F52C; useSupabaseAuth hook</a>
       <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-google-auth">&#x1F52C; useGoogleAuth hook signature</a>
       <a class="link-chip chip-commit" href="project-commits.html#commit-c0a2f14">&#x1F4DC; c0a2f14 &#8212; custom hooks</a>
+    </div>
+  </section>
+
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-due-time-newevent">
+    <div class="feat-header">
+      <span class="feat-icon">🕐</span>
+      <span class="feat-title">dueTime Field &amp; Guided New-Event Prep Flow</span>
+      <span class="feat-badge badge-feat">Feature &#8212; May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Two related calendar improvements shipped together. First, tasks can now carry a specific <strong>time of day</strong> alongside their due date — a compact time picker appears next to the date field in the Task Detail Panel, and clearing either field clears both as a unit. The time flows through to the AI coach context so the AI can factor meeting times into scheduling advice.</p>
+      <p>The bigger change is the <strong>guided new-event prep flow</strong>. When you click <em>Review</em> on a future calendar event that hasn&#8217;t been processed yet, instead of the AI producing a generic task list, it starts a focused multi-turn conversation. It asks only for what it can&#8217;t infer — task title, suggested prep time, any notes. All the structured fields (event date, recurrence pattern, first occurrence) are already held in a <code>pendingNewEventContext</code> staging object in app state. When the AI responds with a special <code>&#8594;NEWEVENT_TASK</code> line, the handler merges the AI&#8217;s natural-language values with the structured context and creates a fully-populated prep task in one shot.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: the staging-area state pattern</h4>
+      <p>A <em>staging area</em> is a piece of state that accumulates values across multiple interactions before being committed. Here <code>pendingNewEventContext</code> stores the event&#8217;s recurrence rule and date the moment the user clicks Review. Those values persist across the AI&#8217;s multi-turn conversation. When the final action arrives, the handler reads from the staging object — it doesn&#8217;t have to re-parse or re-ask for those fields. The staging object is cleared by <code>switchCoachMode</code> so it never leaks across sessions. This is the same pattern a multi-step form wizard uses: each step fills in its slice of the final object, and the submit handler reads it all at once.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Think of it as separating config generation from config application. A script (the AI) fills in only the human-readable values — the task title and notes. A template (app state) already holds the machine-readable schema — recurrence syntax, ISO date string. The final merge produces a complete, valid task record. This is exactly how <code>Ansible</code> combines a vars file (structured data) with a template (<code>.j2</code> file) to render a config: the template author only writes the natural-language parts; the structured fields come from elsewhere.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-pending-new-event">&#x1F52C; pendingNewEventContext pattern</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-2254331">&#x1F4DC; 2254331 &#8212; dueTime + guided prep flow</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-recurring-review">
+    <div class="feat-header">
+      <span class="feat-icon">🔄</span>
+      <span class="feat-title">Recurring Event Acknowledgement &amp; Weekly Review Resurfacing</span>
+      <span class="feat-badge badge-feat">Feature &#8212; May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Recurring calendar events (weekly standups, monthly reviews) now have a <strong>Review</strong> button in the Calendar pending-events banner. Clicking it marks the event as acknowledged and suppresses it from the banner for a configurable number of days (default&#160;7, adjustable in Settings &#8594; Weekly Review). Once the threshold passes, the event resurfaces automatically — ensuring recurring commitments stay on your radar without becoming permanent noise.</p>
+      <p>The Weekly Review mode was also extended: it now injects a <strong>RecurringReviewCard</strong> for each over-threshold recurring event, with two actions per card: <em>Still fine &#10003;</em> resets the acknowledgement clock; <em>Needs work &#8594;</em> creates an Inbox task, opens the Task Detail Panel on that task, and resets the clock.</p>
+      <p>Persistence uses both localStorage (<code>gtd_cal_recurring_ack</code>, <code>gtd_recurring_review_days</code>) and Supabase <code>user_settings</code> columns so the state survives across devices.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: deriving visibility from timestamps</h4>
+      <p><code>recurringAcknowledgedMap</code> is a plain object mapping each recurring event&#8217;s master ID to an <code>&#123;acknowledgedAt, title, recurrenceDesc&#125;</code> record. Whether an event appears in the banner is not stored as a boolean — it&#8217;s <em>derived</em> on every render by comparing <code>Date.now() - acknowledgedAt</code> against the threshold in milliseconds. There are no timers, no scheduled jobs, no explicit &#8220;un-suppress&#8221; action. The event simply becomes visible again once enough time has elapsed. This is a core React principle: <em>derive, don&#8217;t store</em>. If a value can be computed from other state, don&#8217;t give it its own state variable — computing it fresh every render keeps your state minimal and always consistent.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The acknowledgement map is exactly like a <em>last-run file</em> (<code>/var/run/myscript.last</code>). Your cron job writes the current timestamp to that file when it runs. The monitoring check reads the file, subtracts from now, and alerts if the gap exceeds a threshold. No alert flag to set or clear — just a timestamp and a comparison. The <code>recurringReviewDays</code> setting is the equivalent of a configurable alert threshold in your monitoring config.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-recurring-ack">&#x1F52C; recurringAcknowledgedMap — resurfacing logic</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-8aac13b">&#x1F4DC; 8aac13b &#8212; recurring acknowledgement</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-f950ef4">&#x1F4DC; f950ef4 &#8212; prop-threading fix</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-inbox-bulk-project">
+    <div class="feat-header">
+      <span class="feat-icon">📁</span>
+      <span class="feat-title">Inbox Bulk Selection &amp; Project Grouping</span>
+      <span class="feat-badge badge-feat">Feature &#8212; May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Three related features that work together to make project assignment faster:</p>
+      <ul>
+        <li><strong>Inbox multi-select:</strong> each Inbox task row now shows a checkbox. When one or more are checked, a sticky <code>InboxBulkBar</code> appears at the top of the list showing how many tasks are selected and an &#8220;Assign to Project &#9660;&#8221; button. The dropdown lists all top-level active projects plus a &#8220;&#65291;&#160;New project&#8230;&#8221; option that advances to a name-entry step. Confirming assigns every selected task as a child of that project in one operation.</li>
+        <li><strong>&#8220;New Project&#8221; in Task Detail Panel:</strong> the Project dropdown on the right-hand detail panel now includes a &#8220;&#65291;&#160;New project&#8230;&#8221; option. Selecting it swaps the dropdown for an inline text field with &#10003;/&#10005; buttons. Pressing Enter (or &#10003;) creates the project and assigns the current task immediately.</li>
+        <li><strong>AI project-grouping suggestion:</strong> when &#8805;&#160;2 tasks are accepted at once from a calendar event suggestion, Claude Haiku silently evaluates (without touching the coach loading state or message history) whether they form a natural project. If yes, a <code>ProjectGroupSuggestionBar</code> appears in the chat panel, suggesting either an existing project or a new project name. The user can accept, pick a different project, or dismiss.</li>
+      </ul>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: using a Set for multi-select state</h4>
+      <p><code>inboxSelectedIds</code> is a <code>Set&lt;string&gt;</code> held in React state. A <code>Set</code> is the right data structure for a selection because membership checks are O(1) — checking <code>inboxSelectedIds.has(task.id)</code> on every row render is instant regardless of how many items are selected. Duplicate IDs are rejected automatically. Because React state must be updated immutably (you can&#8217;t mutate the existing Set in place), every toggle creates a new Set from the old one: <code>const next = new Set(prev); next.add(id); return next;</code>. This is the standard immutable-update pattern for Set state in React.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>This is the same pattern as selecting multiple servers in a management UI before clicking &#8220;Reboot&#8221; or &#8220;Apply patch&#8221;. The selected-IDs Set is equivalent to the bash array you build up before running a command against all targets: <code>for host in &#36;&#123;selected_hosts[@]&#125;; do ssh &#36;host "apt upgrade -y"; done</code>. The <code>InboxBulkBar</code> is the action toolbar that appears once you have at least one target in the array. The &#8220;Clear&#8221; button is <code>unset selected_hosts</code>.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-inbox-bulk-bar">&#x1F52C; InboxBulkBar component</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-eligible-projects">&#x1F52C; eligibleProjects filter</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-b6060b9">&#x1F4DC; b6060b9 &#8212; bulk selection + grouping</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-eda849f">&#x1F4DC; eda849f &#8212; eligibleProjects fix</a>
+    </div>
+  </section>
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-custom-hooks">
+    <div class="feat-header">
+      <span class="feat-icon">🪝</span>
+      <span class="feat-title">Custom Hook Extraction — useAppSettings, useAIUsageTracking, useProjectReview</span>
+      <span class="feat-badge badge-refactor">Refactor &#8212; May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Three custom hooks were extracted from <code>GTDManager</code> as the first pass of item&#160;7 in the code-quality roadmap. The goal is to progressively drain <code>GTDManager</code> of state logic so the component becomes a pure composition root — wiring hooks and passing props — rather than a 2,500-line monolith that does everything.</p>
+      <ul>
+        <li><strong>useAppSettings</strong> — owns <code>locations</code>, <code>efforts</code>, <code>calibrationOverrides</code>, and <code>tagDisplay</code> state, plus their four <code>localStorage</code> sync effects. <code>DEFAULT_EFFORTS</code> was promoted from an inline <code>const</code> inside <code>GTDManager</code> to a module-level constant so both the hook and the Supabase migration path can reference it.</li>
+        <li><strong>useAIUsageTracking</strong> — owns <code>aiUsageStats</code> and <code>sessionUsage</code> state, their <code>localStorage</code> persistence effect, and the <code>recordUsage</code> callback. All token accounting logic is now isolated in one place.</li>
+        <li><strong>useProjectReview</strong> — owns the five state slices that drive the AI project review flow: <code>reviewProjectIdx</code>, <code>reviewSuggestions</code>, <code>reviewReady</code>, <code>reviewMode</code>, and <code>metadataSuggestions</code>.</li>
+      </ul>
+      <p>Net result: 12 <code>useState</code> calls, 7 <code>useEffect</code> calls, and 1 <code>useCallback</code> were removed from <code>GTDManager</code> and replaced with 3 hook destructures. No callsites changed — this is a pure internal refactor with no behaviour change.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: custom hooks as state namespaces</h4>
+      <p>A custom hook is just a function whose name starts with <code>use</code> and that calls other hooks internally. React enforces the same rules inside it (hooks must be called unconditionally, at the top level) but otherwise it is plain JavaScript. The hook encapsulates a slice of state and the effects that keep it consistent — callers get back only what they need via the return value. Think of it as a module: it hides the implementation (how state is persisted, how effects are wired) and exposes a clean public interface. This is exactly the Single Responsibility Principle applied to state management: each hook does one thing and owns everything that thing requires.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Before the extraction, <code>GTDManager</code> was a single <code>init.d</code> script that configured the network, started the database, set up logging, and launched the app — all in one file. The hook extraction is the equivalent of splitting it into <code>network.service</code>, <code>database.service</code>, and <code>app.service</code> with a thin orchestrator that starts them in order. Each service owns its own config and restart logic. The orchestrator just declares dependencies.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-app-settings">&#x1F52C; useAppSettings hook</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-ai-usage-tracking">&#x1F52C; useAIUsageTracking hook</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-project-review">&#x1F52C; useProjectReview hook</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-d467236">&#x1F4DC; d467236 &#8212; hook extraction</a>
     </div>
   </section>

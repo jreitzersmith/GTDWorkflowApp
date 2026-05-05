@@ -1970,3 +1970,93 @@
   <div class="commit-lesson"><strong>Hooks can accept setters as parameters.</strong> When a hook needs to update state that belongs to the calling component, passing the setter as a parameter is the cleanest option — it keeps the state ownership in the component while letting the hook trigger updates. The alternative (returning a callback from the hook that the component must wire up) adds indirection. The constraint is ordering: the state must be declared before the hook call so the setter exists when it&#8217;s passed in.</div>
   <div class="commit-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hooks</a></div>
 </div>
+
+
+<!-- 2254331 -->
+<div class="commit-entry" id="commit-2254331">
+  <div class="commit-top">
+    <span class="commit-hash">2254331</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: dueTime field + guided new-event prep task flow</div>
+  <div class="commit-body">
+    Two changes in one commit. <strong>dueTime field:</strong> a new <code>dueTime</code> string (HH:MM) was added to the task schema — threaded through <code>taskToDb</code>/<code>dbToTask</code>, all three <code>extract*Action</code> parsers, the <code>callAI</code> <code>ACTION:create</code> handler, and <code>getTaskContext</code> so the AI sees it in context. A Supabase migration added the matching <code>due_time TEXT</code> column. The Task Detail Panel shows a time picker next to the date field; clearing either clears both. <strong>Guided prep flow:</strong> <code>processCalendarEventWithAI</code> gains a <code>forNewEvent=true</code> branch that stores the event&#8217;s structured fields (recurrence, date) in a new <code>pendingNewEventContext</code> state object before the AI conversation begins. The AI only supplies three natural-language values; when it responds with <code>&#8594;NEWEVENT_TASK|title|HH:MM|notes</code>, the handler merges those values with the staged context to create a fully-populated prep task. <code>switchCoachMode</code> clears <code>pendingNewEventContext</code> on mode switch to prevent stale context from leaking.
+  </div>
+  <div class="commit-lesson"><strong>Separate the AI&#8217;s job from the app&#8217;s job.</strong> Structured data (recurrence syntax, ISO dates) should never have to flow through the AI&#8217;s natural-language reply — the AI is unreliable at round-tripping machine-readable formats. Store the structured fields in app state before the conversation starts; let the AI supply only what it&#8217;s good at (human-readable titles and notes); merge them together at the end.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-due-time-newevent">&#8593; Feature: dueTime &amp; Guided Event Prep</a></div>
+</div>
+
+<!-- 8aac13b -->
+<div class="commit-entry" id="commit-8aac13b">
+  <div class="commit-top">
+    <span class="commit-hash">8aac13b</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: recurring GCal event acknowledgement + Weekly Review resurfacing</div>
+  <div class="commit-body">
+    Added <code>recurringAcknowledgedMap</code> state (masterId &#8594; <code>&#123;acknowledgedAt, title, recurrenceDesc&#125;</code>) and <code>recurringReviewDays</code> state (default&#160;7). Clicking <em>Review</em> on a recurring event writes a timestamp entry to the map and suppresses the event from the pending-events banner for the threshold period. Suppression is derived on every render by comparing elapsed time against the threshold — no timers or explicit un-suppress action. The Weekly Review mode injects a <code>RecurringReviewCard</code> for each over-threshold recurring event with two actions: <em>Still fine &#10003;</em> resets the clock; <em>Needs work &#8594;</em> creates an Inbox task, opens the Task Detail Panel, and resets the clock. Settings gains a <em>Weekly Review</em> section with a configurable threshold input. Both state values persist to localStorage and Supabase <code>user_settings</code> (new <code>cal_recurring_acknowledged</code> jsonb column and <code>recurring_review_days</code> integer column).
+  </div>
+  <div class="commit-lesson"><strong>Derive visibility from timestamps, not from boolean flags.</strong> Storing a &#8220;suppressed: true&#8221; flag would require a separate scheduled job or timer to flip it back to false. Storing only a timestamp and computing visibility on each render is self-healing — it automatically becomes correct the moment the threshold elapses, with no extra code.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-recurring-review">&#8593; Feature: Recurring Event Review</a></div>
+</div>
+
+<!-- f950ef4 -->
+<div class="commit-entry" id="commit-f950ef4">
+  <div class="commit-top">
+    <span class="commit-hash">f950ef4</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: pass recurringAcknowledgedMap/recurringReviewDays into CalendarManagementView</div>
+  <div class="commit-body">
+    <code>pendingNewCalendarEvents</code> and <code>handleReviewNewEvent</code> are computed inside <code>CalendarManagementView</code>, not in the parent <code>GTDManager</code> — they couldn&#8217;t close over <code>GTDManager</code> state directly. The three new state values (<code>recurringAcknowledgedMap</code>, <code>recurringReviewDays</code>, <code>setRecurringAcknowledgedMap</code>) were threaded down as explicit props to make them available where they are used.
+  </div>
+  <div class="commit-lesson"><strong>Props are the correct channel for sharing state across a component boundary.</strong> When a child component needs parent state, pass it as a prop — don&#8217;t reach around the component boundary via closures, globals, or Context just because it feels like less boilerplate. Explicit props make the data flow visible and the component&#8217;s interface clear.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-recurring-review">&#8593; Feature: Recurring Event Review</a></div>
+</div>
+
+<!-- b6060b9 -->
+<div class="commit-entry" id="commit-b6060b9">
+  <div class="commit-top">
+    <span class="commit-hash">b6060b9</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: bulk inbox selection, project grouping, new-project in detail panel</div>
+  <div class="commit-body">
+    Three related features. <strong>Inbox multi-select:</strong> added <code>inboxSelectedIds</code> (<code>Set&lt;string&gt;</code>) state; checkbox added to <code>TaskRow</code> via <code>onSelect</code>/<code>isSelected</code> props; <code>InboxBulkBar</code> component renders a sticky assign toolbar when the selection is non-empty; <code>bulkAssignToProject</code> callback handles the actual parent/child wiring. <strong>New project in detail panel:</strong> <code>TaskDetailPanel</code> project dropdown gains a <code>__new__</code> option; selecting it swaps the dropdown for an inline text input with &#10003;/&#10005; buttons; confirming calls <code>reassignProject(task.id, null, name)</code> which was extended to create-and-assign in one <code>setTasks</code> call. <strong>AI project-grouping:</strong> after <code>acceptCalendarSuggestions</code> creates &#8805;&#160;2 tasks, a silent Haiku call evaluates whether they form a project; the response parses a <code>&#8594;GROUP:existing|id|name</code> or <code>&#8594;GROUP:new|name</code> line into <code>pendingGroupSuggestion</code> state; <code>ProjectGroupSuggestionBar</code> renders in the chat panel.
+  </div>
+  <div class="commit-lesson"><strong>Use a Set for multi-select state.</strong> A <code>Set&lt;string&gt;</code> gives O(1) membership checks for <code>isSelected</code>, automatically deduplicates IDs, and is trivial to clear. The only React gotcha: you must create a new Set on every update (<code>new Set(prev)</code>) because React uses reference equality to detect state changes — mutating the existing Set in place is invisible to React.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-inbox-bulk-project">&#8593; Feature: Inbox Bulk Selection &amp; Project Grouping</a></div>
+</div>
+
+<!-- eda849f -->
+<div class="commit-entry" id="commit-eda849f">
+  <div class="commit-top">
+    <span class="commit-hash">eda849f</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: eligibleProjects filter + bulkAssignToProject bucket corruption</div>
+  <div class="commit-body">
+    Two bugs fixed. <strong>eligibleProjects filter:</strong> the project dropdown in <code>TaskDetailPanel</code> was missing <code>!t.parentId</code> and <code>!t.done</code> guards, so sub-projects and completed projects appeared as valid assignment targets. Fixed by adding both guards alongside the existing <code>!excludedIds.has(t.id)</code> check. <strong>bulkAssignToProject bucket corruption:</strong> the initial implementation set <code>bucket:&quot;project&quot;</code> on every child task when assigning — turning inbox tasks into apparent projects, which then leaked into the dropdown. The fix removes the bucket override: only <code>parentId</code> is set on child tasks; they remain in their original bucket (inbox, next, etc.). Both bugs were caught during manual testing immediately after the feature was confirmed.
+  </div>
+  <div class="commit-lesson"><strong>Setting too many fields in one operation is a common source of bugs.</strong> When assigning a task to a project, the only correct change is <code>parentId</code>. Changing <code>bucket</code> at the same time conflated two separate concerns — hierarchy (parentId) and workflow state (bucket) — and caused the task to impersonate a project. Keep mutations minimal and single-purpose.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-inbox-bulk-project">&#8593; Feature: Inbox Bulk Selection &amp; Project Grouping</a></div>
+</div>
+<!-- d467236 -->
+<div class="commit-entry" id="commit-d467236">
+  <div class="commit-top">
+    <span class="commit-hash">d467236</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: extract useAppSettings, useAIUsageTracking, useProjectReview hooks</div>
+  <div class="commit-body">
+    First pass of custom hook extraction from <code>GTDManager</code> (item&#160;7 of the code-quality roadmap). <strong>useAppSettings</strong> captures <code>locations</code>, <code>efforts</code>, <code>calibrationOverrides</code>, <code>tagDisplay</code> and their four <code>localStorage</code> sync effects; <code>DEFAULT_EFFORTS</code> promoted to module-level constant. <strong>useAIUsageTracking</strong> captures <code>aiUsageStats</code>, <code>sessionUsage</code>, their persistence effect, and the <code>recordUsage</code> <code>useCallback</code>. <strong>useProjectReview</strong> captures the five state slices driving the project review UI. Net removal from <code>GTDManager</code>: 12 <code>useState</code> declarations, 7 <code>useEffect</code> calls, 1 <code>useCallback</code> — replaced by 3 hook destructures. Pure internal refactor; no behaviour change.
+  </div>
+  <div class="commit-lesson"><strong>Strip state from the root component incrementally.</strong> Extracting hooks one domain at a time is safer than a big-bang split. Each hook can be validated in isolation (settings still persist? usage panel still updates?), and <code>GTDManager</code> shrinks in measurable steps. The remaining entangled state (task sync, AI chat, calendar) follows the same pattern once the simpler domains are clean.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hook Extraction</a></div>
+</div>
