@@ -2133,49 +2133,92 @@ function useGmailState() {
   return { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount };
 }
 
+const INITIAL_COACH_MESSAGE = "Hi! I'm your GTD Coach. I can see your task list and help you stay organized.\n\nAdd tasks to your **Inbox**, then hit **Process Inbox with AI** to sort them — or just ask me anything.";
+
+function useAICoachState() {
+  const [messages, setMessages] = useState([{ role: 'assistant', text: INITIAL_COACH_MESSAGE }]);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [coachMode, setCoachMode] = useState('chat');
+  const [chatInput, setChatInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [moveMenu, setMoveMenu] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+  const chatEndRef = useRef(null);
+  const chatInputRef = useRef(null);
+  const [provider, setProvider] = useState(() => localStorage.getItem('gtd_provider') || 'claude');
+  const [localModel, setLocalModel] = useState(() => localStorage.getItem('gtd_local_model') || 'llama3.3:70b');
+  const [availableModels, setAvailableModels] = useState([]);
+
+  useEffect(() => { localStorage.setItem('gtd_provider', provider); }, [provider]);
+  useEffect(() => { localStorage.setItem('gtd_local_model', localModel); }, [localModel]);
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  return {
+    messages, setMessages,
+    chatHistory, setChatHistory,
+    coachMode, setCoachMode,
+    chatInput, setChatInput,
+    loading, setLoading,
+    moveMenu, setMoveMenu,
+    pendingAction, setPendingAction,
+    chatEndRef, chatInputRef,
+    provider, setProvider,
+    localModel, setLocalModel,
+    availableModels, setAvailableModels,
+  };
+}
+
+function useTaskUIState() {
+  const [currentBucket, setCurrentBucket] = useState('inbox');
+  const [addText, setAddText] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showUsage, setShowUsage] = useState(false);
+  const [nextGroupBy, setNextGroupBy] = useState('none');
+  const [projectParentId, setProjectParentId] = useState('__new__');
+  const [collapsedNodes, setCollapsedNodes] = useState(new Set());
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [actualEffortPrompt, setActualEffortPrompt] = useState(null);
+  const [pendingRollup, setPendingRollup] = useState(null);
+  const [pendingDeferCheck, setPendingDeferCheck] = useState(null);
+  const [dragId, setDragId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+  const [inboxSelectedIds, setInboxSelectedIds] = useState(new Set());
+  const [pendingGroupSuggestion, setPendingGroupSuggestion] = useState(null);
+
+  return {
+    currentBucket, setCurrentBucket,
+    addText, setAddText,
+    showSettings, setShowSettings,
+    showUsage, setShowUsage,
+    nextGroupBy, setNextGroupBy,
+    projectParentId, setProjectParentId,
+    collapsedNodes, setCollapsedNodes,
+    selectedTaskId, setSelectedTaskId,
+    actualEffortPrompt, setActualEffortPrompt,
+    pendingRollup, setPendingRollup,
+    pendingDeferCheck, setPendingDeferCheck,
+    dragId, setDragId,
+    dropTarget, setDropTarget,
+    inboxSelectedIds, setInboxSelectedIds,
+    pendingGroupSuggestion, setPendingGroupSuggestion,
+  };
+}
+
 export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
-  const [currentBucket, setCurrentBucket] = useState("inbox");
-  const [addText, setAddText] = useState("");
-  const [messages, setMessages] = useState([{ role: "assistant", text: "Hi! I'm your GTD Coach. I can see your task list and help you stay organized.\n\nAdd tasks to your **Inbox**, then hit **Process Inbox with AI** to sort them — or just ask me anything." }]);
-  const [chatHistory, setChatHistory] = useState([]);
-  const [coachMode, setCoachMode] = useState("chat");
-  const [chatInput, setChatInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [moveMenu, setMoveMenu] = useState(null);
-  const [pendingAction, setPendingAction] = useState(null); // { type, title, nextAction }
-  const chatEndRef = useRef(null);
-  const chatInputRef = useRef(null);
-  const [provider, setProvider] = useState(() => localStorage.getItem("gtd_provider") || "claude");
-  const [localModel, setLocalModel] = useState(() => localStorage.getItem("gtd_local_model") || "llama3.3:70b");
-  const [availableModels, setAvailableModels] = useState([]);
+  const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
   const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay } = useAppSettings();
-  const [showSettings, setShowSettings] = useState(false);
-  const [showUsage, setShowUsage] = useState(false);
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
   const { googleToken, googleScope, calendarEnabled, gmailError,
           signInWithGoogle, disconnectGmail, connectCalendar, disconnectCalendar,
           refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
-  const [nextGroupBy, setNextGroupBy] = useState("none");
-  const [projectParentId, setProjectParentId] = useState("__new__");
-  // Set of task IDs whose children are currently hidden in the Projects view.
-  const [collapsedNodes, setCollapsedNodes] = useState(new Set());
-  // ID of the task whose detail panel is currently open (null = closed).
-  const [selectedTaskId, setSelectedTaskId] = useState(null);
-  const [actualEffortPrompt, setActualEffortPrompt] = useState(null); // { taskId, taskText, estimatedEffort }
-  const [pendingRollup, setPendingRollup] = useState(null);           // { taskId, taskText, notes, parentId, parentText }
-  const [pendingDeferCheck, setPendingDeferCheck] = useState(null);    // { taskId, taskText, deferredChildren }
-  const [dragId,             setDragId]             = useState(null);
-  const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
-  // Inbox bulk-selection — Set of task IDs currently checked in the Inbox view.
-  const [inboxSelectedIds,   setInboxSelectedIds]   = useState(new Set());
-  // AI project-grouping suggestion after calendar tasks are accepted.
-  // { taskIds: string[], suggestion: { type: 'existing'|'new', projectId?: string, name?: string } } | null
-  const [pendingGroupSuggestion, setPendingGroupSuggestion] = useState(null);
+  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, dragId, setDragId, dropTarget, setDropTarget, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
 
   // ── Auth ───────────────────────────────────────────────────────────────
@@ -2428,13 +2471,6 @@ export default function GTDManager() {
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [authUser, supabaseReady]);
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  useEffect(() => { localStorage.setItem("gtd_provider", provider); }, [provider]);
-  useEffect(() => { localStorage.setItem("gtd_local_model", localModel); }, [localModel]);
 
   // Load gmail_queue from Supabase on auth ready, merge with any localStorage entries
   useEffect(() => {
