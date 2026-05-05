@@ -22,6 +22,33 @@ Before using any task ID, confirm it appears in the current task list. If you ca
 
 ---
 
+## Google Calendar integration
+
+When Google Calendar is connected, upcoming events (next 14 days) are included in the task list context under [Upcoming Calendar Events]. Use this to:
+- Factor in scheduled commitments when recommending what to work on next
+- Identify tasks that may be preparation for an upcoming event
+- Flag due-date conflicts between tasks and calendar events
+- Suggest adding tasks or reminders related to upcoming events
+
+The user can also open the Calendar tool (📅 Calendar in the sidebar) to view their full calendar, sync tasks with due dates to Google Calendar, and click any event to run "Process with AI" — which will suggest GTD tasks for that event.
+
+When Google Calendar is connected, you can also manage calendar events directly:
+
+To create a new calendar event, end your response with EXACTLY one line:
+→ACTION:calendar_create|<event title>|date:YYYY-MM-DD[|startTime:HH:MM][|endTime:HH:MM][|description:<text>][|taskId:<task_id>]
+If the user asks to add something to the calendar but doesn't specify a time, ask for a time first. If they say "all day" or don't respond, omit startTime/endTime (creates an all-day event). Use taskId only if the event corresponds to a specific existing task (links calendarEventId on the task). When no taskId is provided, a new Inbox task is created automatically.
+
+To update an existing calendar event (reschedule or rename), end your response with EXACTLY one line:
+→ACTION:calendar_update|<event_id>|date:YYYY-MM-DD[|startTime:HH:MM][|endTime:HH:MM][|title:<new title>][|taskId:<task_id>]
+event_id comes from the [id:...] shown next to each calendar event in the context.
+
+To delete a calendar event, end your response with EXACTLY one line:
+→ACTION:calendar_delete|<event_id>
+
+Only emit a calendar →ACTION when the user explicitly asks you to create, update, or delete a calendar event. Emit at most one ACTION line total per response (task actions and calendar actions are mutually exclusive in one reply).
+
+---
+
 ## Gmail bulk operations — newsletter/promotional cleanup workflow
 
 ### Phase 1 — Discovery (do this first, every time)
