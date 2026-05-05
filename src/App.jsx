@@ -203,6 +203,8 @@ Given a project name, its current subtasks, and any metadata, you will:
 1. Write 2-3 sentences assessing the project's current state and momentum.
 2. Identify 2-4 specific, concrete next actions that appear to be missing or would unblock progress.
 
+IMPORTANT: Do not suggest any action that already appears in the current subtasks list, even if the wording differs slightly. Only suggest genuinely new actions not already captured.
+
 End your response with EXACTLY this block — nothing after it:
 →SUGGESTIONS:
 1. [First missing action — start with a strong verb: Call, Draft, Research, Schedule, etc.]
@@ -3198,7 +3200,9 @@ export default function GTDManager() {
     setReviewReady(false);
     const reply = await callAI(prompt, "projectReview", []);
     if (reply) {
-      const suggestions = extractSuggestions(reply);
+      const existingTexts = new Set(children.map(t => t.text.trim().toLowerCase()));
+      const suggestions = extractSuggestions(reply)
+        .filter(text => !existingTexts.has(text.trim().toLowerCase()));
       setReviewSuggestions(suggestions.map(text => ({ text, checked: true })));
       setReviewProjectIdx(idx);
       setReviewReady(true);
@@ -3357,6 +3361,24 @@ export default function GTDManager() {
       reviewProjectMetadata(rootProjects[nextIdx], nextIdx, rootProjects.length);
     }
   }, [reviewProjectIdx, metadataSuggestions, tasks, reviewProjectMetadata, updateTask]);
+
+  // Advances to the next project without applying any metadata suggestions.
+  const skipMetadataReview = useCallback(() => {
+    setMetadataSuggestions([]);
+    setReviewReady(false);
+    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const nextIdx = reviewProjectIdx + 1;
+
+    if (nextIdx >= rootProjects.length) {
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        text: `🎉 **All ${rootProjects.length} project${rootProjects.length !== 1 ? "s" : ""} reviewed!** Metadata has been updated across your projects.`,
+      }]);
+      setCoachMode("chat");
+    } else {
+      reviewProjectMetadata(rootProjects[nextIdx], nextIdx, rootProjects.length);
+    }
+  }, [reviewProjectIdx, tasks, reviewProjectMetadata]);
 
   // ── Entry point + mode selection ────────────────────────────────────────
   const startProjectReview = useCallback(() => {
@@ -4447,6 +4469,7 @@ export default function GTDManager() {
                   prev.map((s, i) => i === idx ? { ...s, overrides: { ...s.overrides, [field]: value } } : s)
                 )}
                 onNext={advanceMetadataReview}
+                onSkip={skipMetadataReview}
                 projectIdx={reviewProjectIdx}
                 totalProjects={tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done).length}
               />
@@ -5367,7 +5390,7 @@ function ReviewModeBar({ onSelect }) {
   );
 }
 
-function MetadataReviewBar({ suggestions, onToggleAccepted, onChangeOverride, onNext, projectIdx, totalProjects }) {
+function MetadataReviewBar({ suggestions, onToggleAccepted, onChangeOverride, onNext, onSkip, projectIdx, totalProjects }) {
   const isEmpty = suggestions.length === 0;
   const isLast  = projectIdx + 1 >= totalProjects;
   const acceptedCount = suggestions.filter(s => s.accepted).length;
@@ -5425,6 +5448,12 @@ function MetadataReviewBar({ suggestions, onToggleAccepted, onChangeOverride, on
           style={{ padding: "4px 14px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
         >
           {nextLabel}
+        </button>
+        <button
+          onClick={onSkip}
+          style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+        >
+          {isLast ? "Skip (Finish)" : "Skip →"}
         </button>
         <span style={{ fontSize: 11, color: COLORS.muted }}>
           Project {projectIdx + 1} of {totalProjects}
