@@ -4252,6 +4252,86 @@ const handleReschedule = async () =&gt; {
 </div>
 
 
+<!-- ═══════════════════════════════════════════════════ snip-variance-updatetask -->
+<div class="snip-block" id="snip-variance-updatetask">
+  <div class="snip-title">updateTask — originalDueDate auto-set on first dueDate assignment</div>
+  <div class="snip-meta">App.jsx · updateTask callback</div>
+  <div class="snip-code"><pre><code class="language-javascript">const updateTask = useCallback((id, changes) =&gt; {
+  setTasks(prev =&gt; {
+    // Auto-set originalDueDate on first dueDate assignment
+    const existing = prev.find(t =&gt; t.id === id);
+    const ch = (existing &amp;&amp; "dueDate" in changes &amp;&amp; changes.dueDate &amp;&amp; !existing.originalDueDate)
+      ? { ...changes, originalDueDate: changes.dueDate }
+      : changes;
+    // Fast path: no deferUntil change — simple single-task update
+    if (!("deferUntil" in ch)) {
+      return prev.map(t =&gt; t.id === id ? { ...t, ...ch } : t);
+    }
+    // ... slow path for deferUntil cascade (uses `ch` throughout)
+  });
+}, []);</code></pre></div>
+  <div class="annotation"><strong>Augmenting changes at the state boundary.</strong> Rather than requiring every call site to pass <code>originalDueDate</code>, <code>updateTask</code> computes it once inside <code>setTasks</code>. The check is: <em>is a new non-null dueDate being set on a task that doesn't yet have an originalDueDate?</em> If so, produce an augmented <code>ch</code> that adds the field; otherwise use <code>changes</code> as-is. All subsequent code — both the fast path and the deferUntil slow path — operates on <code>ch</code>. This means any future call site (AI action parser, CSV import, etc.) automatically gets the right behavior without knowing the derived-field rule exists.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-variance">↑ Feature: Due-Date Variance Tracking</a></div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════ snip-variance-panel -->
+<div class="snip-block" id="snip-variance-panel">
+  <div class="snip-title">TaskDetailPanel — Orig. Due / Completed / Variance rows</div>
+  <div class="snip-meta">App.jsx · TaskDetailPanel JSX</div>
+  <div class="snip-code"><pre><code class="language-javascript">// Orig. Due row — editable with double-confirm
+&lt;div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}&gt;
+  &lt;span style={{ color: COLORS.muted, width: 64 }}&gt;Orig. Due&lt;/span&gt;
+  {editingOriginalDue ? (
+    confirmOriginalDue ? (
+      &lt;div&gt;
+        &lt;span&gt;Reset original due date to {originalDueDraft}? This affects variance tracking.&lt;/span&gt;
+        &lt;button onClick={() =&gt; { onUpdate(task.id, { originalDueDate: originalDueDraft }); setEditingOriginalDue(false); setConfirmOriginalDue(false); }}&gt;Confirm&lt;/button&gt;
+        &lt;button onClick={() =&gt; { setEditingOriginalDue(false); setConfirmOriginalDue(false); }}&gt;Cancel&lt;/button&gt;
+      &lt;/div&gt;
+    ) : (
+      &lt;div&gt;
+        &lt;input type="date" value={originalDueDraft} onChange={e =&gt; setOriginalDueDraft(e.target.value)} /&gt;
+        &lt;button onClick={() =&gt; { if (originalDueDraft) setConfirmOriginalDue(true); }}&gt;Set&lt;/button&gt;
+        &lt;button onClick={() =&gt; setEditingOriginalDue(false)}&gt;✕&lt;/button&gt;
+      &lt;/div&gt;
+    )
+  ) : (
+    &lt;div&gt;
+      &lt;span&gt;{task.originalDueDate || "—"}&lt;/span&gt;
+      &lt;button onClick={() =&gt; { setOriginalDueDraft(task.originalDueDate || ""); setEditingOriginalDue(true); }}&gt;edit&lt;/button&gt;
+    &lt;/div&gt;
+  )}
+&lt;/div&gt;
+
+{/* Completed date — read-only, only shown when set */}
+{task.completedDate &amp;&amp; (
+  &lt;div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}&gt;
+    &lt;span style={{ color: COLORS.muted, width: 64 }}&gt;Completed&lt;/span&gt;
+    &lt;span&gt;{task.completedDate}&lt;/span&gt;
+  &lt;/div&gt;
+)}
+
+{/* Variance chip — IIFE computes days diff inline */}
+{task.originalDueDate &amp;&amp; (task.dueDate || task.completedDate) &amp;&amp; (() =&gt; {
+  const ref = new Date(task.originalDueDate);
+  const cmp = new Date(task.completedDate || task.dueDate);
+  const days = Math.round((cmp - ref) / 86400000);
+  const color = days &lt;= 0 ? "#22c55e" : days &lt;= 7 ? "#f59e0b" : "#ef4444";
+  const label = days === 0 ? "On time" : days &lt; 0 ? `${Math.abs(days)}d early` : `${days}d late`;
+  return (
+    &lt;div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}&gt;
+      &lt;span style={{ color: COLORS.muted, width: 64 }}&gt;Variance&lt;/span&gt;
+      &lt;span style={{ background: color + "22", color, border: `1px solid ${color}55`,
+        borderRadius: 4, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}&gt;{label}&lt;/span&gt;
+    &lt;/div&gt;
+  );
+})()}</code></pre></div>
+  <div class="annotation"><strong>Three-state edit flow and IIFE rendering.</strong> The Orig. Due field has three render states controlled by two booleans: <em>display</em> (<code>!editingOriginalDue</code>), <em>date picker</em> (<code>editingOriginalDue &amp;&amp; !confirmOriginalDue</code>), and <em>confirm prompt</em> (<code>editingOriginalDue &amp;&amp; confirmOriginalDue</code>). This staged approach gives users a safety net before overwriting a meaningful field. The Variance chip uses an IIFE so it can declare local constants (<code>ref</code>, <code>cmp</code>, <code>days</code>, <code>color</code>, <code>label</code>) inline in JSX without a separate component or helper function. The IIFE pattern trades a tiny bit of readability for the convenience of keeping the logic co-located with its output.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-variance">↑ Feature: Due-Date Variance Tracking</a></div>
+</div>
+
+
 </main>
 </div>
 

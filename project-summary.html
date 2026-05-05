@@ -305,6 +305,7 @@
     <li><a href="#feat-settings-sync">Supabase Settings Sync</a></li>
     <li><a href="#feat-calendar">Google Calendar</a></li>
     <li><a href="#feat-calendar-actions">Calendar — Delete, Reschedule &amp; AI Actions</a></li>
+    <li><a href="#feat-variance">Due-Date Variance Tracking</a></li>
   </ul>
 
 </aside>
@@ -2165,6 +2166,38 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-snippet" href="project-snippets.html#snip-cal-action-handler">🔬 callAI — calendar action handler</a>
       <a class="link-chip chip-snippet" href="project-snippets.html#snip-cal-event-detail">🔬 EventDetailPanel — delete + reschedule UI</a>
       <a class="link-chip chip-commit" href="project-commits.html#commit-e1cf66c">📜 e1cf66c — Calendar delete/reschedule/AI actions</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-variance">
+    <div class="feat-header">
+      <span class="feat-icon">📊</span>
+      <span class="feat-title">Due-Date Variance Tracking</span>
+      <span class="feat-badge badge-new">New — May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Two new task fields — <code>originalDueDate</code> and <code>completedDate</code> — enable the app to measure whether tasks were finished on time, late, or early relative to their original estimate.</p>
+      <p><strong>originalDueDate</strong> is set automatically the first time a due date is assigned to a task (inside <code>updateTask</code>). It is never overwritten by subsequent due-date edits, so it always represents the initial commitment. The user can manually reset it via a double-confirm edit flow in the Task Detail Panel (the confirmation message is "Reset original due date to [date]? This affects variance tracking."). The field is also passed to the AI coach so it can factor commitment accuracy into its advice.</p>
+      <p><strong>completedDate</strong> is set to today's date string (<code>YYYY-MM-DD</code>) at all four completion code paths: <code>completeTask</code> (done branch), <code>finishComplete</code>, <code>handleActualEffortSave</code>, and <code>handleActualEffortSkip</code>. It is cleared to <code>null</code> when a task is un-completed so the field stays accurate if a task is reopened.</p>
+      <p><strong>Task Detail Panel</strong> gains three new read rows beneath the Due date field. <em>Orig. Due</em> shows the stored original date with an "edit" button that opens an inline date picker and double-confirm flow. <em>Completed</em> shows <code>completedDate</code> and is only visible for finished tasks. <em>Variance</em> shows a color-coded chip: green for on-time or early, amber for 1–7 days late, red for more than 7 days late. For open tasks it compares <code>originalDueDate</code> to the current <code>dueDate</code>; for completed tasks it compares to <code>completedDate</code>.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: augmenting changes before applying them</h4>
+      <p>The <code>updateTask</code> callback receives a <code>changes</code> object from callers that only contains the fields they care about. Rather than require every call site to know about <code>originalDueDate</code>, the logic is centralised inside <code>setTasks</code>: before running the fast-path map, the function checks whether <code>dueDate</code> is being set for the first time and, if so, produces an augmented <code>ch</code> object that includes <code>originalDueDate</code>. All subsequent code (fast path and slow deferUntil path) uses <code>ch</code> instead of <code>changes</code>. This is a clean way to enforce derived-field rules in a single place without a useEffect or a separate callback.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: IIFE in JSX for inline computed rendering</h4>
+      <p>The Variance chip is rendered via an immediately-invoked function expression (IIFE) inside JSX: <code>{task.originalDueDate &amp;&amp; (task.dueDate || task.completedDate) &amp;&amp; (() =&gt; { ... return (&lt;div&gt;...&lt;/div&gt;); })()}</code>. The IIFE lets you declare local constants (<code>ref</code>, <code>cmp</code>, <code>days</code>, <code>color</code>, <code>label</code>) without extracting a separate component or polluting the enclosing function scope. It's a useful pattern when a JSX expression needs multi-step computation that doesn't warrant its own component.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p><code>originalDueDate</code> is like the ticket's "reported date" in an incident tracker — it records when the work was first scoped, not when the scope last changed. <code>completedDate</code> is the "resolved at" timestamp. The variance chip is the SLA compliance indicator: green = within SLA, amber = minor breach, red = major breach.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-variance-updatetask">🔬 updateTask — originalDueDate auto-set</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-variance-panel">🔬 TaskDetailPanel — Orig. Due / Completed / Variance rows</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-de65bda">📜 de65bda — Due-date variance tracking</a>
     </div>
   </section>
 

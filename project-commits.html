@@ -1897,6 +1897,22 @@
 </div>
 
 
+<!-- de65bda -->
+<div class="commit-entry" id="commit-de65bda">
+  <div class="commit-top">
+    <span class="commit-hash">de65bda</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: add due-date variance tracking (originalDueDate + completedDate)</div>
+  <div class="commit-body">
+    Adds two new task fields and related UI. <strong>originalDueDate</strong> is set automatically inside <code>updateTask</code> when a due date is assigned for the first time — the <code>changes</code> object is augmented to include it before the state map runs, so no call site needs updating. It is never overwritten automatically; the user can reset it via a double-confirm edit flow in the Task Detail Panel. <strong>completedDate</strong> is written as a <code>YYYY-MM-DD</code> string at all four task-completion paths (<code>completeTask</code>, <code>finishComplete</code>, <code>handleActualEffortSave</code>, <code>handleActualEffortSkip</code>) and cleared when a task is un-completed. Both fields are included in the AI context via <code>getTaskContext</code> (<code>original-due</code> and <code>completed</code> meta tags). The <strong>Task Detail Panel</strong> gains three new rows beneath Due: <em>Orig. Due</em> (editable via double-confirm), <em>Completed</em> (read-only, hidden when absent), and <em>Variance</em> (color-coded chip: green ≤ 0 days, amber 1–7, red &gt; 7 — computed via IIFE in JSX).
+  </div>
+  <div class="commit-lesson"><strong>Pattern — augment derived fields at the state boundary, not at call sites.</strong> <code>originalDueDate</code> is a derived field (it's the first value of <code>dueDate</code>). Instead of making every caller pass it, <code>updateTask</code> checks the condition once and augments <code>changes</code> before applying it. This keeps the rule in one place and means future call sites (AI actions, imports, etc.) automatically get it right without needing to know about the derived field.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-variance">↑ Feature: Due-Date Variance Tracking</a></div>
+</div>
+
+
 </main>
 </div>
 
