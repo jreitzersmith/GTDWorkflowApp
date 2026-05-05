@@ -134,6 +134,21 @@ When Google Calendar is connected, upcoming events (next 14 days) are included i
 
 The user can also open the Calendar tool (📅 Calendar in the sidebar) to view their full calendar, sync tasks with due dates to Google Calendar, and click any event to run "Process with AI" — which will suggest GTD tasks for that event.
 
+When Google Calendar is connected, you can also manage calendar events directly:
+
+To create a new calendar event, end your response with EXACTLY one line:
+→ACTION:calendar_create|<event title>|date:YYYY-MM-DD[|startTime:HH:MM][|endTime:HH:MM][|description:<text>][|taskId:<task_id>]
+If the user asks to add something to the calendar but doesn't specify a time, ask for a time first. If they say "all day" or don't respond, omit startTime/endTime (creates an all-day event). Use taskId only if the event corresponds to a specific task (links calendarEventId on the task).
+
+To update an existing calendar event (reschedule or rename), end your response with EXACTLY one line:
+→ACTION:calendar_update|<event_id>|date:YYYY-MM-DD[|startTime:HH:MM][|endTime:HH:MM][|title:<new title>][|taskId:<task_id>]
+event_id comes from the [id:...] shown next to each calendar event in the context.
+
+To delete a calendar event, end your response with EXACTLY one line:
+→ACTION:calendar_delete|<event_id>
+
+Only emit a calendar →ACTION when the user explicitly asks you to create, update, or delete a calendar event. Emit at most one ACTION line total per response (task actions and calendar actions are mutually exclusive in one reply).
+
 Gmail bulk operations — newsletter/promotional cleanup workflow:
 
 Phase 1 — Discovery (do this first, every time):
@@ -830,6 +845,36 @@ async function doCalendarCreateEvent(token, { summary, description, date, startT
   return await res.json();
 }
 
+async function doCalendarDeleteEvent(token, eventId) {
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok && res.status !== 204) { const d = await res.json().catch(() => ({})); throw new Error(d.error?.message || `Calendar API ${res.status}`); }
+}
+
+async function doCalendarUpdateEvent(token, eventId, { summary, date, startTime, endTime }) {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const patch = {};
+  if (summary) patch.summary = summary;
+  if (date) {
+    if (startTime && endTime) {
+      patch.start = { dateTime: `${date}T${startTime}:00`, timeZone: tz };
+      patch.end   = { dateTime: `${date}T${endTime}:00`,   timeZone: tz };
+    } else {
+      patch.start = { date };
+      patch.end   = { date };
+    }
+  }
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Calendar API ${res.status}`); }
+  return await res.json();
+}
+
 // ── Calendar date/display utilities ─────────────────────────────────────────
 
 function calEventStart(ev) {
@@ -1084,6 +1129,55 @@ function extractCreateAction(text) {
   });
   if (!title || !fields.bucket) return null;
   return { title, ...fields };
+}
+
+// Parse →ACTION:calendar_create from AI reply
+function extractCalendarCreateAction(text) {
+  const m = text.match(/→ACTION:calendar_create\|([^|\n]+)\|(.*)/s);
+  if (!m) return null;
+  const title = m[1].trim();
+  const fields = {};
+  m[2].split('|').filter(Boolean).forEach(pair => {
+    const colon = pair.indexOf(':');
+    if (colon === -1) return;
+    const key = pair.slice(0, colon).trim();
+    const val = pair.slice(colon + 1).trim();
+    if (key === 'date')        fields.date        = val;
+    if (key === 'startTime')   fields.startTime   = val;
+    if (key === 'endTime')     fields.endTime     = val;
+    if (key === 'description') fields.description = val;
+    if (key === 'taskId')      fields.taskId      = val;
+  });
+  if (!title || !fields.date) return null;
+  return { title, ...fields };
+}
+
+// Parse →ACTION:calendar_update from AI reply
+function extractCalendarUpdateAction(text) {
+  const m = text.match(/→ACTION:calendar_update\|([^|\n]+)\|(.*)/s);
+  if (!m) return null;
+  const eventId = m[1].trim();
+  const fields = {};
+  m[2].split('|').filter(Boolean).forEach(pair => {
+    const colon = pair.indexOf(':');
+    if (colon === -1) return;
+    const key = pair.slice(0, colon).trim();
+    const val = pair.slice(colon + 1).trim();
+    if (key === 'date')        fields.date        = val;
+    if (key === 'startTime')   fields.startTime   = val;
+    if (key === 'endTime')     fields.endTime     = val;
+    if (key === 'title')       fields.title       = val;
+    if (key === 'taskId')      fields.taskId      = val;
+  });
+  if (!eventId) return null;
+  return { eventId, ...fields };
+}
+
+// Parse →ACTION:calendar_delete from AI reply
+function extractCalendarDeleteAction(text) {
+  const m = text.match(/→ACTION:calendar_delete\|([^\n]+)/);
+  if (!m) return null;
+  return { eventId: m[1].trim() };
 }
 
 // Waterfall: a task is visible in Next Actions only when it has no incomplete next-bucket children.
@@ -2090,7 +2184,7 @@ export default function GTDManager() {
           const dateStr = s.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
           const timeStr = isAllDayEvent(ev) ? 'All day' : s.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
           const loc = ev.location ? ` @ ${ev.location}` : '';
-          return `- ${dateStr} ${timeStr}: "${ev.summary || '(No title)'}${loc}"`;
+          return `- ${dateStr} ${timeStr}: "${ev.summary || '(No title)'}${loc}" [id:${ev.id}]`;
         });
         calSection = `\n\n[Upcoming Calendar Events — next 14 days]\n${lines.join('\n')}`;
       } else {
@@ -2452,6 +2546,52 @@ export default function GTDManager() {
         }
       }
 
+      if (googleToken && calendarEnabled) {
+        const calCreate = extractCalendarCreateAction(reply);
+        const calUpdate = extractCalendarUpdateAction(reply);
+        const calDelete = extractCalendarDeleteAction(reply);
+        if (calCreate) {
+          try {
+            const ev = await doCalendarCreateEvent(googleToken, {
+              summary: calCreate.title, description: calCreate.description || '',
+              date: calCreate.date, startTime: calCreate.startTime, endTime: calCreate.endTime,
+            });
+            setCalendarEvents(prev => [...prev, ev]);
+            if (calCreate.taskId) {
+              setTasks(prev => prev.map(t => t.id === calCreate.taskId ? { ...t, calendarEventId: ev.id } : t));
+            } else {
+              const newId = genId();
+              setTasks(prev => [{
+                id: newId, text: calCreate.title, bucket: 'inbox', done: false, created: Date.now(),
+                priority: [], location: [], dueDate: calCreate.date, effort: null, actualEffort: null,
+                deferUntil: null, notes: calCreate.description || null, recurrence: null,
+                calendarEventId: ev.id,
+              }, ...prev]);
+            }
+            updateChip = { taskName: calCreate.title, fields: ['created in Google Calendar', 'added to Inbox'] };
+          } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
+        } else if (calUpdate) {
+          try {
+            const ev = await doCalendarUpdateEvent(googleToken, calUpdate.eventId, {
+              summary: calUpdate.title, date: calUpdate.date,
+              startTime: calUpdate.startTime, endTime: calUpdate.endTime,
+            });
+            setCalendarEvents(prev => prev.map(e => e.id === ev.id ? ev : e));
+            if (calUpdate.taskId) {
+              setTasks(prev => prev.map(t => t.id === calUpdate.taskId ? { ...t, dueDate: calUpdate.date } : t));
+            }
+            updateChip = { taskName: calUpdate.title || calUpdate.eventId, fields: ['updated in Google Calendar'] };
+          } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
+        } else if (calDelete) {
+          try {
+            await doCalendarDeleteEvent(googleToken, calDelete.eventId);
+            setCalendarEvents(prev => prev.filter(e => e.id !== calDelete.eventId));
+            setTasks(prev => prev.map(t => t.calendarEventId === calDelete.eventId ? { ...t, calendarEventId: null } : t));
+            updateChip = { taskName: 'Calendar event', fields: ['deleted from Google Calendar'] };
+          } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
+        }
+      }
+
       if (actionError) {
         setMessages(prev => [...prev,
           { role: "assistant", text: reply, updateChip },
@@ -2472,7 +2612,7 @@ export default function GTDManager() {
     } finally {
       setLoading(false);
     }
-  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, googleToken, googleScope]);
+  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, googleToken, googleScope, calendarEnabled, setCalendarEvents]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
@@ -6744,6 +6884,18 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [addConfirmId, setAddConfirmId] = useState(null); // task id pending calendar add confirm
   const [addStatus, setAddStatus] = useState({}); // taskId → 'loading' | 'done' | string(error)
+  const [skippedCalendarIds, setSkippedCalendarIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('gtd_cal_skipped') || '[]')); }
+    catch { return new Set(); }
+  });
+  const handleIgnoreTask = (taskId) => {
+    setSkippedCalendarIds(prev => {
+      const next = new Set(prev);
+      next.add(taskId);
+      localStorage.setItem('gtd_cal_skipped', JSON.stringify([...next]));
+      return next;
+    });
+  };
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
 
@@ -6790,10 +6942,29 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
     horizon.setDate(horizon.getDate() + 60);
     return tasks.filter(t =>
       t.dueDate && !t.done && !t.calendarEventId &&
+      t.bucket !== 'inboxHistory' &&
       new Date(t.dueDate + 'T00:00:00') >= today &&
       new Date(t.dueDate + 'T00:00:00') <= horizon
     ).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   }, [tasks, today]);
+
+  const handleDeleteEvent = async (ev) => {
+    if (!googleToken) return;
+    try {
+      await doCalendarDeleteEvent(googleToken, ev.id);
+      setCalendarEvents(prev => prev.filter(e => e.id !== ev.id));
+      setTasks(prev => prev.map(t => t.calendarEventId === ev.id ? { ...t, calendarEventId: null } : t));
+    } catch (e) { setError(`Delete failed: ${e.message}`); }
+  };
+
+  const handleRescheduleEvent = async (ev, newDate, startTime, endTime) => {
+    if (!googleToken) return;
+    try {
+      const updated = await doCalendarUpdateEvent(googleToken, ev.id, { date: newDate, startTime, endTime });
+      setCalendarEvents(prev => prev.map(e => e.id === updated.id ? updated : e));
+      setTasks(prev => prev.map(t => t.calendarEventId === ev.id ? { ...t, dueDate: newDate } : t));
+    } catch (e) { setError(`Reschedule failed: ${e.message}`); }
+  };
 
   const handleConfirmAdd = async (task) => {
     setAddStatus(prev => ({ ...prev, [task.id]: 'loading' }));
@@ -6908,6 +7079,8 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
             onCancelAdd={() => setAddConfirmId(null)}
             onOpenDetail={onOpenDetail}
             selectedTaskId={selectedTaskId}
+            skippedIds={skippedCalendarIds}
+            onIgnore={handleIgnoreTask}
           />
         )}
 
@@ -6921,6 +7094,8 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
             onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
             selectedEvent={selectedEvent}
             onProcessWithAI={processCalendarEventWithAI}
+            onDelete={handleDeleteEvent}
+            onReschedule={handleRescheduleEvent}
           />
         )}
         {calendarTab === 'week' && (
@@ -6932,6 +7107,8 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
             onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
             selectedEvent={selectedEvent}
             onProcessWithAI={processCalendarEventWithAI}
+            onDelete={handleDeleteEvent}
+            onReschedule={handleRescheduleEvent}
           />
         )}
         {calendarTab === 'day' && (
@@ -6942,6 +7119,8 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
             onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
             selectedEvent={selectedEvent}
             onProcessWithAI={processCalendarEventWithAI}
+            onDelete={handleDeleteEvent}
+            onReschedule={handleRescheduleEvent}
           />
         )}
       </div>
@@ -6951,20 +7130,21 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
 
 // ── Calendar sub-components ──────────────────────────────────────────────────
 
-function CalendarPendingTasksSection({ tasks, addConfirmId, addStatus, onRequestAdd, onConfirmAdd, onCancelAdd, onOpenDetail, selectedTaskId }) {
+function CalendarPendingTasksSection({ tasks, addConfirmId, addStatus, onRequestAdd, onConfirmAdd, onCancelAdd, onOpenDetail, selectedTaskId, skippedIds, onIgnore }) {
   const [open, setOpen] = useState(true);
+  const visibleTasks = tasks.filter(t => addStatus[t.id] !== 'done' && !skippedIds?.has(t.id));
   return (
     <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
       <div
         onClick={() => setOpen(v => !v)}
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', cursor: 'pointer', background: COLORS.surface2 }}
       >
-        <span style={{ fontSize: 11, color: COLORS.calendar, fontWeight: 600 }}>📌 Tasks with due dates — not yet on calendar ({tasks.length})</span>
+        <span style={{ fontSize: 11, color: COLORS.calendar, fontWeight: 600 }}>📌 Tasks with due dates — not yet on calendar ({visibleTasks.length})</span>
         <span style={{ fontSize: 11, color: COLORS.muted, marginLeft: 'auto' }}>{open ? '▾' : '▸'}</span>
       </div>
       {open && (
         <div style={{ padding: '4px 0' }}>
-          {tasks.map(task => {
+          {visibleTasks.map(task => {
             const status = addStatus[task.id];
             const isPending = addConfirmId === task.id;
             const isDone = status === 'done';
@@ -6989,13 +7169,23 @@ function CalendarPendingTasksSection({ tasks, addConfirmId, addStatus, onRequest
                   {isError && <div style={{ fontSize: 11, color: '#d4845a', marginTop: 2 }}>⚠ {status.replace('error:', '')}</div>}
                 </div>
                 {!isDone && !isPending && (
-                  <button
-                    onClick={() => onRequestAdd(task.id)}
-                    disabled={isLoading}
-                    style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.calendar}`, background: 'transparent', color: COLORS.calendar, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
-                  >
-                    + Add to Calendar
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button
+                      onClick={() => onRequestAdd(task.id)}
+                      disabled={isLoading}
+                      style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.calendar}`, background: 'transparent', color: COLORS.calendar, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+                    >
+                      + Add to Calendar
+                    </button>
+                    {onIgnore && (
+                      <button
+                        onClick={() => onIgnore(task.id)}
+                        style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+                      >
+                        Ignore
+                      </button>
+                    )}
+                  </div>
                 )}
                 {isPending && (
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -7041,7 +7231,7 @@ function EventChip({ ev, isSelected, onClick }) {
   );
 }
 
-function EventDetailPanel({ ev, onProcessWithAI, onClose }) {
+function EventDetailPanel({ ev, onProcessWithAI, onClose, onDelete, onReschedule }) {
   const allDay = isAllDayEvent(ev);
   const start = calEventStart(ev);
   const end = calEventEnd(ev);
@@ -7055,6 +7245,25 @@ function EventDetailPanel({ ev, onProcessWithAI, onClose }) {
     : (!allDay && end ? ' – ' + end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '');
   const desc = (ev.description || '').replace(/<[^>]*>/g, '').trim();
 
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [rescheduleMode, setRescheduleMode] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleEndTime, setRescheduleEndTime] = useState('');
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+
+  const handleDelete = async () => {
+    if (onDelete) { await onDelete(ev); onClose(); }
+  };
+
+  const handleReschedule = async () => {
+    if (!rescheduleDate || !onReschedule) return;
+    setRescheduleLoading(true);
+    await onReschedule(ev, rescheduleDate, rescheduleTime || null, rescheduleEndTime || null);
+    setRescheduleLoading(false);
+    onClose();
+  };
+
   return (
     <div style={{ margin: '8px 16px', padding: '10px 14px', background: COLORS.calendarBg, border: `1px solid ${COLORS.calendar}44`, borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -7064,19 +7273,74 @@ function EventDetailPanel({ ev, onProcessWithAI, onClose }) {
       <div style={{ fontSize: 12, color: COLORS.text2 }}>🕐 {startStr}{endStr}</div>
       {ev.location && <div style={{ fontSize: 12, color: COLORS.text2 }}>📍 {ev.location}</div>}
       {desc && <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.5, maxHeight: 80, overflowY: 'auto' }}>{desc}</div>}
-      <div style={{ marginTop: 4 }}>
+
+      {rescheduleMode && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0 4px', borderTop: `1px solid ${COLORS.border}` }}>
+          <div style={{ fontSize: 11, color: COLORS.text2, fontWeight: 600 }}>Reschedule to:</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <input type="date" value={rescheduleDate} onChange={e => setRescheduleDate(e.target.value)}
+              style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: COLORS.surface2, color: COLORS.text, fontFamily: 'inherit', fontSize: 12 }} />
+            {!allDay && (
+              <>
+                <input type="time" value={rescheduleTime} onChange={e => setRescheduleTime(e.target.value)} placeholder="Start"
+                  style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: COLORS.surface2, color: COLORS.text, fontFamily: 'inherit', fontSize: 12 }} />
+                <input type="time" value={rescheduleEndTime} onChange={e => setRescheduleEndTime(e.target.value)} placeholder="End"
+                  style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: COLORS.surface2, color: COLORS.text, fontFamily: 'inherit', fontSize: 12 }} />
+              </>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={handleReschedule} disabled={!rescheduleDate || rescheduleLoading}
+              style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${COLORS.calendar}`, background: COLORS.calendar + '22', color: COLORS.calendar, fontFamily: 'inherit', fontSize: 11, cursor: rescheduleDate ? 'pointer' : 'default' }}>
+              {rescheduleLoading ? '…' : 'Confirm'}
+            </button>
+            <button onClick={() => setRescheduleMode(false)}
+              style={{ padding: '4px 8px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0 2px', borderTop: `1px solid ${COLORS.border}` }}>
+          <span style={{ fontSize: 11, color: '#d4845a' }}>Delete this event from Google Calendar?</span>
+          <button onClick={handleDelete}
+            style={{ padding: '3px 10px', borderRadius: 5, border: '1px solid #d4845a', background: '#d4845a22', color: '#d4845a', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+            Delete
+          </button>
+          <button onClick={() => setDeleteConfirm(false)}
+            style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+            Cancel
+          </button>
+        </div>
+      )}
+
+      <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button
           onClick={() => { onProcessWithAI(ev); onClose(); }}
           style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${COLORS.calendar}`, background: COLORS.calendar + '22', color: COLORS.calendar, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
         >
           🤖 Process with AI
         </button>
+        {onReschedule && !rescheduleMode && !deleteConfirm && (
+          <button onClick={() => setRescheduleMode(true)}
+            style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}>
+            📅 Reschedule
+          </button>
+        )}
+        {onDelete && !deleteConfirm && !rescheduleMode && (
+          <button onClick={() => setDeleteConfirm(true)}
+            style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d4845a44', background: 'transparent', color: '#d4845a', fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}>
+            🗑 Delete
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, selectedEvent, onProcessWithAI }) {
+function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, selectedEvent, onProcessWithAI, onDelete, onReschedule }) {
   const year = navDate.getFullYear();
   const month = navDate.getMonth();
   const grid = buildMonthGrid(year, month);
@@ -7084,7 +7348,7 @@ function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, s
   return (
     <div style={{ padding: '8px 0' }}>
       {selectedEvent && (
-        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} />
+        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} onDelete={onDelete} onReschedule={onReschedule} />
       )}
       {/* Day headers */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: `1px solid ${COLORS.border}` }}>
@@ -7128,14 +7392,14 @@ function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, s
   );
 }
 
-function CalendarWeekView({ navDate, events, today, onDayClick, onEventClick, selectedEvent, onProcessWithAI }) {
+function CalendarWeekView({ navDate, events, today, onDayClick, onEventClick, selectedEvent, onProcessWithAI, onDelete, onReschedule }) {
   const monday = getMondayOfWeek(navDate);
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
 
   return (
     <div style={{ padding: '8px 0' }}>
       {selectedEvent && (
-        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} />
+        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} onDelete={onDelete} onReschedule={onReschedule} />
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
         {days.map((d, i) => {
@@ -7164,7 +7428,7 @@ function CalendarWeekView({ navDate, events, today, onDayClick, onEventClick, se
   );
 }
 
-function CalendarDayView({ navDate, events, today, onEventClick, selectedEvent, onProcessWithAI }) {
+function CalendarDayView({ navDate, events, today, onEventClick, selectedEvent, onProcessWithAI, onDelete, onReschedule }) {
   const isToday = isSameDay(navDate, today);
   const dayEvents = eventsForDay(events, navDate.getFullYear(), navDate.getMonth(), navDate.getDate())
     .sort((a, b) => {
@@ -7184,7 +7448,7 @@ function CalendarDayView({ navDate, events, today, onEventClick, selectedEvent, 
       </div>
 
       {selectedEvent && (
-        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} />
+        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} onDelete={onDelete} onReschedule={onReschedule} />
       )}
 
       {allDayEvs.length > 0 && (
