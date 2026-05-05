@@ -5992,7 +5992,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
                 </span>
                 <button
                   onClick={() => { setOriginalDueDraft(task.originalDueDate || ""); setEditingOriginalDue(true); }}
-                  style={{ fontSize: 10, padding: "1px 6px", cursor: "pointer", color: COLORS.muted }}
+                  style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
                 >edit</button>
               </div>
             )}
