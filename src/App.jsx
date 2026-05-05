@@ -2063,6 +2063,11 @@ export default function GTDManager() {
   const [pendingDeferCheck, setPendingDeferCheck] = useState(null);    // { taskId, taskText, deferredChildren }
   const [dragId,             setDragId]             = useState(null);
   const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
+  // Inbox bulk-selection — Set of task IDs currently checked in the Inbox view.
+  const [inboxSelectedIds,   setInboxSelectedIds]   = useState(new Set());
+  // AI project-grouping suggestion after calendar tasks are accepted.
+  // { taskIds: string[], suggestion: { type: 'existing'|'new', projectId?: string, name?: string } } | null
+  const [pendingGroupSuggestion, setPendingGroupSuggestion] = useState(null);
   const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
   const [reviewSuggestions,  setReviewSuggestions]  = useState([]);   // [{ text, checked }]
   const [reviewReady,        setReviewReady]        = useState(false); // true after AI responds for current project
@@ -3090,10 +3095,57 @@ export default function GTDManager() {
       }));
       setTasks(prev => [...newTasks, ...prev]);
       setMessages(prev => [...prev, { role: "assistant", text: `✓ Added **${selected.length} task${selected.length !== 1 ? 's' : ''}** to your GTD system.` }]);
+      // Trigger AI project-grouping suggestion when multiple tasks were added together.
+      if (selected.length >= 2) {
+        suggestProjectGroup(newTasks.map(t => t.id), newTasks.map(t => t.text));
+      }
     }
     setCalendarSuggestions([]);
     setCalendarSuggestionsReady(false);
-  }, [calendarSuggestions]);
+  }, [calendarSuggestions]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Lightweight AI call (no coach UI side-effects) to suggest a project home for a
+  // batch of new tasks. Updates `pendingGroupSuggestion` state on success.
+  const suggestProjectGroup = useCallback(async (newTaskIds, newTaskTitles) => {
+    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const projectLines = rootProjects.length
+      ? rootProjects.map(p => `- [${p.id}] ${p.text}`).join("\n")
+      : "(none)";
+    const taskLines = newTaskTitles.map((t, i) => `${i + 1}. ${t}`).join("\n");
+    const prompt = `You are a GTD coach. The user just added ${newTaskTitles.length} related tasks to their inbox:\n${taskLines}\n\nExisting projects:\n${projectLines}\n\nDo these tasks belong together as a project? If yes:\n- If an existing project is a strong match, reply with exactly: →GROUP:existing|<project_id>|<project_name>\n- If no good match exists, suggest a concise project name and reply with exactly: →GROUP:new|<project name>\n- If they do NOT belong together as a project, reply with exactly: →GROUP:none\n\nReply with only one line, no other text.`;
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 80,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const text = (data.content?.[0]?.text || "").trim();
+      const match = text.match(/^→GROUP:(existing|new|none)\|?(.*?)?\|?(.*)?$/);
+      if (!match) return;
+      const [, type, part1, part2] = match;
+      if (type === "none") return;
+      if (type === "existing") {
+        const projectId = part1?.trim();
+        const projectName = part2?.trim() || rootProjects.find(p => p.id === projectId)?.text || projectId;
+        if (projectId) setPendingGroupSuggestion({ taskIds: newTaskIds, suggestion: { type: "existing", projectId, name: projectName } });
+      } else if (type === "new") {
+        const name = part1?.trim();
+        if (name) setPendingGroupSuggestion({ taskIds: newTaskIds, suggestion: { type: "new", name } });
+      }
+    } catch { /* silent — non-critical */ }
+  }, [tasks]);
 
   // ── Mode A: Task-completeness review ────────────────────────────────────
   const reviewProject = useCallback(async (project, idx, total) => {
@@ -3509,7 +3561,31 @@ export default function GTDManager() {
   // Move a task to a different project, or make it standalone (newProjectId === null).
   // Handles: removing from old parent's childIds, adding to new parent's childIds,
   // and guards against circular references (can't assign a task to one of its own descendants).
-  const reassignProject = useCallback((taskId, newProjectId) => {
+  const reassignProject = useCallback((taskId, newProjectId, newProjectName) => {
+    // If a new project name is provided, create the project first then reassign.
+    if (newProjectName) {
+      const newProjId = genId();
+      setTasks(prev => {
+        const task = prev.find(t => t.id === taskId);
+        if (!task) return prev;
+        const oldProjectId = task.parentId || null;
+        const updated = prev.map(t => {
+          if (t.id === taskId) return { ...t, parentId: newProjId };
+          if (oldProjectId && t.id === oldProjectId)
+            return { ...t, childIds: (t.childIds || []).filter(id => id !== taskId) };
+          return t;
+        });
+        const newProject = {
+          id: newProjId, text: newProjectName.trim(), bucket: "project",
+          done: false, created: Date.now(), priority: [], location: [],
+          dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null,
+          childIds: [taskId],
+        };
+        return [...updated, newProject];
+      });
+      return;
+    }
+
     setTasks(prev => {
       const task = prev.find(t => t.id === taskId);
       if (!task) return prev;
@@ -3560,6 +3636,36 @@ export default function GTDManager() {
         return t;
       }));
     }
+  }, []);
+
+  // Assign multiple selected inbox tasks to an existing or new project at once.
+  const bulkAssignToProject = useCallback((selectedIds, projectId, newProjectName) => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    if (newProjectName) {
+      const newProjId = genId();
+      setTasks(prev => {
+        const updated = prev.map(t => ids.includes(t.id) ? { ...t, parentId: newProjId, bucket: "project" } : t);
+        const newProject = {
+          id: newProjId, text: newProjectName.trim(), bucket: "project",
+          done: false, created: Date.now(), priority: [], location: [],
+          dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null,
+          childIds: ids,
+        };
+        return [...updated, newProject];
+      });
+    } else if (projectId) {
+      setTasks(prev => prev.map(t => {
+        if (ids.includes(t.id)) return { ...t, parentId: projectId, bucket: "project" };
+        if (t.id === projectId) {
+          const existing = t.childIds || [];
+          const toAdd = ids.filter(id => !existing.includes(id));
+          return toAdd.length ? { ...t, childIds: [...existing, ...toAdd] } : t;
+        }
+        return t;
+      }));
+    }
+    setInboxSelectedIds(new Set());
   }, []);
 
   const addLocation = useCallback((name) => {
@@ -4209,6 +4315,26 @@ export default function GTDManager() {
                           onSkipRecurrence: skipRecurrence,
                         }}
                       />
+                    ) : currentBucket === "inbox" ? (
+                      <>
+                        {/* Bulk-selection toolbar — visible when ≥1 task is checked */}
+                        {inboxSelectedIds.size > 0 && (
+                          <InboxBulkBar
+                            selectedCount={inboxSelectedIds.size}
+                            allTasks={tasks}
+                            onAssign={(projectId, newProjectName) => bulkAssignToProject(inboxSelectedIds, projectId, newProjectName)}
+                            onClear={() => setInboxSelectedIds(new Set())}
+                          />
+                        )}
+                        {bucketTasks.map(task => (
+                          <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
+                            onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
+                            pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
+                            onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence}
+                            onSelect={(id, checked) => setInboxSelectedIds(prev => { const next = new Set(prev); if (checked) next.add(id); else next.delete(id); return next; })}
+                            isSelected={inboxSelectedIds.has(task.id)} />
+                        ))}
+                      </>
                     ) : (
                       bucketTasks.map(task => (
                         <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
@@ -4307,6 +4433,18 @@ export default function GTDManager() {
                 )}
                 onAccept={acceptCalendarSuggestions}
                 onDismiss={() => { setCalendarSuggestions([]); setCalendarSuggestionsReady(false); }}
+              />
+            )}
+            {pendingGroupSuggestion && (
+              <ProjectGroupSuggestionBar
+                suggestion={pendingGroupSuggestion.suggestion}
+                taskCount={pendingGroupSuggestion.taskIds.length}
+                allTasks={tasks}
+                onAccept={(projectId, newProjectName) => {
+                  bulkAssignToProject(new Set(pendingGroupSuggestion.taskIds), projectId, newProjectName);
+                  setPendingGroupSuggestion(null);
+                }}
+                onDismiss={() => setPendingGroupSuggestion(null)}
               />
             )}
             <div ref={chatEndRef} />
@@ -4441,7 +4579,7 @@ function Btn({ children, onClick, style = {} }) {
 
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, tagDisplay, indentOverride, depth = 0, collapsedNodes, onToggleCollapse, onToggleCollapseLevel, onOpenDetail, selectedTaskId, onSkipRecurrence }) {
+function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, tagDisplay, indentOverride, depth = 0, collapsedNodes, onToggleCollapse, onToggleCollapseLevel, onOpenDetail, selectedTaskId, onSkipRecurrence, onSelect, isSelected }) {
   const [hover, setHover] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
@@ -4555,6 +4693,16 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
     >
       {/* Main task row */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: highlight ? COLORS.inboxBg : (selectedTaskId === task.id ? COLORS.surface3 : hover ? COLORS.surface2 : "transparent") }}>
+        {/* Bulk-selection checkbox — shown in Inbox when a selection handler is provided */}
+        {onSelect && (
+          <input
+            type="checkbox"
+            checked={!!isSelected}
+            onChange={e => { e.stopPropagation(); onSelect(task.id, e.target.checked); }}
+            onClick={e => e.stopPropagation()}
+            style={{ marginTop: 3, flexShrink: 0, cursor: "pointer", accentColor: COLORS.project, width: 13, height: 13 }}
+          />
+        )}
         {isSubtask && <span style={{ color: COLORS.project, fontSize: 10, marginTop: 3, flexShrink: 0 }}>↳</span>}
         {currentBucket === "project" && (
           <span style={{ color: COLORS.muted, fontSize: 12, marginTop: 1, flexShrink: 0, cursor: "grab", userSelect: "none", opacity: hover ? 0.6 : 0, transition: "opacity 0.1s", lineHeight: 1 }}>⠿</span>
@@ -6239,11 +6387,15 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
   const [editingOriginalDue, setEditingOriginalDue] = useState(false);
   const [originalDueDraft, setOriginalDueDraft] = useState("");
   const [confirmOriginalDue, setConfirmOriginalDue] = useState(false);
+  // "New project" inline creation inside the Project dropdown
+  const [newProjMode, setNewProjMode] = useState(false);
+  const [newProjName, setNewProjName] = useState("");
 
   // Sync drafts if task changes (e.g. another panel opens a different task)
   useEffect(() => { setTitleDraft(task.text); }, [task.id, task.text]);
   useEffect(() => { setNotesDraft(task.notes || ""); }, [task.id, task.notes]);
   useEffect(() => { setEditingOriginalDue(false); setConfirmOriginalDue(false); }, [task.id]);
+  useEffect(() => { setNewProjMode(false); setNewProjName(""); }, [task.id]);
 
   // Close on Escape key
   useEffect(() => {
@@ -6334,19 +6486,63 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
 
-          {/* Parent project — dropdown allows moving to another project or going standalone */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Project</span>
-            <select
-              value={task.parentId || ""}
-              onChange={e => onReassignProject(task.id, e.target.value || null)}
-              style={{ ...fieldInput, flex: 1, fontSize: 12, color: task.parentId ? COLORS.project : COLORS.muted }}
-            >
-              <option value="">— Standalone</option>
-              {eligibleProjects.map(p => (
-                <option key={p.id} value={p.id}>{p.text}</option>
-              ))}
-            </select>
+          {/* Parent project — dropdown allows moving to another project, creating a new one, or going standalone */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, marginTop: 5 }}>Project</span>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+              {!newProjMode ? (
+                <select
+                  value={task.parentId || ""}
+                  onChange={e => {
+                    if (e.target.value === "__new__") {
+                      setNewProjMode(true);
+                      setNewProjName("");
+                    } else {
+                      onReassignProject(task.id, e.target.value || null);
+                    }
+                  }}
+                  style={{ ...fieldInput, fontSize: 12, color: task.parentId ? COLORS.project : COLORS.muted }}
+                >
+                  <option value="">— Standalone</option>
+                  {eligibleProjects.map(p => (
+                    <option key={p.id} value={p.id}>{p.text}</option>
+                  ))}
+                  <option value="__new__">＋ New project…</option>
+                </select>
+              ) : (
+                <div style={{ display: "flex", gap: 5 }}>
+                  <input
+                    autoFocus
+                    value={newProjName}
+                    onChange={e => setNewProjName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        const name = newProjName.trim();
+                        if (name) { onReassignProject(task.id, null, name); }
+                        setNewProjMode(false);
+                        setNewProjName("");
+                      }
+                      if (e.key === "Escape") { setNewProjMode(false); setNewProjName(""); }
+                    }}
+                    placeholder="Project name…"
+                    style={{ ...fieldInput, flex: 1, fontSize: 12 }}
+                  />
+                  <button
+                    onClick={() => {
+                      const name = newProjName.trim();
+                      if (name) { onReassignProject(task.id, null, name); }
+                      setNewProjMode(false);
+                      setNewProjName("");
+                    }}
+                    style={{ padding: "4px 8px", borderRadius: 5, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+                  >✓</button>
+                  <button
+                    onClick={() => { setNewProjMode(false); setNewProjName(""); }}
+                    style={{ padding: "4px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+                  >✕</button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Due date */}
@@ -7281,6 +7477,179 @@ const BUCKET_OPTS = [
   { key: 'waiting', label: 'Waiting For' },
   { key: 'someday', label: 'Someday/Maybe' },
 ];
+
+// ── InboxBulkBar ─────────────────────────────────────────────────────────────
+// Sticky toolbar that appears at the top of the Inbox when tasks are selected.
+function InboxBulkBar({ selectedCount, allTasks, onAssign, onClear }) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState("pick"); // "pick" | "newName"
+  const [newName, setNewName] = useState("");
+  const [chosen, setChosen] = useState("");
+  const rootProjects = allTasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+
+  const handleConfirm = () => {
+    if (mode === "newName") {
+      if (!newName.trim()) return;
+      onAssign(null, newName.trim());
+    } else {
+      if (!chosen) return;
+      if (chosen === "__new__") { setMode("newName"); return; }
+      onAssign(chosen, null);
+    }
+    setOpen(false);
+    setMode("pick");
+    setNewName("");
+    setChosen("");
+  };
+
+  return (
+    <div style={{ background: COLORS.projectBg, borderBottom: `1px solid ${COLORS.project}44`, padding: "7px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", position: "sticky", top: 0, zIndex: 10 }}>
+      <span style={{ fontSize: 12, color: COLORS.project, fontWeight: 600 }}>
+        {selectedCount} task{selectedCount !== 1 ? "s" : ""} selected
+      </span>
+      <div style={{ position: "relative" }}>
+        <button
+          onClick={() => { setOpen(o => !o); setMode("pick"); setChosen(""); setNewName(""); }}
+          style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+        >
+          📁 Assign to Project ▾
+        </button>
+        {open && (
+          <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, background: COLORS.surface, border: `1px solid ${COLORS.border2}`, borderRadius: 8, padding: 10, zIndex: 100, minWidth: 240, boxShadow: "0 4px 16px rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", gap: 8 }}>
+            {mode === "pick" ? (
+              <>
+                <div style={{ fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Choose project</div>
+                <select
+                  value={chosen}
+                  onChange={e => setChosen(e.target.value)}
+                  autoFocus
+                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, padding: "5px 8px", fontFamily: "inherit", fontSize: 12, outline: "none" }}
+                >
+                  <option value="">— Select —</option>
+                  {rootProjects.map(p => <option key={p.id} value={p.id}>{p.text}</option>)}
+                  <option value="__new__">＋ New project…</option>
+                </select>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={handleConfirm} disabled={!chosen} style={{ flex: 1, padding: "5px 0", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: chosen ? COLORS.project + "22" : "transparent", color: chosen ? COLORS.project : COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: chosen ? "pointer" : "default", fontWeight: 600 }}>
+                    {chosen === "__new__" ? "Next →" : "Assign"}
+                  </button>
+                  <button onClick={() => setOpen(false)} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>New project name</div>
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleConfirm(); if (e.key === "Escape") setOpen(false); }}
+                  placeholder="Project name…"
+                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, padding: "5px 8px", fontFamily: "inherit", fontSize: 12, outline: "none" }}
+                />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={handleConfirm} disabled={!newName.trim()} style={{ flex: 1, padding: "5px 0", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: newName.trim() ? COLORS.project + "22" : "transparent", color: newName.trim() ? COLORS.project : COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: newName.trim() ? "pointer" : "default", fontWeight: 600 }}>Create & Assign</button>
+                  <button onClick={() => setMode("pick")} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>← Back</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      <button
+        onClick={onClear}
+        style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+      >✕ Clear</button>
+    </div>
+  );
+}
+
+// ── ProjectGroupSuggestionBar ─────────────────────────────────────────────────
+// Appears in the chat panel after calendar tasks are accepted, offering to group
+// the new tasks into an existing or new project.
+function ProjectGroupSuggestionBar({ suggestion, taskCount, allTasks, onAccept, onDismiss }) {
+  const [overrideName, setOverrideName] = useState(suggestion.name || "");
+  const [showAlt, setShowAlt] = useState(false);
+  const [altChoice, setAltChoice] = useState("");
+  const rootProjects = allTasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+
+  const handleAccept = () => {
+    if (suggestion.type === "existing") onAccept(suggestion.projectId, null);
+    else onAccept(null, overrideName.trim() || suggestion.name);
+  };
+
+  const handleAltConfirm = () => {
+    if (!altChoice) return;
+    if (altChoice === "__new__") return; // handled by the name input below
+    onAccept(altChoice, null);
+  };
+
+  return (
+    <div style={{ background: COLORS.projectBg, border: `1px solid ${COLORS.project}44`, borderRadius: 9, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        📁 AI project suggestion
+      </div>
+      {suggestion.type === "existing" ? (
+        <div style={{ fontSize: 12, color: COLORS.text, lineHeight: 1.5 }}>
+          These {taskCount} tasks look like they belong in{" "}
+          <strong style={{ color: COLORS.project }}>"{suggestion.name}"</strong>.
+          Assign them there?
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: COLORS.text, lineHeight: 1.5 }}>
+          These {taskCount} tasks look like they belong together. Create a new project?
+        </div>
+      )}
+
+      {suggestion.type === "new" && (
+        <input
+          value={overrideName}
+          onChange={e => setOverrideName(e.target.value)}
+          placeholder="Project name…"
+          style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, padding: "5px 8px", fontFamily: "inherit", fontSize: 12, outline: "none" }}
+        />
+      )}
+
+      {showAlt && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <select
+            value={altChoice}
+            onChange={e => setAltChoice(e.target.value)}
+            style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, padding: "4px 6px", fontFamily: "inherit", fontSize: 12, outline: "none" }}
+          >
+            <option value="">— Pick project —</option>
+            {rootProjects.map(p => <option key={p.id} value={p.id}>{p.text}</option>)}
+          </select>
+          <button onClick={handleAltConfirm} disabled={!altChoice} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: altChoice ? COLORS.project : COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: altChoice ? "pointer" : "default" }}>Assign</button>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <button
+          onClick={handleAccept}
+          disabled={suggestion.type === "new" && !overrideName.trim()}
+          style={{ padding: "4px 14px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+        >
+          {suggestion.type === "existing" ? "Yes, assign ✓" : "Create & assign ✓"}
+        </button>
+        {!showAlt && (
+          <button
+            onClick={() => setShowAlt(true)}
+            style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+          >
+            Different project…
+          </button>
+        )}
+        <button
+          onClick={onDismiss}
+          style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function CalendarSuggestionsBar({ suggestions, onToggle, onChangeBucket, onAccept, onDismiss }) {
   const selectedCount = suggestions.filter(s => s.checked).length;
