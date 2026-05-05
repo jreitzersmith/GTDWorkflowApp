@@ -1980,6 +1980,96 @@ function useGoogleAuth({ setCalendarEvents }) {
            signInWithGoogle, disconnectGmail, connectCalendar, disconnectCalendar, refreshGoogleToken };
 }
 
+const DEFAULT_EFFORTS = ["2 min", "5 min", "10 min", "30 min", "1 hour", "2 hours", "6 hours", "1 day", "3 days", "1 week", "1 month"];
+
+// ── useAppSettings ────────────────────────────────────────────────────────────
+// Manages user-configurable settings (locations, efforts, calibration, tag display)
+// and keeps them synced to localStorage.
+function useAppSettings() {
+  const [locations, setLocations] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_locations") || "null") || ["Home", "Work", "Phone", "Computer"]; } catch { return ["Home", "Work", "Phone", "Computer"]; }
+  });
+  const [efforts, setEfforts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_efforts") || "null") || DEFAULT_EFFORTS; } catch { return DEFAULT_EFFORTS; }
+  });
+  // calibrationOverrides: { [effortLabel]: overrideLabel | null }
+  // Stores manual overrides set in Settings; auto-computed values are derived from tasks at runtime.
+  const [calibrationOverrides, setCalibrationOverrides] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_effort_calibration") || "null") || {}; } catch { return {}; }
+  });
+  const [tagDisplay, setTagDisplay] = useState(() => localStorage.getItem("gtd_tag_display") || "below");
+
+  useEffect(() => { localStorage.setItem("gtd_locations",          JSON.stringify(locations)); }, [locations]);
+  useEffect(() => { localStorage.setItem("gtd_efforts",            JSON.stringify(efforts)); }, [efforts]);
+  useEffect(() => { localStorage.setItem("gtd_effort_calibration", JSON.stringify(calibrationOverrides)); }, [calibrationOverrides]);
+  useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
+
+  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay };
+}
+
+// ── useAIUsageTracking ────────────────────────────────────────────────────────
+// Tracks token usage and cost across all AI calls; persists totals to localStorage.
+function useAIUsageTracking() {
+  const [aiUsageStats, setAiUsageStats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_ai_usage') || 'null') || createEmptyUsageStats(); }
+    catch { return createEmptyUsageStats(); }
+  });
+  const [sessionUsage, setSessionUsage] = useState({ inputTokens: 0, outputTokens: 0, requests: 0, costUsd: 0 });
+
+  useEffect(() => { localStorage.setItem('gtd_ai_usage', JSON.stringify(aiUsageStats)); }, [aiUsageStats]);
+
+  const recordUsage = useCallback((inputTokens, outputTokens, durationMs, mode, prov) => {
+    const cost  = prov === 'claude' ? calcCost(inputTokens, outputTokens) : 0;
+    const saved = prov === 'ollama' ? calcCost(inputTokens, outputTokens) : 0;
+    setSessionUsage(prev => ({
+      inputTokens:  prev.inputTokens  + inputTokens,
+      outputTokens: prev.outputTokens + outputTokens,
+      requests:     prev.requests     + 1,
+      costUsd:      prev.costUsd      + cost,
+    }));
+    setAiUsageStats(prev => {
+      const mk = mode || 'chat';
+      const ms = prev.byMode[mk]       || { inputTokens: 0, outputTokens: 0, requests: 0 };
+      const ps = prev.byProvider[prov] || { inputTokens: 0, outputTokens: 0, requests: 0 };
+      const histEntry = { ts: new Date().toISOString(), mode: mk, provider: prov, inputTokens, outputTokens, durationMs };
+      const history = [histEntry, ...(prev.history || [])].slice(0, 500);
+      return {
+        ...prev,
+        totalInputTokens:  (prev.totalInputTokens  || 0) + inputTokens,
+        totalOutputTokens: (prev.totalOutputTokens || 0) + outputTokens,
+        totalRequests:     (prev.totalRequests     || 0) + 1,
+        byMode: { ...prev.byMode, [mk]: { inputTokens: ms.inputTokens + inputTokens, outputTokens: ms.outputTokens + outputTokens, requests: ms.requests + 1 } },
+        byProvider: {
+          ...prev.byProvider,
+          [prov]: {
+            ...ps,
+            inputTokens:  ps.inputTokens  + inputTokens,
+            outputTokens: ps.outputTokens + outputTokens,
+            requests:     ps.requests     + 1,
+            costUsd:  (ps.costUsd  || 0) + cost,
+            savedUsd: (ps.savedUsd || 0) + saved,
+          },
+        },
+        history,
+      };
+    });
+  }, []);
+
+  return { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage };
+}
+
+// ── useProjectReview ──────────────────────────────────────────────────────────
+// Manages all state for the AI-driven project review flow.
+function useProjectReview() {
+  const [reviewProjectIdx,    setReviewProjectIdx]    = useState(0);
+  const [reviewSuggestions,   setReviewSuggestions]   = useState([]);
+  const [reviewReady,         setReviewReady]         = useState(false);
+  const [reviewMode,          setReviewMode]          = useState(null);
+  const [metadataSuggestions, setMetadataSuggestions] = useState([]);
+
+  return { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions };
+}
+
 export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
@@ -1998,27 +2088,10 @@ export default function GTDManager() {
   const [provider, setProvider] = useState(() => localStorage.getItem("gtd_provider") || "claude");
   const [localModel, setLocalModel] = useState(() => localStorage.getItem("gtd_local_model") || "llama3.3:70b");
   const [availableModels, setAvailableModels] = useState([]);
-  const [locations, setLocations] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gtd_locations") || "null") || ["Home", "Work", "Phone", "Computer"]; } catch { return ["Home", "Work", "Phone", "Computer"]; }
-  });
-
-  const DEFAULT_EFFORTS = ["2 min", "5 min", "10 min", "30 min", "1 hour", "2 hours", "6 hours", "1 day", "3 days", "1 week", "1 month"];
-  const [efforts, setEfforts] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gtd_efforts") || "null") || DEFAULT_EFFORTS; } catch { return DEFAULT_EFFORTS; }
-  });
-  // calibrationOverrides: { [effortLabel]: overrideLabel | null }
-  // Stores manual overrides set in Settings; auto-computed values are derived from tasks at runtime.
-  const [calibrationOverrides, setCalibrationOverrides] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gtd_effort_calibration") || "null") || {}; } catch { return {}; }
-  });
-  const [tagDisplay,  setTagDisplay]  = useState(() => localStorage.getItem("gtd_tag_display") || "below");
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay } = useAppSettings();
   const [showSettings, setShowSettings] = useState(false);
   const [showUsage, setShowUsage] = useState(false);
-  const [aiUsageStats, setAiUsageStats] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('gtd_ai_usage') || 'null') || createEmptyUsageStats(); }
-    catch { return createEmptyUsageStats(); }
-  });
-  const [sessionUsage, setSessionUsage] = useState({ inputTokens: 0, outputTokens: 0, requests: 0, costUsd: 0 });
+  const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   // Email Management view state
   const [currentView, setCurrentView] = useState("gtd"); // "gtd" | "email"
   const [emailTab, setEmailTab] = useState(() => localStorage.getItem("gtd_email_tab") || "inbox");
@@ -2068,11 +2141,7 @@ export default function GTDManager() {
   // AI project-grouping suggestion after calendar tasks are accepted.
   // { taskIds: string[], suggestion: { type: 'existing'|'new', projectId?: string, name?: string } } | null
   const [pendingGroupSuggestion, setPendingGroupSuggestion] = useState(null);
-  const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
-  const [reviewSuggestions,  setReviewSuggestions]  = useState([]);   // [{ text, checked }]
-  const [reviewReady,        setReviewReady]        = useState(false); // true after AI responds for current project
-  const [reviewMode,         setReviewMode]         = useState(null);  // null | "tasks" | "metadata"
-  const [metadataSuggestions,setMetadataSuggestions] = useState([]);  // [{ taskId, taskText, fields: {effort?,dueDate?,deferUntil?}, overrides: {...}, accepted: bool }]
+  const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
 
   // ── Auth ───────────────────────────────────────────────────────────────
   const { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink } = useSupabaseAuth();
@@ -2331,11 +2400,6 @@ export default function GTDManager() {
 
   useEffect(() => { localStorage.setItem("gtd_provider", provider); }, [provider]);
   useEffect(() => { localStorage.setItem("gtd_local_model", localModel); }, [localModel]);
-  useEffect(() => { localStorage.setItem("gtd_locations", JSON.stringify(locations)); }, [locations]);
-  useEffect(() => { localStorage.setItem("gtd_efforts",             JSON.stringify(efforts));             }, [efforts]);
-  useEffect(() => { localStorage.setItem("gtd_effort_calibration", JSON.stringify(calibrationOverrides)); }, [calibrationOverrides]);
-  useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
-  useEffect(() => { localStorage.setItem('gtd_ai_usage', JSON.stringify(aiUsageStats)); }, [aiUsageStats]);
   useEffect(() => { localStorage.setItem("gtd_email_tab", emailTab); }, [emailTab]);
   useEffect(() => { localStorage.setItem("gtd_calendar_tab", calendarTab); }, [calendarTab]);
   useEffect(() => { localStorage.setItem("gtd_gmail_queue", JSON.stringify(gmailQueue)); }, [gmailQueue]);
@@ -2463,42 +2527,7 @@ export default function GTDManager() {
     if (provider === "local") fetchModels();
   }, [provider, fetchModels]);
 
-  const recordUsage = useCallback((inputTokens, outputTokens, durationMs, mode, prov) => {
-    const cost = prov === 'claude' ? calcCost(inputTokens, outputTokens) : 0;
-    const saved = prov === 'ollama' ? calcCost(inputTokens, outputTokens) : 0;
-    setSessionUsage(prev => ({
-      inputTokens: prev.inputTokens + inputTokens,
-      outputTokens: prev.outputTokens + outputTokens,
-      requests: prev.requests + 1,
-      costUsd: prev.costUsd + cost,
-    }));
-    setAiUsageStats(prev => {
-      const mk = mode || 'chat';
-      const ms = prev.byMode[mk] || { inputTokens: 0, outputTokens: 0, requests: 0 };
-      const ps = prev.byProvider[prov] || { inputTokens: 0, outputTokens: 0, requests: 0 };
-      const histEntry = { ts: new Date().toISOString(), mode: mk, provider: prov, inputTokens, outputTokens, durationMs };
-      const history = [histEntry, ...(prev.history || [])].slice(0, 500);
-      return {
-        ...prev,
-        totalInputTokens: (prev.totalInputTokens || 0) + inputTokens,
-        totalOutputTokens: (prev.totalOutputTokens || 0) + outputTokens,
-        totalRequests: (prev.totalRequests || 0) + 1,
-        byMode: { ...prev.byMode, [mk]: { inputTokens: ms.inputTokens + inputTokens, outputTokens: ms.outputTokens + outputTokens, requests: ms.requests + 1 } },
-        byProvider: {
-          ...prev.byProvider,
-          [prov]: {
-            ...ps,
-            inputTokens: ps.inputTokens + inputTokens,
-            outputTokens: ps.outputTokens + outputTokens,
-            requests: ps.requests + 1,
-            costUsd: (ps.costUsd || 0) + cost,
-            savedUsd: (ps.savedUsd || 0) + saved,
-          },
-        },
-        history,
-      };
-    });
-  }, []);
+
 
   const callAI = useCallback(async (userMsg, mode, history) => {
     // Inject calibration context only for modes that suggest effort estimates
