@@ -304,6 +304,7 @@
     <li><a href="#feat-filter-search">Rules Filter Search</a></li>
     <li><a href="#feat-settings-sync">Supabase Settings Sync</a></li>
     <li><a href="#feat-calendar">Google Calendar</a></li>
+    <li><a href="#feat-calendar-actions">Calendar — Delete, Reschedule &amp; AI Actions</a></li>
   </ul>
 
 </aside>
@@ -2125,6 +2126,47 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
   </section>
 
 
+
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-calendar-actions">
+    <div class="feat-header">
+      <span class="feat-icon">📅</span>
+      <span class="feat-title">Calendar — Delete, Reschedule &amp; AI Actions</span>
+      <span class="feat-badge badge-new">New — May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Extends the Google Calendar integration with direct event management from within the app and new AI-driven calendar commands.</p>
+      <p><strong>Delete and Reschedule buttons:</strong> the <code>EventDetailPanel</code> (shown when you click a calendar event) now has two new buttons alongside "Process with AI". <em>Delete</em> shows an inline double-confirmation before calling the Google Calendar DELETE endpoint. <em>Reschedule</em> reveals a compact date/time form inline; on confirm it calls the PATCH endpoint and also updates the linked task's <code>dueDate</code> if one exists. Both operations update local state immediately so the calendar view reflects the change without a page reload.</p>
+      <p><strong>AI calendar actions:</strong> the Chat AI coach can now manage calendar events directly. Three new action formats are supported — <code>→ACTION:calendar_create</code>, <code>→ACTION:calendar_update</code>, and <code>→ACTION:calendar_delete</code>. When the AI creates an event (and no existing task is linked), it simultaneously creates a task in the Inbox with the event's date as the due date and <code>calendarEventId</code> already set, so the task never appears in the "not yet on calendar" pending list.</p>
+      <p><strong>If no time is specified,</strong> the AI is instructed to ask the user for a time before creating the event. If the user says "all day" or doesn't provide one, it creates an all-day event by omitting <code>startTime</code>/<code>endTime</code>.</p>
+      <p><strong>Pending tasks list improvements:</strong> the "Tasks with due dates — not yet on calendar" section now excludes <code>inboxHistory</code> bucket tasks (archived items shouldn't need calendar entries). Each row also has an <em>Ignore</em> button that permanently hides the task from the list. The ignored ID set is persisted to <code>localStorage</code> under <code>gtd_cal_skipped</code> so the list stays clean across reloads.</p>
+      <p><strong>Strikethrough fix:</strong> previously, when a task was successfully added to the calendar its row would briefly flash a strikethrough before disappearing. This happened because the <code>addStatus</code> state updated before the parent's <code>tasks</code> state had propagated back through the filtered <code>pendingTasks</code> memo. The fix filters the row out in <code>CalendarPendingTasksSection</code> itself: <code>visibleTasks = tasks.filter(t =&gt; addStatus[t.id] !== 'done' &amp;&amp; !skippedIds?.has(t.id))</code>, so the removal is immediate.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: inline confirmation UI (double-confirm without a modal)</h4>
+      <p>Instead of a dialog box, delete confirmation state lives inside <code>EventDetailPanel</code> as a <code>deleteConfirm</code> boolean. Clicking "Delete" sets it to <code>true</code>, which causes the component to re-render with a confirmation row in place of the button. Clicking "Confirm" fires the async API call; "Cancel" sets <code>deleteConfirm</code> back to <code>false</code>. This pattern — local boolean state driving a conditional render — gives you modal-like safety without pulling in a modal library or lifting state to a parent.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: derived visible list (filtering in the child)</h4>
+      <p>The parent passes the full <code>pendingTasks</code> array down. The child <code>CalendarPendingTasksSection</code> applies its own filter using two pieces of its own state (<code>addStatus</code> and <code>skippedIds</code>): <code>tasks.filter(t =&gt; addStatus[t.id] !== 'done' &amp;&amp; !skippedIds?.has(t.id))</code>. The child knows about transient UI state (just-added, just-ignored) that the parent doesn't need to track. Keeping that filter local avoids callback chains and re-renders in the parent for what is purely a display concern.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: persisted Set state with localStorage</h4>
+      <p>The ignored-task IDs are stored in a <code>Set</code> (not an array) for O(1) lookup. The initial value is loaded from <code>localStorage</code> via the lazy initializer form of <code>useState</code>: <code>useState(() =&gt; new Set(JSON.parse(localStorage.getItem('gtd_cal_skipped') || '[]')))</code>. On each ignore action, a new <code>Set</code> is constructed (never mutate state directly), serialized back to an array for JSON, and written to localStorage. This is the same pattern as any persistent filter preference — the Set is the in-memory lookup structure; the array is the serialization format.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The inline double-confirm is like a "are you sure? [y/N]" prompt in a CLI delete command — no second window, just an additional keypress before the destructive action. The persisted ignore list is like an <code>/etc/cron.deny</code> file — a local exclusion list that survives reboots (page reloads).</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-cal-delete-update-fns">🔬 doCalendarDeleteEvent + doCalendarUpdateEvent</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-cal-action-parsers">🔬 extractCalendarCreateAction / Update / Delete</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-cal-action-handler">🔬 callAI — calendar action handler</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-cal-event-detail">🔬 EventDetailPanel — delete + reschedule UI</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-e1cf66c">📜 e1cf66c — Calendar delete/reschedule/AI actions</a>
+    </div>
+  </section>
 
 
 </main>

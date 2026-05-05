@@ -1881,6 +1881,22 @@
 
 
 
+<!-- e1cf66c -->
+<div class="commit-entry" id="commit-e1cf66c">
+  <div class="commit-top">
+    <span class="commit-hash">e1cf66c</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: calendar delete/reschedule, AI calendar actions, pending list improvements</div>
+  <div class="commit-body">
+    Extends the Google Calendar integration in four areas. <strong>Event management:</strong> <code>EventDetailPanel</code> gains Delete (inline double-confirm → HTTP DELETE) and Reschedule (inline date/time form → HTTP PATCH) buttons; both update local state immediately and sync any linked task's <code>dueDate</code>. <strong>AI calendar commands:</strong> three new action formats — <code>→ACTION:calendar_create</code>, <code>→ACTION:calendar_update</code>, <code>→ACTION:calendar_delete</code> — are parsed after the existing task action block in <code>callAI</code>. When the AI creates a new event with no linked task, it also creates an Inbox task with <code>calendarEventId</code> already set. The AI is instructed to ask for a time if none was specified. <strong>Pending tasks list:</strong> <code>inboxHistory</code> bucket excluded from the filter; each row now has an Ignore button that persists the task ID to <code>gtd_cal_skipped</code> in localStorage. <strong>Bug fix:</strong> tasks moved to calendar no longer briefly show a strikethrough — the <code>visibleTasks</code> filter in <code>CalendarPendingTasksSection</code> now excludes done/ignored tasks locally rather than waiting for the parent memo to recompute.
+  </div>
+  <div class="commit-lesson"><strong>Pattern — keep transient UI state local, persist user preferences.</strong> The delete-confirm and reschedule-form booleans live entirely inside <code>EventDetailPanel</code> — the parent never needs to know about them. Contrast this with the ignored-task IDs, which persist to localStorage because they represent a lasting user decision. A useful rule of thumb: if the state only matters while the component is mounted, keep it local; if it should survive a page reload, persist it.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-calendar-actions">↑ Feature: Calendar Delete, Reschedule &amp; AI Actions</a></div>
+</div>
+
+
 </main>
 </div>
 

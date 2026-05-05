@@ -4025,6 +4025,233 @@ function CalendarSuggestionsBar({ suggestions, onAccept, onDismiss, buckets }) {
 
 
 
+
+
+<!-- ═══════════════════════════════════════════════════ snip-cal-delete-update-fns -->
+<div class="snip-block" id="snip-cal-delete-update-fns">
+  <div class="snip-title">doCalendarDeleteEvent + doCalendarUpdateEvent</div>
+  <div class="snip-code"><pre><code class="language-javascript">// Delete a calendar event by ID
+// HTTP 204 No Content is a success — Google returns no body on delete
+async function doCalendarDeleteEvent(token, eventId) {
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+  );
+  // 204 = success with no body; any other non-ok status is an error
+  if (!res.ok &amp;&amp; res.status !== 204) {
+    const d = await res.json().catch(() =&gt; ({}));
+    throw new Error(d.error?.message || `Calendar API ${res.status}`);
+  }
+}
+
+// Patch (partially update) an event — only send the fields that are changing
+async function doCalendarUpdateEvent(token, eventId, { summary, date, startTime, endTime }) {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const patch = {};                       // build only the fields we need
+  if (summary) patch.summary = summary;
+  if (date) {
+    if (startTime &amp;&amp; endTime) {           // timed event
+      patch.start = { dateTime: `${date}T${startTime}:00`, timeZone: tz };
+      patch.end   = { dateTime: `${date}T${endTime}:00`,   timeZone: tz };
+    } else {                              // all-day event
+      patch.start = { date };
+      patch.end   = { date };
+    }
+  }
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    { method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch) }
+  );
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Calendar API ${res.status}`); }
+  return await res.json();  // returns the full updated event object
+}</code></pre></div>
+  <div class="annotation"><strong>PUT vs PATCH.</strong> Google Calendar supports both PUT (replace the whole event) and PATCH (merge changes). PATCH is safer here because we only send the fields we want to change — title, date, times. A PUT would require sending every field of the existing event, including attendees and recurrence rules we haven't loaded. Always prefer PATCH when you're only changing part of a resource.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-calendar-actions">↑ Feature: Calendar Delete, Reschedule &amp; AI Actions</a></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ snip-cal-action-parsers -->
+<div class="snip-block" id="snip-cal-action-parsers">
+  <div class="snip-title">extractCalendarCreateAction / Update / Delete</div>
+  <div class="snip-code"><pre><code class="language-javascript">// Same pipe-delimited pattern as the task →ACTION: parsers.
+// The AI ends its reply with exactly one of these lines:
+//   →ACTION:calendar_create|Meeting title|date:2026-05-12|startTime:10:00|endTime:11:00
+//   →ACTION:calendar_update|&lt;event_id&gt;|date:2026-05-14|startTime:09:00
+//   →ACTION:calendar_delete|&lt;event_id&gt;
+
+function extractCalendarCreateAction(text) {
+  const m = text.match(/→ACTION:calendar_create\|([^|
+]+)\|(.*)/s);
+  if (!m) return null;
+  const title = m[1].trim();
+  const fields = {};
+  m[2].split('|').filter(Boolean).forEach(pair =&gt; {
+    const colon = pair.indexOf(':');
+    if (colon === -1) return;
+    const key = pair.slice(0, colon).trim();
+    const val = pair.slice(colon + 1).trim();
+    if (key === 'date')        fields.date        = val;
+    if (key === 'startTime')   fields.startTime   = val;
+    if (key === 'endTime')     fields.endTime     = val;
+    if (key === 'description') fields.description = val;
+    if (key === 'taskId')      fields.taskId      = val;  // links to existing task
+  });
+  if (!title || !fields.date) return null;
+  return { title, ...fields };
+}
+
+function extractCalendarUpdateAction(text) {
+  const m = text.match(/→ACTION:calendar_update\|([^|
+]+)\|(.*)/s);
+  if (!m) return null;
+  const eventId = m[1].trim();   // first segment is the Google Calendar event ID
+  const fields = {};
+  m[2].split('|').filter(Boolean).forEach(pair =&gt; {
+    const colon = pair.indexOf(':');
+    if (colon === -1) return;
+    const key = pair.slice(0, colon).trim();
+    const val = pair.slice(colon + 1).trim();
+    if (key === 'date')      fields.date      = val;
+    if (key === 'startTime') fields.startTime = val;
+    if (key === 'endTime')   fields.endTime   = val;
+    if (key === 'title')     fields.title     = val;
+    if (key === 'taskId')    fields.taskId    = val;
+  });
+  return eventId ? { eventId, ...fields } : null;
+}
+
+function extractCalendarDeleteAction(text) {
+  const m = text.match(/→ACTION:calendar_delete\|([^
+]+)/);
+  return m ? { eventId: m[1].trim() } : null;
+}</code></pre></div>
+  <div class="annotation"><strong>Why three separate parsers.</strong> Each action type has a different "primary key" in position 1: <code>calendar_create</code> uses the event title, <code>calendar_update</code> and <code>calendar_delete</code> use the existing Google event ID. Keeping them separate makes each parser short and obvious; a combined parser with conditional logic for the first segment would be harder to read and test. Event IDs reach the AI via the <code>getTaskContext()</code> calendar section, which now appends <code>[id:&lt;eventId&gt;]</code> after each event line.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-calendar-actions">↑ Feature: Calendar Delete, Reschedule &amp; AI Actions</a></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ snip-cal-action-handler -->
+<div class="snip-block" id="snip-cal-action-handler">
+  <div class="snip-title">callAI — calendar action handler (inside chat mode)</div>
+  <div class="snip-code"><pre><code class="language-javascript">// Runs after the existing task →ACTION: block, only when Calendar is connected.
+// At most one ACTION fires per AI reply (task actions and calendar actions
+// are mutually exclusive by prompt instruction).
+
+if (googleToken &amp;&amp; calendarEnabled) {
+  const calCreate = extractCalendarCreateAction(reply);
+  const calUpdate = extractCalendarUpdateAction(reply);
+  const calDelete = extractCalendarDeleteAction(reply);
+
+  if (calCreate) {
+    try {
+      const ev = await doCalendarCreateEvent(googleToken, {
+        summary: calCreate.title, description: calCreate.description || '',
+        date: calCreate.date, startTime: calCreate.startTime, endTime: calCreate.endTime,
+      });
+      setCalendarEvents(prev =&gt; [...prev, ev]);
+
+      if (calCreate.taskId) {
+        // Link an existing task — just set its calendarEventId
+        setTasks(prev =&gt; prev.map(t =&gt;
+          t.id === calCreate.taskId ? { ...t, calendarEventId: ev.id } : t
+        ));
+      } else {
+        // No existing task — create one in Inbox so the event is tracked in GTD
+        const newId = genId();
+        setTasks(prev =&gt; [{
+          id: newId, text: calCreate.title, bucket: 'inbox', done: false,
+          created: Date.now(), priority: [], location: [],
+          dueDate: calCreate.date, effort: null, actualEffort: null,
+          deferUntil: null, notes: calCreate.description || null,
+          recurrence: null,
+          calendarEventId: ev.id,   // linked immediately — won't appear in pending list
+        }, ...prev]);
+      }
+      updateChip = { taskName: calCreate.title, fields: ['created in Google Calendar', 'added to Inbox'] };
+    } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
+
+  } else if (calUpdate) {
+    try {
+      const ev = await doCalendarUpdateEvent(googleToken, calUpdate.eventId, {
+        summary: calUpdate.title, date: calUpdate.date,
+        startTime: calUpdate.startTime, endTime: calUpdate.endTime,
+      });
+      setCalendarEvents(prev =&gt; prev.map(e =&gt; e.id === ev.id ? ev : e));
+      if (calUpdate.taskId) {
+        // Keep task dueDate in sync with the new calendar date
+        setTasks(prev =&gt; prev.map(t =&gt;
+          t.id === calUpdate.taskId ? { ...t, dueDate: calUpdate.date } : t
+        ));
+      }
+      updateChip = { taskName: calUpdate.title || calUpdate.eventId, fields: ['updated in Google Calendar'] };
+    } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
+
+  } else if (calDelete) {
+    try {
+      await doCalendarDeleteEvent(googleToken, calDelete.eventId);
+      setCalendarEvents(prev =&gt; prev.filter(e =&gt; e.id !== calDelete.eventId));
+      // Clear calendarEventId on any task that referenced this event
+      setTasks(prev =&gt; prev.map(t =&gt;
+        t.calendarEventId === calDelete.eventId ? { ...t, calendarEventId: null } : t
+      ));
+      updateChip = { taskName: 'Calendar event', fields: ['deleted from Google Calendar'] };
+    } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
+  }
+}</code></pre></div>
+  <div class="annotation"><strong>Why create an Inbox task on calendar_create.</strong> GTD principle: every commitment should have a home in your system. If the AI creates a calendar event, there's now a commitment with a date but nothing in the task list tracking it. Auto-creating an Inbox task closes that loop and sets <code>calendarEventId</code> immediately, so the task never shows up in the "not yet on calendar" pending list. The user can process it from Inbox like any other task.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-calendar-actions">↑ Feature: Calendar Delete, Reschedule &amp; AI Actions</a></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ snip-cal-event-detail -->
+<div class="snip-block" id="snip-cal-event-detail">
+  <div class="snip-title">EventDetailPanel — delete + reschedule inline UI</div>
+  <div class="snip-code"><pre><code class="language-javascript">// Six pieces of local state drive the two inline flows.
+// No modals, no parent callbacks for UI state.
+const [deleteConfirm, setDeleteConfirm] = useState(false);
+const [rescheduleMode, setRescheduleMode] = useState(false);
+const [rescheduleDate, setRescheduleDate] = useState('');
+const [rescheduleTime, setRescheduleTime] = useState('');
+const [rescheduleEndTime, setRescheduleEndTime] = useState('');
+const [rescheduleLoading, setRescheduleLoading] = useState(false);
+
+// Delete flow: first click → set deleteConfirm=true → renders confirmation row
+const handleDelete = async () =&gt; {
+  if (onDelete) { await onDelete(ev); onClose(); }
+};
+
+// Reschedule flow: sets rescheduleMode=true → renders date/time form
+const handleReschedule = async () =&gt; {
+  if (!rescheduleDate || !onReschedule) return;
+  setRescheduleLoading(true);
+  await onReschedule(ev, rescheduleDate, rescheduleTime || null, rescheduleEndTime || null);
+  setRescheduleLoading(false);
+  onClose();
+};
+
+// In JSX — delete confirmation row (shown when deleteConfirm === true):
+{deleteConfirm &amp;&amp; (
+  &lt;div&gt;
+    &lt;span&gt;Delete this event from Google Calendar?&lt;/span&gt;
+    &lt;button onClick={handleDelete}&gt;Delete&lt;/button&gt;
+    &lt;button onClick={() =&gt; setDeleteConfirm(false)}&gt;Cancel&lt;/button&gt;
+  &lt;/div&gt;
+)}
+
+// In JSX — action buttons row (mutually exclusive: only shown when neither flow is active):
+&lt;div&gt;
+  &lt;button onClick={() =&gt; { onProcessWithAI(ev); onClose(); }}&gt;🤖 Process with AI&lt;/button&gt;
+  {onReschedule &amp;&amp; !rescheduleMode &amp;&amp; !deleteConfirm &amp;&amp; (
+    &lt;button onClick={() =&gt; setRescheduleMode(true)}&gt;📅 Reschedule&lt;/button&gt;
+  )}
+  {onDelete &amp;&amp; !deleteConfirm &amp;&amp; !rescheduleMode &amp;&amp; (
+    &lt;button onClick={() =&gt; setDeleteConfirm(true)}&gt;🗑 Delete&lt;/button&gt;
+  )}
+&lt;/div&gt;</code></pre></div>
+  <div class="annotation"><strong>Mutual exclusion via boolean conditions.</strong> The Reschedule and Delete buttons are only shown when neither <code>rescheduleMode</code> nor <code>deleteConfirm</code> is true. This means activating one flow hides the other's trigger button, keeping the panel uncluttered. No explicit "cancel the other mode" logic is needed — the conditions handle it automatically. This is a common React pattern: use existing state booleans as guards rather than adding explicit "active mode" state.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-calendar-actions">↑ Feature: Calendar Delete, Reschedule &amp; AI Actions</a></div>
+</div>
+
+
 </main>
 </div>
 
