@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -82,6 +82,8 @@ const COLORS = {
   effort: "#6ec6a8", effortBg: "#152520",
   deferred: "#c87ee0", deferredBg: "#1e1428",
   done: "#5a5c58",
+  calendar: "#4a9eca", calendarBg: "#0e1e2c",
+  accent: "#5a8fd4",
 };
 
 const BUCKETS = {
@@ -123,6 +125,14 @@ The task_id / parent_task_id comes from the [id:...] tag shown on each task in t
 Only emit →ACTION:update, →ACTION:add, or →ACTION:create when the user explicitly asks you to change or create something. Never include them unsolicited. Emit at most one ACTION line per response.
 
 Before using any task ID, confirm it appears in the current task list. If you cannot find the task, say so explicitly rather than guessing. If an action cannot be completed (missing ID, ambiguous target, invalid field), state clearly what went wrong and what information you need.
+
+When Google Calendar is connected, upcoming events (next 14 days) are included in the task list context under [Upcoming Calendar Events]. Use this to:
+- Factor in scheduled commitments when recommending what to work on next
+- Identify tasks that may be preparation for an upcoming event
+- Flag due-date conflicts between tasks and calendar events
+- Suggest adding tasks or reminders related to upcoming events
+
+The user can also open the Calendar tool (📅 Calendar in the sidebar) to view their full calendar, sync tasks with due dates to Google Calendar, and click any event to run "Process with AI" — which will suggest GTD tasks for that event.
 
 Gmail bulk operations — newsletter/promotional cleanup workflow:
 
@@ -206,6 +216,24 @@ If all tasks already have adequate metadata, write:
 (none)
 
 Be concise. Under 60 words before the metadata block. Today's date is provided in the task list context.`,
+  calendarEvent: `You are a GTD task planner reviewing a calendar event to identify preparation and follow-up tasks.
+
+Given a calendar event (title, date/time, description), suggest 3-6 specific, actionable tasks:
+- Preparation tasks (things to do before the event)
+- Follow-up tasks (actions to take after the event)
+- Use strong action verbs: Schedule, Send, Draft, Prepare, Review, Book, Confirm, Research, etc.
+
+End your response with EXACTLY this block — nothing after it:
+→SUGGESTIONS:
+1. [First task — start with a strong verb]
+2. [Second task]
+(add up to 6 total)
+
+If no preparation or follow-up tasks are needed, write:
+→SUGGESTIONS:
+(none)
+
+Be concise. Under 60 words before the suggestions block.`,
   dump: `You are a GTD brain dump coach. Surface open loops by asking about one life area at a time:
 Work tasks → Emails to send → People to follow up with → Projects falling behind → Personal errands → Home tasks → Health commitments → Finances → Learning goals → Anything nagging you
 For each response say "Got it — add that to your inbox." then immediately ask about the next area. Under 50 words each. After all areas, give a summary and encourage them to process their inbox.`,
@@ -756,6 +784,83 @@ async function doGmailFetchFilters(token) {
   if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
   const data = await res.json();
   return data.filter || [];
+}
+
+// ── Google Calendar API helpers ──────────────────────────────────────────────
+
+const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+
+// Fetch all calendar events between timeMin and timeMax (Date objects), paging through results
+async function doCalendarFetchEvents(token, timeMin, timeMax) {
+  const allEvents = [];
+  let pageToken = null;
+  do {
+    const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+    url.searchParams.set('timeMin', timeMin.toISOString());
+    url.searchParams.set('timeMax', timeMax.toISOString());
+    url.searchParams.set('singleEvents', 'true');
+    url.searchParams.set('orderBy', 'startTime');
+    url.searchParams.set('maxResults', '250');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Calendar API ${res.status}`); }
+    const data = await res.json();
+    (data.items || []).forEach(e => allEvents.push(e));
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+  return allEvents;
+}
+
+// Create a calendar event — pass date as 'YYYY-MM-DD' for all-day, or include startTime/endTime ('HH:MM') for timed
+async function doCalendarCreateEvent(token, { summary, description, date, startTime, endTime }) {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const body = (startTime && endTime)
+    ? { summary, description: description || '',
+        start: { dateTime: `${date}T${startTime}:00`, timeZone: tz },
+        end:   { dateTime: `${date}T${endTime}:00`,   timeZone: tz } }
+    : { summary, description: description || '',
+        start: { date },
+        end:   { date } };
+  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Calendar API ${res.status}`); }
+  return await res.json();
+}
+
+// ── Calendar date/display utilities ─────────────────────────────────────────
+
+function calEventStart(ev) {
+  return ev.start?.dateTime ? new Date(ev.start.dateTime) : ev.start?.date ? new Date(ev.start.date + 'T00:00:00') : null;
+}
+function calEventEnd(ev) {
+  return ev.end?.dateTime ? new Date(ev.end.dateTime) : ev.end?.date ? new Date(ev.end.date + 'T00:00:00') : null;
+}
+function isAllDayEvent(ev) { return !!ev.start?.date && !ev.start?.dateTime; }
+function fmtCalTime(ev) {
+  if (isAllDayEvent(ev)) return 'All day';
+  const d = calEventStart(ev);
+  if (!d) return '';
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+function eventsForDay(events, year, month, day) {
+  return events.filter(ev => {
+    const s = calEventStart(ev);
+    return s && s.getFullYear() === year && s.getMonth() === month && s.getDate() === day;
+  });
+}
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+function getMondayOfWeek(d) {
+  const day = d.getDay(); // 0=Sun
+  const diff = (day === 0) ? -6 : 1 - day;
+  const m = new Date(d);
+  m.setDate(m.getDate() + diff);
+  m.setHours(0, 0, 0, 0);
+  return m;
 }
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -1388,6 +1493,15 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem('gtd_google_token') || 'null')?.scope || null; }
     catch { return null; }
   });
+  // Google Calendar state
+  const [calendarEnabled, setCalendarEnabled] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_google_token') || 'null')?.calendarEnabled || false; }
+    catch { return false; }
+  });
+  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [calendarTab, setCalendarTab] = useState(() => localStorage.getItem('gtd_calendar_tab') || 'month');
+  const [calendarSuggestions, setCalendarSuggestions] = useState([]); // [{ text, checked, bucket }]
+  const [calendarSuggestionsReady, setCalendarSuggestionsReady] = useState(false);
   const [googleToken, setGoogleToken] = useState(() => {
     try {
       const stored = localStorage.getItem('gtd_google_token');
@@ -1700,10 +1814,12 @@ export default function GTDManager() {
     const pkceRaw = localStorage.getItem('gtd_google_pkce');
     if (!pkceRaw) return;
     localStorage.removeItem('gtd_google_pkce');
-    const pkceScope = (() => { try { return JSON.parse(pkceRaw).scope || 'readonly'; } catch { return 'readonly'; } })();
+    const pkceData = (() => { try { return JSON.parse(pkceRaw); } catch { return {}; } })();
+    const pkceScope = pkceData.scope || 'readonly';
+    const pkceCalendarEnabled = pkceData.calendarEnabled || false;
     window.history.replaceState({}, document.title, window.location.pathname);
     const { code, verifier } = pendingGoogleAuth;
-    console.log('[Gmail OAuth] Exchanging code for token...');
+    console.log('[Google OAuth] Exchanging code for token...');
     (async () => {
       try {
         const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -1719,20 +1835,21 @@ export default function GTDManager() {
           }),
         });
         const data = await res.json();
-        console.log('[Gmail OAuth] Exchange response:', data.access_token ? 'SUCCESS' : data.error);
+        console.log('[Google OAuth] Exchange response:', data.access_token ? 'SUCCESS' : data.error);
         if (data.access_token) {
           const expiry = Date.now() + (data.expires_in || 3600) * 1000;
-          localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token ?? null, expiry, scope: pkceScope }));
+          localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token ?? null, expiry, scope: pkceScope, calendarEnabled: pkceCalendarEnabled }));
           setGoogleToken(data.access_token);
           setGoogleScope(pkceScope);
+          setCalendarEnabled(pkceCalendarEnabled);
           setGmailError(null);
         } else {
           const msg = data.error_description || data.error || JSON.stringify(data);
-          console.error('[Gmail OAuth] Token exchange failed:', data);
+          console.error('[Google OAuth] Token exchange failed:', data);
           setGmailError(`Google error: ${msg}`);
         }
       } catch (e) {
-        console.error('[Gmail OAuth] Fetch error:', e);
+        console.error('[Google OAuth] Fetch error:', e);
         setGmailError(`Network error: ${e.message}`);
       }
     })();
@@ -1769,7 +1886,46 @@ export default function GTDManager() {
     localStorage.removeItem('gtd_google_pkce');
     setGoogleToken(null);
     setGoogleScope(null);
+    setCalendarEnabled(false);
     setGmailError(null);
+  }, []);
+
+  // Connect Google Calendar — re-auths with calendar.events scope, preserving any existing Gmail scope
+  const connectCalendar = useCallback(async () => {
+    const verifier = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
+    const state = 'gtd_' + generateCodeVerifier().slice(0, 16);
+    const gmailScopeMap = {
+      readonly: 'https://www.googleapis.com/auth/gmail.readonly',
+      modify:   'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic',
+      compose:  'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.settings.basic',
+      send:     'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.settings.basic',
+    };
+    const gmailScopeStr = googleScope ? (gmailScopeMap[googleScope] || gmailScopeMap.readonly) : '';
+    const scopeStr = [gmailScopeStr, CALENDAR_SCOPE].filter(Boolean).join(' ');
+    localStorage.setItem('gtd_google_pkce', JSON.stringify({ verifier, state, ts: Date.now(), scope: googleScope || 'readonly', calendarEnabled: true }));
+    const params = new URLSearchParams({
+      client_id: import.meta.env.VITE_GOOGLE_DESKTOPCLIENT_ID,
+      redirect_uri: window.location.origin,
+      response_type: 'code',
+      scope: scopeStr,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  }, [googleScope]);
+
+  // Disconnect calendar only (keep Gmail token intact)
+  const disconnectCalendar = useCallback(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
+      if (stored) { stored.calendarEnabled = false; localStorage.setItem('gtd_google_token', JSON.stringify(stored)); }
+    } catch {}
+    setCalendarEnabled(false);
+    setCalendarEvents([]);
   }, []);
 
   // Silently exchange a stored refresh_token for a new access_token.
@@ -1839,6 +1995,7 @@ export default function GTDManager() {
   useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
   useEffect(() => { localStorage.setItem('gtd_ai_usage', JSON.stringify(aiUsageStats)); }, [aiUsageStats]);
   useEffect(() => { localStorage.setItem("gtd_email_tab", emailTab); }, [emailTab]);
+  useEffect(() => { localStorage.setItem("gtd_calendar_tab", calendarTab); }, [calendarTab]);
   useEffect(() => { localStorage.setItem("gtd_gmail_queue", JSON.stringify(gmailQueue)); }, [gmailQueue]);
 
   // Load gmail_queue from Supabase on auth ready, merge with any localStorage entries
@@ -1913,8 +2070,38 @@ export default function GTDManager() {
       });
       return `${label} (${items.length}):\n${lines.join("\n")}`;
     });
-    return `Today's date: ${today}\n\n${sections.join("\n\n")}`;
-  }, [tasks]);
+    // Append upcoming calendar events (next 14 days) when calendar is connected
+    let calSection = '';
+    if (calendarEnabled && calendarEvents.length > 0) {
+      const todayDate = new Date();
+      todayDate.setHours(0, 0, 0, 0);
+      const horizon = new Date(todayDate);
+      horizon.setDate(horizon.getDate() + 14);
+      const upcoming = calendarEvents
+        .filter(ev => {
+          const s = calEventStart(ev);
+          return s && s >= todayDate && s <= horizon;
+        })
+        .sort((a, b) => calEventStart(a) - calEventStart(b))
+        .slice(0, 20);
+      if (upcoming.length) {
+        const lines = upcoming.map(ev => {
+          const s = calEventStart(ev);
+          const dateStr = s.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+          const timeStr = isAllDayEvent(ev) ? 'All day' : s.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+          const loc = ev.location ? ` @ ${ev.location}` : '';
+          return `- ${dateStr} ${timeStr}: "${ev.summary || '(No title)'}${loc}"`;
+        });
+        calSection = `\n\n[Upcoming Calendar Events — next 14 days]\n${lines.join('\n')}`;
+      } else {
+        calSection = '\n\n[Calendar: connected, no events in the next 14 days]';
+      }
+    } else if (calendarEnabled) {
+      calSection = '\n\n[Calendar: connected — events loading or unavailable]';
+    }
+
+    return `Today's date: ${today}\n\n${sections.join("\n\n")}${calSection}`;
+  }, [tasks, calendarEnabled, calendarEvents]);
 
   const fetchModels = useCallback(async () => {
     try {
@@ -2388,6 +2575,51 @@ export default function GTDManager() {
     setChatInput(prompt);
     setTimeout(() => chatInputRef.current?.focus(), 100);
   }, [setCoachMode, setChatInput, chatInputRef]);
+
+  // Process a Google Calendar event with AI — calls Claude directly and populates checkbox suggestions
+  const processCalendarEventWithAI = useCallback(async (event) => {
+    const title = event.summary || '(No title)';
+    const startStr = event.start?.dateTime
+      ? new Date(event.start.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+      : (event.start?.date || '');
+    const endStr = event.end?.dateTime
+      ? new Date(event.end.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+      : '';
+    const lines = [
+      `Title: ${title}`,
+      `Date/Time: ${startStr}${endStr ? ` → ${endStr}` : ''}`,
+      event.location ? `Location: ${event.location}` : null,
+      event.description ? `Description: ${event.description.replace(/<[^>]*>/g, '').slice(0, 500)}` : null,
+    ].filter(Boolean).join('\n');
+
+    setCoachMode("chat");
+    setCalendarSuggestionsReady(false);
+    setCalendarSuggestions([]);
+    setMessages(prev => [...prev, { role: "user", text: `📅 Reviewing calendar event: **"${title}"**` }]);
+
+    const reply = await callAI(lines, "calendarEvent", []);
+    if (reply) {
+      const suggestions = extractSuggestions(reply);
+      setCalendarSuggestions(suggestions.map(text => ({ text, checked: true, bucket: 'inbox' })));
+      setCalendarSuggestionsReady(true);
+    }
+  }, [callAI]);
+
+  // Accept selected calendar suggestions — create tasks and clear the bar
+  const acceptCalendarSuggestions = useCallback(() => {
+    const selected = calendarSuggestions.filter(s => s.checked);
+    if (selected.length) {
+      const newTasks = selected.map(s => ({
+        id: genId(), text: s.text, bucket: s.bucket || 'inbox',
+        done: false, created: Date.now(), priority: [], location: [],
+        dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null,
+      }));
+      setTasks(prev => [...newTasks, ...prev]);
+      setMessages(prev => [...prev, { role: "assistant", text: `✓ Added **${selected.length} task${selected.length !== 1 ? 's' : ''}** to your GTD system.` }]);
+    }
+    setCalendarSuggestions([]);
+    setCalendarSuggestionsReady(false);
+  }, [calendarSuggestions]);
 
   // ── Mode A: Task-completeness review ────────────────────────────────────
   const reviewProject = useCallback(async (project, idx, total) => {
@@ -3115,6 +3347,14 @@ export default function GTDManager() {
               <span style={{ fontSize: 11, background: COLORS.inbox + "22", color: COLORS.inbox, padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{gmailUnreadCount}</span>
             )}
           </div>
+          <div
+            onClick={() => { setCurrentView("calendar"); setShowSettings(false); }}
+            style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "calendar" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "calendar" ? COLORS.calendar : "transparent"}`, transition: "background 0.1s" }}
+          >
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.calendar, flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 13, color: currentView === "calendar" ? COLORS.text : COLORS.text2 }}>📅 Calendar</span>
+            {calendarEnabled && <span style={{ fontSize: 9, background: COLORS.calendar + "33", color: COLORS.calendar, padding: "1px 5px", borderRadius: 8, fontWeight: 500 }}>✓</span>}
+          </div>
         </div>
 
         <div style={s.sidebarActions}>
@@ -3162,6 +3402,9 @@ export default function GTDManager() {
               onConnectGmail={signInWithGoogle}
               onDisconnectGmail={disconnectGmail}
               gmailError={gmailError}
+              calendarEnabled={calendarEnabled}
+              onConnectCalendar={connectCalendar}
+              onDisconnectCalendar={disconnectCalendar}
             />
           ) : showUsage ? (
             <UsagePanel
@@ -3181,6 +3424,21 @@ export default function GTDManager() {
               processEmailWithAI={processEmailWithAI}
               openCoachChat={openCoachChat}
               authUser={authUser}
+            />
+          ) : currentView === "calendar" ? (
+            <CalendarManagementView
+              googleToken={googleToken}
+              calendarEnabled={calendarEnabled}
+              calendarTab={calendarTab}
+              setCalendarTab={setCalendarTab}
+              tasks={tasks}
+              setTasks={setTasks}
+              calendarEvents={calendarEvents}
+              setCalendarEvents={setCalendarEvents}
+              processCalendarEventWithAI={processCalendarEventWithAI}
+              onConnectCalendar={connectCalendar}
+              onOpenDetail={setSelectedTaskId}
+              selectedTaskId={selectedTaskId}
             />
           ) : (
             <>
@@ -3545,6 +3803,19 @@ export default function GTDManager() {
                 onNext={advanceMetadataReview}
                 projectIdx={reviewProjectIdx}
                 totalProjects={tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done).length}
+              />
+            )}
+            {calendarSuggestionsReady && (
+              <CalendarSuggestionsBar
+                suggestions={calendarSuggestions}
+                onToggle={idx => setCalendarSuggestions(prev =>
+                  prev.map((s, i) => i === idx ? { ...s, checked: !s.checked } : s)
+                )}
+                onChangeBucket={(idx, bucket) => setCalendarSuggestions(prev =>
+                  prev.map((s, i) => i === idx ? { ...s, bucket } : s)
+                )}
+                onAccept={acceptCalendarSuggestions}
+                onDismiss={() => { setCalendarSuggestions([]); setCalendarSuggestionsReady(false); }}
               />
             )}
             <div ref={chatEndRef} />
@@ -4714,7 +4985,7 @@ function UsagePanel({ stats, onClear, onClose }) {
 }
 
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, googleScope, onConnectGmail, onDisconnectGmail, gmailError }) {
+function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, googleScope, onConnectGmail, onDisconnectGmail, gmailError, calendarEnabled, onConnectCalendar, onDisconnectCalendar }) {
   const fileInputRef = useRef(null);
 
   const [importMode, setImportMode] = useState("replace");
@@ -4819,6 +5090,32 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
               </button>
               {gmailError && <div style={{ fontSize: 11, color: '#d4845a', lineHeight: 1.4 }}>⚠ {gmailError}</div>}
             </div>
+          )}
+        </SettingsSection>
+        <SettingsSection label="Google Calendar" storageKey="gtd_settings_calendar">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
+            Connect Google Calendar to view events, add tasks as calendar events, and let the AI suggest tasks from your calendar.
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 10, lineHeight: 1.4, padding: '7px 10px', background: COLORS.surface2, borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+            ⚠ Before connecting, enable the <strong style={{ color: COLORS.text2 }}>Google Calendar API</strong> in your Google Cloud Console project and add the <code style={{ fontSize: 10, background: COLORS.surface3, padding: '1px 4px', borderRadius: 3 }}>calendar.events</code> scope to your OAuth consent screen.
+          </div>
+          {calendarEnabled ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: COLORS.next }}>✓ Calendar connected</span>
+              <button onClick={onDisconnectCalendar}
+                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                Disconnect
+              </button>
+              <button onClick={onConnectCalendar}
+                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                Reconnect
+              </button>
+            </div>
+          ) : (
+            <button onClick={onConnectCalendar}
+              style={{ padding: '7px 14px', borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}>
+              <span style={{ fontSize: 14 }}>📅</span> Connect Calendar
+            </button>
           )}
         </SettingsSection>
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
@@ -6352,6 +6649,591 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
             );
           })()}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── CalendarSuggestionsBar ───────────────────────────────────────────────────
+const BUCKET_OPTS = [
+  { key: 'inbox',   label: 'Inbox' },
+  { key: 'next',    label: 'Next Actions' },
+  { key: 'project', label: 'Projects' },
+  { key: 'waiting', label: 'Waiting For' },
+  { key: 'someday', label: 'Someday/Maybe' },
+];
+
+function CalendarSuggestionsBar({ suggestions, onToggle, onChangeBucket, onAccept, onDismiss }) {
+  const selectedCount = suggestions.filter(s => s.checked).length;
+  const isEmpty = suggestions.length === 0;
+  return (
+    <div style={{ background: COLORS.calendarBg, border: `1px solid ${COLORS.calendar}44`, borderRadius: 9, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        {isEmpty ? '✓ No tasks suggested' : '📅 Suggested tasks from calendar event — check to add'}
+      </div>
+      {isEmpty ? (
+        <div style={{ fontSize: 12, color: COLORS.muted }}>No preparation or follow-up tasks identified for this event.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {suggestions.map((s, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={s.checked}
+                onChange={() => onToggle(idx)}
+                style={{ marginTop: 3, accentColor: COLORS.calendar, flexShrink: 0, cursor: 'pointer' }}
+              />
+              <span style={{ flex: 1, fontSize: 12, color: s.checked ? COLORS.text : COLORS.muted, textDecoration: s.checked ? 'none' : 'line-through', lineHeight: 1.45 }}>
+                {s.text}
+              </span>
+              <select
+                value={s.bucket}
+                onChange={e => onChangeBucket(idx, e.target.value)}
+                disabled={!s.checked}
+                style={{ fontSize: 11, background: COLORS.surface3, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: s.checked ? COLORS.text2 : COLORS.muted, padding: '2px 5px', fontFamily: 'inherit', cursor: 'pointer', flexShrink: 0 }}
+              >
+                {BUCKET_OPTS.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        {!isEmpty && (
+          <button
+            onClick={onAccept}
+            style={{ padding: '4px 14px', borderRadius: 6, border: `1px solid ${COLORS.calendar}`, background: 'transparent', color: COLORS.calendar, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+          >
+            {selectedCount > 0 ? `Add ${selectedCount} task${selectedCount !== 1 ? 's' : ''} ✓` : 'Add Selected'}
+          </button>
+        )}
+        <button
+          onClick={onDismiss}
+          style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── CalendarManagementView ───────────────────────────────────────────────────
+
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAY_NAMES_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function buildMonthGrid(year, month) {
+  const firstDay = new Date(year, month, 1);
+  const startDow = firstDay.getDay(); // 0=Sun
+  const start = new Date(year, month, 1 - startDow);
+  const grid = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    grid.push(d);
+  }
+  return grid;
+}
+
+function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, setCalendarTab, tasks, setTasks, calendarEvents, setCalendarEvents, processCalendarEventWithAI, onConnectCalendar, onOpenDetail, selectedTaskId }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [navDate, setNavDate] = useState(new Date());
+  const [fetchWindow, setFetchWindow] = useState(null); // { start: Date, end: Date }
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [addConfirmId, setAddConfirmId] = useState(null); // task id pending calendar add confirm
+  const [addStatus, setAddStatus] = useState({}); // taskId → 'loading' | 'done' | string(error)
+
+  const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
+
+  // Fetch events for a 60-day window centered on a given date
+  const fetchEvents = useCallback(async (center) => {
+    if (!googleToken || !calendarEnabled) return;
+    const start = new Date(center);
+    start.setDate(start.getDate() - 15);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(center);
+    end.setDate(end.getDate() + 45);
+    end.setHours(23, 59, 59, 999);
+    setLoading(true);
+    setError(null);
+    try {
+      const evs = await doCalendarFetchEvents(googleToken, start, end);
+      setCalendarEvents(evs);
+      setFetchWindow({ start, end });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [googleToken, calendarEnabled, setCalendarEvents]);
+
+  // Initial fetch on mount or connection
+  useEffect(() => {
+    if (googleToken && calendarEnabled) fetchEvents(new Date());
+  }, [googleToken, calendarEnabled]); // eslint-disable-line
+
+  // Refetch if navDate drifts near the edge of the current window
+  useEffect(() => {
+    if (!fetchWindow || !googleToken || !calendarEnabled) return;
+    const margin = 7 * 86400000;
+    if (navDate < new Date(fetchWindow.start.getTime() + margin) ||
+        navDate > new Date(fetchWindow.end.getTime() - margin)) {
+      fetchEvents(navDate);
+    }
+  }, [navDate]); // eslint-disable-line
+
+  // Tasks with due dates in the next 60 days that haven't been pushed to calendar
+  const pendingTasks = useMemo(() => {
+    const horizon = new Date(today);
+    horizon.setDate(horizon.getDate() + 60);
+    return tasks.filter(t =>
+      t.dueDate && !t.done && !t.calendarEventId &&
+      new Date(t.dueDate + 'T00:00:00') >= today &&
+      new Date(t.dueDate + 'T00:00:00') <= horizon
+    ).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  }, [tasks, today]);
+
+  const handleConfirmAdd = async (task) => {
+    setAddStatus(prev => ({ ...prev, [task.id]: 'loading' }));
+    try {
+      const ev = await doCalendarCreateEvent(googleToken, { summary: task.text, description: `GTD task added from your task manager.`, date: task.dueDate });
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, calendarEventId: ev.id } : t));
+      setCalendarEvents(prev => [...prev, ev]);
+      setAddStatus(prev => ({ ...prev, [task.id]: 'done' }));
+      setAddConfirmId(null);
+    } catch (e) {
+      setAddStatus(prev => ({ ...prev, [task.id]: 'error:' + e.message }));
+    }
+  };
+
+  // ── Navigation helpers ──
+  const navPrev = () => {
+    setNavDate(d => {
+      const n = new Date(d);
+      if (calendarTab === 'month')      { n.setMonth(n.getMonth() - 1); n.setDate(1); }
+      else if (calendarTab === 'week')  { n.setDate(n.getDate() - 7); }
+      else                              { n.setDate(n.getDate() - 1); }
+      return n;
+    });
+  };
+  const navNext = () => {
+    setNavDate(d => {
+      const n = new Date(d);
+      if (calendarTab === 'month')      { n.setMonth(n.getMonth() + 1); n.setDate(1); }
+      else if (calendarTab === 'week')  { n.setDate(n.getDate() + 7); }
+      else                              { n.setDate(n.getDate() + 1); }
+      return n;
+    });
+  };
+  const navLabel = () => {
+    if (calendarTab === 'month') return `${MONTH_NAMES[navDate.getMonth()]} ${navDate.getFullYear()}`;
+    if (calendarTab === 'week') {
+      const mon = getMondayOfWeek(navDate);
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      return `${mon.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${sun.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    }
+    return navDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
+  const tabBtnStyle = (t) => ({
+    padding: '5px 13px', borderRadius: 6, border: `1px solid ${calendarTab === t ? COLORS.calendar : COLORS.border}`,
+    background: calendarTab === t ? COLORS.calendar + '22' : 'transparent',
+    color: calendarTab === t ? COLORS.calendar : COLORS.text2,
+    fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', fontWeight: calendarTab === t ? 600 : 400,
+  });
+
+  // ── Not connected ──
+  if (!calendarEnabled) {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px 10px', borderBottom: `1px solid ${COLORS.border}` }}>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: 16, fontWeight: 300 }}>📅 Calendar</div>
+          <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>View events, sync tasks, and get AI suggestions</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 32 }}>
+          <div style={{ fontSize: 40 }}>📅</div>
+          <div style={{ fontSize: 15, color: COLORS.text2, fontWeight: 500 }}>Connect Google Calendar</div>
+          <div style={{ fontSize: 12, color: COLORS.muted, textAlign: 'center', maxWidth: 320, lineHeight: 1.6 }}>
+            View 60 days of events, sync tasks with due dates, and let the AI suggest GTD tasks from your calendar events.
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.muted, textAlign: 'center', maxWidth: 320, lineHeight: 1.5, background: COLORS.surface2, padding: '10px 14px', borderRadius: 8, border: `1px solid ${COLORS.border}` }}>
+            First enable the <strong style={{ color: COLORS.text2 }}>Google Calendar API</strong> in your Google Cloud Console and add the <code style={{ fontSize: 10, background: COLORS.surface3, padding: '1px 4px', borderRadius: 3 }}>calendar.events</code> scope to your OAuth consent screen.
+          </div>
+          <button
+            onClick={onConnectCalendar}
+            style={{ padding: '9px 20px', borderRadius: 8, border: `1px solid ${COLORS.calendar}`, background: COLORS.calendar + '22', color: COLORS.calendar, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+          >
+            Connect Calendar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Connected ──
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ padding: '10px 16px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: 15, fontWeight: 300, marginRight: 4 }}>📅 Calendar</div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {['month', 'week', 'day'].map(t => (
+            <button key={t} onClick={() => setCalendarTab(t)} style={tabBtnStyle(t)}>
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+          <button onClick={navPrev} style={{ padding: '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer' }}>‹</button>
+          <span style={{ fontSize: 13, fontWeight: 500, color: COLORS.text, minWidth: 160, textAlign: 'center' }}>{navLabel()}</span>
+          <button onClick={navNext} style={{ padding: '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer' }}>›</button>
+          <button onClick={() => { setNavDate(new Date()); }} style={{ padding: '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Today</button>
+          <button onClick={() => fetchEvents(navDate)} disabled={loading} style={{ padding: '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: loading ? COLORS.muted : COLORS.text2, fontFamily: 'inherit', fontSize: 11, cursor: loading ? 'default' : 'pointer' }}>{loading ? '…' : '↺'}</button>
+        </div>
+      </div>
+
+      {error && <div style={{ padding: '8px 16px', fontSize: 12, color: '#d4845a' }}>⚠ {error}</div>}
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {/* Tasks → Calendar section */}
+        {pendingTasks.length > 0 && (
+          <CalendarPendingTasksSection
+            tasks={pendingTasks}
+            addConfirmId={addConfirmId}
+            addStatus={addStatus}
+            onRequestAdd={id => setAddConfirmId(id)}
+            onConfirmAdd={handleConfirmAdd}
+            onCancelAdd={() => setAddConfirmId(null)}
+            onOpenDetail={onOpenDetail}
+            selectedTaskId={selectedTaskId}
+          />
+        )}
+
+        {/* Calendar view */}
+        {calendarTab === 'month' && (
+          <CalendarMonthView
+            navDate={navDate}
+            events={calendarEvents}
+            today={today}
+            onDayClick={d => { setNavDate(d); setCalendarTab('day'); }}
+            onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
+            selectedEvent={selectedEvent}
+            onProcessWithAI={processCalendarEventWithAI}
+          />
+        )}
+        {calendarTab === 'week' && (
+          <CalendarWeekView
+            navDate={navDate}
+            events={calendarEvents}
+            today={today}
+            onDayClick={d => { setNavDate(d); setCalendarTab('day'); }}
+            onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
+            selectedEvent={selectedEvent}
+            onProcessWithAI={processCalendarEventWithAI}
+          />
+        )}
+        {calendarTab === 'day' && (
+          <CalendarDayView
+            navDate={navDate}
+            events={calendarEvents}
+            today={today}
+            onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
+            selectedEvent={selectedEvent}
+            onProcessWithAI={processCalendarEventWithAI}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Calendar sub-components ──────────────────────────────────────────────────
+
+function CalendarPendingTasksSection({ tasks, addConfirmId, addStatus, onRequestAdd, onConfirmAdd, onCancelAdd, onOpenDetail, selectedTaskId }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+      <div
+        onClick={() => setOpen(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', cursor: 'pointer', background: COLORS.surface2 }}
+      >
+        <span style={{ fontSize: 11, color: COLORS.calendar, fontWeight: 600 }}>📌 Tasks with due dates — not yet on calendar ({tasks.length})</span>
+        <span style={{ fontSize: 11, color: COLORS.muted, marginLeft: 'auto' }}>{open ? '▾' : '▸'}</span>
+      </div>
+      {open && (
+        <div style={{ padding: '4px 0' }}>
+          {tasks.map(task => {
+            const status = addStatus[task.id];
+            const isPending = addConfirmId === task.id;
+            const isDone = status === 'done';
+            const isLoading = status === 'loading';
+            const isError = status && status.startsWith('error:');
+            const isSelected = selectedTaskId === task.id;
+            return (
+              <div key={task.id} style={{ padding: '6px 16px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap', background: isSelected ? COLORS.surface3 : 'transparent' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    onClick={() => onOpenDetail && onOpenDetail(isSelected ? null : task.id)}
+                    title="Click to view / edit task details"
+                    style={{ fontSize: 13, color: isDone ? COLORS.muted : isSelected ? COLORS.calendar : COLORS.text, textDecoration: isDone ? 'line-through' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: onOpenDetail ? 'pointer' : 'default' }}
+                  >
+                    {task.text}
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1 }}>
+                    Due {task.dueDate}
+                    {task.bucket && <span style={{ marginLeft: 6, background: COLORS.surface3, padding: '0px 5px', borderRadius: 4 }}>{task.bucket === 'next' ? '⚡' : task.bucket === 'project' ? '📁' : task.bucket === 'waiting' ? '⏳' : task.bucket === 'someday' ? '💭' : '📥'} {task.bucket}</span>}
+                    {task.effort && <span style={{ marginLeft: 6, color: COLORS.effort }}>{task.effort}</span>}
+                  </div>
+                  {isError && <div style={{ fontSize: 11, color: '#d4845a', marginTop: 2 }}>⚠ {status.replace('error:', '')}</div>}
+                </div>
+                {!isDone && !isPending && (
+                  <button
+                    onClick={() => onRequestAdd(task.id)}
+                    disabled={isLoading}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.calendar}`, background: 'transparent', color: COLORS.calendar, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    + Add to Calendar
+                  </button>
+                )}
+                {isPending && (
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, color: COLORS.text2, alignSelf: 'center' }}>Add "{task.text}" on {task.dueDate}?</span>
+                    <button onClick={() => onConfirmAdd(task)} disabled={isLoading}
+                      style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.calendar}`, background: COLORS.calendar + '22', color: COLORS.calendar, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                      {isLoading ? '…' : 'Confirm'}
+                    </button>
+                    <button onClick={onCancelAdd}
+                      style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                {isDone && <span style={{ fontSize: 11, color: COLORS.next, flexShrink: 0 }}>✓ Added</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventChip({ ev, isSelected, onClick }) {
+  const allDay = isAllDayEvent(ev);
+  const timeStr = allDay ? '' : fmtCalTime(ev) + ' ';
+  return (
+    <div
+      onClick={e => { e.stopPropagation(); onClick(ev); }}
+      title={ev.summary || '(No title)'}
+      style={{
+        fontSize: 10, padding: '1px 5px', borderRadius: 3,
+        background: isSelected ? COLORS.calendar : COLORS.calendar + '33',
+        color: isSelected ? '#fff' : COLORS.calendar,
+        border: `1px solid ${COLORS.calendar}55`,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        cursor: 'pointer', lineHeight: 1.5, marginBottom: 1,
+      }}
+    >
+      {timeStr}{ev.summary || '(No title)'}
+    </div>
+  );
+}
+
+function EventDetailPanel({ ev, onProcessWithAI, onClose }) {
+  const allDay = isAllDayEvent(ev);
+  const start = calEventStart(ev);
+  const end = calEventEnd(ev);
+  const startStr = start
+    ? (allDay
+        ? start.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+        : start.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))
+    : '';
+  const endStr = (!allDay && end && !isSameDay(start, end))
+    ? ' – ' + end.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : (!allDay && end ? ' – ' + end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '');
+  const desc = (ev.description || '').replace(/<[^>]*>/g, '').trim();
+
+  return (
+    <div style={{ margin: '8px 16px', padding: '10px 14px', background: COLORS.calendarBg, border: `1px solid ${COLORS.calendar}44`, borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, lineHeight: 1.4 }}>{ev.summary || '(No title)'}</div>
+        <button onClick={onClose} style={{ padding: '2px 7px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>✕</button>
+      </div>
+      <div style={{ fontSize: 12, color: COLORS.text2 }}>🕐 {startStr}{endStr}</div>
+      {ev.location && <div style={{ fontSize: 12, color: COLORS.text2 }}>📍 {ev.location}</div>}
+      {desc && <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.5, maxHeight: 80, overflowY: 'auto' }}>{desc}</div>}
+      <div style={{ marginTop: 4 }}>
+        <button
+          onClick={() => { onProcessWithAI(ev); onClose(); }}
+          style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${COLORS.calendar}`, background: COLORS.calendar + '22', color: COLORS.calendar, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+        >
+          🤖 Process with AI
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, selectedEvent, onProcessWithAI }) {
+  const year = navDate.getFullYear();
+  const month = navDate.getMonth();
+  const grid = buildMonthGrid(year, month);
+
+  return (
+    <div style={{ padding: '8px 0' }}>
+      {selectedEvent && (
+        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} />
+      )}
+      {/* Day headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: `1px solid ${COLORS.border}` }}>
+        {DAY_NAMES_SHORT.map(d => (
+          <div key={d} style={{ padding: '4px 6px', fontSize: 10, color: COLORS.muted, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{d}</div>
+        ))}
+      </div>
+      {/* Day grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+        {grid.map((d, i) => {
+          const isThisMonth = d.getMonth() === month;
+          const isToday = isSameDay(d, today);
+          const dayEvents = eventsForDay(events, d.getFullYear(), d.getMonth(), d.getDate());
+          const maxShow = 3;
+          const overflow = dayEvents.length - maxShow;
+          return (
+            <div
+              key={i}
+              onClick={() => onDayClick(new Date(d))}
+              style={{
+                minHeight: 80, padding: '4px 4px 2px', borderRight: (i + 1) % 7 !== 0 ? `1px solid ${COLORS.border}` : 'none',
+                borderBottom: `1px solid ${COLORS.border}`, cursor: 'pointer',
+                background: isToday ? COLORS.calendarBg : 'transparent',
+                transition: 'background 0.1s',
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? COLORS.calendar : isThisMonth ? COLORS.text2 : COLORS.muted, marginBottom: 2, textAlign: 'right', paddingRight: 2 }}>
+                {isToday ? <span style={{ background: COLORS.calendar, color: '#fff', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{d.getDate()}</span> : d.getDate()}
+              </div>
+              {dayEvents.slice(0, maxShow).map(ev => (
+                <EventChip key={ev.id} ev={ev} isSelected={selectedEvent?.id === ev.id} onClick={onEventClick} />
+              ))}
+              {overflow > 0 && (
+                <div style={{ fontSize: 9, color: COLORS.muted, paddingLeft: 4, cursor: 'pointer' }}>+{overflow} more</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CalendarWeekView({ navDate, events, today, onDayClick, onEventClick, selectedEvent, onProcessWithAI }) {
+  const monday = getMondayOfWeek(navDate);
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
+
+  return (
+    <div style={{ padding: '8px 0' }}>
+      {selectedEvent && (
+        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} />
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+        {days.map((d, i) => {
+          const isToday = isSameDay(d, today);
+          const dayEvents = eventsForDay(events, d.getFullYear(), d.getMonth(), d.getDate());
+          return (
+            <div key={i} style={{ borderRight: i < 6 ? `1px solid ${COLORS.border}` : 'none', padding: '0 4px' }}>
+              <div
+                onClick={() => onDayClick(new Date(d))}
+                style={{ padding: '6px 4px 4px', textAlign: 'center', cursor: 'pointer', marginBottom: 4 }}
+              >
+                <div style={{ fontSize: 10, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{DAY_NAMES_SHORT[d.getDay()]}</div>
+                <div style={{ fontSize: 18, fontWeight: isToday ? 700 : 300, color: isToday ? COLORS.calendar : COLORS.text2, lineHeight: 1.2 }}>{d.getDate()}</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {dayEvents.map(ev => (
+                  <EventChip key={ev.id} ev={ev} isSelected={selectedEvent?.id === ev.id} onClick={onEventClick} />
+                ))}
+                {dayEvents.length === 0 && <div style={{ height: 40 }} />}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CalendarDayView({ navDate, events, today, onEventClick, selectedEvent, onProcessWithAI }) {
+  const isToday = isSameDay(navDate, today);
+  const dayEvents = eventsForDay(events, navDate.getFullYear(), navDate.getMonth(), navDate.getDate())
+    .sort((a, b) => {
+      const ta = calEventStart(a); const tb = calEventStart(b);
+      if (!ta) return 1; if (!tb) return -1;
+      return ta - tb;
+    });
+
+  const allDayEvs = dayEvents.filter(ev => isAllDayEvent(ev));
+  const timedEvs = dayEvents.filter(ev => !isAllDayEvent(ev));
+
+  return (
+    <div style={{ padding: '12px 16px' }}>
+      <div style={{ fontSize: 13, fontWeight: 500, color: isToday ? COLORS.calendar : COLORS.text2, marginBottom: 12 }}>
+        {navDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+        {isToday && <span style={{ fontSize: 11, marginLeft: 8, background: COLORS.calendar + '33', color: COLORS.calendar, padding: '2px 8px', borderRadius: 10 }}>Today</span>}
+      </div>
+
+      {selectedEvent && (
+        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} />
+      )}
+
+      {allDayEvs.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>All Day</div>
+          {allDayEvs.map(ev => (
+            <div key={ev.id} style={{ marginBottom: 4 }}>
+              <div
+                onClick={() => onEventClick(ev)}
+                style={{ padding: '7px 12px', borderRadius: 6, background: selectedEvent?.id === ev.id ? COLORS.calendar + '33' : COLORS.calendarBg, border: `1px solid ${COLORS.calendar}44`, cursor: 'pointer' }}
+              >
+                <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 500 }}>{ev.summary || '(No title)'}</div>
+                {ev.location && <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>📍 {ev.location}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {timedEvs.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {timedEvs.map(ev => {
+            const start = calEventStart(ev);
+            const end = calEventEnd(ev);
+            const timeStr = start ? start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+            const endStr = end ? end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+            return (
+              <div key={ev.id} style={{ marginBottom: 2 }}>
+                <div
+                  onClick={() => onEventClick(ev)}
+                  style={{ display: 'flex', gap: 12, padding: '8px 12px', borderRadius: 6, background: selectedEvent?.id === ev.id ? COLORS.calendar + '33' : COLORS.calendarBg, border: `1px solid ${COLORS.calendar}44`, cursor: 'pointer' }}
+                >
+                  <div style={{ fontSize: 11, color: COLORS.calendar, minWidth: 90, flexShrink: 0, lineHeight: 1.4, paddingTop: 2 }}>
+                    {timeStr}{endStr ? <><br /><span style={{ color: COLORS.muted }}>→ {endStr}</span></> : ''}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: COLORS.text, fontWeight: 500 }}>{ev.summary || '(No title)'}</div>
+                    {ev.location && <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1 }}>📍 {ev.location}</div>}
+                    {ev.description && <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.description.replace(/<[^>]*>/g, '').slice(0, 100)}</div>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {dayEvents.length === 0 && (
+        <div style={{ fontSize: 13, color: COLORS.muted, textAlign: 'center', marginTop: 40 }}>No events on this day.</div>
       )}
     </div>
   );
