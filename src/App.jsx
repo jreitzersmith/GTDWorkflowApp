@@ -324,8 +324,7 @@ async function doGmailSearch(query, token, maxResults = 10) {
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${limit}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!listRes.ok) { const d = await listRes.json(); throw new Error(d.error?.message || `Gmail API ${listRes.status}`); }
-  const listData = await listRes.json();
+  const listData = await parseApiResponse(listRes, 'Gmail API');
   const messages = listData.messages || [];
   if (!messages.length) return "No emails found matching that query.";
   const details = (await Promise.all(
@@ -515,8 +514,7 @@ async function doGmailListLabels(token) {
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
-  const data = await res.json();
+  const data = await parseApiResponse(res, 'Gmail API');
   const labels = (data.labels || [])
     .map(l => `${l.name} (ID: ${l.id})`)
     .join('\n');
@@ -528,8 +526,7 @@ async function doGmailFetchLabelsRaw(token) {
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
-  const data = await res.json();
+  const data = await parseApiResponse(res, 'Gmail API');
   return data.labels || [];
 }
 
@@ -543,7 +540,7 @@ async function doGmailLabel(messageId, addLabelIds, removeLabelIds, token) {
       body: JSON.stringify({ addLabelIds: addLabelIds || [], removeLabelIds: removeLabelIds || [] }),
     }
   );
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  await parseApiResponse(res, 'Gmail API');
   return { success: true, message_id: messageId };
 }
 
@@ -589,8 +586,7 @@ async function doGmailCompose(to, subject, body, threadId, token) {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
-  const data = await res.json();
+  const data = await parseApiResponse(res, 'Gmail API');
   return { draft_id: data.id, status: 'Draft created \u2014 not yet sent' };
 }
 
@@ -604,8 +600,7 @@ async function doGmailSend(to, subject, body, threadId, token) {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
-  const data = await res.json();
+  const data = await parseApiResponse(res, 'Gmail API');
   return { message_id: data.id, status: 'Email sent successfully' };
 }
 
@@ -616,8 +611,7 @@ async function doGmailCreateLabel(name, token) {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, labelListVisibility: 'labelShow', messageListVisibility: 'show' }),
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
-  const data = await res.json();
+  const data = await parseApiResponse(res, 'Gmail API');
   return { label_id: data.id, name: data.name, status: 'Label created successfully' };
 }
 
@@ -626,8 +620,7 @@ async function doGmailListFilters(token) {
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/filters', {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
-  const data = await res.json();
+  const data = await parseApiResponse(res, 'Gmail API');
   const filters = data.filter || [];
   if (!filters.length) return 'No filters found.';
   return filters.map(f => {
@@ -657,8 +650,7 @@ async function doGmailCreateFilter(criteriaFrom, criteriaTo, criteriaSubject, cr
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
-  const data = await res.json();
+  const data = await parseApiResponse(res, 'Gmail API');
   return { filter_id: data.id, status: 'Filter created successfully' };
 }
 
@@ -746,8 +738,7 @@ async function doGmailFetchInbox(token, pageToken = null) {
   url.searchParams.set('maxResults', '50');
   if (pageToken) url.searchParams.set('pageToken', pageToken);
   const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
-  const data = await res.json();
+  const data = await parseApiResponse(res, 'Gmail API');
   const messages = data.messages || [];
   if (!messages.length) return { emails: [], nextPageToken: null };
   const details = await Promise.all(messages.map(async ({ id }) => {
@@ -778,8 +769,7 @@ async function doGmailGetMessageBody(id, token) {
     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
-  const msg = await res.json();
+  const msg = await parseApiResponse(res, 'Gmail API');
   const hdrs = msg.payload?.headers || [];
   const get = name => hdrs.find(h => h.name === name)?.value || '';
   return {
@@ -796,8 +786,7 @@ async function doGmailFetchFilters(token) {
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/filters', {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
-  const data = await res.json();
+  const data = await parseApiResponse(res, 'Gmail API');
   return data.filter || [];
 }
 
@@ -818,8 +807,7 @@ async function doCalendarFetchEvents(token, timeMin, timeMax) {
     url.searchParams.set('maxResults', '250');
     if (pageToken) url.searchParams.set('pageToken', pageToken);
     const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Calendar API ${res.status}`); }
-    const data = await res.json();
+    const data = await parseApiResponse(res, 'Calendar API');
     (data.items || []).forEach(e => allEvents.push(e));
     pageToken = data.nextPageToken || null;
   } while (pageToken);
@@ -841,8 +829,7 @@ async function doCalendarCreateEvent(token, { summary, description, date, startT
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Calendar API ${res.status}`); }
-  return await res.json();
+  return parseApiResponse(res, 'Calendar API');
 }
 
 async function doCalendarDeleteEvent(token, eventId) {
@@ -871,8 +858,7 @@ async function doCalendarUpdateEvent(token, eventId, { summary, date, startTime,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   });
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Calendar API ${res.status}`); }
-  return await res.json();
+  return parseApiResponse(res, 'Calendar API');
 }
 
 // ── Calendar date/display utilities ─────────────────────────────────────────
@@ -909,6 +895,30 @@ function getMondayOfWeek(d) {
 }
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// Day-name -> JS weekday index mapping used by recurrence parsing.
+const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+// Parse a recurrence field value from AI action syntax into a recurrence object.
+// Returns null when val is 'off', otherwise returns a recurrence config object.
+function parseRecurrenceValue(val) {
+  if (val === 'off') return null;
+  const [freq, intStr, daysStr] = val.split(':');
+  const interval = parseInt(intStr) || 1;
+  const rec = { frequency: freq, interval, rescheduleFrom: 'dueDate', sendToInbox: false };
+  if (daysStr) rec.weekDays = daysStr.split(',').map(d => DAY_MAP[d.toLowerCase()]).filter(n => n !== undefined);
+  return rec;
+}
+
+// Throws a descriptive error for non-ok API responses; otherwise returns parsed JSON.
+// Use as: const data = await parseApiResponse(res, 'Gmail API');
+async function parseApiResponse(res, label = 'API') {
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error?.message || `${label} ${res.status}`);
+  }
+  return res.json();
+}
 
 // ── Supabase field mappers (camelCase ↔ snake_case) ──────────────────────────
 function taskToDb(task, userId) {
@@ -1037,7 +1047,6 @@ function extractUpdateAction(text) {
   const pureFields = notesIdx !== -1 ? fieldStr.slice(0, notesIdx).replace(/\|$/, '') : fieldStr;
   const notesRaw   = notesIdx !== -1 ? fieldStr.slice(fieldStr.indexOf('notes:', notesIdx) + 6) : null;
 
-  const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   const changes = {};
   pureFields.split('|').filter(Boolean).forEach(pair => {
     const colon = pair.indexOf(':');
@@ -1052,17 +1061,7 @@ function extractUpdateAction(text) {
     if (key === 'title')        changes.text         = val;
     if (key === 'priority')     changes.priority     = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'location')     changes.location     = val.split(',').map(s => s.trim()).filter(Boolean);
-    if (key === 'recur') {
-      if (val === 'off') {
-        changes.recurrence = null;
-      } else {
-        const [freq, intStr, daysStr] = val.split(':');
-        const interval = parseInt(intStr) || 1;
-        const rec = { frequency: freq, interval, rescheduleFrom: 'dueDate', sendToInbox: false };
-        if (daysStr) rec.weekDays = daysStr.split(',').map(d => DAY_MAP[d.toLowerCase()]).filter(n => n !== undefined);
-        changes.recurrence = rec;
-      }
-    }
+    if (key === 'recur') changes.recurrence = parseRecurrenceValue(val);
   });
   if (notesRaw !== null) changes.notes = notesRaw.replace(/\\n/g, '\n');
 
@@ -1075,7 +1074,6 @@ function extractAddAction(text) {
   if (!m) return null;
   const title = m[1].trim();
   const rest = m[2];
-  const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   const fields = {};
   rest.split('|').filter(Boolean).forEach(pair => {
     const colon = pair.indexOf(':');
@@ -1088,13 +1086,7 @@ function extractAddAction(text) {
     if (key === 'defer')    fields.deferUntil = val;
     if (key === 'effort')   fields.effort     = val;
     if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
-    if (key === 'recur' && val !== 'off') {
-      const [freq, intStr, daysStr] = val.split(':');
-      const interval = parseInt(intStr) || 1;
-      const rec = { frequency: freq, interval, rescheduleFrom: 'dueDate', sendToInbox: false };
-      if (daysStr) rec.weekDays = daysStr.split(',').map(d => DAY_MAP[d.toLowerCase()]).filter(n => n !== undefined);
-      fields.recurrence = rec;
-    }
+    if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
   });
   if (!fields.parentId || !title) return null;
   return { title, ...fields };
@@ -1107,7 +1099,6 @@ function extractCreateAction(text) {
   const title = m[1].trim();
   const rest = m[2];
   const VALID_BUCKETS = new Set(['inbox', 'next', 'someday', 'waiting']);
-  const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   const fields = {};
   rest.split('|').filter(Boolean).forEach(pair => {
     const colon = pair.indexOf(':');
@@ -1119,13 +1110,7 @@ function extractCreateAction(text) {
     if (key === 'defer')    fields.deferUntil = val;
     if (key === 'effort')   fields.effort     = val;
     if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
-    if (key === 'recur' && val !== 'off') {
-      const [freq, intStr, daysStr] = val.split(':');
-      const interval = parseInt(intStr) || 1;
-      const rec = { frequency: freq, interval, rescheduleFrom: 'dueDate', sendToInbox: false };
-      if (daysStr) rec.weekDays = daysStr.split(',').map(d => DAY_MAP[d.toLowerCase()]).filter(n => n !== undefined);
-      fields.recurrence = rec;
-    }
+    if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
   });
   if (!title || !fields.bucket) return null;
   return { title, ...fields };
@@ -1720,7 +1705,6 @@ export default function GTDManager() {
             const rows = local.map(t => taskToDb(t, authUser.id));
             supabase.from('tasks').insert(rows).then(({ error: e2 }) => {
               if (e2) console.error('Migration failed:', e2);
-              else console.log(`Migrated ${rows.length} tasks to Supabase`);
               setSupabaseReady(true);
             });
           } else {
@@ -1764,7 +1748,6 @@ export default function GTDManager() {
             calibration_overrides: localCalib,
           }).then(({ error: e2 }) => {
             if (e2) console.error('Settings migration failed:', e2);
-            else console.log('Settings migrated to Supabase');
             settingsReadyRef.current = true;
           });
         }
@@ -1860,7 +1843,6 @@ export default function GTDManager() {
       if (ok) {
         localStorage.removeItem('gtd_pending_writes');
         setSyncStatus('synced');
-        console.log('Pending writes flushed successfully');
       }
     };
     setSyncStatus(navigator.onLine ? 'synced' : 'offline');
@@ -1913,7 +1895,6 @@ export default function GTDManager() {
     const pkceCalendarEnabled = pkceData.calendarEnabled || false;
     window.history.replaceState({}, document.title, window.location.pathname);
     const { code, verifier } = pendingGoogleAuth;
-    console.log('[Google OAuth] Exchanging code for token...');
     (async () => {
       try {
         const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -1929,7 +1910,6 @@ export default function GTDManager() {
           }),
         });
         const data = await res.json();
-        console.log('[Google OAuth] Exchange response:', data.access_token ? 'SUCCESS' : data.error);
         if (data.access_token) {
           const expiry = Date.now() + (data.expires_in || 3600) * 1000;
           localStorage.setItem('gtd_google_token', JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token ?? null, expiry, scope: pkceScope, calendarEnabled: pkceCalendarEnabled }));
@@ -2043,7 +2023,6 @@ export default function GTDManager() {
         // refresh_token is not re-issued on refresh — keep the existing one
         localStorage.setItem('gtd_google_token', JSON.stringify({ ...stored, access_token: data.access_token, expiry }));
         setGoogleToken(data.access_token);
-        console.log('[Gmail OAuth] Token refreshed silently, expires in', data.expires_in, 's');
         return data.access_token;
       }
       // Refresh failed (revoked, expired refresh token, etc.) — clear everything
@@ -2323,7 +2302,6 @@ export default function GTDManager() {
           } finally {
             clearTimeout(abortTimer);
           }
-          console.log("[Claude API response]", data);
           if (!res.ok || data.error) {
             throw new Error(`Anthropic error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
           }
@@ -2477,7 +2455,6 @@ export default function GTDManager() {
           }),
         });
         const data = await res.json();
-        console.log("[Open WebUI response]", data);
         if (!res.ok || data.error) {
           throw new Error(`Open WebUI error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
         }
