@@ -3247,6 +3247,24 @@ export default function GTDManager() {
     }
   }, [reviewProjectIdx, reviewSuggestions, tasks, reviewProject]);
 
+  // Advances to the next project without adding any suggested tasks.
+  const skipProjectReview = useCallback(() => {
+    setReviewSuggestions([]);
+    setReviewReady(false);
+    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const nextIdx = reviewProjectIdx + 1;
+
+    if (nextIdx >= rootProjects.length) {
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        text: `🎉 **All ${rootProjects.length} project${rootProjects.length !== 1 ? "s" : ""} reviewed!** Your project list is up to date. Switch to Next Actions to see what's ready to work on.`,
+      }]);
+      setCoachMode("chat");
+    } else {
+      reviewProject(rootProjects[nextIdx], nextIdx, rootProjects.length);
+    }
+  }, [reviewProjectIdx, tasks, reviewProject]);
+
   // ── Mode B: Metadata-quality review ─────────────────────────────────────
   const reviewProjectMetadata = useCallback(async (project, idx, total) => {
     setCurrentBucket("project");
@@ -4455,6 +4473,7 @@ export default function GTDManager() {
                   prev.map((s, i) => i === idx ? { ...s, checked: !s.checked } : s)
                 )}
                 onNext={advanceProjectReview}
+                onSkip={skipProjectReview}
                 projectIdx={reviewProjectIdx}
                 totalProjects={tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done).length}
               />
@@ -5463,7 +5482,7 @@ function MetadataReviewBar({ suggestions, onToggleAccepted, onChangeOverride, on
   );
 }
 
-function ProjectReviewBar({ suggestions, onToggle, onNext, projectIdx, totalProjects }) {
+function ProjectReviewBar({ suggestions, onToggle, onNext, onSkip, projectIdx, totalProjects }) {
   const selectedCount = suggestions.filter(s => s.checked).length;
   const isEmpty = suggestions.length === 0;
   const isLast = projectIdx + 1 >= totalProjects;
@@ -5502,6 +5521,12 @@ function ProjectReviewBar({ suggestions, onToggle, onNext, projectIdx, totalProj
           style={{ padding: "4px 14px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
         >
           {nextLabel}
+        </button>
+        <button
+          onClick={onSkip}
+          style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+        >
+          {isLast ? "Skip (Finish)" : "Skip →"}
         </button>
         <span style={{ fontSize: 11, color: COLORS.muted }}>
           Project {projectIdx + 1} of {totalProjects}
