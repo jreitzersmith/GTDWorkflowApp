@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Component } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -918,6 +918,41 @@ async function parseApiResponse(res, label = 'API') {
     throw new Error(d.error?.message || `${label} ${res.status}`);
   }
   return res.json();
+}
+
+// ── Error Boundary ────────────────────────────────────────────────────────────
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error(`[ErrorBoundary: ${this.props.label}]`, error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 13, color: '#ef4444', fontWeight: 600 }}>
+            ⚠ {this.props.label || 'This section'} crashed
+          </div>
+          <div style={{ fontSize: 12, color: '#888', fontFamily: 'monospace', maxWidth: 400, wordBreak: 'break-word' }}>
+            {this.state.error?.message}
+          </div>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #555', background: 'transparent', color: '#ccc', cursor: 'pointer' }}
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 // ── Supabase field mappers (camelCase ↔ snake_case) ──────────────────────────
@@ -3501,6 +3536,7 @@ export default function GTDManager() {
         {/* TASK ROW */}
         <div style={s.taskRow}>
         {/* TASK PANEL */}
+        <ErrorBoundary label="Task Panel">
         <div style={s.taskPanel}>
           {showSettings ? (
             <SettingsPanel
@@ -3858,10 +3894,12 @@ export default function GTDManager() {
             </>
           )}
         </div>
+        </ErrorBoundary>
         </div>{/* end taskRow */}
         <ResizeHandle onMouseDown={coachDragDown} direction="v" />
 
         {/* COACH PANEL */}
+        <ErrorBoundary label="AI Coach">
         <div style={s.coachPanel}>
           <div style={s.coachHeader}>
             <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.06em", textTransform: "uppercase" }}>🤖 AI Coach</span>
@@ -3967,9 +4005,11 @@ export default function GTDManager() {
             {sessionUsage.costUsd > 0 && <span style={{ color: COLORS.text2 }}>{fmtCost(sessionUsage.costUsd)}</span>}
           </div>
         </div>{/* end coachPanel */}
+        </ErrorBoundary>
         </div>{/* end mainLeft */}
 
         {/* TASK DETAIL PANEL — full height alongside both task list and coach */}
+        <ErrorBoundary label="Task Detail">
         {selectedTaskId && currentView !== "email" && (() => {
           const selTask = tasks.find(t => t.id === selectedTaskId);
           return selTask ? (
@@ -3991,6 +4031,7 @@ export default function GTDManager() {
             </>
           ) : null;
         })()}
+        </ErrorBoundary>
       </div>{/* end main */}
 
       {/* Note roll-up prompt — shown when completing a subtask that has notes */}
