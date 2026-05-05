@@ -3645,7 +3645,7 @@ export default function GTDManager() {
     if (newProjectName) {
       const newProjId = genId();
       setTasks(prev => {
-        const updated = prev.map(t => ids.includes(t.id) ? { ...t, parentId: newProjId, bucket: "project" } : t);
+        const updated = prev.map(t => ids.includes(t.id) ? { ...t, parentId: newProjId } : t);
         const newProject = {
           id: newProjId, text: newProjectName.trim(), bucket: "project",
           done: false, created: Date.now(), priority: [], location: [],
@@ -3656,7 +3656,7 @@ export default function GTDManager() {
       });
     } else if (projectId) {
       setTasks(prev => prev.map(t => {
-        if (ids.includes(t.id)) return { ...t, parentId: projectId, bucket: "project" };
+        if (ids.includes(t.id)) return { ...t, parentId: projectId };
         if (t.id === projectId) {
           const existing = t.childIds || [];
           const toAdd = ids.filter(id => !existing.includes(id));
@@ -6431,7 +6431,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
   };
   const excludedIds = getDescendantIds(task.id, allTasks);
   const eligibleProjects = allTasks.filter(
-    t => t.bucket === "project" && !excludedIds.has(t.id)
+    t => t.bucket === "project" && !t.parentId && !t.done && !excludedIds.has(t.id)
   );
 
   const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };

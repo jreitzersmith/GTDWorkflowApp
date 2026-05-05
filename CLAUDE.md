@@ -85,9 +85,10 @@ Every task object: `{ id, text, bucket, done, created, priority[], location[], d
 ## Suggested next features (in rough priority order)
 1. Brain Dump auto-capture (AI extracts items and adds them directly to Inbox)
 2. Daily focus view (pick 3 Most Important Tasks from Next Actions)
-3. Todoist export / two-way sync
-4. Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
-5. Multi-device sync (Supabase or similar)
+3. Inbox Process mode — AI identifies co-related tasks during inbox processing and suggests grouping them into an existing project or a new one (similar to the calendar-event grouping flow)
+4. Todoist export / two-way sync
+5. Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
+6. Multi-device sync (Supabase or similar)
 
 ## API Key setup (local dev)
 Create a `.env` file:
