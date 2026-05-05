@@ -3925,6 +3925,9 @@ export default function GTDManager() {
               setSkippedCalendarIds={setSkippedCalendarIds}
               seenCalendarEventIds={seenCalendarEventIds}
               setSeenCalendarEventIds={setSeenCalendarEventIds}
+              recurringAcknowledgedMap={recurringAcknowledgedMap}
+              recurringReviewDays={recurringReviewDays}
+              setRecurringAcknowledgedMap={setRecurringAcknowledgedMap}
             />
           ) : (
             <>
@@ -7352,7 +7355,7 @@ function buildMonthGrid(year, month) {
   return grid;
 }
 
-function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, setCalendarTab, tasks, setTasks, calendarEvents, setCalendarEvents, processCalendarEventWithAI, onConnectCalendar, onOpenDetail, selectedTaskId, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds }) {
+function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, setCalendarTab, tasks, setTasks, calendarEvents, setCalendarEvents, processCalendarEventWithAI, onConnectCalendar, onOpenDetail, selectedTaskId, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, setRecurringAcknowledgedMap }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [navDate, setNavDate] = useState(new Date());
