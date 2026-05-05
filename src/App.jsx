@@ -1989,7 +1989,7 @@ const DEFAULT_EFFORTS = ["2 min", "5 min", "10 min", "30 min", "1 hour", "2 hour
 // and keeps them synced to localStorage.
 function useAppSettings() {
   const [locations, setLocations] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gtd_locations") || "null") || ["Home", "Work", "Phone", "Computer"]; } catch { return ["Home", "Work", "Phone", "Computer"]; }
+    try { return (JSON.parse(localStorage.getItem("gtd_locations") || "null") || ["Computer", "Home", "Phone", "Work"]); } catch { return ["Computer", "Home", "Phone", "Work"]; }
   });
   const [efforts, setEfforts] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_efforts") || "null") || DEFAULT_EFFORTS; } catch { return DEFAULT_EFFORTS; }
@@ -2255,7 +2255,7 @@ export default function GTDManager() {
         }
         if (data) {
           // Server wins — overwrite local state
-          if (Array.isArray(data.locations)) setLocations(data.locations);
+          if (Array.isArray(data.locations)) setLocations([...data.locations].sort((a, b) => a.localeCompare(b)));
           if (Array.isArray(data.efforts)) setEfforts(data.efforts);
           if (data.calibration_overrides && typeof data.calibration_overrides === 'object')
             setCalibrationOverrides(data.calibration_overrides);
@@ -3770,13 +3770,13 @@ export default function GTDManager() {
   const addLocation = useCallback((name) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setLocations(prev => prev.includes(trimmed) ? prev : [...prev, trimmed]);
+    setLocations(prev => prev.includes(trimmed) ? prev : [...prev, trimmed].sort((a, b) => a.localeCompare(b)));
   }, []);
 
   const renameLocation = useCallback((oldName, newName) => {
     const trimmed = newName.trim();
     if (!trimmed || trimmed === oldName) return;
-    setLocations(prev => prev.map(l => l === oldName ? trimmed : l));
+    setLocations(prev => prev.map(l => l === oldName ? trimmed : l).sort((a, b) => a.localeCompare(b)));
     setTasks(prev => prev.map(t => ({
       ...t,
       location: (t.location || []).map(l => l === oldName ? trimmed : l),
@@ -3884,7 +3884,7 @@ export default function GTDManager() {
     if (mode === "replace") {
       if (!window.confirm(`Replace all ${tasks.length} current tasks with ${data.tasks.length} imported tasks?`)) return;
       setTasks(data.tasks);
-      if (Array.isArray(data.locations)) setLocations(data.locations);
+      if (Array.isArray(data.locations)) setLocations([...data.locations].sort((a, b) => a.localeCompare(b)));
       if (Array.isArray(data.efforts)) setEfforts(data.efforts);
     } else {
       const existingIds = new Set(tasks.map(t => t.id));
@@ -3895,7 +3895,7 @@ export default function GTDManager() {
       }
       setTasks(prev => [...incoming, ...prev]);
       if (Array.isArray(data.locations))
-        setLocations(prev => [...new Set([...prev, ...data.locations])]);
+        setLocations(prev => [...new Set([...prev, ...data.locations])].sort((a, b) => a.localeCompare(b)));
       if (Array.isArray(data.efforts))
         setEfforts(prev => { const s = new Set(prev); return [...prev, ...data.efforts.filter(e => !s.has(e))]; });
       alert(`Merged ${incoming.length} new task${incoming.length !== 1 ? "s" : ""}.`);
