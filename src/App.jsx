@@ -2072,6 +2072,67 @@ function useProjectReview() {
   return { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions };
 }
 
+// ── useCalendarState ──────────────────────────────────────────────────────────
+// Owns all calendar-related UI state and simple localStorage persistence.
+// Note: Supabase-dependent effects that consume this state (settings read/write,
+// localStorage fallbacks keyed on authUser) remain in GTDManager until auth state
+// is also extracted.
+function useCalendarState() {
+  const [calendarEvents, setCalendarEvents]               = useState([]);
+  const [calendarTab, setCalendarTab]                     = useState(() => localStorage.getItem('gtd_calendar_tab') || 'month');
+  const [skippedCalendarIds, setSkippedCalendarIds]       = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('gtd_cal_skipped') || '[]')); }
+    catch { return new Set(); }
+  });
+  const [seenCalendarEventIds, setSeenCalendarEventIds]   = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('gtd_cal_seen_events') || '[]')); }
+    catch { return new Set(); }
+  });
+  const [recurringAcknowledgedMap, setRecurringAcknowledgedMap] = useState(() => {
+    try { const raw = JSON.parse(localStorage.getItem('gtd_cal_recurring_ack') || '[]');
+          return new Map(raw); }
+    catch { return new Map(); }
+  });
+  const [recurringReviewDays, setRecurringReviewDays]     = useState(() => {
+    const v = parseInt(localStorage.getItem('gtd_recurring_review_days') || '7', 10);
+    return isNaN(v) ? 7 : v;
+  });
+  const [calendarSuggestions, setCalendarSuggestions]           = useState([]);
+  const [calendarSuggestionsReady, setCalendarSuggestionsReady] = useState(false);
+
+  useEffect(() => { localStorage.setItem('gtd_calendar_tab', calendarTab); }, [calendarTab]);
+
+  return {
+    calendarEvents, setCalendarEvents,
+    calendarTab, setCalendarTab,
+    skippedCalendarIds, setSkippedCalendarIds,
+    seenCalendarEventIds, setSeenCalendarEventIds,
+    recurringAcknowledgedMap, setRecurringAcknowledgedMap,
+    recurringReviewDays, setRecurringReviewDays,
+    calendarSuggestions, setCalendarSuggestions,
+    calendarSuggestionsReady, setCalendarSuggestionsReady,
+  };
+}
+
+// ── useGmailState ─────────────────────────────────────────────────────────────
+// Owns email view state and simple localStorage persistence.
+// Note: the unread-count fetch (depends on googleToken) and the Supabase
+// gmail_queue load (depends on authUser + supabaseReady) remain in GTDManager
+// until those dependencies are also extracted.
+function useGmailState() {
+  const [currentView, setCurrentView]           = useState("gtd");
+  const [emailTab, setEmailTab]                 = useState(() => localStorage.getItem("gtd_email_tab") || "inbox");
+  const [gmailQueue, setGmailQueue]             = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gtd_gmail_queue") || "[]"); } catch { return []; }
+  });
+  const [gmailUnreadCount, setGmailUnreadCount] = useState(null);
+
+  useEffect(() => { localStorage.setItem("gtd_email_tab",   emailTab); }, [emailTab]);
+  useEffect(() => { localStorage.setItem("gtd_gmail_queue", JSON.stringify(gmailQueue)); }, [gmailQueue]);
+
+  return { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount };
+}
+
 export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
@@ -2094,36 +2155,8 @@ export default function GTDManager() {
   const [showSettings, setShowSettings] = useState(false);
   const [showUsage, setShowUsage] = useState(false);
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
-  // Email Management view state
-  const [currentView, setCurrentView] = useState("gtd"); // "gtd" | "email"
-  const [emailTab, setEmailTab] = useState(() => localStorage.getItem("gtd_email_tab") || "inbox");
-  const [gmailQueue, setGmailQueue] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gtd_gmail_queue") || "[]"); } catch { return []; }
-  });
-  const [gmailUnreadCount, setGmailUnreadCount] = useState(null);
-  // ── Google Auth hook ──────────────────────────────────────────────
-  // calendarEvents declared first so setCalendarEvents is available to pass to the hook
-  const [calendarEvents, setCalendarEvents] = useState([]);
-  const [calendarTab, setCalendarTab] = useState(() => localStorage.getItem('gtd_calendar_tab') || 'month');
-  const [skippedCalendarIds, setSkippedCalendarIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('gtd_cal_skipped') || '[]')); }
-    catch { return new Set(); }
-  });
-  const [seenCalendarEventIds, setSeenCalendarEventIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('gtd_cal_seen_events') || '[]')); }
-    catch { return new Set(); }
-  });
-  const [recurringAcknowledgedMap, setRecurringAcknowledgedMap] = useState(() => {
-    try { const raw = JSON.parse(localStorage.getItem('gtd_cal_recurring_ack') || '[]');
-          return new Map(raw); }
-    catch { return new Map(); }
-  });
-  const [recurringReviewDays, setRecurringReviewDays] = useState(() => {
-    const v = parseInt(localStorage.getItem('gtd_recurring_review_days') || '7', 10);
-    return isNaN(v) ? 7 : v;
-  });
-  const [calendarSuggestions, setCalendarSuggestions] = useState([]); // [{ text, checked, bucket }]
-  const [calendarSuggestionsReady, setCalendarSuggestionsReady] = useState(false);
+  const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
+  const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
   const { googleToken, googleScope, calendarEnabled, gmailError,
           signInWithGoogle, disconnectGmail, connectCalendar, disconnectCalendar,
           refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
@@ -2402,9 +2435,6 @@ export default function GTDManager() {
 
   useEffect(() => { localStorage.setItem("gtd_provider", provider); }, [provider]);
   useEffect(() => { localStorage.setItem("gtd_local_model", localModel); }, [localModel]);
-  useEffect(() => { localStorage.setItem("gtd_email_tab", emailTab); }, [emailTab]);
-  useEffect(() => { localStorage.setItem("gtd_calendar_tab", calendarTab); }, [calendarTab]);
-  useEffect(() => { localStorage.setItem("gtd_gmail_queue", JSON.stringify(gmailQueue)); }, [gmailQueue]);
 
   // Load gmail_queue from Supabase on auth ready, merge with any localStorage entries
   useEffect(() => {
