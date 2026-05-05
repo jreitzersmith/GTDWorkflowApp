@@ -1960,3 +1960,13 @@
   <div class="commit-lesson"><strong>Class components are still required for Error Boundaries.</strong> React&#8217;s error boundary API (<code>static getDerivedStateFromError</code> + <code>componentDidCatch</code>) is only available on class components — there is no hook equivalent. This is one of the few remaining reasons to write a class component in a modern React codebase. The new JSX transform means <code>React</code> no longer needs to be in scope for JSX, but <code>Component</code> still needs to be imported explicitly for class inheritance.</div>
   <div class="commit-back"><a href="project-summary.html#refactor-error-boundaries">&#8593; Refactor: Error Boundaries</a></div>
 </div>
+
+<div class="commit-entry" id="commit-c0a2f14">
+  <div class="commit-hash">c0a2f14</div>
+  <div class="commit-msg">refactor: extract useSupabaseAuth and useGoogleAuth custom hooks</div>
+  <div class="commit-body">
+    Two custom hooks extracted from <code>GTDManager</code>, removing ~120 lines of inline declarations. <strong>useSupabaseAuth</strong> owns <code>authUser</code>, <code>authLoading</code>, <code>authEmail</code>, <code>authSent</code>, the session-restore effect, and the <code>sendMagicLink</code> callback. <strong>useGoogleAuth</strong> owns all five Google state variables (<code>googleToken</code>, <code>googleScope</code>, <code>calendarEnabled</code>, <code>gmailError</code>, <code>pendingGoogleAuth</code>), the PKCE exchange effect, two token-refresh effects, and all five OAuth callbacks. It accepts <code>setCalendarEvents</code> as a parameter so <code>disconnectCalendar</code> can clear calendar view state that remains in <code>GTDManager</code>. <code>calendarEvents</code> state was hoisted above the hook call so its setter is available to pass in.
+  </div>
+  <div class="commit-lesson"><strong>Hooks can accept setters as parameters.</strong> When a hook needs to update state that belongs to the calling component, passing the setter as a parameter is the cleanest option — it keeps the state ownership in the component while letting the hook trigger updates. The alternative (returning a callback from the hook that the component must wire up) adds indirection. The constraint is ordering: the state must be declared before the hook call so the setter exists when it&#8217;s passed in.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hooks</a></div>
+</div>

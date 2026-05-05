@@ -4493,3 +4493,82 @@ class ErrorBoundary extends Component {
   <div class="annotation"><strong>getDerivedStateFromError vs componentDidCatch.</strong> These two methods serve different purposes. <code>getDerivedStateFromError</code> is a pure static method that converts the thrown error into new state — it runs during the render phase and must be side-effect free. <code>componentDidCatch</code> runs after the render is committed and is the right place for side effects like logging. Having both means the boundary can update its UI in the same render cycle as the crash, while still logging to an error service on the next tick.</div>
   <div class="snip-back"><a href="project-summary.html#refactor-error-boundaries">&#8593; Refactor: Error Boundaries</a></div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- CUSTOM HOOKS SNIPPETS -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="snip-entry" id="snip-use-supabase-auth">
+  <div class="snip-header">
+    <span class="snip-title">useSupabaseAuth — Supabase session hook</span>
+    <span class="snip-file">App.jsx — module level</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">function useSupabaseAuth() {
+  const [authUser, setAuthUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authSent, setAuthSent] = useState(false);
+
+  const sendMagicLink = useCallback(async () => {
+    if (!authEmail.trim()) return;
+    await supabase.auth.signInWithOtp({ email: authEmail.trim() });
+    setAuthSent(true);
+  }, [authEmail]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+    });
+    // Exchange Supabase magic-link ?code= (skipping Google OAuth codes)
+    const _p = new URLSearchParams(window.location.search);
+    const _code = _p.get('code');
+    const _state = _p.get('state');
+    if (_code && !_state?.startsWith('gtd_')) {
+      supabase.auth.exchangeCodeForSession(_code)
+        .then(({ error }) => { if (error) console.error('Supabase code exchange:', error); });
+    }
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink };
+}
+
+// Usage in GTDManager:
+const { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink } = useSupabaseAuth();</code></pre></div>
+  <div class="annotation"><strong>Single-responsibility extraction.</strong> This hook has one job: manage the Supabase auth session lifecycle. All four state variables, the effect, and the callback are cohesive — they all exist to answer the question "is the user logged in and how do we log them in?" Nothing else belongs here. The result is that <code>GTDManager</code> no longer needs to know anything about <code>supabase.auth.getSession</code>, <code>onAuthStateChange</code>, or magic-link codes.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hooks</a></div>
+</div>
+
+<div class="snip-entry" id="snip-use-google-auth">
+  <div class="snip-header">
+    <span class="snip-title">useGoogleAuth — Google OAuth hook signature</span>
+    <span class="snip-file">App.jsx — module level</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// calendarEvents declared first so setCalendarEvents is available to pass in
+const [calendarEvents, setCalendarEvents] = useState([]);
+const [calendarTab, setCalendarTab] = useState(...);
+const [calendarSuggestions, setCalendarSuggestions] = useState([]);
+const [calendarSuggestionsReady, setCalendarSuggestionsReady] = useState(false);
+
+// useGoogleAuth accepts setCalendarEvents so disconnectCalendar can clear
+// calendar view state that lives in GTDManager, not inside the hook.
+const { googleToken, googleScope, calendarEnabled, gmailError,
+        signInWithGoogle, disconnectGmail, connectCalendar,
+        disconnectCalendar, refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
+
+// Inside the hook — disconnectCalendar uses the passed-in setter:
+const disconnectCalendar = useCallback(() => {
+  try {
+    const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
+    if (stored) { stored.calendarEnabled = false; localStorage.setItem('gtd_google_token', JSON.stringify(stored)); }
+  } catch {}
+  setCalendarEnabled(false);   // hook-owned state — set directly
+  setCalendarEvents([]);        // component-owned state — set via passed-in setter
+}, [setCalendarEvents]);</code></pre></div>
+  <div class="annotation"><strong>Passing a setter as a parameter.</strong> <code>calendarEvents</code> belongs in <code>GTDManager</code> because the Calendar view and other parts of the component read it directly. But <code>disconnectCalendar</code> (which lives in the hook) needs to clear it on disconnect. Passing <code>setCalendarEvents</code> as a hook parameter solves this cleanly: the hook gets the update capability without owning the state. The caller must declare that state before the hook call — hence the hoisting of <code>calendarEvents</code> above the <code>useGoogleAuth</code> line.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-custom-hooks">&#8593; Refactor: Custom Hooks</a></div>
+</div>

@@ -2264,3 +2264,32 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-commit" href="project-commits.html#commit-09a7f30">&#x1F4DC; 09a7f30 &#8212; Error Boundaries</a>
     </div>
   </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-custom-hooks">
+    <div class="feat-header">
+      <span class="feat-icon">🪝</span>
+      <span class="feat-title">Custom Hooks — useSupabaseAuth &amp; useGoogleAuth</span>
+      <span class="feat-badge badge-refactor">Refactor — May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Two custom hooks extracted from <code>GTDManager</code>, each grouping related state, effects, and callbacks into a named unit. Before this change all authentication logic lived as bare declarations inside the component function. <code>GTDManager</code> now replaces ~120 lines with two hook calls.</p>
+      <ul>
+        <li><strong>useSupabaseAuth()</strong> — session restore, magic-link exchange, auth state listener. Returns <code>authUser</code>, <code>authLoading</code>, <code>authEmail</code>, <code>setAuthEmail</code>, <code>authSent</code>, <code>sendMagicLink</code>.</li>
+        <li><strong>useGoogleAuth({ setCalendarEvents })</strong> — PKCE exchange, silent token refresh, proactive refresh timer, and all five connect/disconnect callbacks. Returns <code>googleToken</code>, <code>googleScope</code>, <code>calendarEnabled</code>, <code>gmailError</code>, and the five callbacks. Accepts <code>setCalendarEvents</code> so <code>disconnectCalendar</code> can clear calendar view state that stays in <code>GTDManager</code>.</li>
+      </ul>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: passing setters into hooks</h4>
+      <p>A hook that needs to update state owned by its caller can accept the setter as a parameter. This keeps state ownership in the component (where it belongs, since other parts of the component need it) while letting the hook trigger updates. The one ordering constraint: the state must be declared before the hook call, so the setter is defined when it&#8217;s passed in. <code>calendarEvents</code> was hoisted above the <code>useGoogleAuth</code> call for exactly this reason.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Extracting auth logic into a hook is like moving authentication middleware into its own module rather than inlining it in every route handler. The routes still call it and use its output, but the implementation — token validation, refresh logic, session management — lives in one place. A bug in OAuth token refresh now has one fix location instead of being scattered across the component.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-supabase-auth">&#x1F52C; useSupabaseAuth hook</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-google-auth">&#x1F52C; useGoogleAuth hook signature</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-c0a2f14">&#x1F4DC; c0a2f14 &#8212; custom hooks</a>
+    </div>
+  </section>
