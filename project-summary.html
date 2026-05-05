@@ -2165,10 +2165,7 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-snippet" href="project-snippets.html#snip-cal-action-parsers">🔬 extractCalendarCreateAction / Update / Delete</a>
       <a class="link-chip chip-snippet" href="project-snippets.html#snip-cal-action-handler">🔬 callAI — calendar action handler</a>
       <a class="link-chip chip-snippet" href="project-snippets.html#snip-cal-event-detail">🔬 EventDetailPanel — delete + reschedule UI</a>
-      <a class="link-chip chip-commit" href="project-commits.html#commit-e1cf66c">📜 e1cf66c — Calendar delete/reschedule/AI actions</a>
-    </div>
-  </section>
-
+      <a class="link-chip chip-commit" href="project-commits.html#commit-e1cf66c">📜 e1cf66c — Calendar delete/reschedule/AI a
   <!-- ═══════════════════════════════════════════════════════════ -->
   <section class="feat" id="feat-variance">
     <div class="feat-header">
@@ -2177,33 +2174,62 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <span class="feat-badge badge-new">New — May 5</span>
     </div>
     <div class="feat-desc">
-      <p>Two new task fields — <code>originalDueDate</code> and <code>completedDate</code> — enable the app to measure whether tasks were finished on time, late, or early relative to their original estimate.</p>
-      <p><strong>originalDueDate</strong> is set automatically the first time a due date is assigned to a task (inside <code>updateTask</code>). It is never overwritten by subsequent due-date edits, so it always represents the initial commitment. The user can manually reset it via a double-confirm edit flow in the Task Detail Panel (the confirmation message is "Reset original due date to [date]? This affects variance tracking."). The field is also passed to the AI coach so it can factor commitment accuracy into its advice.</p>
-      <p><strong>completedDate</strong> is set to today's date string (<code>YYYY-MM-DD</code>) at all four completion code paths: <code>completeTask</code> (done branch), <code>finishComplete</code>, <code>handleActualEffortSave</code>, and <code>handleActualEffortSkip</code>. It is cleared to <code>null</code> when a task is un-completed so the field stays accurate if a task is reopened.</p>
-      <p><strong>Task Detail Panel</strong> gains three new read rows beneath the Due date field. <em>Orig. Due</em> shows the stored original date with an "edit" button that opens an inline date picker and double-confirm flow. <em>Completed</em> shows <code>completedDate</code> and is only visible for finished tasks. <em>Variance</em> shows a color-coded chip: green for on-time or early, amber for 1–7 days late, red for more than 7 days late. For open tasks it compares <code>originalDueDate</code> to the current <code>dueDate</code>; for completed tasks it compares to <code>completedDate</code>.</p>
+      <p>Two new fields on every task — <code>originalDueDate</code> and <code>completedDate</code> — enable schedule-drift tracking. <code>originalDueDate</code> is auto-captured the first time a due date is assigned and never overwritten automatically. <code>completedDate</code> is stamped as today&#8217;s date on every completion path. The <strong>Task Detail Panel</strong> gains three new read rows:</p>
+      <ul>
+        <li><strong>Orig. Due</strong> — the first due date ever set; editable via a two-step confirm flow (pick date &#8594; confirm) to prevent accidental resets.</li>
+        <li><strong>Completed</strong> — read-only; the date the task was marked done.</li>
+        <li><strong>Variance</strong> — a colour-coded badge: green (on time or early), amber (1&#8211;7 days late), red (&gt;7 days late). Compares <code>completedDate ?? dueDate</code> against <code>originalDueDate</code>.</li>
+      </ul>
+      <p>Both fields are included in the AI context string so the coach can reference completion history and schedule drift when giving advice.</p>
     </div>
     <div class="box box-concept">
-      <h4>React Concept: augmenting changes before applying them</h4>
-      <p>The <code>updateTask</code> callback receives a <code>changes</code> object from callers that only contains the fields they care about. Rather than require every call site to know about <code>originalDueDate</code>, the logic is centralised inside <code>setTasks</code>: before running the fast-path map, the function checks whether <code>dueDate</code> is being set for the first time and, if so, produces an augmented <code>ch</code> object that includes <code>originalDueDate</code>. All subsequent code (fast path and slow deferUntil path) uses <code>ch</code> instead of <code>changes</code>. This is a clean way to enforce derived-field rules in a single place without a useEffect or a separate callback.</p>
+      <h4>React Concept: auto-capture at write time</h4>
+      <p><code>originalDueDate</code> is set inside <code>updateTask</code> rather than at each call site. The logic is: <code>const ch = (existing &amp;&amp; "dueDate" in changes &amp;&amp; changes.dueDate &amp;&amp; !existing.originalDueDate) ? &#123; ...changes, originalDueDate: changes.dueDate &#125; : changes</code>. Because this lives in the one function that handles all task updates, no caller needs to remember to set it — the invariant is enforced at the mutation boundary.</p>
     </div>
     <div class="box box-concept">
-      <h4>React Concept: IIFE in JSX for inline computed rendering</h4>
-      <p>The Variance chip is rendered via an immediately-invoked function expression (IIFE) inside JSX: <code>{task.originalDueDate &amp;&amp; (task.dueDate || task.completedDate) &amp;&amp; (() =&gt; { ... return (&lt;div&gt;...&lt;/div&gt;); })()}</code>. The IIFE lets you declare local constants (<code>ref</code>, <code>cmp</code>, <code>days</code>, <code>color</code>, <code>label</code>) without extracting a separate component or polluting the enclosing function scope. It's a useful pattern when a JSX expression needs multi-step computation that doesn't warrant its own component.</p>
+      <h4>React Concept: two-step confirm for destructive edits</h4>
+      <p>Editing <code>originalDueDate</code> uses three local state booleans: <code>editingOriginalDue</code> (shows the date picker), <code>originalDueDraft</code> (the picked value), and <code>confirmOriginalDue</code> (shows the confirmation prompt). This is the same pattern as the Calendar delete flow — no modal, no global state, just local booleans. The confirm step exists because resetting the original due date changes historical variance data, which is not reversible.</p>
     </div>
     <div class="box box-sysadmin">
       <h4>Sysadmin Analogy</h4>
-      <p><code>originalDueDate</code> is like the ticket's "reported date" in an incident tracker — it records when the work was first scoped, not when the scope last changed. <code>completedDate</code> is the "resolved at" timestamp. The variance chip is the SLA compliance indicator: green = within SLA, amber = minor breach, red = major breach.</p>
+      <p>This is like stamping a ticket&#8217;s <code>created_at</code> and <code>resolved_at</code> fields in an incident tracker and computing MTTR. <code>originalDueDate</code> is the SLA start; <code>completedDate</code> is the resolution timestamp; the variance badge is the SLA breach indicator. Once the ticket is resolved, you don&#8217;t edit <code>created_at</code> — similarly, <code>originalDueDate</code> is protected behind a confirm step.</p>
     </div>
     <div class="link-row">
-      <a class="link-chip chip-snippet" href="project-snippets.html#snip-variance-updatetask">🔬 updateTask — originalDueDate auto-set</a>
-      <a class="link-chip chip-snippet" href="project-snippets.html#snip-variance-panel">🔬 TaskDetailPanel — Orig. Due / Completed / Variance rows</a>
-      <a class="link-chip chip-commit" href="project-commits.html#commit-de65bda">📜 de65bda — Due-date variance tracking</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-variance-fields">&#x1F52C; originalDueDate auto-capture in updateTask</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-variance-badge">&#x1F52C; Variance badge in TaskDetailPanel</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-de65bda">&#x1F4DC; de65bda &#8212; due-date variance tracking</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-2adefb4">&#x1F4DC; 2adefb4 &#8212; pill button style fix</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-34e45d5">&#x1F4DC; 34e45d5 &#8212; edit flow style fix</a>
     </div>
   </section>
 
-
-</main>
-</div>
-
-</body>
-</html>
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-dry-cleanup">
+    <div class="feat-header">
+      <span class="feat-icon">&#x1F9F9;</span>
+      <span class="feat-title">DRY Cleanup — Shared Helpers</span>
+      <span class="feat-badge badge-refactor">Refactor — May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Four targeted cleanup changes with no behaviour impact, addressing the top DRY violations identified in a code-quality audit against the project&#8217;s <code>Senior_Code_Engineer.md</code> standards:</p>
+      <ul>
+        <li><strong>DAY_MAP constant</strong> — moved from three identical local definitions inside <code>extractUpdateAction</code>, <code>extractAddAction</code>, and <code>extractCreateAction</code> to a single module-level constant.</li>
+        <li><strong>parseRecurrenceValue()</strong> — the 8-line recurrence-parsing block (split frequency, build interval, map weekday names) was duplicated across all three <code>extract*</code> functions. Extracted to a pure module-level function.</li>
+        <li><strong>parseApiResponse()</strong> — the <code>if (!res.ok) &#123; const d = await res.json(); throw new Error(d.error?.message || ...) &#125;</code> pattern appeared 14 times across Gmail and Calendar API helpers. Replaced by a single async helper that throws on failure and returns parsed JSON on success.</li>
+        <li><strong>console.log removal</strong> — 8 debug-level log statements removed; all <code>console.error</code> and <code>console.warn</code> calls retained.</li>
+      </ul>
+    </div>
+    <div class="box box-concept">
+      <h4>Engineering Concept: DRY at the right granularity</h4>
+      <p>Not every repeated pattern is worth extracting — the test is whether a bug fix or behaviour change requires editing more than one place. All three violations here failed that test: a recurrence bug required three identical fixes; an API error-shape change required 14 edits. <code>parseApiResponse</code> also improves on the original by adding <code>.catch(() =&gt; ({}))</code> so a non-JSON error body (e.g. a 502 gateway page) doesn&#8217;t cause a secondary parse failure.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Replacing 14 identical error-check blocks with one shared function is like replacing 14 copies of an inline bash error-check (<code>if [ $? -ne 0 ]; then echo "API failed"; exit 1; fi</code>) with a single <code>die()</code> function at the top of the script. The code works either way — but when the error message format needs to change, you edit one line instead of fourteen.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-parse-api-response">&#x1F52C; parseApiResponse helper</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-parse-recurrence-value">&#x1F52C; parseRecurrenceValue helper</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-11a4e28">&#x1F4DC; 11a4e28 &#8212; DRY cleanup</a>
+    </div>
+  </section>

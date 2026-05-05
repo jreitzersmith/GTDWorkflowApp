@@ -4340,3 +4340,106 @@ const handleReschedule = async () =&gt; {
 </script>
 </body>
 </html>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- VARIANCE TRACKING SNIPPETS -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="snip-entry" id="snip-variance-fields">
+  <div class="snip-header">
+    <span class="snip-title">originalDueDate auto-capture in updateTask</span>
+    <span class="snip-file">App.jsx — updateTask callback</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">const updateTask = useCallback((id, changes) => {
+  setTasks(prev => {
+    // Auto-set originalDueDate on first dueDate assignment
+    const existing = prev.find(t => t.id === id);
+    const ch = (existing && "dueDate" in changes && changes.dueDate && !existing.originalDueDate)
+      ? { ...changes, originalDueDate: changes.dueDate }
+      : changes;
+    // ... rest of updateTask
+  });
+});</code></pre></div>
+  <div class="annotation"><strong>Capture at the mutation boundary, not at call sites.</strong> By checking <code>!existing.originalDueDate</code> inside <code>updateTask</code>, the auto-capture happens exactly once — on the first dueDate assignment — regardless of which part of the app triggers the update. No caller needs to pass <code>originalDueDate</code> explicitly.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-variance">&#8593; Feature: Due-Date Variance Tracking</a></div>
+</div>
+
+<div class="snip-entry" id="snip-variance-badge">
+  <div class="snip-header">
+    <span class="snip-title">Variance badge in TaskDetailPanel</span>
+    <span class="snip-file">App.jsx — TaskDetailPanel</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">{task.originalDueDate && (task.dueDate || task.completedDate) && (() => {
+  const ref = new Date(task.originalDueDate);
+  const cmp = new Date(task.completedDate || task.dueDate);
+  const days = Math.round((cmp - ref) / 86400000);
+  const color = days &lt;= 0 ? "#22c55e" : days &lt;= 7 ? "#f59e0b" : "#ef4444";
+  const label = days === 0 ? "On time" : days &lt; 0 ? `${Math.abs(days)}d early` : `${days}d late`;
+  return (
+    &lt;div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}&gt;
+      &lt;span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}&gt;Variance&lt;/span&gt;
+      &lt;span style={{ background: color + "22", color, border: `1px solid ${color}55`,
+                     borderRadius: 4, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}&gt;
+        {label}
+      &lt;/span&gt;
+    &lt;/div&gt;
+  );
+})()}</code></pre></div>
+  <div class="annotation"><strong>IIFE for inline derived UI.</strong> The variance calculation is too complex for a ternary but too small to warrant a helper function. An immediately-invoked function expression (IIFE) — <code>(() =&gt; &#123; ... return &lt;JSX /&gt;; })()</code> — runs the calculation inline without polluting the component&#8217;s scope. Only rendered when <code>originalDueDate</code> is present, keeping the panel clean for tasks that were never tracked.</div>
+  <div class="snip-back"><a href="project-summary.html#feat-variance">&#8593; Feature: Due-Date Variance Tracking</a></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- DRY CLEANUP SNIPPETS -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="snip-entry" id="snip-parse-api-response">
+  <div class="snip-header">
+    <span class="snip-title">parseApiResponse — shared API error helper</span>
+    <span class="snip-file">App.jsx — module level</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Throws a descriptive error for non-ok API responses; otherwise returns parsed JSON.
+// Use as: const data = await parseApiResponse(res, 'Gmail API');
+async function parseApiResponse(res, label = 'API') {
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error?.message || `${label} ${res.status}`);
+  }
+  return res.json();
+}
+
+// Before (repeated 14 times):
+if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+const data = await res.json();
+
+// After:
+const data = await parseApiResponse(res, 'Gmail API');</code></pre></div>
+  <div class="annotation"><strong>The .catch(() =&gt; (&#123;&#125;)) improvement.</strong> The original inline pattern called <code>res.json()</code> unconditionally on error, which would throw a secondary error if the error body was not valid JSON (e.g. a 502 HTML gateway page). The helper adds <code>.catch(() =&gt; ({}))</code> so a non-JSON body silently produces an empty object, and the fallback <code>`${label} ${res.status}`</code> message is used instead. This makes error reporting more robust at no cost.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-dry-cleanup">&#8593; Refactor: DRY Cleanup</a></div>
+</div>
+
+<div class="snip-entry" id="snip-parse-recurrence-value">
+  <div class="snip-header">
+    <span class="snip-title">parseRecurrenceValue — shared recurrence parser</span>
+    <span class="snip-file">App.jsx — module level</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+// Parse a recurrence field value from AI action syntax into a recurrence object.
+// Returns null when val is 'off', otherwise returns a recurrence config object.
+function parseRecurrenceValue(val) {
+  if (val === 'off') return null;
+  const [freq, intStr, daysStr] = val.split(':');
+  const interval = parseInt(intStr) || 1;
+  const rec = { frequency: freq, interval, rescheduleFrom: 'dueDate', sendToInbox: false };
+  if (daysStr) rec.weekDays = daysStr.split(',')
+    .map(d => DAY_MAP[d.toLowerCase()])
+    .filter(n => n !== undefined);
+  return rec;
+}
+
+// Used in extractUpdateAction, extractAddAction, extractCreateAction:
+if (key === 'recur') changes.recurrence = parseRecurrenceValue(val);</code></pre></div>
+  <div class="annotation"><strong>Pure functions are easy to extract.</strong> The recurrence parser takes a string and returns an object — no side effects, no component state, no DOM. Pure functions like this are the easiest refactoring target: move them to module scope, replace each call site with one line, done. The <code>null</code> return for <code>'off'</code> also unifies the <code>extractAddAction</code> and <code>extractCreateAction</code> which previously skipped the <code>'off'</code> case entirely — now all three functions handle it consistently.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-dry-cleanup">&#8593; Refactor: DRY Cleanup</a></div>
+</div>
