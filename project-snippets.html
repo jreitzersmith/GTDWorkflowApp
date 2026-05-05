@@ -3750,6 +3750,279 @@ function UsagePanel({ stats, onClear, onClose }) {
   <div class="annotation"><strong>localStorage persistence pattern.</strong> The same three-line pattern used for tasks, efforts, and locations: (1) lazy <code>useState</code> initialiser reads from localStorage on mount — the function runs exactly once; (2) a <code>useEffect([aiUsageStats])</code> writes back on every change. The <code>|| createEmptyUsageStats()</code> fallback handles the first run (nothing stored yet) and silently recovers from corrupt JSON. Keep this pattern in muscle memory — it's the idiomatic React way to persist any state that should survive a page refresh.</div>
 </div>
 
+<!-- snip-oauth-refresh -->
+<div class="snippet" id="snip-oauth-refresh">
+  <div class="snip-header">
+    <span class="snip-title">refreshGoogleToken — silent token exchange + proactive timer</span>
+    <span class="snip-file">App.jsx · refreshGoogleToken + useEffect timer</span>
+    <span class="snip-back"><a href="project-summary.html#feat-oauth-refresh">↑ OAuth Token Auto-Refresh</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Exchange a refresh_token for a new access_token without user interaction.
+// Called on mount (if token is expired) and by the proactive timer.
+const refreshGoogleToken = useCallback(async () => {
+  const stored = JSON.parse(localStorage.getItem('gtd_google_token') || 'null');
+  if (!stored?.refresh_token) return; // nothing we can do without a refresh token
+
+  try {
+    const resp = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id:     GOOGLE_CLIENT_ID,
+        refresh_token: stored.refresh_token,
+        grant_type:    'refresh_token',
+      }),
+    });
+    const data = await resp.json();
+    if (data.access_token) {
+      // Merge the new access_token + expiry into the stored token object.
+      // Keep everything else (refresh_token, calendarEnabled, etc.) intact.
+      const updated = { ...stored, access_token: data.access_token,
+                        expires_at: Date.now() + data.expires_in * 1000 };
+      localStorage.setItem('gtd_google_token', JSON.stringify(updated));
+      setGoogleToken(updated);
+    } else {
+      setGmailError('Token refresh failed — please reconnect Gmail in Settings.');
+    }
+  } catch (e) {
+    setGmailError('Token refresh failed: ' + e.message);
+  }
+}, []);
+
+// Proactive timer: schedule a refresh 5 minutes before the token expires.
+// This useEffect runs whenever googleToken changes (new auth or just refreshed).
+useEffect(() => {
+  if (!googleToken?.expires_at) return;
+  const msUntilExpiry = googleToken.expires_at - Date.now();
+  const msUntilRefresh = msUntilExpiry - 5 * 60 * 1000; // 5 min before expiry
+  if (msUntilRefresh <= 0) {
+    refreshGoogleToken(); // already expired or about to — refresh immediately
+    return;
+  }
+  const timer = setTimeout(refreshGoogleToken, msUntilRefresh);
+  return () => clearTimeout(timer); // cleanup: cancel if token changes first
+}, [googleToken, refreshGoogleToken]);</code></pre></div>
+  <div class="annotation"><strong>Why the cleanup matters.</strong> If the user manually disconnects Gmail and reconnects before the timer fires, <code>googleToken</code> changes, the effect re-runs, and the old <code>clearTimeout(timer)</code> cancels the stale timer. Without this cleanup, the old timer would still fire and attempt a refresh using the old token object captured in its closure — a subtle bug that would be hard to reproduce.</div>
+</div>
+
+<!-- snip-calendar-oauth -->
+<div class="snippet" id="snip-calendar-oauth">
+  <div class="snip-header">
+    <span class="snip-title">connectCalendar — incremental OAuth scope expansion</span>
+    <span class="snip-file">App.jsx · connectCalendar()</span>
+    <span class="snip-back"><a href="project-summary.html#feat-calendar">↑ Google Calendar Integration</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+
+// Connect Calendar by re-running the PKCE OAuth flow with both Gmail and
+// Calendar scopes combined. The user approves once; both scopes are granted.
+const connectCalendar = useCallback(async () => {
+  // Build combined scope string reusing existing Gmail scopes.
+  const combinedScope = [
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/gmail.labels',
+    CALENDAR_SCOPE,
+  ].join(' ');
+
+  // Store calendarEnabled: true in the PKCE state so the OAuth callback
+  // knows to set it on the token object after the exchange completes.
+  const pkceState = JSON.stringify({ calendarEnabled: true });
+
+  // Run the same PKCE flow used for Gmail — just with the bigger scope.
+  await startPKCEFlow(combinedScope, pkceState);
+}, []);
+
+// In the OAuth callback (runs when Google redirects back):
+const pkceData = (() => {
+  try { return JSON.parse(sessionStorage.getItem('pkce_state') || '{}'); }
+  catch { return {}; }
+})();
+
+// After successful token exchange, persist calendarEnabled from PKCE state:
+const newToken = {
+  access_token:    data.access_token,
+  refresh_token:   data.refresh_token,
+  expires_at:      Date.now() + data.expires_in * 1000,
+  calendarEnabled: pkceData.calendarEnabled || false,
+  // gmail fields set separately...
+};
+localStorage.setItem('gtd_google_token', JSON.stringify(newToken));
+setCalendarEnabled(pkceData.calendarEnabled || false);</code></pre></div>
+  <div class="annotation"><strong>Why reuse the existing token object.</strong> Creating a separate <code>gtd_calendar_token</code> entry in localStorage would mean managing two independent OAuth lifecycles — two expiry timers, two refresh flows, two disconnect buttons. By merging <code>calendarEnabled</code> into the existing token object, the existing refresh timer and disconnect logic cover Calendar automatically. The PKCE state field is just a side-channel to pass extra data through the OAuth redirect round-trip.</div>
+</div>
+
+<!-- snip-calendar-fetch -->
+<div class="snippet" id="snip-calendar-fetch">
+  <div class="snip-header">
+    <span class="snip-title">doCalendarFetchEvents + sliding 60-day window</span>
+    <span class="snip-file">App.jsx · doCalendarFetchEvents + CalendarManagementView fetch logic</span>
+    <span class="snip-back"><a href="project-summary.html#feat-calendar">↑ Google Calendar Integration</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Fetch all events in a time range from the primary calendar.
+// Returns the raw array of event objects from the Google Calendar API.
+async function doCalendarFetchEvents(token, timeMin, timeMax) {
+  const params = new URLSearchParams({
+    timeMin:      timeMin.toISOString(),  // RFC 3339 required by the API
+    timeMax:      timeMax.toISOString(),
+    singleEvents: 'true',                 // expand recurring events into instances
+    orderBy:      'startTime',
+    maxResults:   '500',
+  });
+  const resp = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
+    { headers: { Authorization: `Bearer ${token.access_token}` } }
+  );
+  const data = await resp.json();
+  return data.items || [];
+}
+
+// Inside CalendarManagementView: sliding window state + fetch effect.
+const [windowStart, setWindowStart] = useState(() => {
+  const d = new Date(); d.setDate(d.getDate() - 7); return d; // 7 days back
+});
+const [windowEnd, setWindowEnd] = useState(() => {
+  const d = new Date(); d.setDate(d.getDate() + 53); return d; // 53 days forward
+});
+
+// Re-fetch whenever the window changes.
+useEffect(() => {
+  if (!token?.calendarEnabled) return;
+  doCalendarFetchEvents(token, windowStart, windowEnd)
+    .then(setCalendarEvents)
+    .catch(err => setCalendarError(err.message));
+}, [windowStart, windowEnd, token]);
+
+// Called by nav arrows: if the view date gets within 5 days of either edge,
+// slide the window 30 days in that direction and let the effect re-fetch.
+function checkAndSlideWindow(viewDate) {
+  const EDGE_BUFFER_DAYS = 5;
+  if ((viewDate - windowStart) / 86400000 &lt; EDGE_BUFFER_DAYS) {
+    setWindowStart(d => { const n = new Date(d); n.setDate(n.getDate() - 30); return n; });
+    setWindowEnd(d =>   { const n = new Date(d); n.setDate(n.getDate() - 30); return n; });
+  } else if ((windowEnd - viewDate) / 86400000 &lt; EDGE_BUFFER_DAYS) {
+    setWindowStart(d => { const n = new Date(d); n.setDate(n.getDate() + 30); return n; });
+    setWindowEnd(d =>   { const n = new Date(d); n.setDate(n.getDate() + 30); return n; });
+  }
+}</code></pre></div>
+  <div class="annotation"><strong>Why a sliding window instead of fetching everything.</strong> Google Calendar has no hard limit on how far back events go — fetching the full history on every page load would be slow and wasteful. The window stores just enough data to render the current view plus a buffer. When the user navigates near an edge, the state update triggers the effect, which fetches the new range and merges it into the existing events array. The user never waits for an explicit "load more" action.</div>
+</div>
+
+<!-- snip-calendar-pending -->
+<div class="snippet" id="snip-calendar-pending">
+  <div class="snip-header">
+    <span class="snip-title">CalendarPendingTasksSection — add task due dates to calendar</span>
+    <span class="snip-file">App.jsx · CalendarPendingTasksSection component</span>
+    <span class="snip-back"><a href="project-summary.html#feat-calendar">↑ Google Calendar Integration</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Tasks that have a dueDate but no calendarEventId yet —
+// shown in the "Tasks → Calendar" section below the views.
+function CalendarPendingTasksSection({ tasks, token, onUpdateTask, onOpenDetail }) {
+  const [confirmId, setConfirmId] = useState(null); // which task is confirming
+
+  // Filter to tasks that have a due date but haven't been added to calendar yet.
+  const pending = tasks.filter(t => t.dueDate &amp;&amp; !t.calendarEventId &amp;&amp; !t.done);
+
+  async function handleAddToCalendar(task) {
+    // Create a Google Calendar event for this task's due date.
+    const event = await doCalendarCreateEvent(token, {
+      summary:     task.text,
+      description: task.notes || '',
+      date:        task.dueDate,  // all-day event on the due date
+    });
+    // Store the returned event ID on the task so it won't appear here again.
+    onUpdateTask(task.id, { calendarEventId: event.id });
+    setConfirmId(null);
+  }
+
+  return (
+    &lt;div&gt;
+      {pending.map(task =&gt; (
+        &lt;div key={task.id}&gt;
+          {/* Clicking the title opens the existing TaskDetailPanel */}
+          &lt;span onClick={() =&gt; onOpenDetail(task.id)} style={{ cursor: 'pointer' }}&gt;
+            {task.text}
+          &lt;/span&gt;
+          &lt;span&gt;Due: {task.dueDate}&lt;/span&gt;
+
+          {confirmId === task.id ? (
+            // Inline confirm dialog — no modal, just inline buttons
+            &lt;span&gt;
+              Add "{task.text}" to Google Calendar?
+              &lt;button onClick={() =&gt; handleAddToCalendar(task)}&gt;Yes&lt;/button&gt;
+              &lt;button onClick={() =&gt; setConfirmId(null)}&gt;Cancel&lt;/button&gt;
+            &lt;/span&gt;
+          ) : (
+            &lt;button onClick={() =&gt; setConfirmId(task.id)}&gt;Add to Calendar&lt;/button&gt;
+          )}
+        &lt;/div&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}</code></pre></div>
+  <div class="annotation"><strong>Inline confirm vs. modal.</strong> A confirm state per task (<code>confirmId === task.id</code>) shows the confirmation UI inline, right next to the button that triggered it. This avoids the overhead of a modal overlay and keeps the user's eye on the item they're acting on. The pattern is: store the ID of the item being confirmed, render the confirm UI conditionally for that ID, clear the ID on confirm or cancel.</div>
+</div>
+
+<!-- snip-calendar-suggestions -->
+<div class="snippet" id="snip-calendar-suggestions">
+  <div class="snip-header">
+    <span class="snip-title">CalendarSuggestionsBar — AI-suggested tasks from a calendar event</span>
+    <span class="snip-file">App.jsx · CalendarSuggestionsBar component</span>
+    <span class="snip-back"><a href="project-summary.html#feat-calendar">↑ Google Calendar Integration</a></span>
+  </div>
+  <div class="hljs-wrap"><pre><code class="language-javascript">// Shown in the AI Coach panel after "Process with AI" on a calendar event.
+// Mirrors the ProjectReviewBar — same checkbox + bucket-dropdown pattern.
+function CalendarSuggestionsBar({ suggestions, onAccept, onDismiss, buckets }) {
+  // Each suggestion: { text, bucket, checked }
+  const [items, setItems] = useState(() =>
+    suggestions.map(s =&gt; ({ ...s, checked: true })) // all checked by default
+  );
+
+  function toggle(i) {
+    setItems(prev =&gt; prev.map((item, idx) =&gt;
+      idx === i ? { ...item, checked: !item.checked } : item
+    ));
+  }
+  function setBucket(i, bucket) {
+    setItems(prev =&gt; prev.map((item, idx) =&gt;
+      idx === i ? { ...item, bucket } : item
+    ));
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;div&gt;Suggested tasks — check the ones to add:&lt;/div&gt;
+      {items.map((item, i) =&gt; (
+        &lt;div key={i}&gt;
+          {/* Checkbox to include/exclude this suggestion */}
+          &lt;input type="checkbox" checked={item.checked}
+                 onChange={() =&gt; toggle(i)} /&gt;
+          &lt;span&gt;{item.text}&lt;/span&gt;
+          {/* Per-item bucket selector — defaults to the AI's suggestion */}
+          &lt;select value={item.bucket} onChange={e =&gt; setBucket(i, e.target.value)}&gt;
+            {buckets.map(b =&gt; &lt;option key={b} value={b}&gt;{b}&lt;/option&gt;)}
+          &lt;/select&gt;
+        &lt;/div&gt;
+      ))}
+      &lt;button onClick={() =&gt; onAccept(items.filter(i =&gt; i.checked))}&gt;
+        Add selected
+      &lt;/button&gt;
+      &lt;button onClick={onDismiss}&gt;Dismiss&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+// The AI's calendarEvent mode ends its response with a →SUGGESTIONS: block:
+// →SUGGESTIONS:
+// [ ] Prepare slides | Next Actions
+// [ ] Send agenda to attendees | Next Actions
+// [ ] Book follow-up call | Waiting For
+//
+// The parent component parses this block into the suggestions array
+// passed to CalendarSuggestionsBar — same parser used for Project Review.</code></pre></div>
+  <div class="annotation"><strong>Why reuse the →SUGGESTIONS: pattern.</strong> The AI already knows how to emit a <code>→SUGGESTIONS:</code> block from Project Review mode. Reusing the same format means the same parser works for both features, the AI has consistent output expectations, and the UI components share the same shape of data. When you control both the AI prompt and the UI, aligning on a shared format reduces surface area for bugs.</div>
+</div>
+
+
 
 
 </main>

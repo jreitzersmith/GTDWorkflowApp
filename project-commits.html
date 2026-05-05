@@ -1803,6 +1803,82 @@
   <div class="commit-back"><a href="project-summary.html#feat-email-view">↑ Feature: Email Management View</a></div>
 </div>
 
+<!-- 2175ac2 -->
+<div class="commit-entry" id="commit-2175ac2">
+  <div class="commit-top">
+    <span class="commit-hash">2175ac2</span>
+    <span class="commit-date">2026-05-04</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: auto-refresh Google OAuth token before it expires</div>
+  <div class="commit-body">
+    Google access tokens expire after one hour. This commit adds two mechanisms: (1) on app mount, if the stored access token is expired, <code>refreshGoogleToken()</code> silently exchanges the stored <code>refresh_token</code> for a new <code>access_token</code> via <code>oauth2.googleapis.com/token</code>; (2) after every successful auth or refresh, a <code>setTimeout</code> schedules a proactive refresh 5 minutes before the token expires. Also fixes a bug where <code>refresh_token</code> was being discarded during the initial OAuth exchange instead of stored, and stops the app from nuking localStorage on startup when only the access token is expired (the refresh token is still valid).
+  </div>
+  <div class="commit-lesson"><strong>Pattern — proactive credential renewal:</strong> Waiting for an API call to return 401 before refreshing a token is reactive and disruptive. The better pattern is to schedule the renewal before expiry using the <code>expires_in</code> field returned by the OAuth server. The <code>setTimeout</code> in a <code>useEffect</code> with a <code>clearTimeout</code> cleanup ensures the timer is cancelled if the component unmounts or the token is replaced before the timer fires.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-oauth-refresh">↑ Feature: OAuth Token Auto-Refresh</a></div>
+</div>
+
+<!-- 5f614d9 -->
+<div class="commit-entry" id="commit-5f614d9">
+  <div class="commit-top">
+    <span class="commit-hash">5f614d9</span>
+    <span class="commit-date">2026-05-04</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: show error message in Settings if Gmail token refresh fails</div>
+  <div class="commit-body">
+    If <code>refreshGoogleToken()</code> fails (e.g. the user has revoked access in their Google account, or there is a network error), the failure was previously silent. This commit surfaces the error as an inline message in the Settings panel so the user knows they need to reconnect Gmail rather than wondering why API calls are failing.
+  </div>
+  <div class="commit-lesson"><strong>Pattern — surface errors where the user can act on them:</strong> Error messages are most useful when they appear close to the control that fixes the problem. Showing the refresh error in Settings, next to the "Disconnect / Reconnect Gmail" button, gives the user immediate context and a clear path to resolution. A silent failure or a generic toast is much harder to act on.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-oauth-refresh">↑ Feature: OAuth Token Auto-Refresh</a></div>
+</div>
+
+<!-- cfd242c -->
+<div class="commit-entry" id="commit-cfd242c">
+  <div class="commit-top">
+    <span class="commit-hash">cfd242c</span>
+    <span class="commit-date">2026-05-04</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: add search input to Rules &gt; Filters section</div>
+  <div class="commit-body">
+    Adds a live search box above the filters list in the Rules tab. A <code>filterSearch</code> state string is controlled by a text input. On each render, <code>filters.filter(f =&gt; JSON.stringify(f).toLowerCase().includes(term))</code> produces the visible subset; the "N of M" count badge and the list both react to the filter automatically. A ✕ clear button appears when the filter is non-empty. Mirrors the label filter search added to the Labels section in the previous session.
+  </div>
+  <div class="commit-lesson"><strong>React pattern — controlled input + derived render:</strong> Store only the raw filter string in state; derive the filtered list directly in the render function. No "filteredFilters" state, no useEffect to sync it. Every keystroke updates state, triggers a render, and the filtered list is computed fresh. For an in-memory array of a few hundred items this is instant and the simplest correct approach.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-filter-search">↑ Feature: Rules Filter Search</a></div>
+</div>
+
+<!-- 3e95cb2 -->
+<div class="commit-entry" id="commit-3e95cb2">
+  <div class="commit-top">
+    <span class="commit-hash">3e95cb2</span>
+    <span class="commit-date">2026-05-04</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: sync locations, efforts, calibration_overrides to Supabase</div>
+  <div class="commit-body">
+    Adds a <code>user_settings</code> table to Supabase (schema in <code>supabase_user_settings.sql</code>) and syncs three user-configurable lists to it: locations, effort labels, and AI calibration overrides. On sign-in, the server copy wins if a row exists; if empty, local localStorage values are migrated up. A <code>settingsReadyRef</code> boolean gate prevents write-back until the initial server read completes, avoiding a startup race condition. Any subsequent change to the three settings triggers a debounced 1.5-second upsert. The <code>handleImport</code> function already calls <code>setLocations</code>/<code>setEfforts</code>, so imported settings automatically sync without additional wiring.
+  </div>
+  <div class="commit-lesson"><strong>React pattern — useRef as a write gate:</strong> A <code>useRef(false)</code> is used instead of state because flipping it to <code>true</code> should not cause a re-render — it is purely a side-channel flag. The sync <code>useEffect</code> reads <code>settingsReadyRef.current</code> and returns early if false. Once the async Supabase read resolves and the state setters have been called, <code>settingsReadyRef.current = true</code> enables writes. This prevents the classic "overwrite server with stale local value on startup" race.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-settings-sync">↑ Feature: Supabase Settings Sync</a></div>
+</div>
+
+<!-- 9c11d0a -->
+<div class="commit-entry" id="commit-9c11d0a">
+  <div class="commit-top">
+    <span class="commit-hash">9c11d0a</span>
+    <span class="commit-date">2026-05-04</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: Google Calendar integration</div>
+  <div class="commit-body">
+    Adds a full Google Calendar tool. OAuth PKCE re-auths with Gmail scopes plus <code>calendar.events</code> combined; <code>calendarEnabled</code> boolean is stored in the existing <code>gtd_google_token</code> localStorage object. Calendar API helpers fetch a 60-day sliding event window from the primary calendar. <code>CalendarManagementView</code> renders Month / Week / Day tab views with navigation arrows; the window slides and re-fetches automatically as the user navigates near either edge. <code>CalendarPendingTasksSection</code> lists tasks with a due date but no <code>calendarEventId</code> — each has an inline Add to Calendar confirm; on success, <code>calendarEventId</code> is set on the task. Clicking a task title opens the existing <code>TaskDetailPanel</code>. <code>EventDetailPanel</code> adds a Process with AI button per event; the <code>calendarEvent</code> AI mode produces a <code>→SUGGESTIONS:</code> block rendered in <code>CalendarSuggestionsBar</code> — a checkbox list with per-item bucket dropdown. Upcoming 14-day events are injected into <code>getTaskContext()</code> so the AI Coach is passively calendar-aware on every call. <code>useMemo</code> added to React imports; <code>calendar</code>/<code>calendarBg</code>/<code>accent</code> added to the COLORS token object.
+  </div>
+  <div class="commit-lesson"><strong>Architecture pattern — reuse over rebuild:</strong> Three existing patterns are reused rather than rebuilt: (1) the PKCE OAuth flow already written for Gmail is extended with an extra scope rather than duplicating it; (2) the <code>→SUGGESTIONS:</code> block pattern from Project Review is used for calendar event suggestions rather than inventing a new format; (3) the <code>TaskDetailPanel</code> is reused in the Calendar view by passing <code>onOpenDetail</code> props down — no structural changes needed. When adding new features, look for existing patterns in the codebase before writing new ones.</div>
+  <div class="commit-back"><a href="project-summary.html#feat-calendar">↑ Feature: Google Calendar Integration</a></div>
+</div>
+
+
 
 
 </main>

@@ -224,7 +224,7 @@
   <a href="project-summary.html" class="active">📄 Feature Summary</a>
   <a href="project-snippets.html">🔬 Code Snippets</a>
   <a href="project-commits.html">📜 Commit Log</a>
-  <span class="updated">Last updated: May 3, 2026</span>
+  <span class="updated">Last updated: May 4, 2026</span>
 </nav>
 
 <div class="layout">
@@ -296,6 +296,14 @@
   <ul>
     <li><a href="#feat-email-polish">Email View Polish</a></li>
     <li><a href="#feat-ai-usage">AI Usage Tracking</a></li>
+  </ul>
+
+  <div class="section-label">May 4 — New</div>
+  <ul>
+    <li><a href="#feat-oauth-refresh">OAuth Token Auto-Refresh</a></li>
+    <li><a href="#feat-filter-search">Rules Filter Search</a></li>
+    <li><a href="#feat-settings-sync">Supabase Settings Sync</a></li>
+    <li><a href="#feat-calendar">Google Calendar</a></li>
   </ul>
 
 </aside>
@@ -2005,6 +2013,118 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-commit" href="project-commits.html#commit-6e5707f">📜 6e5707f — AI usage tracking</a>
     </div>
   </section>
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-oauth-refresh">
+    <div class="feat-header">
+      <span class="feat-icon">🔐</span>
+      <span class="feat-title">OAuth Token Auto-Refresh</span>
+      <span class="feat-badge badge-new">New — May 4</span>
+    </div>
+    <div class="feat-desc">
+      <p>Google OAuth access tokens expire after one hour. Previously the app would silently fail API calls once the token expired, requiring manual disconnect and reconnect. Two fixes address this:</p>
+      <p><strong>Silent refresh on mount:</strong> when the app loads and finds a stored token that is already expired, it immediately calls <code>refreshGoogleToken()</code> using the stored <code>refresh_token</code> to exchange for a new <code>access_token</code> — no user interaction required.</p>
+      <p><strong>Proactive timer:</strong> after every successful auth or refresh, a <code>setTimeout</code> fires 5 minutes before the token expires. When it fires, <code>refreshGoogleToken()</code> runs again silently, keeping the session alive indefinitely while the app is open.</p>
+      <p><strong>Error surface:</strong> if a refresh fails (revoked grant, network error), the Settings panel now shows an inline error message rather than silently leaving the user in a broken state.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: setTimeout + useEffect cleanup</h4>
+      <p>The proactive timer is set inside a <code>useEffect</code> that runs when the token changes. The effect returns a cleanup function that calls <code>clearTimeout</code> — so if the component unmounts or the token updates before the timer fires, the stale timer is cancelled. This "set timer on mount, clear on cleanup" pattern is the standard React way to manage background timers safely.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>This is exactly like a cron job that runs <code>kinit</code> or renews an AWS STS session credential before it expires — proactive rather than reactive. The <code>refresh_token</code> is the long-lived credential (like a service account key); the <code>access_token</code> is the short-lived session token derived from it.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-oauth-refresh">🔬 refreshGoogleToken + proactive timer</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-2175ac2">📜 2175ac2 — auto-refresh OAuth token</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-5f614d9">📜 5f614d9 — error message on refresh failure</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-filter-search">
+    <div class="feat-header">
+      <span class="feat-icon">🔍</span>
+      <span class="feat-title">Rules Filter Search Input</span>
+      <span class="feat-badge badge-new">New — May 4</span>
+    </div>
+    <div class="feat-desc">
+      <p>The Filters section of the Rules tab now has a live search input that filters displayed entries by any text in their from/to/subject/query criteria. A count badge updates to show "N of M" as you type, and a ✕ button clears the search — the same UX as the label filter search added in the previous session.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: controlled input + in-render filter</h4>
+      <p>A <code>filterSearch</code> state string is bound to the text input. The visible filter list is computed in the render function with <code>.filter()</code> — no separate "filteredFilters" state is stored. The count badge reads <code>visible.length</code> of <code>all.length</code> automatically. Store the minimum (just the search string), derive everything else at render time.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-cfd242c">📜 cfd242c — Rules filter search input</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-settings-sync">
+    <div class="feat-header">
+      <span class="feat-icon">☁️</span>
+      <span class="feat-title">Supabase Settings Sync</span>
+      <span class="feat-badge badge-new">New — May 4</span>
+    </div>
+    <div class="feat-desc">
+      <p>Three user-configurable settings — <strong>locations</strong>, <strong>effort labels</strong>, and <strong>calibration overrides</strong> — are now synced to Supabase via a <code>user_settings</code> table (schema in <code>supabase_user_settings.sql</code>). They now persist across devices and survive a localStorage clear.</p>
+      <p><strong>Conflict resolution:</strong> on sign-in, server wins if a row exists; if the row is empty, the local localStorage values are migrated up — the same policy used for tasks.</p>
+      <p><strong>Write gate:</strong> a <code>settingsReadyRef</code> flag prevents any writes until the initial Supabase read/migration completes, avoiding a race where a stale local value overwrites a valid server value at startup. Once ready, any change to the three settings triggers a debounced 1.5-second upsert.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: useRef as a mutable write gate</h4>
+      <p>Unlike state, updating a <code>useRef</code> does not trigger a re-render. <code>settingsReadyRef.current = false</code> starts as a gate; once the initial load completes, it's set to <code>true</code>. The sync <code>useEffect</code> checks this flag at the top and returns early if false. This is a common pattern for "do this once setup is complete" without the overhead of a state-driven re-render cycle.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>"Server wins on first sync" is the same conflict policy used in config management tools like Puppet or Ansible — the server is the source of truth; the local copy is only authoritative when no server copy exists. The debounced write is like a dirty-page writeback with a coalesce window: rapid successive changes collapse into one write.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-3e95cb2">📜 3e95cb2 — Supabase settings sync</a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="feat" id="feat-calendar">
+    <div class="feat-header">
+      <span class="feat-icon">📅</span>
+      <span class="feat-title">Google Calendar Integration</span>
+      <span class="feat-badge badge-new">New — May 4</span>
+    </div>
+    <div class="feat-desc">
+      <p>A full Google Calendar tool in the Tools sidebar section. After connecting (OAuth PKCE combining existing Gmail scopes with <code>calendar.events</code>), the app fetches a 60-day sliding window of events from the primary calendar.</p>
+      <p><strong>Three views:</strong> Month (6×7 grid), Week (Monday-based, 7 columns), Day (all-day events at top, timed events below). Clicking a day in Month or Week navigates to Day view. Nav arrows shift by month/week/day. As you navigate near either edge of the 60-day window, the window slides and re-fetches automatically.</p>
+      <p><strong>Tasks → Calendar:</strong> a section below the views lists tasks with a due date but no <code>calendarEventId</code> yet. Each shows an inline "Add to Calendar" confirm dialog. On success, <code>calendarEventId</code> is stored on the task and it disappears from the list. Clicking a task title opens the existing Task Detail Panel.</p>
+      <p><strong>Process with AI:</strong> clicking any event opens an <code>EventDetailPanel</code> with a "🤖 Process with AI" button. The AI responds in <code>calendarEvent</code> mode, suggesting preparation and follow-up tasks in a <code>CalendarSuggestionsBar</code> — a checkbox list with per-item bucket dropdowns, mirroring the Project Review suggestions UI.</p>
+      <p><strong>AI awareness:</strong> upcoming events for the next 14 days are injected into <code>getTaskContext()</code> on every AI call, so the coach can spot scheduling conflicts and factor in calendar load when giving advice.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: sliding data window with useEffect</h4>
+      <p>A 60-day fetch window (<code>windowStart</code> / <code>windowEnd</code> dates) is stored in state. A <code>useEffect([windowStart, windowEnd])</code> re-fetches whenever the window changes. As the user navigates, the current view date is checked against the window edges — if it gets close to either edge, the window state is updated, which automatically triggers the fetch. This "store the window, derive the fetch" pattern avoids manually coordinating navigation and data loading.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: incremental OAuth scope expansion</h4>
+      <p>Rather than creating a separate Google token for Calendar, the existing <code>googleToken</code> localStorage object is reused with a <code>calendarEnabled: true</code> boolean added. <code>connectCalendar()</code> triggers a fresh PKCE flow requesting Gmail scopes <em>plus</em> <code>calendar.events</code> — one user approval covers both. The PKCE state object carries <code>calendarEnabled: true</code> so the OAuth callback knows to set the flag on the returned token.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: reusing an existing panel (TaskDetailPanel)</h4>
+      <p>Rather than building a new editing UI for tasks shown in the Calendar view, the existing <code>TaskDetailPanel</code> component is reused. The Calendar view receives <code>onOpenDetail</code> and <code>selectedTaskId</code> props; clicking a task title calls <code>onOpenDetail(taskId)</code>. The panel renders because the existing condition <code>selectedTaskId &amp;&amp; currentView !== 'email'</code> already permits it in the calendar view. No structural change to the panel was needed — only passing the right props down.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The sliding window is like a log tail with a rolling buffer — keep the last N lines, refill when you scroll near the start. Incremental scope expansion is like adding an IAM policy to an existing service account rather than creating a new one for each capability.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-calendar-oauth">🔬 connectCalendar — OAuth + calendarEnabled</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-calendar-fetch">🔬 doCalendarFetchEvents + sliding window</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-calendar-pending">🔬 CalendarPendingTasksSection</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-calendar-suggestions">🔬 CalendarSuggestionsBar</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-9c11d0a">📜 9c11d0a — Google Calendar integration</a>
+    </div>
+  </section>
+
+
 
 
 </main>
