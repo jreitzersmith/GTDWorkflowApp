@@ -2146,6 +2146,8 @@ export default function GTDManager() {
       const lines = items.map(t => {
         const meta = [];
         if (t.dueDate)          meta.push(`due:${t.dueDate}`);
+        if (t.originalDueDate)  meta.push(`original-due:${t.originalDueDate}`);
+        if (t.completedDate)    meta.push(`completed:${t.completedDate}`);
         if (t.deferUntil)       meta.push(`defer-until:${t.deferUntil}`);
         if (t.effort)           meta.push(`effort:${t.effort}`);
         if (t.actualEffort)     meta.push(`actual-effort:${t.actualEffort}`);
@@ -2872,9 +2874,14 @@ export default function GTDManager() {
 
   const updateTask = useCallback((id, changes) => {
     setTasks(prev => {
+      // Auto-set originalDueDate on first dueDate assignment
+      const existing = prev.find(t => t.id === id);
+      const ch = (existing && "dueDate" in changes && changes.dueDate && !existing.originalDueDate)
+        ? { ...changes, originalDueDate: changes.dueDate }
+        : changes;
       // Fast path: no deferUntil change — simple single-task update
-      if (!("deferUntil" in changes)) {
-        return prev.map(t => t.id === id ? { ...t, ...changes } : t);
+      if (!("deferUntil" in ch)) {
+        return prev.map(t => t.id === id ? { ...t, ...ch } : t);
       }
       // Collect all descendant IDs recursively via childIds
       const getDescendants = (taskId) => {
@@ -2883,12 +2890,12 @@ export default function GTDManager() {
         return task.childIds.flatMap(cid => [cid, ...getDescendants(cid)]);
       };
       const target = prev.find(t => t.id === id);
-      if (!target) return prev.map(t => t.id === id ? { ...t, ...changes } : t);
+      if (!target) return prev.map(t => t.id === id ? { ...t, ...ch } : t);
       const oldDefer = target.deferUntil;
-      const newDefer = changes.deferUntil ?? null;
+      const newDefer = ch.deferUntil ?? null;
       const descendants = new Set(getDescendants(id));
       return prev.map(t => {
-        if (t.id === id) return { ...t, ...changes };
+        if (t.id === id) return { ...t, ...ch };
         if (!descendants.has(t.id)) return t;
         if (newDefer !== null) {
           // Setting: cascade new date to all descendants
@@ -3057,12 +3064,12 @@ export default function GTDManager() {
     if (!task.done) {
       const nextOcc = task.recurrence ? buildNextOccurrence(task) : null;
       setTasks(prev => {
-        const mapped = prev.map(t => t.id === id ? { ...t, done: true, bucket: "done" } : t);
+        const mapped = prev.map(t => t.id === id ? { ...t, done: true, bucket: "done", completedDate: new Date().toISOString().split('T')[0] } : t);
         return nextOcc ? [nextOcc, ...mapped] : mapped;
       });
     } else {
       setTasks(prev => prev.map(t => t.id === id
-        ? { ...t, done: false, bucket: "inbox", actualEffort: null }
+        ? { ...t, done: false, bucket: "inbox", actualEffort: null, completedDate: null }
         : t
       ));
     }
@@ -3076,7 +3083,7 @@ export default function GTDManager() {
     } else {
       const nextOcc = task?.recurrence ? buildNextOccurrence(task) : null;
       setTasks(prev => {
-        const mapped = prev.map(t => t.id === taskId ? { ...t, done: true, bucket: "done" } : t);
+        const mapped = prev.map(t => t.id === taskId ? { ...t, done: true, bucket: "done", completedDate: new Date().toISOString().split('T')[0] } : t);
         return nextOcc ? [nextOcc, ...mapped] : mapped;
       });
     }
@@ -3121,7 +3128,7 @@ export default function GTDManager() {
     setTasks(prev => {
       const mapped = prev.map(t =>
         t.id === actualEffortPrompt.taskId
-          ? { ...t, done: true, bucket: "done", actualEffort }
+          ? { ...t, done: true, bucket: "done", actualEffort, completedDate: new Date().toISOString().split('T')[0] }
           : t
       );
       return nextOcc ? [nextOcc, ...mapped] : mapped;
@@ -3136,7 +3143,7 @@ export default function GTDManager() {
     setTasks(prev => {
       const mapped = prev.map(t =>
         t.id === actualEffortPrompt.taskId
-          ? { ...t, done: true, bucket: "done" }
+          ? { ...t, done: true, bucket: "done", completedDate: new Date().toISOString().split('T')[0] }
           : t
       );
       return nextOcc ? [nextOcc, ...mapped] : mapped;
@@ -5830,10 +5837,14 @@ function EmptyState({ bucket }) {
 function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
   const [titleDraft, setTitleDraft] = useState(task.text);
   const [notesDraft, setNotesDraft] = useState(task.notes || "");
+  const [editingOriginalDue, setEditingOriginalDue] = useState(false);
+  const [originalDueDraft, setOriginalDueDraft] = useState("");
+  const [confirmOriginalDue, setConfirmOriginalDue] = useState(false);
 
   // Sync drafts if task changes (e.g. another panel opens a different task)
   useEffect(() => { setTitleDraft(task.text); }, [task.id, task.text]);
   useEffect(() => { setNotesDraft(task.notes || ""); }, [task.id, task.notes]);
+  useEffect(() => { setEditingOriginalDue(false); setConfirmOriginalDue(false); }, [task.id]);
 
   // Close on Escape key
   useEffect(() => {
@@ -5949,6 +5960,66 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
               style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
             />
           </div>
+
+          {/* Original due date */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Orig. Due</span>
+            {editingOriginalDue ? (
+              confirmOriginalDue ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontSize: 11, color: COLORS.muted }}>Reset original due date to {originalDueDraft}? This affects variance tracking.</span>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => { onUpdate(task.id, { originalDueDate: originalDueDraft }); setEditingOriginalDue(false); setConfirmOriginalDue(false); }} style={{ fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>Confirm</button>
+                    <button onClick={() => { setEditingOriginalDue(false); setConfirmOriginalDue(false); }} style={{ fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <input
+                    type="date"
+                    value={originalDueDraft}
+                    onChange={e => setOriginalDueDraft(e.target.value)}
+                    style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
+                  />
+                  <button onClick={() => { if (originalDueDraft) setConfirmOriginalDue(true); }} style={{ fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>Set</button>
+                  <button onClick={() => setEditingOriginalDue(false)} style={{ fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>✕</button>
+                </div>
+              )
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: task.originalDueDate ? COLORS.text : COLORS.muted }}>
+                  {task.originalDueDate || "—"}
+                </span>
+                <button
+                  onClick={() => { setOriginalDueDraft(task.originalDueDate || ""); setEditingOriginalDue(true); }}
+                  style={{ fontSize: 10, padding: "1px 6px", cursor: "pointer", color: COLORS.muted }}
+                >edit</button>
+              </div>
+            )}
+          </div>
+
+          {/* Completed date — read-only */}
+          {task.completedDate && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Completed</span>
+              <span>{task.completedDate}</span>
+            </div>
+          )}
+
+          {/* Variance — only when originalDueDate is set */}
+          {task.originalDueDate && (task.dueDate || task.completedDate) && (() => {
+            const ref = new Date(task.originalDueDate);
+            const cmp = new Date(task.completedDate || task.dueDate);
+            const days = Math.round((cmp - ref) / 86400000);
+            const color = days <= 0 ? "#22c55e" : days <= 7 ? "#f59e0b" : "#ef4444";
+            const label = days === 0 ? "On time" : days < 0 ? `${Math.abs(days)}d early` : `${days}d late`;
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Variance</span>
+                <span style={{ background: color + "22", color, border: `1px solid ${color}55`, borderRadius: 4, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}>{label}</span>
+              </div>
+            );
+          })()}
 
           {/* Recurrence */}
           <div>
