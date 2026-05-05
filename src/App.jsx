@@ -5969,8 +5969,8 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <span style={{ fontSize: 11, color: COLORS.muted }}>Reset original due date to {originalDueDraft}? This affects variance tracking.</span>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => { onUpdate(task.id, { originalDueDate: originalDueDraft }); setEditingOriginalDue(false); setConfirmOriginalDue(false); }} style={{ fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>Confirm</button>
-                    <button onClick={() => { setEditingOriginalDue(false); setConfirmOriginalDue(false); }} style={{ fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>Cancel</button>
+                    <button onClick={() => { onUpdate(task.id, { originalDueDate: originalDueDraft }); setEditingOriginalDue(false); setConfirmOriginalDue(false); }} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.next}`, background: 'transparent', color: COLORS.next, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Confirm</button>
+                    <button onClick={() => { setEditingOriginalDue(false); setConfirmOriginalDue(false); }} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Cancel</button>
                   </div>
                 </div>
               ) : (
@@ -5981,8 +5981,8 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
                     onChange={e => setOriginalDueDraft(e.target.value)}
                     style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
                   />
-                  <button onClick={() => { if (originalDueDraft) setConfirmOriginalDue(true); }} style={{ fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>Set</button>
-                  <button onClick={() => setEditingOriginalDue(false)} style={{ fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>✕</button>
+                  <button onClick={() => { if (originalDueDraft) setConfirmOriginalDue(true); }} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.next}`, background: 'transparent', color: COLORS.next, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Set</button>
+                  <button onClick={() => setEditingOriginalDue(false)} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>✕</button>
                 </div>
               )
             ) : (
