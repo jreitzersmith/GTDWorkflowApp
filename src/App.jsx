@@ -2038,6 +2038,15 @@ export default function GTDManager() {
     try { return new Set(JSON.parse(localStorage.getItem('gtd_cal_seen_events') || '[]')); }
     catch { return new Set(); }
   });
+  const [recurringAcknowledgedMap, setRecurringAcknowledgedMap] = useState(() => {
+    try { const raw = JSON.parse(localStorage.getItem('gtd_cal_recurring_ack') || '[]');
+          return new Map(raw); }
+    catch { return new Map(); }
+  });
+  const [recurringReviewDays, setRecurringReviewDays] = useState(() => {
+    const v = parseInt(localStorage.getItem('gtd_recurring_review_days') || '7', 10);
+    return isNaN(v) ? 7 : v;
+  });
   const [calendarSuggestions, setCalendarSuggestions] = useState([]); // [{ text, checked, bucket }]
   const [calendarSuggestionsReady, setCalendarSuggestionsReady] = useState(false);
   const { googleToken, googleScope, calendarEnabled, gmailError,
@@ -2052,7 +2061,6 @@ export default function GTDManager() {
   const [actualEffortPrompt, setActualEffortPrompt] = useState(null); // { taskId, taskText, estimatedEffort }
   const [pendingRollup, setPendingRollup] = useState(null);           // { taskId, taskText, notes, parentId, parentText }
   const [pendingDeferCheck, setPendingDeferCheck] = useState(null);    // { taskId, taskText, deferredChildren }
-  const [pendingNewEventContext, setPendingNewEventContext] = useState(null); // { recurrence, firstOccDate }
   const [dragId,             setDragId]             = useState(null);
   const [dropTarget,         setDropTarget]         = useState(null); // { id, position: "before"|"inside"|"after" }
   const [reviewProjectIdx,   setReviewProjectIdx]   = useState(0);
@@ -2144,6 +2152,8 @@ export default function GTDManager() {
             setCalibrationOverrides(data.calibration_overrides);
           if (Array.isArray(data.cal_skipped_tasks)) setSkippedCalendarIds(new Set(data.cal_skipped_tasks));
           if (Array.isArray(data.cal_seen_events))   setSeenCalendarEventIds(new Set(data.cal_seen_events));
+          if (Array.isArray(data.cal_recurring_acknowledged)) setRecurringAcknowledgedMap(new Map(data.cal_recurring_acknowledged));
+          if (typeof data.recurring_review_days === 'number') setRecurringReviewDays(data.recurring_review_days);
           settingsReadyRef.current = true;
         } else {
           // Supabase empty — migrate from localStorage
@@ -2224,6 +2234,8 @@ export default function GTDManager() {
           calibration_overrides: calibrationOverrides,
           cal_skipped_tasks: [...skippedCalendarIds],
           cal_seen_events:   [...seenCalendarEventIds],
+          cal_recurring_acknowledged: [...recurringAcknowledgedMap.entries()],
+          recurring_review_days: recurringReviewDays,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         .then(({ error }) => {
@@ -2232,7 +2244,7 @@ export default function GTDManager() {
         });
     }, 1500);
     return () => clearTimeout(settingsDebounceRef.current);
-  }, [locations, efforts, calibrationOverrides, skippedCalendarIds, seenCalendarEventIds, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [locations, efforts, calibrationOverrides, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fallback: keep localStorage in sync for unauthenticated sessions
   useEffect(() => {
@@ -2241,6 +2253,12 @@ export default function GTDManager() {
   useEffect(() => {
     if (!authUser) localStorage.setItem('gtd_cal_seen_events', JSON.stringify([...seenCalendarEventIds]));
   }, [seenCalendarEventIds, authUser]);
+  useEffect(() => {
+    if (!authUser) localStorage.setItem('gtd_cal_recurring_ack', JSON.stringify([...recurringAcknowledgedMap.entries()]));
+  }, [recurringAcknowledgedMap, authUser]);
+  useEffect(() => {
+    if (!authUser) localStorage.setItem('gtd_recurring_review_days', String(recurringReviewDays));
+  }, [recurringReviewDays, authUser]);
 
   // Phase 6 — offline resilience: flush pending writes when connectivity returns
   useEffect(() => {
@@ -2778,27 +2796,6 @@ export default function GTDManager() {
         }
       }
 
-      // Handle →NEWEVENT_TASK — lightweight format for calendar-event prep tasks
-      if (!updateChip && pendingNewEventContext) {
-        const netMatch = reply.match(/→NEWEVENT_TASK\|([^|\n]+)\|([^|\n]*)\|([\s\S]*)/);
-        if (netMatch) {
-          const netTitle = netMatch[1].trim();
-          const netTime  = netMatch[2].trim();
-          const netNotes = netMatch[3].trim();
-          const { recurrence: evRecur, firstOccDate } = pendingNewEventContext;
-          const newId2 = genId();
-          setTasks(prev => [{
-            id: newId2, text: netTitle, bucket: 'next', done: false, created: Date.now(),
-            priority: [], location: [], dueDate: firstOccDate || null,
-            dueTime: /^\d{1,2}:\d{2}$/.test(netTime) ? netTime : null,
-            effort: null, actualEffort: null, deferUntil: null,
-            notes: netNotes || null, recurrence: evRecur || null,
-          }, ...prev]);
-          updateChip = { taskName: netTitle, fields: ["created in next"] };
-          setPendingNewEventContext(null);
-        }
-      }
-
       if (googleToken && calendarEnabled) {
         const calCreate = extractCalendarCreateAction(reply);
         const calUpdate = extractCalendarUpdateAction(reply);
@@ -2883,7 +2880,7 @@ export default function GTDManager() {
     } finally {
       setLoading(false);
     }
-  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, googleToken, googleScope, calendarEnabled, setCalendarEvents, pendingNewEventContext, setPendingNewEventContext]);
+  }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel, googleToken, googleScope, calendarEnabled, setCalendarEvents]);
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
@@ -2897,9 +2894,8 @@ export default function GTDManager() {
     setCoachMode(mode);
     setChatHistory([]);
     setPendingAction(null);
-    setPendingNewEventContext(null);
     setMessages([{ role: "assistant", text: introMsg }]);
-  }, [setPendingNewEventContext]);
+  }, []);
 
   const processNextInboxItem = useCallback(async (task) => {
     setPendingAction(null);
@@ -2963,9 +2959,56 @@ export default function GTDManager() {
     setTimeout(() => processNextInboxItem(inbox[0]), 100);
   }, [tasks, switchCoachMode, processNextInboxItem]);
 
+  const handleRecurringStillFine = useCallback((masterId) => {
+    setRecurringAcknowledgedMap(prev => {
+      const next = new Map(prev);
+      const entry = next.get(masterId);
+      if (entry) next.set(masterId, { ...entry, acknowledgedAt: Date.now() });
+      return next;
+    });
+  }, []);
+
+  const handleRecurringNeedsWork = useCallback((masterId, title) => {
+    const newId = genId();
+    const newTask = {
+      id: newId, text: title, bucket: 'inbox', done: false, created: Date.now(),
+      priority: [], location: [], dueDate: null, dueTime: null, effort: null,
+      actualEffort: null, deferUntil: null,
+      notes: 'Recurring calendar event — needs follow-up',
+      recurrence: null, childIds: [], parentId: null,
+    };
+    setTasks(prev => [newTask, ...prev]);
+    setSelectedTaskId(newId);
+    setCurrentBucket('inbox');
+    setRecurringAcknowledgedMap(prev => {
+      const next = new Map(prev);
+      const entry = next.get(masterId);
+      if (entry) next.set(masterId, { ...entry, acknowledgedAt: Date.now() });
+      return next;
+    });
+  }, []);
+
   const startWeeklyReview = () => {
     const total = tasks.filter(t => t.bucket !== "done").length;
-    switchCoachMode("review", `Let's do your Weekly Review. You have **${total} active tasks** across your lists.\n\n**Step 1: Capture loose ends.**\nLook around — any sticky notes, papers, or things not yet in your system?`);
+    const introMsg = "Let's do your Weekly Review. You have **" + total +
+      " active task" + (total !== 1 ? "s" : "") + "** across your lists.\n\n" +
+      "**Step 1: Capture loose ends.**\nLook around — any sticky notes, papers, or things not yet in your system?";
+    const now = Date.now();
+    const thresholdMs = recurringReviewDays * 86400000;
+    const dueForReview = [];
+    for (const [masterId, entry] of recurringAcknowledgedMap.entries()) {
+      if (now - entry.acknowledgedAt >= thresholdMs) {
+        dueForReview.push({ masterId, title: entry.title, recurrenceDesc: entry.recurrenceDesc, acknowledgedAt: entry.acknowledgedAt });
+      }
+    }
+    const msgs = [{ role: 'assistant', text: introMsg }];
+    if (dueForReview.length > 0) {
+      msgs.push({ role: 'system', type: 'recurringReview', events: dueForReview });
+    }
+    setCoachMode("review");
+    setChatHistory([]);
+    setPendingAction(null);
+    setMessages(msgs);
   };
 
   const startBrainDump = () => {
@@ -2988,9 +3031,8 @@ export default function GTDManager() {
     setTimeout(() => chatInputRef.current?.focus(), 100);
   }, [setCoachMode, setChatInput, chatInputRef]);
 
-  // Process a Google Calendar event with AI
-  // forNewEvent=true — multi-turn guided flow to create a prep task
-  const processCalendarEventWithAI = useCallback(async (event, forNewEvent = false) => {
+  // Process a Google Calendar event with AI — calls Claude directly and populates checkbox suggestions
+  const processCalendarEventWithAI = useCallback(async (event) => {
     const title = event.summary || '(No title)';
     const startStr = event.start?.dateTime
       ? new Date(event.start.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
@@ -2999,7 +3041,6 @@ export default function GTDManager() {
       ? new Date(event.end.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
       : '';
     let recurrenceLine = null;
-    let recurSyntax = null;
     if (event.recurrence?.length) {
       const rruleStr = event.recurrence.find(r => r.startsWith('RRULE:'));
       if (rruleStr) {
@@ -3009,7 +3050,7 @@ export default function GTDManager() {
         const daysLabel  = parsed.weekDays?.length ? ` on ${parsed.weekDays.map(d => RD[d]).join(',')}` : '';
         const untilLabel = parsed.until ? ` until ${parsed.until}` : '';
         const intLabel   = parsed.interval > 1 ? ` every ${parsed.interval}` : '';
-        recurSyntax = [
+        const recurSyntax = [
           `recur:${parsed.frequency}:${parsed.interval || 1}`,
           parsed.weekDays?.length ? parsed.weekDays.map(d => RD[d]).join(',') : null,
           parsed.until || null,
@@ -3028,43 +3069,15 @@ export default function GTDManager() {
     setCoachMode("chat");
     setCalendarSuggestionsReady(false);
     setCalendarSuggestions([]);
+    setMessages(prev => [...prev, { role: "user", text: `📅 Reviewing calendar event: **"${title}"**` }]);
 
-    if (forNewEvent) {
-      const evRecurrence = recurSyntax ? parseRecurrenceValue(recurSyntax) : null;
-      const firstOccDate = event.start?.dateTime
-        ? new Date(event.start.dateTime).toISOString().slice(0, 10)
-        : (event.start?.date || null);
-      setPendingNewEventContext({ recurrence: evRecurrence, firstOccDate });
-      const eventStartTime = event.start?.dateTime
-        ? new Date(event.start.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-        : null;
-      const guideParts = [
-        `📅 New calendar event detected:`,
-        lines,
-        ``,
-        `Please assess whether the user needs to prepare for this event.`,
-        ``,
-        `If a preparation task makes sense, offer to create one. When confirmed:`,
-        `1. Ask what topics/items to cover in prep.`,
-        `2. Ask how long prep takes and what buffer time they want before the event` + (eventStartTime ? ` (event starts at ${eventStartTime})` : '') + `.`,
-        ``,
-        `Once you have the details, end your response with EXACTLY this line (no other ACTION lines):`,
-        `→NEWEVENT_TASK|<task title>|<HH:MM start time for prep>|<notes describing what to cover>`,
-        ``,
-        `Calc start time: event start minus prep duration minus buffer. Do NOT use →ACTION:create.`,
-      ];
-      setMessages(prev => [...prev, { role: "user", text: `📅 New event: **"${title}"**` }]);
-      await callAI(guideParts.join('\n'), "chat", []);
-    } else {
-      setMessages(prev => [...prev, { role: "user", text: `📅 Reviewing calendar event: **"${title}"**` }]);
-      const reply = await callAI(lines, "calendarEvent", []);
-      if (reply) {
-        const suggestions = extractSuggestions(reply);
-        setCalendarSuggestions(suggestions.map(text => ({ text, checked: true, bucket: 'inbox' })));
-        setCalendarSuggestionsReady(true);
-      }
+    const reply = await callAI(lines, "calendarEvent", []);
+    if (reply) {
+      const suggestions = extractSuggestions(reply);
+      setCalendarSuggestions(suggestions.map(text => ({ text, checked: true, bucket: 'inbox' })));
+      setCalendarSuggestionsReady(true);
     }
-  }, [callAI, setPendingNewEventContext]);
+  }, [callAI]);
 
   // Accept selected calendar suggestions — create tasks and clear the bar
   const acceptCalendarSuggestions = useCallback(() => {
@@ -3872,6 +3885,8 @@ export default function GTDManager() {
               calendarEnabled={calendarEnabled}
               onConnectCalendar={connectCalendar}
               onDisconnectCalendar={disconnectCalendar}
+              recurringReviewDays={recurringReviewDays}
+              onSetRecurringReviewDays={setRecurringReviewDays}
             />
           ) : showUsage ? (
             <UsagePanel
@@ -4240,7 +4255,7 @@ export default function GTDManager() {
 
           <div style={s.chatMessages}>
             {messages.map((msg, i) => (
-              <ChatBubble key={i} msg={msg} />
+              <ChatBubble key={i} msg={msg} onRecurringStillFine={handleRecurringStillFine} onRecurringNeedsWork={handleRecurringNeedsWork} />
             ))}
             {loading && <TypingIndicator />}
             {pendingAction && (
@@ -4915,7 +4930,33 @@ function ActionBtn({ children, onClick, color }) {
   );
 }
 
-function ChatBubble({ msg }) {
+function RecurringReviewCard({ events, onStillFine, onNeedsWork }) {
+  return (
+    <div style={{ border: `1px solid ${COLORS.border2}`, borderRadius: 10, overflow: 'hidden', margin: '4px 0' }}>
+      <div style={{ padding: '8px 12px', background: COLORS.surface2, borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', gap: 7 }}>
+        <span style={{ fontSize: 14 }}>↻</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.text }}>Recurring events to check in on</span>
+        <span style={{ fontSize: 11, color: COLORS.muted, marginLeft: 4 }}>({events.length})</span>
+      </div>
+      {events.map(ev => (
+        <div key={ev.masterId} style={{ padding: '9px 12px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</div>
+            {ev.recurrenceDesc && <div style={{ fontSize: 10, color: COLORS.muted, marginTop: 2 }}>{ev.recurrenceDesc}</div>}
+          </div>
+          <button onClick={() => onStillFine(ev.masterId)}
+            style={{ padding: '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.next, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
+            Still fine ✓</button>
+          <button onClick={() => onNeedsWork(ev.masterId, ev.title)}
+            style={{ padding: '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
+            Needs work →</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork }) {
   const isUser = msg.role === "user";
   if (msg.isSearchChip) return (
     <div style={{ display: "flex", alignItems: "center", gap: 6,
@@ -4923,6 +4964,9 @@ function ChatBubble({ msg }) {
                   fontStyle: "italic" }}>
       {msg.text}
     </div>
+  );
+  if (msg.type === 'recurringReview') return (
+    <RecurringReviewCard events={msg.events} onStillFine={onRecurringStillFine} onNeedsWork={onRecurringNeedsWork} />
   );
   return (
     <div style={{ display: "flex", gap: 7, flexDirection: isUser ? "row-reverse" : "row", maxWidth: "100%" }}>
@@ -5469,7 +5513,7 @@ function UsagePanel({ stats, onClear, onClose }) {
 }
 
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, googleScope, onConnectGmail, onDisconnectGmail, gmailError, calendarEnabled, onConnectCalendar, onDisconnectCalendar }) {
+function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, googleScope, onConnectGmail, onDisconnectGmail, gmailError, calendarEnabled, onConnectCalendar, onDisconnectCalendar, recurringReviewDays, onSetRecurringReviewDays }) {
   const fileInputRef = useRef(null);
 
   const [importMode, setImportMode] = useState("replace");
@@ -5601,6 +5645,21 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
               <span style={{ fontSize: 14 }}>📅</span> Connect Calendar
             </button>
           )}
+        </SettingsSection>
+        <SettingsSection label="Weekly Review" storageKey="gtd_settings_weekly_review">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
+            Recurring calendar events you’ve reviewed will resurface during your Weekly Review after this many days.
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label style={{ fontSize: 12, color: COLORS.text2 }}>Resurface after</label>
+            <input
+              type="number" min="1" max="365"
+              value={recurringReviewDays}
+              onChange={e => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v > 0) onSetRecurringReviewDays(v); }}
+              style={{ width: 60, padding: '4px 8px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text, fontFamily: 'inherit', fontSize: 12 }}
+            />
+            <span style={{ fontSize: 12, color: COLORS.text2 }}>days</span>
+          </div>
         </SettingsSection>
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
           <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
@@ -7313,7 +7372,16 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
 
   const handleReviewNewEvent = useCallback((ev) => {
     handleMarkEventSeen(ev);
-    processCalendarEventWithAI(ev, true);
+    if (ev.recurrence?.length || ev.recurringEventId) {
+      const masterKey = ev.recurringEventId || ev.id;
+      const recurrenceDesc = Array.isArray(ev.recurrence) && ev.recurrence[0] ? ev.recurrence[0] : '';
+      setRecurringAcknowledgedMap(prev => {
+        const next = new Map(prev);
+        next.set(masterKey, { acknowledgedAt: Date.now(), title: ev.summary || '(No title)', recurrenceDesc });
+        return next;
+      });
+    }
+    processCalendarEventWithAI(ev);
   }, [handleMarkEventSeen, processCalendarEventWithAI]);
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
@@ -7329,12 +7397,14 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
       if (!evStart || evStart < today || evStart > horizon) return false;
       const masterKey = ev.recurringEventId || ev.id;
       if (seenCalendarEventIds.has(masterKey)) return false;
+      const _ack = recurringAcknowledgedMap.get(masterKey);
+      if (_ack && (Date.now() - _ack.acknowledgedAt) < recurringReviewDays * 86400000) return false;
       if (linkedIds.has(ev.id) || (ev.recurringEventId && linkedIds.has(ev.recurringEventId))) return false;
       if (seenMasters.has(masterKey)) return false;
       seenMasters.add(masterKey);
       return true;
     }).sort((a, b) => calEventStart(a) - calEventStart(b));
-  }, [calendarEvents, tasks, seenCalendarEventIds, today]);
+  }, [calendarEvents, tasks, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, today]);
 
   // Fetch events for a 60-day window centered on a given date
   const fetchEvents = useCallback(async (center) => {
