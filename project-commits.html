@@ -2089,3 +2089,59 @@
   <div class="commit-lesson"><strong>Consistency across parallel UI surfaces matters.</strong> Once a pattern (skip button) is established in one review mode, users expect it everywhere the same flow appears. Asymmetric UI — where metadata review has a skip but task review doesn&#8217;t — creates confusion and makes the app feel unfinished. When you add a control to one surface of a parallel pair, immediately check whether the other surface needs it too.</div>
   <div class="commit-back"><a href="project-summary.html#fix-project-review">&#8593; Fix: Project Review Improvements</a></div>
 </div>
+<!-- d4e97596 -->
+<div class="commit-entry" id="commit-d4e97596">
+  <div class="commit-top">
+    <span class="commit-hash">d4e97596</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: extract useCalendarState and useGmailState custom hooks</div>
+  <div class="commit-body">
+    Second pass of custom hook extraction (item&#160;7). <strong>useCalendarState</strong> captures 8 state slices: <code>calendarEvents</code>, <code>calendarTab</code>, <code>skippedCalendarIds</code>, <code>seenCalendarEventIds</code>, <code>recurringAcknowledgedMap</code>, <code>recurringReviewDays</code>, <code>calendarSuggestions</code>, <code>calendarSuggestionsReady</code>, plus the <code>calendarTab</code> localStorage effect. <strong>useGmailState</strong> captures 4 state slices: <code>currentView</code>, <code>emailTab</code>, <code>gmailQueue</code>, <code>gmailUnreadCount</code>, plus the <code>emailTab</code> and <code>gmailQueue</code> localStorage effects. Both hooks are parameter-free; the auth-dependent effects (unread count fetch needs <code>googleToken</code>; Supabase queue load needs <code>authUser</code>/<code>supabaseReady</code>) remain in GTDManager with comments explaining why. Net: 12 more <code>useState</code> declarations and 3 <code>useEffect</code> calls removed from GTDManager.
+  </div>
+  <div class="commit-lesson"><strong>When you can&#8217;t move everything, document what stays and why.</strong> The temptation when extracting a hook is to make it look clean by pulling in all related code &mdash; but if some of that code depends on values produced by later hooks, moving it would violate React&#8217;s rules. The right answer is to leave those effects in GTDManager with a clear comment: &#8220;this stays here until X is available at this call site.&#8221; A future pass that restructures hook call order can then move them cleanly. Partial extraction with honest documentation beats an overly clever restructure that silently breaks the rules.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-cal-gmail-hooks">&#8593; Refactor: Cal/Gmail Hook Extraction</a></div>
+</div>
+<!-- 923e4a2a -->
+<div class="commit-entry" id="commit-923e4a2a">
+  <div class="commit-top">
+    <span class="commit-hash">923e4a2a</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: alphabetize location list on add, rename, and import</div>
+  <div class="commit-body">
+    Sort applied at every write site: <code>addLocation</code> sorts after append; <code>renameLocation</code> sorts after the map pass; the Supabase server-wins load, the import-replace path, and the import-merge path all sort on arrival. Default fallback list reordered to <code>Computer / Home / Phone / Work</code>. No behaviour change to task data — only the display order of the location tag list in Settings.
+  </div>
+  <div class="commit-lesson"><strong>Sort at the write site, not the read site.</strong> Sorting inside <code>setLocations</code> means the array is always pre-sorted in state; the render just uses it as-is. Sorting in JSX instead would re-run on every render and scatter the sort logic across the codebase. Centralising the sort at the mutation point also makes it easy to verify coverage: count the callsites, check each one sorts.</div>
+  <div class="commit-back"><a href="project-summary.html#fix-sort-locations">&#8593; Fix: Location List Sort</a></div>
+</div>
+<!-- daf4487c -->
+<div class="commit-entry" id="commit-daf4487c">
+  <div class="commit-top">
+    <span class="commit-hash">daf4487c</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: extract useAICoachState and useTaskUIState custom hooks</div>
+  <div class="commit-body">
+    Third pass of custom hook extraction. <strong>useAICoachState</strong> owns the entire AI coach panel: 10 state slices, 2 refs (<code>chatEndRef</code>, <code>chatInputRef</code>), and 3 effects (provider/localModel localStorage + chatEnd auto-scroll). <code>INITIAL_COACH_MESSAGE</code> promoted to module-level constant. <strong>useTaskUIState</strong> owns 15 pure UI state slices covering bucket navigation, panel toggles, project tree state, drag-drop, inbox bulk selection, and AI prompt queues — no effects, entirely ephemeral. Net: 25 <code>useState</code>, 2 <code>useRef</code>, 3 <code>useEffect</code> removed from GTDManager.
+  </div>
+  <div class="commit-lesson"><strong>The absence of effects is a design signal.</strong> <code>useTaskUIState</code> has no <code>useEffect</code> calls — that&#8217;s intentional and meaningful. It tells the next reader: this state is purely reactive to user input, never persisted, never synced. When you extract a hook and find you have nothing to put in the effects section, resist the urge to add one. The emptiness is the correct design.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-coach-ui-hooks">&#8593; Refactor: Coach/UI Hook Extraction</a></div>
+</div>
+<!-- f2927cef -->
+<div class="commit-entry" id="commit-f2927cef">
+  <div class="commit-top">
+    <span class="commit-hash">f2927cef</span>
+    <span class="commit-date">2026-05-05</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: add PropTypes to all major components</div>
+  <div class="commit-body">
+    Installs <code>prop-types</code> and adds runtime prop validation to 8 components. Shared <code>taskShape</code> constant defined at module level and reused wherever a component accepts a task object or array. Components covered: <strong>TaskRow</strong> (28 props), <strong>SettingsPanel</strong> (27), <strong>TaskDetailPanel</strong> (11), <strong>EmailManagementView</strong> (10), <strong>MetadataReviewBar</strong> (7), <strong>ProjectReviewBar</strong> (6), <strong>ProviderSelector</strong> (6), <strong>CalendarSuggestionsBar</strong> (5). Zero runtime cost in production — warnings only appear in dev mode.
+  </div>
+  <div class="commit-lesson"><strong>PropTypes are documentation that bites back.</strong> A component&#8217;s <code>.propTypes</code> block is simultaneously a spec for callers, a guide for future readers, and a runtime assertion that fires in dev when something is wrong. Unlike a comment, it can&#8217;t go stale silently — if a required prop goes missing, the console tells you immediately. The shared <code>taskShape</code> pattern also prevents the schema from being defined differently in different places, which is the real long-term maintenance win.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-proptypes">&#8593; Refactor: PropTypes</a></div>
+</div>

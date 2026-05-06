@@ -1,6 +1,12 @@
-import { useState, useEffect, useRef, useCallback, useMemo, Component } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, Component } from "react";
 import { createClient } from "@supabase/supabase-js";
 import PropTypes from "prop-types";
+
+// ── Task contexts — eliminates rowProps drilling through ProjectTree/CompletedTree ──
+// Stable callbacks (completeTask, deleteTask, etc.) that TaskRow needs from GTDManager.
+const TaskActionsContext = createContext(null);
+// Shared state (currentBucket, allTasks, moveMenu, etc.) that every row in a view reads.
+const TaskRowContext = createContext(null);
 
 // Shared PropTypes shape for a task object — used across multiple components.
 const taskShape = PropTypes.shape({
@@ -8,7 +14,7 @@ const taskShape = PropTypes.shape({
   text:         PropTypes.string.isRequired,
   bucket:       PropTypes.string.isRequired,
   done:         PropTypes.bool.isRequired,
-  created:      PropTypes.string.isRequired,
+  created:      PropTypes.number.isRequired,
   priority:     PropTypes.arrayOf(PropTypes.string),
   location:     PropTypes.arrayOf(PropTypes.string),
   dueDate:      PropTypes.string,
@@ -4000,6 +4006,33 @@ export default function GTDManager() {
     chatInputRow: { display: "flex", gap: 6, padding: "8px 12px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, alignItems: "flex-end" },
   };
 
+  // ── Context values ─────────────────────────────────────────────────────
+  const taskActionsValue = {
+    onComplete:           completeTask,
+    onDelete:             deleteTask,
+    onMove:               moveTask,
+    onAskAI:              askAIAboutTask,
+    onUpdateTask:         updateTask,
+    onAssignToProject:    assignToProject,
+    onSkipRecurrence:     skipRecurrence,
+    onNavigate:           setCurrentBucket,
+    onOpenDetail:         setSelectedTaskId,
+    onToggleCollapse:     toggleCollapse,
+    onToggleCollapseLevel: toggleCollapseLevel,
+  };
+  const taskRowValue = {
+    currentBucket,
+    allTasks: tasks,
+    moveMenu,
+    setMoveMenu,
+    pendingAction,
+    collapsedNodes,
+    selectedTaskId,
+    locations,
+    efforts,
+    tagDisplay,
+  };
+
   // ── Auth gate ────────────────────────────────────────────────────────
   if (authLoading) return (
     <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center",
@@ -4118,6 +4151,8 @@ export default function GTDManager() {
         <div style={s.taskRow}>
         {/* TASK PANEL */}
         <ErrorBoundary label="Task Panel">
+        <TaskActionsContext.Provider value={taskActionsValue}>
+        <TaskRowContext.Provider value={taskRowValue}>
         <div style={s.taskPanel}>
           {showSettings ? (
             <SettingsPanel
@@ -4329,35 +4364,12 @@ export default function GTDManager() {
                     <ProjectTree
                       parentId={null}
                       depth={0}
-                      allTasks={tasks}
                       dragId={dragId}
                       dropTarget={dropTarget}
                       onDragStart={handleProjectDragStart}
                       onDragOver={handleProjectDragOver}
                       onDragEnd={handleProjectDragEnd}
                       onDrop={handleProjectDrop}
-                      rowProps={{
-                        currentBucket,
-                        moveMenu, setMoveMenu,
-                        onComplete: completeTask,
-                        onDelete: deleteTask,
-                        onMove: moveTask,
-                        onAskAI: askAIAboutTask,
-                        onUpdateTask: updateTask,
-                        pendingAction,
-                        allTasks: tasks,
-                        onNavigate: setCurrentBucket,
-                        locations,
-                        efforts,
-                        onAssignToProject: assignToProject,
-                        tagDisplay,
-                        collapsedNodes,
-                        onToggleCollapse: toggleCollapse,
-                        onToggleCollapseLevel: toggleCollapseLevel,
-                        onOpenDetail: setSelectedTaskId,
-                        selectedTaskId,
-                        onSkipRecurrence: skipRecurrence,
-                      }}
                     />
                   </div>
                 ) : currentBucket === "next" ? (() => {
@@ -4374,10 +4386,7 @@ export default function GTDManager() {
                   }
                   if (nextGroupBy === "none") {
                     return visible.map(task => (
-                      <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                        onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                        pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                        onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence} />
+                      <TaskRow key={task.id} task={task} />
                     ));
                   }
                   return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => {
@@ -4388,10 +4397,7 @@ export default function GTDManager() {
                       <div key={key}>
                         <GroupDivider label={label} count={items.length} effortTotal={groupEffortLabel} isUngrouped={key === "__ungrouped__"} />
                         {items.map(task => (
-                          <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                            onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                            pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                            onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence} />
+                          <TaskRow key={task.id} task={task} />
                         ))}
                       </div>
                     );
@@ -4405,10 +4411,7 @@ export default function GTDManager() {
                         Sorted by wake date — earliest first. Tasks move to Inbox automatically when their date arrives.
                       </div>
                       {bucketTasks.map(task => (
-                        <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                          onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                          pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                          onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence} />
+                        <TaskRow key={task.id} task={task} />
                       ))}
                     </div>
                   )
@@ -4443,33 +4446,7 @@ export default function GTDManager() {
                       );
                     })()}
                     {currentBucket === "done" ? (
-                      <CompletedTree
-                        parentId={null}
-                        depth={0}
-                        allTasks={tasks}
-                        rowProps={{
-                          currentBucket,
-                          moveMenu, setMoveMenu,
-                          onComplete: completeTask,
-                          onDelete: deleteTask,
-                          onMove: moveTask,
-                          onAskAI: askAIAboutTask,
-                          onUpdateTask: updateTask,
-                          pendingAction,
-                          allTasks: tasks,
-                          onNavigate: setCurrentBucket,
-                          locations,
-                          efforts,
-                          onAssignToProject: assignToProject,
-                          tagDisplay,
-                          collapsedNodes,
-                          onToggleCollapse: toggleCollapse,
-                          onToggleCollapseLevel: toggleCollapseLevel,
-                          onOpenDetail: setSelectedTaskId,
-                          selectedTaskId,
-                          onSkipRecurrence: skipRecurrence,
-                        }}
-                      />
+                      <CompletedTree parentId={null} depth={0} />
                     ) : currentBucket === "inbox" ? (
                       <>
                         {/* Bulk-selection toolbar — visible when ≥1 task is checked */}
@@ -4482,20 +4459,14 @@ export default function GTDManager() {
                           />
                         )}
                         {bucketTasks.map(task => (
-                          <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                            onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                            pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                            onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence}
+                          <TaskRow key={task.id} task={task}
                             onSelect={(id, checked) => setInboxSelectedIds(prev => { const next = new Set(prev); if (checked) next.add(id); else next.delete(id); return next; })}
                             isSelected={inboxSelectedIds.has(task.id)} />
                         ))}
                       </>
                     ) : (
                       bucketTasks.map(task => (
-                        <TaskRow key={task.id} task={task} currentBucket={currentBucket} moveMenu={moveMenu} setMoveMenu={setMoveMenu}
-                          onComplete={completeTask} onDelete={deleteTask} onMove={moveTask} onAskAI={askAIAboutTask} onUpdateTask={updateTask}
-                          pendingAction={pendingAction} allTasks={tasks} onNavigate={setCurrentBucket} locations={locations} efforts={efforts}
-                          onAssignToProject={assignToProject} tagDisplay={tagDisplay} onOpenDetail={setSelectedTaskId} selectedTaskId={selectedTaskId} onSkipRecurrence={skipRecurrence} />
+                        <TaskRow key={task.id} task={task} />
                       ))
                     )}
                   </>
@@ -4504,6 +4475,8 @@ export default function GTDManager() {
             </>
           )}
         </div>
+        </TaskRowContext.Provider>
+        </TaskActionsContext.Provider>
         </ErrorBoundary>
         </div>{/* end taskRow */}
         <ResizeHandle onMouseDown={coachDragDown} direction="v" />
@@ -4736,7 +4709,9 @@ function Btn({ children, onClick, style = {} }) {
 
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
-function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDelete, onMove, onAskAI, onUpdateTask, pendingAction, allTasks, onNavigate, isSubtask, locations, efforts, onAssignToProject, tagDisplay, indentOverride, depth = 0, collapsedNodes, onToggleCollapse, onToggleCollapseLevel, onOpenDetail, selectedTaskId, onSkipRecurrence, onSelect, isSelected }) {
+function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelected }) {
+  const { onComplete, onDelete, onMove, onAskAI, onUpdateTask, onAssignToProject, onSkipRecurrence, onNavigate, onOpenDetail, onToggleCollapse, onToggleCollapseLevel } = useContext(TaskActionsContext);
+  const { currentBucket, allTasks, moveMenu, setMoveMenu, pendingAction, collapsedNodes, selectedTaskId, locations, efforts, tagDisplay } = useContext(TaskRowContext);
   const [hover, setHover] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
@@ -5225,33 +5200,12 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
 }
 
 TaskRow.propTypes = {
-  task:                  taskShape.isRequired,
-  currentBucket:         PropTypes.string.isRequired,
-  moveMenu:              PropTypes.string,
-  setMoveMenu:           PropTypes.func.isRequired,
-  onComplete:            PropTypes.func.isRequired,
-  onDelete:              PropTypes.func.isRequired,
-  onMove:                PropTypes.func.isRequired,
-  onAskAI:               PropTypes.func.isRequired,
-  onUpdateTask:          PropTypes.func.isRequired,
-  pendingAction:         PropTypes.shape({ type: PropTypes.string, title: PropTypes.string }),
-  allTasks:              PropTypes.arrayOf(taskShape).isRequired,
-  onNavigate:            PropTypes.func,
-  isSubtask:             PropTypes.bool,
-  locations:             PropTypes.arrayOf(PropTypes.string).isRequired,
-  efforts:               PropTypes.arrayOf(PropTypes.string).isRequired,
-  onAssignToProject:     PropTypes.func,
-  tagDisplay:            PropTypes.string.isRequired,
-  indentOverride:        PropTypes.number,
-  depth:                 PropTypes.number,
-  collapsedNodes:        PropTypes.instanceOf(Set).isRequired,
-  onToggleCollapse:      PropTypes.func.isRequired,
-  onToggleCollapseLevel: PropTypes.func.isRequired,
-  onOpenDetail:          PropTypes.func.isRequired,
-  selectedTaskId:        PropTypes.string,
-  onSkipRecurrence:      PropTypes.func,
-  onSelect:              PropTypes.func,
-  isSelected:            PropTypes.bool,
+  task:           taskShape.isRequired,
+  isSubtask:      PropTypes.bool,
+  indentOverride: PropTypes.number,
+  depth:          PropTypes.number,
+  onSelect:       PropTypes.func,
+  isSelected:     PropTypes.bool,
 };
 
 function ActionBtn({ children, onClick, color }) {
@@ -6510,7 +6464,8 @@ function DropLine({ depth }) {
 // Read-only hierarchical view for completed tasks.
 // parentId === null  → virtual roots: done tasks whose parent is not also done.
 // parentId !== null  → done children of parentId in childIds order.
-function CompletedTree({ parentId, depth, allTasks, rowProps }) {
+function CompletedTree({ parentId, depth }) {
+  const { allTasks, collapsedNodes } = useContext(TaskRowContext);
   if (depth > 5) return null;
 
   let children;
@@ -6527,20 +6482,9 @@ function CompletedTree({ parentId, depth, allTasks, rowProps }) {
     <>
       {children.map(task => (
         <div key={task.id}>
-          <TaskRow
-            task={task}
-            isSubtask={depth > 0}
-            indentOverride={depth * 22}
-            depth={depth}
-            {...rowProps}
-          />
-          {!rowProps.collapsedNodes?.has(task.id) && (
-            <CompletedTree
-              parentId={task.id}
-              depth={depth + 1}
-              allTasks={allTasks}
-              rowProps={rowProps}
-            />
+          <TaskRow task={task} isSubtask={depth > 0} indentOverride={depth * 22} depth={depth} />
+          {!collapsedNodes?.has(task.id) && (
+            <CompletedTree parentId={task.id} depth={depth + 1} />
           )}
         </div>
       ))}
@@ -6548,7 +6492,8 @@ function CompletedTree({ parentId, depth, allTasks, rowProps }) {
   );
 }
 
-function ProjectTree({ parentId, depth, allTasks, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop, rowProps }) {
+function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop }) {
+  const { allTasks, collapsedNodes } = useContext(TaskRowContext);
   if (depth > 5) return null;
   const children = getOrderedChildren(parentId, allTasks);
   if (!children.length) return null;
@@ -6578,28 +6523,20 @@ function ProjectTree({ parentId, depth, allTasks, dragId, dropTarget, onDragStar
                 transition: "opacity 0.1s",
               }}
             >
-              <TaskRow
-                task={task}
-                isSubtask={depth > 0}
-                indentOverride={depth * 22}
-                depth={depth}
-                {...rowProps}
-              />
+              <TaskRow task={task} isSubtask={depth > 0} indentOverride={depth * 22} depth={depth} />
             </div>
 
             {/* Recurse into children — skipped when this node is collapsed. */}
-            {!rowProps.collapsedNodes?.has(task.id) && (
+            {!collapsedNodes?.has(task.id) && (
               <ProjectTree
                 parentId={task.id}
                 depth={depth + 1}
-                allTasks={allTasks}
                 dragId={dragId}
                 dropTarget={dropTarget}
                 onDragStart={onDragStart}
                 onDragOver={onDragOver}
                 onDragEnd={onDragEnd}
                 onDrop={onDrop}
-                rowProps={rowProps}
               />
             )}
 

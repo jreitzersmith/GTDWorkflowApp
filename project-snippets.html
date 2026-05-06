@@ -4338,6 +4338,84 @@ const handleReschedule = async () =&gt; {
 <script>
   document.addEventListener('DOMContentLoaded', () => { hljs.highlightAll(); });
 </script>
+<div class="snip-entry" id="snip-use-calendar-state">
+  <div class="snip-header">
+    <span class="snip-title">useCalendarState — calendar + suggestions state hook</span>
+    <span class="snip-file">App.jsx — module level, above GTDManager</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">function useCalendarState() {
+  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [calendarTab, setCalendarTab] = useState(
+    () =&gt; localStorage.getItem('gtd_calendar_tab') || 'month'
+  );
+  const [skippedCalendarIds, setSkippedCalendarIds] = useState(() =&gt; {
+    try { return new Set(JSON.parse(localStorage.getItem('gtd_cal_skipped') || '[]')); }
+    catch { return new Set(); }
+  });
+  const [seenCalendarEventIds, setSeenCalendarEventIds] = useState(() =&gt; { /* ...Map from localStorage */ });
+  const [recurringAcknowledgedMap, setRecurringAcknowledgedMap] = useState(() =&gt; { /* ...Map */ });
+  const [recurringReviewDays, setRecurringReviewDays] = useState(() =&gt; { /* ...number */ });
+  const [calendarSuggestions, setCalendarSuggestions] = useState([]);
+  const [calendarSuggestionsReady, setCalendarSuggestionsReady] = useState(false);
+
+  // calendarTab is safe here — no auth dependency
+  useEffect(() =&gt; {
+    localStorage.setItem('gtd_calendar_tab', calendarTab);
+  }, [calendarTab]);
+
+  // NOTE: four localStorage effects for seenCalendarEventIds, recurringAcknowledgedMap,
+  // recurringReviewDays, and skippedCalendarIds depend on authUser/Supabase and remain
+  // in GTDManager until hook call ordering allows them to move.
+
+  return {
+    calendarEvents, setCalendarEvents,
+    calendarTab, setCalendarTab,
+    skippedCalendarIds, setSkippedCalendarIds,
+    seenCalendarEventIds, setSeenCalendarEventIds,
+    recurringAcknowledgedMap, setRecurringAcknowledgedMap,
+    recurringReviewDays, setRecurringReviewDays,
+    calendarSuggestions, setCalendarSuggestions,
+    calendarSuggestionsReady, setCalendarSuggestionsReady,
+  };
+}</code></pre></div>
+  <div class="annotation"><strong>Eight state slices, one localStorage effect.</strong> Most of the calendar state is auth-independent (what tab is selected, which event IDs have been seen in the current session), so it migrates cleanly. The Supabase persistence effects — which must fire after the user is authenticated — stay in GTDManager with a comment explaining why they are deferred.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-cal-gmail-hooks">&#8593; Refactor: Cal/Gmail Hook Extraction</a></div>
+</div>
+
+<div class="snip-entry" id="snip-use-gmail-state">
+  <div class="snip-header">
+    <span class="snip-title">useGmailState — email view + queue state hook</span>
+    <span class="snip-file">App.jsx — module level, above GTDManager</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">function useGmailState() {
+  const [currentView, setCurrentView] = useState("gtd");
+  const [emailTab, setEmailTab] = useState(
+    () =&gt; localStorage.getItem("gtd_email_tab") || "inbox"
+  );
+  const [gmailQueue, setGmailQueue] = useState(() =&gt; {
+    try { return JSON.parse(localStorage.getItem("gtd_gmail_queue") || "[]"); }
+    catch { return []; }
+  });
+  const [gmailUnreadCount, setGmailUnreadCount] = useState(null);
+
+  useEffect(() =&gt; {
+    localStorage.setItem("gtd_email_tab", emailTab);
+  }, [emailTab]);
+
+  useEffect(() =&gt; {
+    localStorage.setItem("gtd_gmail_queue", JSON.stringify(gmailQueue));
+  }, [gmailQueue]);
+
+  // NOTE: unread count fetch (needs googleToken from useGoogleAuth) and the
+  // Supabase gmail_queue load (needs authUser + supabaseReady) remain in
+  // GTDManager — both values are produced by hooks called after useGmailState.
+
+  return { currentView, setCurrentView, emailTab, setEmailTab,
+           gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount };
+}</code></pre></div>
+  <div class="annotation"><strong>Parameter-free hooks keep call order flexible.</strong> Passing <code>googleToken</code> as a parameter would force the call site to compute it first, which in turn would require reordering the hook calls in GTDManager. By keeping the hook parameter-free and leaving the token-dependent effects in GTDManager, the hook can be called anywhere in the component without introducing ordering constraints.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-cal-gmail-hooks">&#8593; Refactor: Cal/Gmail Hook Extraction</a></div>
+</div>
 </body>
 </html>
 
@@ -4915,4 +4993,110 @@ const skipProjectReview = useCallback(() => {
 &lt;/button&gt;</code></pre></div>
   <div class="annotation"><strong>Skip vs. Next share the same advance logic.</strong> The only difference between <code>skipProjectReview</code> and <code>advanceProjectReview</code> is that the skip version omits the <code>setTasks</code> call that adds checked suggestions. Everything else — clearing state, computing <code>nextIdx</code>, deciding whether to loop or finish — is identical. The skip button is styled in muted grey (<code>COLORS.muted</code> / <code>COLORS.border</code>) so it reads as clearly secondary to the primary action without being hidden.</div>
   <div class="snip-back"><a href="project-summary.html#fix-project-review">&#8593; Fix: Project Review Improvements</a></div>
+</div>
+<div class="snip-entry" id="snip-use-ai-coach-state">
+  <div class="snip-header">
+    <span class="snip-title">useAICoachState — AI coach panel state + refs + effects</span>
+    <span class="snip-file">App.jsx — module level, above GTDManager</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">const INITIAL_COACH_MESSAGE = "Hi! I'm your GTD Coach...";
+
+function useAICoachState() {
+  const [messages, setMessages] = useState([{ role: 'assistant', text: INITIAL_COACH_MESSAGE }]);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [coachMode, setCoachMode] = useState('chat');
+  const [chatInput, setChatInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [moveMenu, setMoveMenu] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+  const chatEndRef = useRef(null);
+  const chatInputRef = useRef(null);
+  const [provider, setProvider] = useState(() =&gt; localStorage.getItem('gtd_provider') || 'claude');
+  const [localModel, setLocalModel] = useState(() =&gt; localStorage.getItem('gtd_local_model') || 'llama3.3:70b');
+  const [availableModels, setAvailableModels] = useState([]);
+
+  useEffect(() =&gt; { localStorage.setItem('gtd_provider', provider); }, [provider]);
+  useEffect(() =&gt; { localStorage.setItem('gtd_local_model', localModel); }, [localModel]);
+  useEffect(() =&gt; {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  return { messages, setMessages, chatHistory, setChatHistory,
+           coachMode, setCoachMode, chatInput, setChatInput,
+           loading, setLoading, moveMenu, setMoveMenu,
+           pendingAction, setPendingAction,
+           chatEndRef, chatInputRef,
+           provider, setProvider, localModel, setLocalModel,
+           availableModels, setAvailableModels };
+}</code></pre></div>
+  <div class="annotation"><strong>Refs and their effects travel with their state.</strong> <code>chatEndRef</code> and <code>chatInputRef</code> only exist to interact with the chat panel DOM, so they live here alongside the state they support. The scroll effect moves in too because its only dependency is <code>messages</code> — entirely self-contained within this hook.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-coach-ui-hooks">&#8593; Refactor: Coach/UI Hook Extraction</a></div>
+</div>
+
+<div class="snip-entry" id="snip-use-task-ui-state">
+  <div class="snip-header">
+    <span class="snip-title">useTaskUIState — ephemeral UI navigation and interaction state</span>
+    <span class="snip-file">App.jsx — module level, above GTDManager</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">function useTaskUIState() {
+  const [currentBucket, setCurrentBucket] = useState('inbox');
+  const [addText, setAddText] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showUsage, setShowUsage] = useState(false);
+  const [nextGroupBy, setNextGroupBy] = useState('none');
+  const [projectParentId, setProjectParentId] = useState('__new__');
+  const [collapsedNodes, setCollapsedNodes] = useState(new Set());
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [actualEffortPrompt, setActualEffortPrompt] = useState(null);
+  const [pendingRollup, setPendingRollup] = useState(null);
+  const [pendingDeferCheck, setPendingDeferCheck] = useState(null);
+  const [dragId, setDragId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+  const [inboxSelectedIds, setInboxSelectedIds] = useState(new Set());
+  const [pendingGroupSuggestion, setPendingGroupSuggestion] = useState(null);
+
+  return { currentBucket, setCurrentBucket, addText, setAddText,
+           showSettings, setShowSettings, showUsage, setShowUsage,
+           nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId,
+           collapsedNodes, setCollapsedNodes, selectedTaskId, setSelectedTaskId,
+           actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup,
+           pendingDeferCheck, setPendingDeferCheck, dragId, setDragId,
+           dropTarget, setDropTarget, inboxSelectedIds, setInboxSelectedIds,
+           pendingGroupSuggestion, setPendingGroupSuggestion };
+}</code></pre></div>
+  <div class="annotation"><strong>No effects means pure UI state.</strong> Every piece of state here is driven solely by user interaction — none of it needs to be persisted or synced. That absence of effects is itself a signal: this hook is a clean namespace for ephemeral state, and it will reset to defaults on every page reload.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-coach-ui-hooks">&#8593; Refactor: Coach/UI Hook Extraction</a></div>
+</div>
+</body>
+<div class="snip-entry" id="snip-task-shape">
+  <div class="snip-header">
+    <span class="snip-title">taskShape — shared PropTypes schema for task objects</span>
+    <span class="snip-file">App.jsx — module level, after imports</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">const taskShape = PropTypes.shape({
+  id:           PropTypes.string.isRequired,
+  text:         PropTypes.string.isRequired,
+  bucket:       PropTypes.string.isRequired,
+  done:         PropTypes.bool.isRequired,
+  created:      PropTypes.string.isRequired,
+  priority:     PropTypes.arrayOf(PropTypes.string),
+  location:     PropTypes.arrayOf(PropTypes.string),
+  dueDate:      PropTypes.string,
+  effort:       PropTypes.string,
+  actualEffort: PropTypes.string,
+  deferUntil:   PropTypes.string,
+  notes:        PropTypes.string,
+  recurrence:   PropTypes.string,
+  parentId:     PropTypes.string,
+  childIds:     PropTypes.arrayOf(PropTypes.string),
+});
+
+// Used in TaskRow, TaskDetailPanel, SettingsPanel, EmailManagementView:
+TaskRow.propTypes = {
+  task:     taskShape.isRequired,
+  allTasks: PropTypes.arrayOf(taskShape).isRequired,
+  // ... 26 more props
+};</code></pre></div>
+  <div class="annotation"><strong>Define once, reference everywhere.</strong> Without <code>taskShape</code>, every component that accepts a task object would duplicate the full field list. With it, the schema is a single source of truth — if a new field is added to tasks, only <code>taskShape</code> needs updating.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-proptypes">&#8593; Refactor: PropTypes</a></div>
 </div>

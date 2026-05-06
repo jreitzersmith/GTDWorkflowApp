@@ -313,6 +313,7 @@
     <li><a href="#refactor-dry-cleanup">DRY Cleanup</a></li>
     <li><a href="#refactor-error-boundaries">Error Boundaries</a></li>
     <li><a href="#refactor-custom-hooks">Custom Hooks</a></li>
+    <li><a href="#refactor-cal-gmail-hooks">Cal/Gmail Hooks</a></li>
   </ul>
 
   <div class="section-label">May 5 &#8212; New</div>
@@ -320,6 +321,16 @@
     <li><a href="#feat-due-time-newevent">dueTime &amp; Guided Event Prep</a></li>
     <li><a href="#feat-recurring-review">Recurring Event Review</a></li>
     <li><a href="#feat-inbox-bulk-project">Inbox Bulk Selection &amp; Project Grouping</a></li>
+  </ul>
+
+  <div class="section-label">May 5 &#8212; Fixes &amp; Refactors</div>
+  <ul>
+    <li><a href="#refactor-custom-hooks">Custom Hook Extraction (pass 1)</a></li>
+    <li><a href="#refactor-cal-gmail-hooks">Custom Hook Extraction (pass 2)</a></li>
+    <li><a href="#refactor-coach-ui-hooks">Custom Hook Extraction (pass 3)</a></li>
+    <li><a href="#refactor-proptypes">PropTypes</a></li>
+    <li><a href="#fix-project-review">Project Review Fixes</a></li>
+    <li><a href="#fix-sort-locations">Location List Sort</a></li>
   </ul>
 
 </aside>
@@ -2423,6 +2434,116 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
     </div>
   </section>
   <!-- ═══════════════════════════════════════════════════════════ -->
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-cal-gmail-hooks">
+    <div class="feat-header">
+      <span class="feat-icon">🪝</span>
+      <span class="feat-title">Custom Hook Extraction — useCalendarState, useGmailState</span>
+      <span class="feat-badge badge-refactor">Refactor &#8212; May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Second pass of the custom hook extraction (item&#160;7). Two more hooks were lifted out of <code>GTDManager</code>, covering the calendar and Gmail state slices:</p>
+      <ul>
+        <li><strong>useCalendarState</strong> — owns <code>calendarEvents</code>, <code>calendarTab</code>, <code>skippedCalendarIds</code>, <code>seenCalendarEventIds</code>, <code>recurringAcknowledgedMap</code>, <code>recurringReviewDays</code>, <code>calendarSuggestions</code>, and <code>calendarSuggestionsReady</code>. Includes the <code>calendarTab</code> <code>localStorage</code> sync effect. The four <code>localStorage</code> effects that depend on <code>authUser</code> / Supabase state remain in <code>GTDManager</code> temporarily — they can only safely move once the auth hook is called earlier in the component.</li>
+        <li><strong>useGmailState</strong> — owns <code>currentView</code>, <code>emailTab</code>, <code>gmailQueue</code>, and <code>gmailUnreadCount</code>. Includes the <code>emailTab</code> and <code>gmailQueue</code> <code>localStorage</code> sync effects. The unread count fetch (needs <code>googleToken</code>) and the Supabase gmail queue load (needs <code>authUser</code> + <code>supabaseReady</code>) remain in <code>GTDManager</code> for the same reason.</li>
+      </ul>
+      <p>Net result: 12 more <code>useState</code> declarations and 3 <code>useEffect</code> calls were removed from <code>GTDManager</code> and replaced with 2 hook destructures. The hooks are parameter-free; the entangled effects that rely on auth tokens will follow in a later pass once the hook call order is restructured.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: hook call ordering constraints</h4>
+      <p>React requires hooks to be called in the same order on every render. This means a hook cannot conditionally access a value produced by another hook that is called <em>after</em> it in the same component. In this case, <code>useGmailState</code> is called before <code>useGoogleAuth</code> (which produces <code>googleToken</code>), so the Gmail unread-count effect — which needs <code>googleToken</code> — cannot live inside <code>useGmailState</code> yet. The solution is to move that effect into <code>GTDManager</code> temporarily and document why, rather than silently reordering hook calls (which would break the rules) or collapsing two unrelated hooks into one just to share a dependency (which would break Single Responsibility). Incremental extraction is always safer than a big-bang restructure.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Imagine splitting a monolithic startup script into individual <code>systemd</code> services, but one service depends on a socket that another service hasn&#8217;t opened yet. You can&#8217;t move the dependent code into its own unit until the dependency is declared with <code>After=</code> / <code>Requires=</code>. Until then, the dependent code stays in the orchestrator. The hook ordering constraint is the same: you can&#8217;t move a piece of code into a hook until the value it depends on is available at the point where that hook is called.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-calendar-state">&#x1F52C; useCalendarState hook</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-gmail-state">&#x1F52C; useGmailState hook</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-d4e97596">&#x1F4DC; d4e97596 &#8212; cal/gmail hook extraction</a>
+    </div>
+  </section>
+  <!-- ══════════════════════════════════════════════════════════════ -->
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="fix-sort-locations">
+    <div class="feat-header">
+      <span class="feat-icon">🔤</span>
+      <span class="feat-title">Location List — Alphabetical Sort</span>
+      <span class="feat-badge badge-fix">Fix &#8212; May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>The Locations list in Settings now stays alphabetically sorted at all times. Previously, new locations were appended to the bottom of the list in the order they were added, making longer lists hard to scan.</p>
+      <p>Sort is applied at every mutation point: <code>addLocation</code> sorts after appending; <code>renameLocation</code> sorts after the map pass; both import paths (replace and merge) and the Supabase server-wins load sort on arrival. The default fallback list was also reordered to match (<code>Computer / Home / Phone / Work</code>).</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: sort at the write site, not the read site</h4>
+      <p>Sorting could be applied when rendering the list (in the JSX), but that means the sort runs on every render even when the data hasn&#8217;t changed. Sorting at the write site — inside <code>setLocations</code> — means the stored array is always already sorted; the render just uses it directly. This is the same principle as keeping a database index up to date at write time rather than sorting query results at read time. The tradeoff is that every mutation must remember to sort, which is why it was applied to all five callsites in one commit.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-923e4a2a">&#x1F4DC; 923e4a2a &#8212; alphabetize locations</a>
+    </div>
+  </section>
+  <!-- ══════════════════════════════════════════════════════════════ -->
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-coach-ui-hooks">
+    <div class="feat-header">
+      <span class="feat-icon">🪝</span>
+      <span class="feat-title">Custom Hook Extraction — useAICoachState, useTaskUIState</span>
+      <span class="feat-badge badge-refactor">Refactor &#8212; May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Third pass of the custom hook extraction (item&#160;7), the largest single pass yet. Two hooks were extracted covering the AI coach panel and general UI state:</p>
+      <ul>
+        <li><strong>useAICoachState</strong> — owns the entire AI coach panel state: <code>messages</code>, <code>chatHistory</code>, <code>coachMode</code>, <code>chatInput</code>, <code>loading</code>, <code>moveMenu</code>, <code>pendingAction</code>, <code>provider</code>, <code>localModel</code>, <code>availableModels</code>, plus <code>chatEndRef</code> and <code>chatInputRef</code>. Moves with them: the <code>provider</code> and <code>localModel</code> localStorage effects and the <code>chatEndRef</code> auto-scroll effect (which depends only on <code>messages</code>, safely self-contained). <code>INITIAL_COACH_MESSAGE</code> was promoted to a module-level constant.</li>
+        <li><strong>useTaskUIState</strong> — owns all pure UI navigation and transient state: <code>currentBucket</code>, <code>addText</code>, <code>showSettings</code>, <code>showUsage</code>, <code>nextGroupBy</code>, <code>projectParentId</code>, <code>collapsedNodes</code>, <code>selectedTaskId</code>, <code>actualEffortPrompt</code>, <code>pendingRollup</code>, <code>pendingDeferCheck</code>, <code>dragId</code>, <code>dropTarget</code>, <code>inboxSelectedIds</code>, <code>pendingGroupSuggestion</code>. No effects — every piece of state here is purely driven by user interaction with no side effects of its own.</li>
+      </ul>
+      <p>Net: 25 <code>useState</code> declarations, 2 <code>useRef</code> calls, and 3 <code>useEffect</code> calls removed from <code>GTDManager</code> and replaced with 2 hook destructures. What remains in <code>GTDManager</code>'s state section: <code>tasks</code> (tightly coupled to Supabase sync effects), <code>supabaseReady</code>, <code>syncStatus</code>, and three refs used by the sync debounce — all of which are set <em>inside</em> complex effects that depend on <code>authUser</code> and the task array itself.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: refs belong in hooks too</h4>
+      <p><code>useRef</code> is a hook just like <code>useState</code>, and refs that are logically tied to a slice of state belong in the same hook. <code>chatEndRef</code> and <code>chatInputRef</code> only exist to interact with the chat panel DOM — so they live in <code>useAICoachState</code> alongside the state they support. The scroll effect that uses <code>chatEndRef</code> also moves into the hook because its only dependency is <code>messages</code>, which is declared in the same hook. When all the pieces belong together, they should travel together.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p><code>useTaskUIState</code> is a pure in-memory config object — like the environment variables for a process. They drive behaviour (which bucket is selected, which panel is open, which task is being dragged) but nothing about them needs to be persisted or synced. They reset on reload. <code>useAICoachState</code> is more like a stateful service: it has its own persistence (localStorage for provider/model), its own I/O (the scroll effect), and its own internal data structures (message history). Separating these two categories makes it immediately obvious which state is ephemeral and which survives a refresh.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-ai-coach-state">&#x1F52C; useAICoachState hook</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-use-task-ui-state">&#x1F52C; useTaskUIState hook</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-daf4487c">&#x1F4DC; daf4487c &#8212; coach/UI hook extraction</a>
+    </div>
+  </section>
+  <!-- ══════════════════════════════════════════════════════════════ -->
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-proptypes">
+    <div class="feat-header">
+      <span class="feat-icon">🔍</span>
+      <span class="feat-title">PropTypes — Runtime Prop Validation</span>
+      <span class="feat-badge badge-refactor">Refactor &#8212; May 5</span>
+    </div>
+    <div class="feat-desc">
+      <p>Added PropTypes definitions to all eight major presentational and container components (item&#160;6 of the code-quality roadmap). A shared <code>taskShape</code> constant is defined once at module level and reused wherever a component accepts a task object or an array of tasks, avoiding duplication of the full task schema.</p>
+      <p>Components covered: <strong>TaskRow</strong> (28 props), <strong>SettingsPanel</strong> (27 props), <strong>TaskDetailPanel</strong> (11 props), <strong>EmailManagementView</strong> (10 props), <strong>MetadataReviewBar</strong> (7 props), <strong>ProjectReviewBar</strong> (6 props), <strong>ProviderSelector</strong> (6 props), <strong>CalendarSuggestionsBar</strong> (5 props).</p>
+      <p>PropTypes warnings only appear in development mode — they have zero runtime cost in the production build. They fire in the browser console whenever a required prop is missing or a prop is passed with the wrong type, catching bugs at the call site rather than deep inside the component.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: PropTypes vs TypeScript</h4>
+      <p>PropTypes is a runtime validation library: it checks prop types when the component actually renders, in the browser, and logs warnings to the console. TypeScript is a compile-time type checker: it catches mismatches before the code runs. The two approaches are complementary. Since this project uses plain JavaScript (no TypeScript), PropTypes is the right tool — it adds meaningful safety without requiring a build-step type system. The shared <code>taskShape</code> object demonstrates the key pattern: define a complex shape once, import or reference it everywhere. If the task schema changes, you update one definition and all components stay in sync.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>PropTypes is like input validation in a shell script: you check that the arguments you were given are what you expected before doing anything with them, and you print a clear error message if they&#8217;re not. Without it, a missing prop silently propagates until it causes a confusing crash ten function calls later. The <code>taskShape</code> constant is the equivalent of a shared schema file that every script imports — one source of truth for what a valid input looks like.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-task-shape">&#x1F52C; taskShape — shared PropTypes constant</a>
+      <a class="link-chip chip-commit" href="project-commits.html#commit-f2927cef">&#x1F4DC; f2927cef &#8212; PropTypes</a>
+    </div>
+  </section>
+  <!-- ══════════════════════════════════════════════════════════════ -->
   <section class="feat" id="fix-project-review">
     <div class="feat-header">
       <span class="feat-icon">🔍</span>
