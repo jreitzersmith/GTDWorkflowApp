@@ -22,7 +22,7 @@ const taskShape = PropTypes.shape({
   actualEffort: PropTypes.string,
   deferUntil:   PropTypes.string,
   notes:        PropTypes.string,
-  recurrence:   PropTypes.string,
+  recurrence:   PropTypes.object,
   parentId:     PropTypes.string,
   childIds:     PropTypes.arrayOf(PropTypes.string),
 });
@@ -6585,22 +6585,233 @@ function EmptyState({ bucket }) {
 // ---------------------------------------------------------------------------
 // TaskDetailPanel — side panel showing full task detail + notes editor
 // ---------------------------------------------------------------------------
+// ── TaskDetailPanel shared styles ─────────────────────────────────────────────
+const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
+const fieldInput = { width: "100%", background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", boxSizing: "border-box" };
+
+// ── ProjectSelector ───────────────────────────────────────────────────────────
+function ProjectSelector({ taskId, parentId, eligibleProjects, onReassignProject }) {
+  const [newProjMode, setNewProjMode] = useState(false);
+  const [newProjName, setNewProjName] = useState("");
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12 }}>
+      <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, marginTop: 5 }}>Project</span>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+        {!newProjMode ? (
+          <select
+            value={parentId || ""}
+            onChange={e => {
+              if (e.target.value === "__new__") {
+                setNewProjMode(true);
+                setNewProjName("");
+              } else {
+                onReassignProject(taskId, e.target.value || null);
+              }
+            }}
+            style={{ ...fieldInput, fontSize: 12, color: parentId ? COLORS.project : COLORS.muted }}
+          >
+            <option value="">— Standalone</option>
+            {eligibleProjects.map(p => (
+              <option key={p.id} value={p.id}>{p.text}</option>
+            ))}
+            <option value="__new__">＋ New project…</option>
+          </select>
+        ) : (
+          <div style={{ display: "flex", gap: 5 }}>
+            <input
+              autoFocus
+              value={newProjName}
+              onChange={e => setNewProjName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  const name = newProjName.trim();
+                  if (name) { onReassignProject(taskId, null, name); }
+                  setNewProjMode(false);
+                  setNewProjName("");
+                }
+                if (e.key === "Escape") { setNewProjMode(false); setNewProjName(""); }
+              }}
+              placeholder="Project name…"
+              style={{ ...fieldInput, flex: 1, fontSize: 12 }}
+            />
+            <button
+              onClick={() => {
+                const name = newProjName.trim();
+                if (name) { onReassignProject(taskId, null, name); }
+                setNewProjMode(false);
+                setNewProjName("");
+              }}
+              style={{ padding: "4px 8px", borderRadius: 5, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+            >✓</button>
+            <button
+              onClick={() => { setNewProjMode(false); setNewProjName(""); }}
+              style={{ padding: "4px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+            >✕</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+ProjectSelector.propTypes = {
+  taskId:            PropTypes.string.isRequired,
+  parentId:          PropTypes.string,
+  eligibleProjects:  PropTypes.arrayOf(taskShape).isRequired,
+  onReassignProject: PropTypes.func.isRequired,
+};
+
+// ── OriginalDueDateField ──────────────────────────────────────────────────────
+function OriginalDueDateField({ taskId, originalDueDate, onUpdate }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+      <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Orig. Due</span>
+      {editing ? (
+        confirming ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 11, color: COLORS.muted }}>Reset original due date to {draft}? This affects variance tracking.</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => { onUpdate(taskId, { originalDueDate: draft }); setEditing(false); setConfirming(false); }} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.next}`, background: 'transparent', color: COLORS.next, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Confirm</button>
+              <button onClick={() => { setEditing(false); setConfirming(false); }} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="date"
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
+            />
+            <button onClick={() => { if (draft) setConfirming(true); }} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.next}`, background: 'transparent', color: COLORS.next, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Set</button>
+            <button onClick={() => setEditing(false)} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>✕</button>
+          </div>
+        )
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ color: originalDueDate ? COLORS.text : COLORS.muted }}>
+            {originalDueDate || "—"}
+          </span>
+          <button
+            onClick={() => { setDraft(originalDueDate || ""); setEditing(true); }}
+            style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+          >edit</button>
+        </div>
+      )}
+    </div>
+  );
+}
+OriginalDueDateField.propTypes = {
+  taskId:          PropTypes.string.isRequired,
+  originalDueDate: PropTypes.string,
+  onUpdate:        PropTypes.func.isRequired,
+};
+
+// ── RecurrenceEditor ──────────────────────────────────────────────────────────
+function RecurrenceEditor({ rec, taskId, onUpdate }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, fontSize: 12 }}>Repeat</span>
+        <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 12 }}>
+          <input
+            type="checkbox"
+            checked={!!rec}
+            onChange={e => onUpdate(taskId, { recurrence: e.target.checked
+              ? { frequency: "weekly", interval: 1, rescheduleFrom: "completion", sendToInbox: false }
+              : null })}
+          />
+          {rec ? "Enabled" : "Off"}
+        </label>
+      </div>
+      {rec && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Every</span>
+            <input
+              type="number" min={1} max={99}
+              value={rec.interval || 1}
+              onChange={e => onUpdate(taskId, { recurrence: { ...rec, interval: Math.max(1, parseInt(e.target.value) || 1) } })}
+              style={{ ...fieldInput, width: 46, textAlign: "center", padding: "3px 4px", fontSize: 12 }}
+            />
+            <select
+              value={rec.frequency}
+              onChange={e => onUpdate(taskId, { recurrence: { ...rec, frequency: e.target.value, weekDays: e.target.value !== "weekly" ? undefined : rec.weekDays } })}
+              style={{ ...fieldInput, flex: 1, fontSize: 12, padding: "3px 6px" }}
+            >
+              <option value="daily">day(s)</option>
+              <option value="weekly">week(s)</option>
+              <option value="monthly">month(s)</option>
+              <option value="yearly">year(s)</option>
+            </select>
+          </div>
+          {rec.frequency === "weekly" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>On</span>
+              <div style={{ display: "flex", gap: 3 }}>
+                {["Su","Mo","Tu","We","Th","Fr","Sa"].map((day, i) => {
+                  const active = (rec.weekDays || []).includes(i);
+                  return (
+                    <button key={i} onClick={() => {
+                      const cur = rec.weekDays || [];
+                      const next = active ? cur.filter(x => x !== i) : [...cur, i].sort((a,b) => a-b);
+                      onUpdate(taskId, { recurrence: { ...rec, weekDays: next.length ? next : undefined } });
+                    }}
+                    style={{ width: 26, height: 22, borderRadius: 4, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + "22" : "transparent", color: active ? COLORS.project : COLORS.muted, fontSize: 10, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+                    >{day}</button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Until</span>
+            <input
+              type="date"
+              value={rec.until || ""}
+              onChange={e => onUpdate(taskId, { recurrence: { ...rec, until: e.target.value || undefined } })}
+              style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
+            />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Base on</span>
+            <select
+              value={rec.rescheduleFrom || "completion"}
+              onChange={e => onUpdate(taskId, { recurrence: { ...rec, rescheduleFrom: e.target.value } })}
+              style={{ ...fieldInput, flex: 1, fontSize: 12, padding: "3px 6px" }}
+            >
+              <option value="completion">Completion date</option>
+              <option value="dueDate">Original due date</option>
+            </select>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>On spawn</span>
+            <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+              <input type="checkbox" checked={!!rec.sendToInbox}
+                onChange={e => onUpdate(taskId, { recurrence: { ...rec, sendToInbox: e.target.checked } })} />
+              Send to Inbox
+            </label>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+RecurrenceEditor.propTypes = {
+  rec:      PropTypes.object,
+  taskId:   PropTypes.string.isRequired,
+  onUpdate: PropTypes.func.isRequired,
+};
+
+// ── TaskDetailPanel ───────────────────────────────────────────────────────────
 function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
   const [titleDraft, setTitleDraft] = useState(task.text);
   const [notesDraft, setNotesDraft] = useState(task.notes || "");
-  const [editingOriginalDue, setEditingOriginalDue] = useState(false);
-  const [originalDueDraft, setOriginalDueDraft] = useState("");
-  const [confirmOriginalDue, setConfirmOriginalDue] = useState(false);
-  // "New project" inline creation inside the Project dropdown
-  const [newProjMode, setNewProjMode] = useState(false);
-  const [newProjName, setNewProjName] = useState("");
-
   // Sync drafts if task changes (e.g. another panel opens a different task)
   useEffect(() => { setTitleDraft(task.text); }, [task.id, task.text]);
   useEffect(() => { setNotesDraft(task.notes || ""); }, [task.id, task.notes]);
-  useEffect(() => { setEditingOriginalDue(false); setConfirmOriginalDue(false); }, [task.id]);
-  useEffect(() => { setNewProjMode(false); setNewProjName(""); }, [task.id]);
-
   // Close on Escape key
   useEffect(() => {
     const handler = (e) => { if (e.key === "Escape") onClose(); };
@@ -6619,10 +6830,8 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
     if (val !== (task.notes || null)) onUpdate(task.id, { notes: val });
   };
 
-  const parentProject = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
   const bucketColor = BUCKETS[task.bucket]?.color || COLORS.muted;
   const bucketLabel = BUCKETS[task.bucket]?.label || task.bucket;
-  const rec = task.recurrence || null;
 
   // Build the list of projects the task can be assigned to.
   // Excludes: the task itself, and any of its descendants (would create a cycle).
@@ -6637,9 +6846,6 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
   const eligibleProjects = allTasks.filter(
     t => t.bucket === "project" && !t.parentId && !t.done && !excludedIds.has(t.id)
   );
-
-  const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
-  const fieldInput = { width: "100%", background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", boxSizing: "border-box" };
 
   return (
     <div style={{ ...style, background: COLORS.surface, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -6690,64 +6896,12 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
 
-          {/* Parent project — dropdown allows moving to another project, creating a new one, or going standalone */}
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, marginTop: 5 }}>Project</span>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
-              {!newProjMode ? (
-                <select
-                  value={task.parentId || ""}
-                  onChange={e => {
-                    if (e.target.value === "__new__") {
-                      setNewProjMode(true);
-                      setNewProjName("");
-                    } else {
-                      onReassignProject(task.id, e.target.value || null);
-                    }
-                  }}
-                  style={{ ...fieldInput, fontSize: 12, color: task.parentId ? COLORS.project : COLORS.muted }}
-                >
-                  <option value="">— Standalone</option>
-                  {eligibleProjects.map(p => (
-                    <option key={p.id} value={p.id}>{p.text}</option>
-                  ))}
-                  <option value="__new__">＋ New project…</option>
-                </select>
-              ) : (
-                <div style={{ display: "flex", gap: 5 }}>
-                  <input
-                    autoFocus
-                    value={newProjName}
-                    onChange={e => setNewProjName(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter") {
-                        const name = newProjName.trim();
-                        if (name) { onReassignProject(task.id, null, name); }
-                        setNewProjMode(false);
-                        setNewProjName("");
-                      }
-                      if (e.key === "Escape") { setNewProjMode(false); setNewProjName(""); }
-                    }}
-                    placeholder="Project name…"
-                    style={{ ...fieldInput, flex: 1, fontSize: 12 }}
-                  />
-                  <button
-                    onClick={() => {
-                      const name = newProjName.trim();
-                      if (name) { onReassignProject(task.id, null, name); }
-                      setNewProjMode(false);
-                      setNewProjName("");
-                    }}
-                    style={{ padding: "4px 8px", borderRadius: 5, border: `1px solid ${COLORS.project}`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
-                  >✓</button>
-                  <button
-                    onClick={() => { setNewProjMode(false); setNewProjName(""); }}
-                    style={{ padding: "4px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
-                  >✕</button>
-                </div>
-              )}
-            </div>
-          </div>
+          <ProjectSelector
+            taskId={task.id}
+            parentId={task.parentId}
+            eligibleProjects={eligibleProjects}
+            onReassignProject={onReassignProject}
+          />
 
           {/* Due date */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
@@ -6760,42 +6914,11 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             />
           </div>
 
-          {/* Original due date */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Orig. Due</span>
-            {editingOriginalDue ? (
-              confirmOriginalDue ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={{ fontSize: 11, color: COLORS.muted }}>Reset original due date to {originalDueDraft}? This affects variance tracking.</span>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => { onUpdate(task.id, { originalDueDate: originalDueDraft }); setEditingOriginalDue(false); setConfirmOriginalDue(false); }} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.next}`, background: 'transparent', color: COLORS.next, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Confirm</button>
-                    <button onClick={() => { setEditingOriginalDue(false); setConfirmOriginalDue(false); }} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <input
-                    type="date"
-                    value={originalDueDraft}
-                    onChange={e => setOriginalDueDraft(e.target.value)}
-                    style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
-                  />
-                  <button onClick={() => { if (originalDueDraft) setConfirmOriginalDue(true); }} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.next}`, background: 'transparent', color: COLORS.next, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Set</button>
-                  <button onClick={() => setEditingOriginalDue(false)} style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>✕</button>
-                </div>
-              )
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color: task.originalDueDate ? COLORS.text : COLORS.muted }}>
-                  {task.originalDueDate || "—"}
-                </span>
-                <button
-                  onClick={() => { setOriginalDueDraft(task.originalDueDate || ""); setEditingOriginalDue(true); }}
-                  style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
-                >edit</button>
-              </div>
-            )}
-          </div>
+          <OriginalDueDateField
+            taskId={task.id}
+            originalDueDate={task.originalDueDate}
+            onUpdate={onUpdate}
+          />
 
           {/* Completed date — read-only */}
           {task.completedDate && (
@@ -6821,91 +6944,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
           })()}
 
           {/* Recurrence */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, fontSize: 12 }}>Repeat</span>
-              <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={!!rec}
-                  onChange={e => onUpdate(task.id, { recurrence: e.target.checked
-                    ? { frequency: "weekly", interval: 1, rescheduleFrom: "completion", sendToInbox: false }
-                    : null })}
-                />
-                {rec ? "Enabled" : "Off"}
-              </label>
-            </div>
-            {rec && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                  <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Every</span>
-                  <input
-                    type="number" min={1} max={99}
-                    value={rec.interval || 1}
-                    onChange={e => onUpdate(task.id, { recurrence: { ...rec, interval: Math.max(1, parseInt(e.target.value) || 1) } })}
-                    style={{ ...fieldInput, width: 46, textAlign: "center", padding: "3px 4px", fontSize: 12 }}
-                  />
-                  <select
-                    value={rec.frequency}
-                    onChange={e => onUpdate(task.id, { recurrence: { ...rec, frequency: e.target.value, weekDays: e.target.value !== "weekly" ? undefined : rec.weekDays } })}
-                    style={{ ...fieldInput, flex: 1, fontSize: 12, padding: "3px 6px" }}
-                  >
-                    <option value="daily">day(s)</option>
-                    <option value="weekly">week(s)</option>
-                    <option value="monthly">month(s)</option>
-                    <option value="yearly">year(s)</option>
-                  </select>
-                </div>
-                {rec.frequency === "weekly" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                    <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>On</span>
-                    <div style={{ display: "flex", gap: 3 }}>
-                      {["Su","Mo","Tu","We","Th","Fr","Sa"].map((day, i) => {
-                        const active = (rec.weekDays || []).includes(i);
-                        return (
-                          <button key={i} onClick={() => {
-                            const cur = rec.weekDays || [];
-                            const next = active ? cur.filter(x => x !== i) : [...cur, i].sort((a,b) => a-b);
-                            onUpdate(task.id, { recurrence: { ...rec, weekDays: next.length ? next : undefined } });
-                          }}
-                          style={{ width: 26, height: 22, borderRadius: 4, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + "22" : "transparent", color: active ? COLORS.project : COLORS.muted, fontSize: 10, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
-                          >{day}</button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                  <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Until</span>
-                  <input
-                    type="date"
-                    value={rec.until || ""}
-                    onChange={e => onUpdate(task.id, { recurrence: { ...rec, until: e.target.value || undefined } })}
-                    style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
-                  />
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                  <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Base on</span>
-                  <select
-                    value={rec.rescheduleFrom || "completion"}
-                    onChange={e => onUpdate(task.id, { recurrence: { ...rec, rescheduleFrom: e.target.value } })}
-                    style={{ ...fieldInput, flex: 1, fontSize: 12, padding: "3px 6px" }}
-                  >
-                    <option value="completion">Completion date</option>
-                    <option value="dueDate">Original due date</option>
-                  </select>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                  <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>On spawn</span>
-                  <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                    <input type="checkbox" checked={!!rec.sendToInbox}
-                      onChange={e => onUpdate(task.id, { recurrence: { ...rec, sendToInbox: e.target.checked } })} />
-                    Send to Inbox
-                  </label>
-                </div>
-              </div>
-            )}
-          </div>
+          <RecurrenceEditor rec={task.recurrence || null} taskId={task.id} onUpdate={onUpdate} />
 
           {/* Defer until */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
