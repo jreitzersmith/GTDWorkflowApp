@@ -1,6 +1,8 @@
 // Pure task utilities: date helpers, recurrence, action-line parsers,
 // waterfall filter, group-by, effort helpers, and calibration context.
-// No React or API dependencies.
+import { useState, useRef, useEffect, useCallback } from "react";
+import { genId } from "../api/calendarApi.js";
+import { COLORS } from "../constants.jsx";
 
 // Returns today as "YYYY-MM-DD" in local time (for deferred-date comparisons).
 function todayStr() {

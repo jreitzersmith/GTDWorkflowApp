@@ -1,6 +1,8 @@
 // Gmail and web-search tool definitions and API helpers.
 // Pure async functions — no React dependencies.
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 // ── Web search tool (Tavily) — used by AI coach in Chat mode ─────────────────
 const TOOLS = [
   {
