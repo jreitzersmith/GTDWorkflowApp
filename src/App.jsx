@@ -1,5 +1,25 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Component } from "react";
 import { createClient } from "@supabase/supabase-js";
+import PropTypes from "prop-types";
+
+// Shared PropTypes shape for a task object — used across multiple components.
+const taskShape = PropTypes.shape({
+  id:           PropTypes.string.isRequired,
+  text:         PropTypes.string.isRequired,
+  bucket:       PropTypes.string.isRequired,
+  done:         PropTypes.bool.isRequired,
+  created:      PropTypes.string.isRequired,
+  priority:     PropTypes.arrayOf(PropTypes.string),
+  location:     PropTypes.arrayOf(PropTypes.string),
+  dueDate:      PropTypes.string,
+  effort:       PropTypes.string,
+  actualEffort: PropTypes.string,
+  deferUntil:   PropTypes.string,
+  notes:        PropTypes.string,
+  recurrence:   PropTypes.string,
+  parentId:     PropTypes.string,
+  childIds:     PropTypes.arrayOf(PropTypes.string),
+});
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -5204,6 +5224,36 @@ function TaskRow({ task, currentBucket, moveMenu, setMoveMenu, onComplete, onDel
   );
 }
 
+TaskRow.propTypes = {
+  task:                  taskShape.isRequired,
+  currentBucket:         PropTypes.string.isRequired,
+  moveMenu:              PropTypes.string,
+  setMoveMenu:           PropTypes.func.isRequired,
+  onComplete:            PropTypes.func.isRequired,
+  onDelete:              PropTypes.func.isRequired,
+  onMove:                PropTypes.func.isRequired,
+  onAskAI:               PropTypes.func.isRequired,
+  onUpdateTask:          PropTypes.func.isRequired,
+  pendingAction:         PropTypes.shape({ type: PropTypes.string, title: PropTypes.string }),
+  allTasks:              PropTypes.arrayOf(taskShape).isRequired,
+  onNavigate:            PropTypes.func,
+  isSubtask:             PropTypes.bool,
+  locations:             PropTypes.arrayOf(PropTypes.string).isRequired,
+  efforts:               PropTypes.arrayOf(PropTypes.string).isRequired,
+  onAssignToProject:     PropTypes.func,
+  tagDisplay:            PropTypes.string.isRequired,
+  indentOverride:        PropTypes.number,
+  depth:                 PropTypes.number,
+  collapsedNodes:        PropTypes.instanceOf(Set).isRequired,
+  onToggleCollapse:      PropTypes.func.isRequired,
+  onToggleCollapseLevel: PropTypes.func.isRequired,
+  onOpenDetail:          PropTypes.func.isRequired,
+  selectedTaskId:        PropTypes.string,
+  onSkipRecurrence:      PropTypes.func,
+  onSelect:              PropTypes.func,
+  isSelected:            PropTypes.bool,
+};
+
 function ActionBtn({ children, onClick, color }) {
   const [hover, setHover] = useState(false);
   return (
@@ -5548,6 +5598,23 @@ function MetadataReviewBar({ suggestions, onToggleAccepted, onChangeOverride, on
   );
 }
 
+MetadataReviewBar.propTypes = {
+  suggestions: PropTypes.arrayOf(PropTypes.shape({
+    taskId:    PropTypes.string.isRequired,
+    taskText:  PropTypes.string.isRequired,
+    field:     PropTypes.string.isRequired,
+    value:     PropTypes.string.isRequired,
+    accepted:  PropTypes.bool.isRequired,
+    override:  PropTypes.string,
+  })).isRequired,
+  onToggleAccepted: PropTypes.func.isRequired,
+  onChangeOverride: PropTypes.func.isRequired,
+  onNext:           PropTypes.func.isRequired,
+  onSkip:           PropTypes.func.isRequired,
+  projectIdx:       PropTypes.number.isRequired,
+  totalProjects:    PropTypes.number.isRequired,
+};
+
 function ProjectReviewBar({ suggestions, onToggle, onNext, onSkip, projectIdx, totalProjects }) {
   const selectedCount = suggestions.filter(s => s.checked).length;
   const isEmpty = suggestions.length === 0;
@@ -5602,6 +5669,18 @@ function ProjectReviewBar({ suggestions, onToggle, onNext, onSkip, projectIdx, t
   );
 }
 
+ProjectReviewBar.propTypes = {
+  suggestions: PropTypes.arrayOf(PropTypes.shape({
+    text:    PropTypes.string.isRequired,
+    checked: PropTypes.bool.isRequired,
+  })).isRequired,
+  onToggle:      PropTypes.func.isRequired,
+  onNext:        PropTypes.func.isRequired,
+  onSkip:        PropTypes.func.isRequired,
+  projectIdx:    PropTypes.number.isRequired,
+  totalProjects: PropTypes.number.isRequired,
+};
+
 function ProviderSelector({ provider, setProvider, localModel, setLocalModel, availableModels, fetchModels }) {
   const [open, setOpen] = useState(false);
 
@@ -5653,6 +5732,15 @@ function ProviderSelector({ provider, setProvider, localModel, setLocalModel, av
     </div>
   );
 }
+
+ProviderSelector.propTypes = {
+  provider:        PropTypes.string.isRequired,
+  setProvider:     PropTypes.func.isRequired,
+  localModel:      PropTypes.string.isRequired,
+  setLocalModel:   PropTypes.func.isRequired,
+  availableModels: PropTypes.arrayOf(PropTypes.string).isRequired,
+  fetchModels:     PropTypes.func.isRequired,
+};
 
 function ProviderOption({ label, icon, color, active, onClick }) {
   const [hover, setHover] = useState(false);
@@ -6005,6 +6093,36 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
     </div>
   );
 }
+
+SettingsPanel.propTypes = {
+  locations:                  PropTypes.arrayOf(PropTypes.string).isRequired,
+  tasks:                      PropTypes.arrayOf(taskShape).isRequired,
+  onAdd:                      PropTypes.func.isRequired,
+  onRename:                   PropTypes.func.isRequired,
+  onRemove:                   PropTypes.func.isRequired,
+  efforts:                    PropTypes.arrayOf(PropTypes.string).isRequired,
+  onAddEffort:                PropTypes.func.isRequired,
+  onRenameEffort:             PropTypes.func.isRequired,
+  onRemoveEffort:             PropTypes.func.isRequired,
+  calibrationOverrides:       PropTypes.objectOf(PropTypes.number).isRequired,
+  onSetCalibrationOverride:   PropTypes.func.isRequired,
+  onClearCalibrationOverride: PropTypes.func.isRequired,
+  tagDisplay:                 PropTypes.string.isRequired,
+  onSetTagDisplay:            PropTypes.func.isRequired,
+  onExport:                   PropTypes.func.isRequired,
+  onImport:                   PropTypes.func.isRequired,
+  onClose:                    PropTypes.func.isRequired,
+  googleToken:                PropTypes.string,
+  googleScope:                PropTypes.string,
+  onConnectGmail:             PropTypes.func.isRequired,
+  onDisconnectGmail:          PropTypes.func.isRequired,
+  gmailError:                 PropTypes.string,
+  calendarEnabled:            PropTypes.bool.isRequired,
+  onConnectCalendar:          PropTypes.func.isRequired,
+  onDisconnectCalendar:       PropTypes.func.isRequired,
+  recurringReviewDays:        PropTypes.number.isRequired,
+  onSetRecurringReviewDays:   PropTypes.func.isRequired,
+};
 
 function TagDisplaySetting({ value, onChange }) {
   const opts = [
@@ -6958,6 +7076,20 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
   );
 }
 
+TaskDetailPanel.propTypes = {
+  task:              taskShape.isRequired,
+  allTasks:          PropTypes.arrayOf(taskShape).isRequired,
+  locations:         PropTypes.arrayOf(PropTypes.string).isRequired,
+  efforts:           PropTypes.arrayOf(PropTypes.string).isRequired,
+  onUpdate:          PropTypes.func.isRequired,
+  onComplete:        PropTypes.func.isRequired,
+  onDelete:          PropTypes.func.isRequired,
+  onReassignProject: PropTypes.func.isRequired,
+  onSkipRecurrence:  PropTypes.func,
+  onClose:           PropTypes.func.isRequired,
+  style:             PropTypes.object,
+};
+
 // ── Email Management View ─────────────────────────────────────────────────────
 
 function avatarInitials(name) {
@@ -7618,6 +7750,19 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
   );
 }
 
+EmailManagementView.propTypes = {
+  googleToken:        PropTypes.string.isRequired,
+  googleScope:        PropTypes.string,
+  gmailQueue:         PropTypes.arrayOf(PropTypes.object).isRequired,
+  setGmailQueue:      PropTypes.func.isRequired,
+  emailTab:           PropTypes.string.isRequired,
+  setEmailTab:        PropTypes.func.isRequired,
+  tasks:              PropTypes.arrayOf(taskShape).isRequired,
+  processEmailWithAI: PropTypes.func.isRequired,
+  openCoachChat:      PropTypes.func.isRequired,
+  authUser:           PropTypes.object,
+};
+
 // ── CalendarSuggestionsBar ───────────────────────────────────────────────────
 const BUCKET_OPTS = [
   { key: 'inbox',   label: 'Inbox' },
@@ -7854,6 +7999,19 @@ function CalendarSuggestionsBar({ suggestions, onToggle, onChangeBucket, onAccep
     </div>
   );
 }
+
+CalendarSuggestionsBar.propTypes = {
+  suggestions: PropTypes.arrayOf(PropTypes.shape({
+    id:      PropTypes.string.isRequired,
+    text:    PropTypes.string.isRequired,
+    checked: PropTypes.bool.isRequired,
+    bucket:  PropTypes.string.isRequired,
+  })).isRequired,
+  onToggle:       PropTypes.func.isRequired,
+  onChangeBucket: PropTypes.func.isRequired,
+  onAccept:       PropTypes.func.isRequired,
+  onDismiss:      PropTypes.func.isRequired,
+};
 
 // ── CalendarManagementView ───────────────────────────────────────────────────
 

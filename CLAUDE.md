@@ -89,6 +89,11 @@ Every task object: `{ id, text, bucket, done, created, priority[], location[], d
 4. Todoist export / two-way sync
 5. Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
 6. Multi-device sync (Supabase or similar)
+7. Dark-theme checkboxes — native browser checkboxes throughout the app don't respect the dark theme; replace with styled custom checkboxes consistent with the COLORS token system
+8. Remove "Process with AI" button from the left sidebar navigation panel
+9. Daily Review button (replaces "Process with AI" in sidebar) — context-aware: shows "Start Day" in the morning or if the start-of-day review hasn't run yet that calendar day; shows "End Day" in the afternoon/evening or after start-of-day completes. Button label/icon changes to reflect state. Must handle incomplete/interrupted start-of-day reviews gracefully. Persist daily review state (last run date + phase) in localStorage.
+10. AI-assisted daily planning — evaluate calendar + task list to build an optimized daily todo list; accounts for effort estimates on tasks and adds travel time estimates for external/offsite calendar events. Likely a new AI coach mode.
+11. Shopping list manager — lightweight tool for managing shopping lists, likely as a new bucket or sidebar section distinct from the GTD task buckets
 
 ## API Key setup (local dev)
 Create a `.env` file:
