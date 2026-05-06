@@ -94,6 +94,8 @@ Every task object: `{ id, text, bucket, done, created, priority[], location[], d
 9. Daily Review button (replaces "Process with AI" in sidebar) — context-aware: shows "Start Day" in the morning or if the start-of-day review hasn't run yet that calendar day; shows "End Day" in the afternoon/evening or after start-of-day completes. Button label/icon changes to reflect state. Must handle incomplete/interrupted start-of-day reviews gracefully. Persist daily review state (last run date + phase) in localStorage.
 10. AI-assisted daily planning — evaluate calendar + task list to build an optimized daily todo list; accounts for effort estimates on tasks and adds travel time estimates for external/offsite calendar events. Likely a new AI coach mode.
 11. Shopping list manager — lightweight tool for managing shopping lists, likely as a new bucket or sidebar section distinct from the GTD task buckets
+12. Gmail inbox financial detail capture — when processing emails, extract any financial details (amounts, due dates, account references) and export them to a Google Sheet in Google Drive
+13. Gmail inbox rate limiting — inbox metadata fetches hit Gmail's 429 rate limit when loading many messages in parallel; add request queuing / exponential backoff to eliminate the errors
 
 ## API Key setup (local dev)
 Create a `.env` file:
