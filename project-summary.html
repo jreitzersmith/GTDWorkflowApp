@@ -2698,3 +2698,31 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-commit" href="project-commits.html#commit-f8772d59">&#x1F4DC; f8772d59 &mdash; TaskDetailPanel split</a>
     </div>
   </section>
+<!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-taskrow-split">
+    <div class="feat-header">
+      <span class="feat-icon">&#x1F5C2;</span>
+      <span class="feat-title">Code Quality 2e &mdash; TaskRow.jsx Split</span>
+      <span class="feat-badge badge-refactor">Refactor &mdash; May 7</span>
+    </div>
+    <div class="feat-desc">
+      <p><code>TaskRow.jsx</code> was 553 lines and exported five unrelated symbols: <code>BucketItem</code>, <code>SidebarBtn</code>, <code>Btn</code>, <code>PRIORITIES</code>, and <code>TaskRow</code>. The first three are sidebar and generic UI primitives that had no semantic connection to task rows &mdash; they were there for historical reasons only.</p>
+      <p>The split produced two files:</p>
+      <ul>
+        <li><strong>SidebarComponents.jsx</strong> (~66 lines) &mdash; <code>BucketItem</code> (renders a single bucket navigation item in the left sidebar), <code>SidebarBtn</code> (primary/secondary sidebar action button with hover state), and <code>Btn</code> (generic action button used in various panels). PropTypes added to all three.</li>
+        <li><strong>TaskRow.jsx</strong> (~513 lines, was 553) &mdash; now exports only <code>PRIORITIES</code> (the constant array) and <code>TaskRow</code> (the task list row component with its expanded metadata and assign-to-project panels).</li>
+      </ul>
+      <p>App.jsx import updated from a single line pulling five names from <code>TaskRow.jsx</code> to two lines &mdash; one per file. No runtime behaviour changed.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: Module Cohesion</h4>
+      <p>A module is cohesive when every export serves the same purpose. <code>BucketItem</code> renders sidebar navigation; <code>TaskRow</code> renders a task in a list. These are different responsibilities, different rendering contexts, and different reasons to change. Keeping them in one file creates a false coupling &mdash; a change to the sidebar forces a reader to wade through hundreds of lines of task-row rendering logic to find what they need. <code>SidebarComponents.jsx</code> groups things by what they <em>are</em>, not by what file they happened to land in first.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Finding <code>BucketItem</code> in <code>TaskRow.jsx</code> is like finding your <code>nginx.conf</code> inside the <code>postgresql</code> config directory because someone edited them in the same session. The files work, but the location is a lie. Good filesystem hygiene means each file lives where its name says it should &mdash; and the same principle applies to React source files.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-f7c23b3">&#x1F4DC; f7c23b3 &mdash; TaskRow split</a>
+    </div>
+  </section>

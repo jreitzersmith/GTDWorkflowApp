@@ -5218,3 +5218,21 @@ import { UsagePanel } from "./components/UsagePanel.jsx";
   <div class="annotation"><strong>Re-exports hide the real location.</strong> When <code>UsagePanel</code> was exported from <code>SettingsPanel.jsx</code>, the import path gave a false address. Direct imports are self-documenting — the path is the definition's home.</div>
   <div class="snip-back"><a href="project-summary.html#refactor-settings-split">&#8593; Refactor: Settings Split</a></div>
 </div>
+<div class="snip-card" id="snip-taskrow-split">
+  <div class="snip-header">
+    <span class="snip-title">TaskRow split — import map before and after</span>
+    <span class="snip-file">src/App.jsx — import block</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Before (five unrelated symbols from one file):
+import { BucketItem, SidebarBtn, Btn, PRIORITIES, TaskRow } from "./components/TaskRow.jsx";
+
+// After (each file exports what it is):
+import { BucketItem, SidebarBtn, Btn } from "./components/SidebarComponents.jsx";
+import { PRIORITIES, TaskRow } from "./components/TaskRow.jsx";
+
+// New file map:
+// SidebarComponents.jsx  — BucketItem, SidebarBtn, Btn (~66 lines)
+// TaskRow.jsx            — PRIORITIES, TaskRow (553 → 513 lines)</code></pre></div>
+  <div class="annotation"><strong>The filename is the documentation.</strong> A reader looking for sidebar components now has an obvious destination. The import line itself answers "where does this come from?" without needing to grep or open a barrel file.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-taskrow-split">&#8593; Refactor: TaskRow Split</a></div>
+</div>

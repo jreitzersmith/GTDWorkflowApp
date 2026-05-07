@@ -244,6 +244,7 @@
   <a href="#commit-df93c016">df93c016 · refactor: SettingsPanel.jsx split (2b)</a>
   <a href="#commit-de6e25ea">de6e25ea · refactor: email.jsx split (2c)</a>
   <a href="#commit-f8772d59">f8772d59 · refactor: TaskDetailPanel.jsx split (2d)</a>
+  <a href="#commit-f7c23b3">f7c23b3 · refactor: extract SidebarComponents from TaskRow (2e)</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -2253,5 +2254,17 @@
   <div class="commit-lesson"><strong>Unused imports are a code smell.</strong> <code>DropLine</code> had been imported in App.jsx since the component was first extracted, but App.jsx never rendered it directly &mdash; it was only used inside <code>ProjectTree</code>. The split forced an explicit review of what was actually needed, surfacing the dead import. Removing it keeps the dependency graph honest.</div>
   <div class="commit-back"><a href="project-summary.html#refactor-taskdetail-split">&#8593; Refactor: TaskDetailPanel Split</a></div>
 </div>
-
-
+<!-- f7c23b3 -->
+<div class="commit-entry" id="commit-f7c23b3">
+  <div class="commit-top">
+    <span class="commit-hash">f7c23b3</span>
+    <span class="commit-date">2026-05-07</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: extract SidebarComponents from TaskRow.jsx (item 2e)</div>
+  <div class="commit-body">
+    New file: <strong>SidebarComponents.jsx</strong> (~66 lines) &mdash; <code>BucketItem</code> (sidebar nav item), <code>SidebarBtn</code> (primary/secondary sidebar button), <code>Btn</code> (generic action button). These three components had no semantic connection to task rows but were housed in <code>TaskRow.jsx</code> purely for historical reasons. <code>TaskRow.jsx</code> trimmed from 553 &rarr; 513 lines; now exports only <code>PRIORITIES</code> and <code>TaskRow</code>. App.jsx import split into two lines &mdash; one from each file.
+  </div>
+  <div class="commit-lesson"><strong>Wrong file is a silent lie.</strong> A component named <code>BucketItem</code> that renders the sidebar navigation has nothing to do with how individual tasks are displayed. Leaving it in <code>TaskRow.jsx</code> told every future reader a false story about where sidebar components live. Moving it to <code>SidebarComponents.jsx</code> makes the codebase self-documenting: the filename is the answer to &ldquo;where do I find the sidebar?&rdquo;</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-taskrow-split">&#8593; Refactor: TaskRow Split</a></div>
+</div>
