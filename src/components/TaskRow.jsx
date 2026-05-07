@@ -6,6 +6,7 @@ import {
   countDescendants, effortToMinutes, isDeferred,
   minutesToEffortLabel, sumDescendantEffort,
 } from "../utils/taskUtils.jsx";
+import { ActionBtn } from "./AICoach.jsx";
 
 function BucketItem({ bkey, cfg, count, active, onClick }) {
   return (
