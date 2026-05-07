@@ -13,7 +13,8 @@ import {
   ReviewModeBar, MetadataReviewBar, ProjectReviewBar,
   ProviderSelector, ProviderOption,
 } from "./components/AICoach.jsx";
-import { SettingsPanel, UsagePanel } from "./components/SettingsPanel.jsx";
+import { SettingsPanel } from "./components/SettingsPanel.jsx";
+import { UsagePanel } from "./components/UsagePanel.jsx";
 import {
   DropLine, CompletedTree, ProjectTree, GroupDivider, EmptyState,
   TaskDetailPanel,
