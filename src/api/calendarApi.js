@@ -207,10 +207,20 @@ async function doCalendarUpdateEvent(token, eventId, { summary, date, startTime,
   }
   if (attendees?.length) {
     // Fetch existing event to merge attendees (PATCH replaces, not appends)
-    const existing = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    ).then(r => r.json()).catch(() => ({}));
+    let existing = {};
+    try {
+      const existingRes = await fetch(
+        'https://www.googleapis.com/calendar/v3/calendars/primary/events/' + encodeURIComponent(eventId),
+        { headers: { Authorization: 'Bearer ' + token } }
+      );
+      if (existingRes.ok) {
+        existing = await existingRes.json().catch(() => ({}));
+      } else {
+        console.warn('Calendar API: could not fetch existing attendees for event ' + eventId + ' (' + existingRes.status + ') - new attendees will replace existing');
+      }
+    } catch (e) {
+      console.warn('Calendar API: attendee-merge GET failed for event ' + eventId + ' - new attendees will replace existing', e);
+    }
     const existingEmails = new Set((existing.attendees || []).map(a => a.email));
     const merged = [...(existing.attendees || []),
       ...attendees.filter(a => !existingEmails.has(a.email))];
@@ -280,12 +290,17 @@ function parseRecurrenceValue(val) {
 
 // Throws a descriptive error for non-ok API responses; otherwise returns parsed JSON.
 // Use as: const data = await parseApiResponse(res, 'Gmail API');
-async function parseApiResponse(res, label = 'API') {
+async function parseApiResponse(res, label) {
+  const lbl = label || 'API';
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    throw new Error(d.error?.message || `${label} ${res.status}`);
+    throw new Error(d.error?.message || (lbl + ' ' + res.status));
   }
-  return res.json();
+  try {
+    return await res.json();
+  } catch (err) {
+    throw new Error(lbl + ': unexpected response format');
+  }
 }
 
 

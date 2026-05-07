@@ -60,6 +60,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI }) {
   const [checkedIds, setCheckedIds] = useState(new Set());
   const [emailDetail, setEmailDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   // Load inbox on mount / when token changes
   useEffect(() => {
@@ -107,9 +108,10 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI }) {
           <button style={gmailBtnSm} onClick={() => { setInboxNextPageToken(null); loadInbox(null); }} disabled={inboxLoading}>↻ Refresh</button>
           {checkedIds.size > 0 && (
             <>
-              <button style={gmailBtnSmDanger} onClick={async () => {
+              <button style={gmailBtnSmDanger} disabled={archiving} onClick={async () => {
                 const ids = [...checkedIds];
                 if (googleScope !== 'full') { setInboxError('Archive requires Gmail write access — reconnect in Settings.'); return; }
+                setArchiving(true);
                 try {
                   await doGmailBatchLabel(ids, [], ['INBOX'], googleToken);
                   setInboxEmails(prev => prev.filter(e => !checkedIds.has(e.id)));
@@ -117,8 +119,10 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI }) {
                   if (checkedIds.has(selectedId)) setSelectedId(null);
                 } catch (e) {
                   setInboxError(`Archive failed: ${e.message}`);
+                } finally {
+                  setArchiving(false);
                 }
-              }}>Archive ({checkedIds.size})</button>
+              }}>{archiving ? 'Archiving…' : `Archive (${checkedIds.size})`}</button>
               <button style={gmailBtnPrimary} onClick={() => {
                 const email = emailDetail || inboxEmails.find(e => e.id === [...checkedIds][0]);
                 if (email) processEmailWithAI(email);
@@ -204,17 +208,21 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI }) {
                   Process with AI ↗
                 </button>
                 <button style={{ ...gmailBtn(), textAlign: 'left' }}
+                  disabled={archiving}
                   onClick={async () => {
                     if (googleScope !== 'full') { setInboxError('Archive requires Gmail write access — reconnect in Settings.'); return; }
+                    setArchiving(true);
                     try {
                       await doGmailBatchLabel([selectedId], [], ['INBOX'], googleToken);
                       setInboxEmails(prev => prev.filter(e => e.id !== selectedId));
                       setSelectedId(null);
                     } catch (e) {
                       setInboxError(`Archive failed: ${e.message}`);
+                    } finally {
+                      setArchiving(false);
                     }
                   }}>
-                  Archive
+                  {archiving ? 'Archiving…' : 'Archive'}
                 </button>
                 <button style={{ ...gmailBtn(), textAlign: 'left', color: COLORS.muted }} onClick={() => setSelectedId(null)}>Close</button>
               </div>
@@ -437,6 +445,7 @@ function EmailRulesPanel({ googleToken, googleScope }) {
   const [gmailFilters, setGmailFilters] = useState([]);
   const [rulesLoading, setRulesLoading] = useState(false);
   const [rulesError, setRulesError] = useState(null);
+  const [deletingFilterId, setDeletingFilterId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [labelsOpen, setLabelsOpen] = useState(true);
   const [labelFilter, setLabelFilter] = useState('');
@@ -457,7 +466,7 @@ function EmailRulesPanel({ googleToken, googleScope }) {
       ]);
       setGmailLabels(labels.filter(l => !l.type || l.type === 'user'));
       setGmailFilters(filters);
-    } catch (e) { console.error('Rules load error', e); }
+    } catch (e) { setRulesError(e.message); }
     finally { setRulesLoading(false); }
   };
 
@@ -536,15 +545,18 @@ function EmailRulesPanel({ googleToken, googleScope }) {
                     ))}
                   </div>
                 </div>
-                <button style={gmailBtnSmDanger} onClick={async () => {
+                <button style={gmailBtnSmDanger} disabled={deletingFilterId === f.id} onClick={async () => {
                   if (googleScope !== 'full') { setRulesError('Deleting filters requires Gmail write access — reconnect in Settings.'); return; }
+                  setDeletingFilterId(f.id);
                   try {
                     await doGmailDeleteFilter(f.id, googleToken);
                     setGmailFilters(prev => prev.filter(x => x.id !== f.id));
                   } catch (e) {
                     setRulesError(`Delete failed: ${e.message}`);
+                  } finally {
+                    setDeletingFilterId(null);
                   }
-                }}>Delete</button>
+                }}>{deletingFilterId === f.id ? 'Deleting…' : 'Delete'}</button>
               </div>
             );
           }); })()}
