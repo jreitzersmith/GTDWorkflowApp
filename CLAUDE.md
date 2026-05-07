@@ -301,6 +301,7 @@ Every task object: `{ id, text, bucket, done, created, priority[], location[], d
 6. Brain Dump auto-capture (AI extracts items and adds them directly to Inbox)
 7. Daily focus view (pick 3 Most Important Tasks from Next Actions)
 8. Inbox Process mode — AI identifies co-related tasks during inbox processing and suggests grouping them into an existing project or a new one (similar to the calendar-event grouping flow)
+8a. "Add & Ask AI" single-task scope — currently the button adds the task to Inbox then hands off to `processNextInboxItem`, which after the user confirms the move auto-chains to the next inbox item via `handleConfirmMove`. It should stop after the one task. Fix: add a `singleTaskMode` flag (or a dedicated `processSingleTask` function) that skips the auto-continue branch in `handleConfirmMove`.
 9. Todoist export / two-way sync
 10. Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
 11. ~~Multi-device sync~~ — **done (Supabase)**

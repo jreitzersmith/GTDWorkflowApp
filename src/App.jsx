@@ -6,7 +6,8 @@ import { EmailManagementView } from "./components/email.jsx";
 import { InboxBulkBar, ProjectGroupSuggestionBar } from "./components/InboxBars.jsx";
 import { CalendarSuggestionsBar } from "./components/CalendarSuggestionsBar.jsx";
 import { CalendarManagementView } from "./components/CalendarManagementView.jsx";
-import { BucketItem, SidebarBtn, Btn, PRIORITIES, TaskRow } from "./components/TaskRow.jsx";
+import { BucketItem, SidebarBtn, Btn } from "./components/SidebarComponents.jsx";
+import { PRIORITIES, TaskRow } from "./components/TaskRow.jsx";
 import {
   ActionBtn, RecurringReviewCard, ChatBubble, TypingIndicator,
   PendingActionBar, DeferCheckPrompt, NoteRollupPrompt, ActualEffortPrompt,
