@@ -4416,6 +4416,47 @@ const handleReschedule = async () =&gt; {
   <div class="annotation"><strong>Parameter-free hooks keep call order flexible.</strong> Passing <code>googleToken</code> as a parameter would force the call site to compute it first, which in turn would require reordering the hook calls in GTDManager. By keeping the hook parameter-free and leaving the token-dependent effects in GTDManager, the hook can be called anywhere in the component without introducing ordering constraints.</div>
   <div class="snip-back"><a href="project-summary.html#refactor-cal-gmail-hooks">&#8593; Refactor: Cal/Gmail Hook Extraction</a></div>
 </div>
+
+<div class="snip-entry" id="snip-async-errors">
+  <div class="snip-header">doWebSearch — before and after error wrapping</div>
+  <div class="snip-code"><pre><code class="language-js">// BEFORE — error escapes the callAI loop; Claude never gets a tool result
+if (toolUse.name === "web_search") {
+  const result = await doWebSearch(query);   // throws → loop aborts
+  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
+}
+
+// AFTER — error becomes an is_error tool result; loop continues
+if (toolUse.name === "web_search") {
+  try {
+    const result = await doWebSearch(query);
+    toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
+  } catch (e) {
+    toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message });
+  }
+}</code></pre></div>
+  <div class="annotation"><strong>The same fix was applied to doGmailSearch, doGmailCompose, and doGmailSend.</strong> All other tool handlers in the same block already used this pattern — these four were the outliers.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-async-errors">&#8593; Code Quality: Async Error Handling</a></div>
+</div>
+
+<div class="snip-entry" id="snip-calendar-split">
+  <div class="snip-header">calendar.jsx — file structure before and after the split</div>
+  <div class="snip-code"><pre><code class="language-text">// BEFORE — one 830-line file
+src/components/
+  calendar.jsx          (830 lines — CalendarSuggestionsBar, CalendarManagementView,
+                          CalendarNewEventsSection, CalendarPendingTasksSection,
+                          EventChip, EventDetailPanel, CalendarMonthView,
+                          CalendarWeekView, CalendarDayView + constants/utils)
+
+// AFTER — four focused files
+src/components/
+  CalendarSuggestionsBar.jsx       ( 73 lines — AI coach suggestions bar)
+  CalendarManagementSections.jsx   (128 lines — new-events panel + pending-tasks panel)
+  CalendarEventDisplay.jsx         (317 lines — EventChip, EventDetailPanel, 3 views, utils)
+  CalendarManagementView.jsx       (325 lines — main container, state, API calls)
+  calendar.jsx                     (  2 lines — tombstone comment)</code></pre></div>
+  <div class="annotation"><strong>Latent bug fixed during the split:</strong> <code>CalendarSuggestionsBar</code> used <code>BUCKET_OPTS</code> (from <code>InboxBars.jsx</code>) without importing it. In the new standalone file the missing import was immediately obvious and corrected.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-calendar-split">&#8593; Code Quality: calendar.jsx Split</a></div>
+</div>
 </body>
 </html>
 
