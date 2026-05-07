@@ -333,6 +333,12 @@
     <li><a href="#fix-sort-locations">Location List Sort</a></li>
   </ul>
 
+  <div class="section-label">May 7 &#8212; Refactors</div>
+  <ul>
+    <li><a href="#refactor-calendar-split">Calendar Split (2a)</a></li>
+    <li><a href="#refactor-settings-split">Settings Split (2b)</a></li>
+  </ul>
+
 </aside>
 
 <!-- MAIN -->
@@ -2571,5 +2577,96 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-snippet" href="project-snippets.html#snip-skip-review">&#x1F52C; skipProjectReview + skipMetadataReview callbacks</a>
       <a class="link-chip chip-commit" href="project-commits.html#commit-75e7d1a">&#x1F4DC; 75e7d1a &#8212; dedup + metadata skip</a>
       <a class="link-chip chip-commit" href="project-commits.html#commit-9b37c54">&#x1F4DC; 9b37c54 &#8212; task mode skip</a>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-calendar-split">
+    <div class="feat-header">
+      <span class="feat-icon">📅</span>
+      <span class="feat-title">Code Quality 2a — calendar.jsx Split</span>
+      <span class="feat-badge badge-refactor">Refactor &#8212; May 7</span>
+    </div>
+    <div class="feat-desc">
+      <p><code>calendar.jsx</code> was 830 lines and exported eight components with mixed responsibilities. It was split into four focused files:</p>
+      <ul>
+        <li><strong>CalendarSuggestionsBar.jsx</strong> (~73 lines) — the dismissible suggestion chips bar that appears above the calendar when the AI detects tasks to schedule.</li>
+        <li><strong>CalendarManagementSections.jsx</strong> (~128 lines) — two collapsible sections: new-events-from-tasks and pending-tasks-with-due-dates.</li>
+        <li><strong>CalendarEventDisplay.jsx</strong> (~317 lines) — all calendar view rendering: month grid, week view, day view, event chips, and the event detail panel.</li>
+        <li><strong>CalendarManagementView.jsx</strong> (~325 lines) — the container component: owns state, API calls, event CRUD, navigation, and composes the display components.</li>
+      </ul>
+      <p>The original <code>calendar.jsx</code> was replaced with a two-line tombstone comment. App.jsx imports were updated from one combined import to two targeted imports.</p>
+      <p>A latent bug was also fixed during the split: <code>CalendarSuggestionsBar</code> was using <code>BUCKET_OPTS</code> (defined in <code>InboxBars.jsx</code>) without importing it. It silently passed because suggestions are usually empty; the new file required an explicit import which surfaces the dependency correctly.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: Presentational vs Container Components</h4>
+      <p>A container component owns state and data-fetching; it knows <em>what</em> the data is. A presentational component receives data via props and renders UI; it knows <em>how</em> to display it. <code>CalendarManagementView</code> is the container — it calls the Google Calendar API, manages event state, and handles CRUD. <code>CalendarEventDisplay</code> and <code>CalendarManagementSections</code> are presentational — they receive events as props and render them. Separating them makes the display components independently testable and reusable.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>A 830-line single file is like a shell script that does authentication, business logic, formatting, and output all in one. Splitting it is the same discipline as breaking that script into sourced libraries — each library has one job. The tombstone comment left in the original file is the equivalent of a symlink with a note: "the real thing is over there now."</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-cal-split">&#x1F4DC; commit &#8212; calendar.jsx split</a>
+    </div>
+  </section>
+  
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-email-split">
+    <div class="feat-header">
+      <span class="feat-icon">&#x1F4E7;</span>
+      <span class="feat-title">Code Quality 2c &mdash; email.jsx Split</span>
+      <span class="feat-badge badge-refactor">Refactor &mdash; May 7</span>
+    </div>
+    <div class="feat-desc">
+      <p><code>email.jsx</code> was 724 lines containing five distinct concerns: shared utilities, inbox list UI, bulk-action queue, Gmail rules viewer, and the top-level tab container. It was split into five files:</p>
+      <ul>
+        <li><strong>emailUtils.js</strong> (~50 lines) &mdash; shared pure utilities (<code>sleep</code>, <code>avatarInitials</code>, <code>avatarColor</code>, <code>formatEmailDate</code>) and shared button style constants (<code>gmailBtn</code>, <code>gmailBtnPrimary</code>, <code>gmailBtnSm</code>, <code>gmailBtnSmDanger</code>). A plain <code>.js</code> module (no JSX) consumed by all three panel components.</li>
+        <li><strong>EmailInboxPanel.jsx</strong> (~185 lines) &mdash; inbox list with checkboxes, avatar chips, pagination, and a 300px detail slide-out panel. Handles per-message body fetching and bulk archive.</li>
+        <li><strong>EmailCleanupPanel.jsx</strong> (~200 lines) &mdash; bulk-action queue with newsletter and promotional discovery prompts. Runs Gmail searches, creates labels and filters, persists entries to Supabase.</li>
+        <li><strong>EmailRulesPanel.jsx</strong> (~195 lines) &mdash; Gmail filters and labels viewer with search inputs and alphabetical letter quicklinks. Supports filter deletion when the Gmail write scope is active.</li>
+        <li><strong>email.jsx</strong> (~60 lines, was 724) &mdash; trimmed to the <code>EmailManagementView</code> tab container only. Imports and renders the three panels above based on <code>emailTab</code> state. Also removed a stale <code>// ── CalendarSuggestionsBar</code> comment left over from the 2a calendar split.</li>
+      </ul>
+      <p>App.jsx needed no changes &mdash; it already imported only <code>{ EmailManagementView }</code> from <code>email.jsx</code>. The other symbols (<code>AVATAR_COLORS</code>, <code>EmailInboxPanel</code>, etc.) had no external consumers and were simply removed from the export list.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: Extracting a Shared Utility Module</h4>
+      <p>When multiple components need the same helper functions or style constants, the right move is a plain <code>.js</code> utility module &mdash; not a component file with JSX, not copy-pasted duplicates. <code>emailUtils.js</code> exports pure functions and plain objects. Any component can import exactly what it needs. Because there is no JSX and no React state, the module is trivially testable in isolation without mounting anything.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Think of <code>emailUtils.js</code> as a shared shell library (<code>lib/email-utils.sh</code>) that defines common functions like <code>format_date()</code> and color variables. Every script that handles email sources it. Without the library, each script would define its own <code>format_date()</code> &mdash; three slightly different implementations that diverge over time. The library is the single source of truth; the scripts are the consumers.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-de6e25ea">&#x1F4DC; de6e25ea &mdash; email.jsx split</a>
+    </div>
+  </section>
+<!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-settings-split">
+    <div class="feat-header">
+      <span class="feat-icon">⚙</span>
+      <span class="feat-title">Code Quality 2b — SettingsPanel.jsx Split</span>
+      <span class="feat-badge badge-refactor">Refactor &#8212; May 7</span>
+    </div>
+    <div class="feat-desc">
+      <p><code>SettingsPanel.jsx</code> was 760 lines containing six distinct components with no separation between the general-purpose wrapper, the standalone usage view, and the settings-specific manager widgets. It was split into four files:</p>
+      <ul>
+        <li><strong>SettingsSection.jsx</strong> (~35 lines) — the generic collapsible section wrapper used throughout the settings panel. Persists open/closed state to <code>localStorage</code> via a <code>storageKey</code> prop. Now has its own <code>PropTypes</code> definition.</li>
+        <li><strong>UsagePanel.jsx</strong> (~130 lines) — the standalone AI usage stats view (lifetime totals, by-provider breakdown, by-mode table, clear button). Exported directly; App.jsx now imports it from here rather than as a re-export.</li>
+        <li><strong>SettingsManagerComponents.jsx</strong> (~290 lines) — four settings-specific components: <code>TagDisplaySetting</code> (inline vs. below toggle), <code>LocationManager</code> (CRUD with cascade rename/remove), <code>EffortManager</code> (CRUD for effort levels), and <code>EffortCalibrationManager</code> (auto-stats grid with manual overrides).</li>
+        <li><strong>SettingsPanel.jsx</strong> (~230 lines, was 760) — trimmed to the main container: header, file-import ref, Gmail/Calendar/WeeklyReview/Backup sections, and the <code>SettingsSection</code> wrappers around the manager components.</li>
+      </ul>
+      <p>App.jsx was updated (Option B): <code>UsagePanel</code> is now imported directly from <code>UsagePanel.jsx</code> rather than via a re-export from <code>SettingsPanel.jsx</code>. Re-exporting is a code smell — it hides where a symbol actually lives.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: Re-exports vs Direct Imports</h4>
+      <p>A re-export (<code>export { X } from "./other"</code>) lets consumers import from a single barrel file. This feels convenient but has a cost: the import path no longer tells you where the code is defined. When <code>App.jsx</code> imported <code>UsagePanel</code> from <code>SettingsPanel.jsx</code>, a future reader would have to open <code>SettingsPanel.jsx</code> to discover the real home. Direct imports — one import path per definition — are more honest. The extra import line is a worthwhile trade-off.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>A re-export is like a symlink pointing to another symlink — it works, but resolving where the actual file lives requires following the chain. Direct imports are canonical paths: you always know exactly what you're loading and where it came from. In a large codebase, a chain of re-exports can hide accidental circular dependencies; direct imports make the dependency graph transparent.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-df93c016">&#x1F4DC; df93c016 &#8212; SettingsPanel split</a>
     </div>
   </section>

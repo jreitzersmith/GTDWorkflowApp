@@ -4457,6 +4457,36 @@ src/components/
   <div class="annotation"><strong>Latent bug fixed during the split:</strong> <code>CalendarSuggestionsBar</code> used <code>BUCKET_OPTS</code> (from <code>InboxBars.jsx</code>) without importing it. In the new standalone file the missing import was immediately obvious and corrected.</div>
   <div class="snip-back"><a href="project-summary.html#refactor-calendar-split">&#8593; Code Quality: calendar.jsx Split</a></div>
 </div>
+
+<div class="snip-entry" id="snip-email-split">
+  <div class="snip-header">
+    <span class="snip-title">email.jsx split &mdash; file map and trimmed container</span>
+    <span class="snip-file">src/components/email.jsx (was 724 lines &rarr; ~60 lines)</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// emailUtils.js — shared pure utilities and button style constants
+export { sleep, avatarInitials, AVATAR_COLORS, avatarColor, formatEmailDate,
+         gmailBtn, gmailBtnPrimary, gmailBtnSm, gmailBtnSmDanger };
+
+// EmailInboxPanel.jsx  — inbox list, avatar chips, pagination, detail panel
+// EmailCleanupPanel.jsx — bulk-action queue, newsletter discovery prompts
+// EmailRulesPanel.jsx  — Gmail filters + labels viewer with letter quicklinks
+
+// email.jsx (was 724 lines) — tab container only:
+import { EmailInboxPanel }   from "./EmailInboxPanel.jsx";
+import { EmailCleanupPanel } from "./EmailCleanupPanel.jsx";
+import { EmailRulesPanel }   from "./EmailRulesPanel.jsx";
+
+function EmailManagementView({ googleToken, googleScope, gmailQueue,
+    setGmailQueue, emailTab, setEmailTab, processEmailWithAI,
+    openCoachChat, authUser }) {
+  // ...tab bar + conditional panel render (~60 lines total)
+}
+
+export { EmailManagementView }; // only public symbol — App.jsx unchanged</code></pre></div>
+  <div class="annotation"><strong>When the public API shrinks, the split worked.</strong> Before: five exports, many with no external consumer. After: one export. The module boundary now matches the actual usage &mdash; callers only ever needed <code>EmailManagementView</code>.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-email-split">&#8593; Refactor: Email Split</a></div>
+</div>
+
 </body>
 </html>
 
@@ -5140,4 +5170,26 @@ TaskRow.propTypes = {
 };</code></pre></div>
   <div class="annotation"><strong>Define once, reference everywhere.</strong> Without <code>taskShape</code>, every component that accepts a task object would duplicate the full field list. With it, the schema is a single source of truth — if a new field is added to tasks, only <code>taskShape</code> needs updating.</div>
   <div class="snip-back"><a href="project-summary.html#refactor-proptypes">&#8593; Refactor: PropTypes</a></div>
+</div>
+
+<div class="snip-entry" id="snip-settings-split">
+  <div class="snip-header">
+    <span class="snip-title">SettingsPanel split — import map before and after</span>
+    <span class="snip-file">src/App.jsx — import block</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Before (both symbols from one file):
+import { SettingsPanel, UsagePanel } from "./components/SettingsPanel.jsx";
+
+// After (Option B — each symbol from its own file):
+import { SettingsPanel } from "./components/SettingsPanel.jsx";
+import { UsagePanel } from "./components/UsagePanel.jsx";
+
+// New file map:
+// SettingsSection.jsx          — collapsible wrapper (~35 lines)
+// UsagePanel.jsx               — AI usage stats view (~130 lines)
+// SettingsManagerComponents.jsx — TagDisplaySetting, LocationManager,
+//                                  EffortManager, EffortCalibrationManager (~290 lines)
+// SettingsPanel.jsx            — main container, was 760 lines → ~230 lines</code></pre></div>
+  <div class="annotation"><strong>Re-exports hide the real location.</strong> When <code>UsagePanel</code> was exported from <code>SettingsPanel.jsx</code>, the import path gave a false address. Direct imports are self-documenting — the path is the definition's home.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-settings-split">&#8593; Refactor: Settings Split</a></div>
 </div>

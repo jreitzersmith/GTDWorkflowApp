@@ -287,8 +287,8 @@ Every task object: `{ id, text, bucket, done, created, priority[], location[], d
 ### Code quality (Senior_Code_Engineer.md gaps — prioritised above product features)
 1. ~~[CODE QUALITY] Async error handling~~ — **done** (26a709b): wrapped `doWebSearch`, `doGmailSearch`, `doGmailCompose`, `doGmailSend` call sites in `callAI` with `is_error` tool results.
 2. [CODE QUALITY] Component size and single responsibility — split by file:
-   - 2a. `calendar.jsx` (830 lines)
-   - 2b. `SettingsPanel.jsx` (760 lines)
+   - ~~2a. `calendar.jsx` (830 lines)~~ — **done** (see commit): split into CalendarSuggestionsBar, CalendarManagementSections, CalendarEventDisplay, CalendarManagementView
+   - ~~2b. `SettingsPanel.jsx` (760 lines)~~ — **done** (df93c016): split into SettingsSection, UsagePanel, SettingsManagerComponents, SettingsPanel (container)
    - 2c. `email.jsx` (711 lines)
    - 2d. `TaskDetailPanel.jsx` (624 lines)
    - 2e. `TaskRow.jsx` (553 lines)

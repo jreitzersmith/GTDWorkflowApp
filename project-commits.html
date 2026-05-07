@@ -2145,3 +2145,46 @@
   <div class="commit-lesson"><strong>PropTypes are documentation that bites back.</strong> A component&#8217;s <code>.propTypes</code> block is simultaneously a spec for callers, a guide for future readers, and a runtime assertion that fires in dev when something is wrong. Unlike a comment, it can&#8217;t go stale silently — if a required prop goes missing, the console tells you immediately. The shared <code>taskShape</code> pattern also prevents the schema from being defined differently in different places, which is the real long-term maintenance win.</div>
   <div class="commit-back"><a href="project-summary.html#refactor-proptypes">&#8593; Refactor: PropTypes</a></div>
 </div>
+<!-- cal-split -->
+<div class="commit-entry" id="commit-cal-split">
+  <div class="commit-top">
+    <span class="commit-hash">see git log</span>
+    <span class="commit-date">2026-05-07</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: split calendar.jsx (830 lines) into four focused files (item 2a)</div>
+  <div class="commit-body">
+    <code>calendar.jsx</code> tombstoned. New files: <strong>CalendarSuggestionsBar.jsx</strong> (73 lines), <strong>CalendarManagementSections.jsx</strong> (128 lines), <strong>CalendarEventDisplay.jsx</strong> (317 lines), <strong>CalendarManagementView.jsx</strong> (325 lines). App.jsx import updated. Fixed latent bug: <code>BUCKET_OPTS</code> from <code>InboxBars.jsx</code> was used in <code>CalendarSuggestionsBar</code> without being imported.
+  </div>
+  <div class="commit-lesson"><strong>Splits reveal latent bugs.</strong> The missing <code>BUCKET_OPTS</code> import had always been there, silently passing because suggestions are normally empty. Moving the component to its own file required an explicit import statement and made the hidden dependency visible. File splits are cheap static analysis.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-calendar-split">&#8593; Refactor: Calendar Split</a></div>
+</div>
+<!-- df93c016 -->
+<div class="commit-entry" id="commit-df93c016">
+  <div class="commit-top">
+    <span class="commit-hash">df93c016</span>
+    <span class="commit-date">2026-05-07</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: split SettingsPanel.jsx (760 lines) into focused files (item 2b)</div>
+  <div class="commit-body">
+    New files: <strong>SettingsSection.jsx</strong> (35 lines), <strong>UsagePanel.jsx</strong> (130 lines), <strong>SettingsManagerComponents.jsx</strong> (290 lines). <code>SettingsPanel.jsx</code> trimmed from 760 to ~230 lines. App.jsx updated to import <code>UsagePanel</code> directly from <code>UsagePanel.jsx</code> (Option B — no re-export barrel).
+  </div>
+  <div class="commit-lesson"><strong>Re-exports are a smell.</strong> Importing <code>UsagePanel</code> from <code>SettingsPanel.jsx</code> hid where the component actually lived. Direct imports — one path per definition — keep the dependency graph honest and make it trivial to find any symbol's source file.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-settings-split">&#8593; Refactor: Settings Split</a></div>
+</div>
+<!-- de6e25ea -->
+<div class="commit-entry" id="commit-de6e25ea">
+  <div class="commit-top">
+    <span class="commit-hash">de6e25ea</span>
+    <span class="commit-date">2026-05-07</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: split email.jsx (724 lines) into focused single-responsibility components (item 2c)</div>
+  <div class="commit-body">
+    New files: <strong>emailUtils.js</strong> (50 lines &mdash; shared utils + button styles), <strong>EmailInboxPanel.jsx</strong> (185 lines), <strong>EmailCleanupPanel.jsx</strong> (200 lines), <strong>EmailRulesPanel.jsx</strong> (195 lines). <code>email.jsx</code> trimmed from 724 to ~60 lines (tab container only). Removed stale <code>// ── CalendarSuggestionsBar</code> comment left from the 2a split. App.jsx unchanged.
+  </div>
+  <div class="commit-lesson"><strong>Unused exports are dead weight.</strong> The original file exported <code>AVATAR_COLORS</code>, <code>EmailInboxPanel</code>, and the other panel components even though nothing outside the file consumed them. Removing the unused exports during the split made the module boundary explicit: only <code>EmailManagementView</code> is public surface area.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-email-split">&#8593; Refactor: Email Split</a></div>
+</div>
+
