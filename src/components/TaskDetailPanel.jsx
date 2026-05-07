@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../constants.jsx";
-import { TaskRowContext } from "../contexts.js";
+import { TaskRowContext, taskShape } from "../contexts.js";
 import {
   effortToMinutes, getOrderedChildren,
 } from "../utils/taskUtils.jsx";

@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../constants.jsx";
+import { taskShape } from "../contexts.js";
 import {
   effortAccuracyColor, effortToMinutes, minutesToEffortLabel,
 } from "../utils/taskUtils.jsx";
