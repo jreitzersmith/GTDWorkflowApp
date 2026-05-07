@@ -4,7 +4,8 @@ import { TaskActionsContext, TaskRowContext, taskShape } from "./contexts.js";
 import { COLORS, BUCKETS, COACH_MODES, SYSTEM_PROMPTS, OPENWEBUI_URL } from "./constants.jsx";
 import { EmailManagementView } from "./components/email.jsx";
 import { InboxBulkBar, ProjectGroupSuggestionBar } from "./components/InboxBars.jsx";
-import { CalendarSuggestionsBar, CalendarManagementView } from "./components/calendar.jsx";
+import { CalendarSuggestionsBar } from "./components/CalendarSuggestionsBar.jsx";
+import { CalendarManagementView } from "./components/CalendarManagementView.jsx";
 import { BucketItem, SidebarBtn, Btn, PRIORITIES, TaskRow } from "./components/TaskRow.jsx";
 import {
   ActionBtn, RecurringReviewCard, ChatBubble, TypingIndicator,
