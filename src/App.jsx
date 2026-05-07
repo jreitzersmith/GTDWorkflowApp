@@ -582,23 +582,19 @@ export default function GTDManager() {
                 setMessages(prev => [...prev, {
                   role: "assistant", text: `🔍 Searching: "${query}"`, isSearchChip: true,
                 }]);
-                const result = await doWebSearch(query);
-                toolResults.push({
-                  type: "tool_result",
-                  tool_use_id: toolUse.id,
-                  content: result,
-                });
+                try {
+                  const result = await doWebSearch(query);
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_search") {
                 const query = toolUse.input.query;
                 setMessages(prev => [...prev, {
                   role: "assistant", text: `📧 Searching Gmail: "${query}"`, isSearchChip: true,
                 }]);
-                const result = await doGmailSearch(query, googleToken, toolUse.input.max_results || 10);
-                toolResults.push({
-                  type: "tool_result",
-                  tool_use_id: toolUse.id,
-                  content: result,
-                });
+                try {
+                  const result = await doGmailSearch(query, googleToken, toolUse.input.max_results || 10);
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_list_labels") {
                 try {
                   const result = await doGmailListLabels(googleToken);
@@ -680,18 +676,22 @@ export default function GTDManager() {
                 } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_compose") {
                 setMessages(prev => [...prev, { role: "assistant", text: `✏️ Creating draft...`, isSearchChip: true }]);
-                const result = await doGmailCompose(
-                  toolUse.input.to, toolUse.input.subject, toolUse.input.body,
-                  toolUse.input.thread_id, googleToken
-                );
-                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                try {
+                  const result = await doGmailCompose(
+                    toolUse.input.to, toolUse.input.subject, toolUse.input.body,
+                    toolUse.input.thread_id, googleToken
+                  );
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === "gmail_send") {
                 setMessages(prev => [...prev, { role: "assistant", text: `📤 Sending email...`, isSearchChip: true }]);
-                const result = await doGmailSend(
-                  toolUse.input.to, toolUse.input.subject, toolUse.input.body,
-                  toolUse.input.thread_id, googleToken
-                );
-                toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                try {
+                  const result = await doGmailSend(
+                    toolUse.input.to, toolUse.input.subject, toolUse.input.body,
+                    toolUse.input.thread_id, googleToken
+                  );
+                  toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                } catch (e) { toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               }
             }
             // Ensure every tool_use block has a result (empty content triggers Anthropic 400)
