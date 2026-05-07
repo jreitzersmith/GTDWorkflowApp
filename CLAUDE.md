@@ -96,6 +96,7 @@ Every task object: `{ id, text, bucket, done, created, priority[], location[], d
 11. Shopping list manager — lightweight tool for managing shopping lists, likely as a new bucket or sidebar section distinct from the GTD task buckets
 12. Gmail inbox financial detail capture — when processing emails, extract any financial details (amounts, due dates, account references) and export them to a Google Sheet in Google Drive
 13. Gmail inbox rate limiting — inbox metadata fetches hit Gmail's 429 rate limit when loading many messages in parallel; add request queuing / exponential backoff to eliminate the errors
+14. [RETHINK] Inbox History bucket exposure to AI — currently `inboxHistory` is excluded from `getTaskContext` and from valid `→ACTION:update` bucket targets, so the AI can't move tasks there via chat. This was intentional (Inbox History is system-managed via Process mode) but may be too restrictive. Decide: should the AI be able to file tasks directly to Inbox History, and if so, should it also be able to see tasks already there?
 
 ## API Key setup (local dev)
 Create a `.env` file:

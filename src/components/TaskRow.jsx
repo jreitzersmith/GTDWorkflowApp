@@ -3,8 +3,8 @@ import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../constants.jsx";
 import { TaskActionsContext, TaskRowContext, taskShape } from "../contexts.js";
 import {
-  countDescendants, effortToMinutes, isDeferred,
-  minutesToEffortLabel, sumDescendantEffort,
+  countDescendants, effortAccuracyColor, effortToMinutes, isDeferred,
+  minutesToEffortLabel, subtractFromDate, sumDescendantEffort,
 } from "../utils/taskUtils.jsx";
 import { ActionBtn } from "./AICoach.jsx";
 

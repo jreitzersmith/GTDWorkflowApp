@@ -3,8 +3,9 @@ import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../constants.jsx";
 import { TaskRowContext, taskShape } from "../contexts.js";
 import {
-  effortToMinutes, getOrderedChildren,
+  effortAccuracyColor, effortToMinutes, getOrderedChildren,
 } from "../utils/taskUtils.jsx";
+import { TaskRow } from "./TaskRow.jsx";
 
 function DropLine({ depth }) {
   return (
@@ -395,7 +396,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
   };
   const excludedIds = getDescendantIds(task.id, allTasks);
   const eligibleProjects = allTasks.filter(
-    t => (t.bucket === "project" || t.id === task.parentId) && !t.done && !excludedIds.has(t.id)
+    t => (t.bucket === "project" && !t.parentId || t.id === task.parentId) && !t.done && !excludedIds.has(t.id)
   );
 
   return (

@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import { COLORS } from "../constants.jsx";
 import { taskShape } from "../contexts.js";
 import {
-  effortAccuracyColor, effortToMinutes, minutesToEffortLabel,
+  effortAccuracyColor, effortToMinutes, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES,
 } from "../utils/taskUtils.jsx";
 import {
   createEmptyUsageStats, fmtCost, fmtTokens,

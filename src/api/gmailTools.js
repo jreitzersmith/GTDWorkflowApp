@@ -1,5 +1,6 @@
 // Gmail and web-search tool definitions and API helpers.
 // Pure async functions — no React dependencies.
+import { parseApiResponse } from "./calendarApi.js";
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
