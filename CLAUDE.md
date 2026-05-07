@@ -289,7 +289,7 @@ Every task object: `{ id, text, bucket, done, created, priority[], location[], d
 2. [CODE QUALITY] Component size and single responsibility — split by file:
    - ~~2a. `calendar.jsx` (830 lines)~~ — **done** (see commit): split into CalendarSuggestionsBar, CalendarManagementSections, CalendarEventDisplay, CalendarManagementView
    - ~~2b. `SettingsPanel.jsx` (760 lines)~~ — **done** (df93c016): split into SettingsSection, UsagePanel, SettingsManagerComponents, SettingsPanel (container)
-   - 2c. `email.jsx` (711 lines)
+   - ~~2c. `email.jsx` (711 lines)~~ — **done** (de6e25ea): split into emailUtils.js, EmailInboxPanel.jsx, EmailCleanupPanel.jsx, EmailRulesPanel.jsx; email.jsx trimmed to ~60-line tab container
    - 2d. `TaskDetailPanel.jsx` (624 lines)
    - 2e. `TaskRow.jsx` (553 lines)
    - 2f. `App.jsx` (2,579 lines) — worst offender; `GTDManager` mixes state, data flow, event handling, and rendering all at once
