@@ -337,6 +337,7 @@
   <ul>
     <li><a href="#refactor-calendar-split">Calendar Split (2a)</a></li>
     <li><a href="#refactor-settings-split">Settings Split (2b)</a></li>
+      <li><a href="#refactor-taskdetail-split">TaskDetailPanel Split (2d)</a></li>
   </ul>
 
 </aside>
@@ -2668,5 +2669,32 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
     </div>
     <div class="link-row">
       <a class="link-chip chip-commit" href="project-commits.html#commit-df93c016">&#x1F4DC; df93c016 &#8212; SettingsPanel split</a>
+    </div>
+  </section>
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-taskdetail-split">
+    <div class="feat-header">
+      <span class="feat-icon">&#x1F4CB;</span>
+      <span class="feat-title">Code Quality 2d &mdash; TaskDetailPanel.jsx Split</span>
+      <span class="feat-badge badge-refactor">Refactor &mdash; May 7</span>
+    </div>
+    <div class="feat-desc">
+      <p><code>TaskDetailPanel.jsx</code> was 624 lines mixing two unrelated groups of components: list-view helpers used throughout the bucket views, and the detail panel itself with its sub-components. It was split into two files:</p>
+      <ul>
+        <li><strong>TaskListHelpers.jsx</strong> (~160 lines) &mdash; five components used in the bucket task lists: <code>DropLine</code> (drag-and-drop insert indicator, private), <code>CompletedTree</code> (read-only done hierarchy), <code>ProjectTree</code> (drag-and-drop project tree), <code>GroupDivider</code> (section header for grouped views), and <code>EmptyState</code> (per-bucket placeholder). None of these have anything to do with the detail panel.</li>
+        <li><strong>TaskDetailPanel.jsx</strong> (~490 lines, was 624) &mdash; the shared style tokens (<code>fieldLabel</code>, <code>fieldInput</code>), three private sub-components (<code>ProjectSelector</code>, <code>OriginalDueDateField</code>, <code>RecurrenceEditor</code>), and the main <code>TaskDetailPanel</code> component.</li>
+      </ul>
+      <p>App.jsx already imported <code>DropLine</code> but never used it &mdash; the unused import was removed. All other callers were unchanged. The stale <code>// ── Email Management View</code> comment at the bottom of the original file was also removed.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: Cohesion vs Co-location</h4>
+      <p>Co-location means putting related things together; cohesion means every thing in a module serves the same purpose. <code>CompletedTree</code> and <code>EmptyState</code> have nothing to do with the detail panel &mdash; they just happened to live in the same file. Moving them to <code>TaskListHelpers.jsx</code> makes both files cohesive: one file is about rendering the task list, the other is about editing a single task&rsquo;s details. A reader can now open the right file immediately rather than scanning 600 lines to find the component they need.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>Imagine a <code>/usr/local/bin</code> that contains both your deployment scripts and your monitoring dashboards just because both touch servers. It works, but it is the wrong unit of organisation. The right split is by purpose &mdash; deployment tools in one directory, monitoring tools in another &mdash; so that anyone looking for a monitoring script knows exactly where to look without grepping through unrelated files.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-f8772d59">&#x1F4DC; f8772d59 &mdash; TaskDetailPanel split</a>
     </div>
   </section>

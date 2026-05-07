@@ -4486,6 +4486,31 @@ export { EmailManagementView }; // only public symbol — App.jsx unchanged</cod
   <div class="annotation"><strong>When the public API shrinks, the split worked.</strong> Before: five exports, many with no external consumer. After: one export. The module boundary now matches the actual usage &mdash; callers only ever needed <code>EmailManagementView</code>.</div>
   <div class="snip-back"><a href="project-summary.html#refactor-email-split">&#8593; Refactor: Email Split</a></div>
 </div>
+<div class="snip-entry" id="snip-taskdetail-split">
+  <div class="snip-header">
+    <span class="snip-title">TaskDetailPanel split &mdash; import before and after</span>
+    <span class="snip-file">src/App.jsx &mdash; import block</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Before (list helpers and detail panel mixed in one file):
+import {
+  DropLine, CompletedTree, ProjectTree, GroupDivider, EmptyState,
+  TaskDetailPanel,
+} from "./components/TaskDetailPanel.jsx";
+
+// After (each group in its own file; unused DropLine removed):
+import { CompletedTree, ProjectTree, GroupDivider, EmptyState } from "./components/TaskListHelpers.jsx";
+import { TaskDetailPanel } from "./components/TaskDetailPanel.jsx";
+
+// TaskListHelpers.jsx (~160 lines):
+//   DropLine (private), CompletedTree, ProjectTree, GroupDivider, EmptyState
+//
+// TaskDetailPanel.jsx (~490 lines, was 624):
+//   fieldLabel/fieldInput (private), ProjectSelector (private),
+//   OriginalDueDateField (private), RecurrenceEditor (private), TaskDetailPanel</code></pre></div>
+  <div class="annotation"><strong>Splitting surfaces dead imports.</strong> <code>DropLine</code> had been in the App.jsx import since the component was created &mdash; but App.jsx never used it. The split forced a line-by-line review of which symbols were actually needed, making the dead import visible for the first time.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-taskdetail-split">&#8593; Refactor: TaskDetailPanel Split</a></div>
+</div>
+
 
 </body>
 </html>

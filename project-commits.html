@@ -2187,4 +2187,19 @@
   <div class="commit-lesson"><strong>Unused exports are dead weight.</strong> The original file exported <code>AVATAR_COLORS</code>, <code>EmailInboxPanel</code>, and the other panel components even though nothing outside the file consumed them. Removing the unused exports during the split made the module boundary explicit: only <code>EmailManagementView</code> is public surface area.</div>
   <div class="commit-back"><a href="project-summary.html#refactor-email-split">&#8593; Refactor: Email Split</a></div>
 </div>
+<!-- f8772d59 -->
+<div class="commit-entry" id="commit-f8772d59">
+  <div class="commit-top">
+    <span class="commit-hash">f8772d59</span>
+    <span class="commit-date">2026-05-07</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: split TaskDetailPanel.jsx (624 lines) into focused files (item 2d)</div>
+  <div class="commit-body">
+    New file: <strong>TaskListHelpers.jsx</strong> (~160 lines) &mdash; <code>DropLine</code>, <code>CompletedTree</code>, <code>ProjectTree</code>, <code>GroupDivider</code>, <code>EmptyState</code>. <code>TaskDetailPanel.jsx</code> trimmed from 624 to ~490 lines. Removed unused <code>DropLine</code> import from App.jsx (imported but never referenced). Removed stale Email Management View comment.
+  </div>
+  <div class="commit-lesson"><strong>Unused imports are a code smell.</strong> <code>DropLine</code> had been imported in App.jsx since the component was first extracted, but App.jsx never rendered it directly &mdash; it was only used inside <code>ProjectTree</code>. The split forced an explicit review of what was actually needed, surfacing the dead import. Removing it keeps the dependency graph honest.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-taskdetail-split">&#8593; Refactor: TaskDetailPanel Split</a></div>
+</div>
+
 
