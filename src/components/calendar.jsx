@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import PropTypes from "prop-types";
 import { COLORS } from "../constants.jsx";
 import {
   doCalendarFetchEvents, doCalendarCreateEvent,

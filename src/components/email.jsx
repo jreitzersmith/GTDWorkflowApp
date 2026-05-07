@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import { COLORS } from "../constants.jsx";
 import { supabase, queueEntryToRow } from "../api/supabase.js";
 import {
