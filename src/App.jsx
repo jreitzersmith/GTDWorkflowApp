@@ -15,10 +15,8 @@ import {
 } from "./components/AICoach.jsx";
 import { SettingsPanel } from "./components/SettingsPanel.jsx";
 import { UsagePanel } from "./components/UsagePanel.jsx";
-import {
-  DropLine, CompletedTree, ProjectTree, GroupDivider, EmptyState,
-  TaskDetailPanel,
-} from "./components/TaskDetailPanel.jsx";
+import { CompletedTree, ProjectTree, GroupDivider, EmptyState } from "./components/TaskListHelpers.jsx";
+import { TaskDetailPanel } from "./components/TaskDetailPanel.jsx";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth.js";
 import { useGoogleAuth } from "./hooks/useGoogleAuth.js";
 import { useAppSettings } from "./hooks/useAppSettings.js";

@@ -1,147 +1,14 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../constants.jsx";
-import { TaskRowContext, taskShape } from "../contexts.js";
-import {
-  effortAccuracyColor, effortToMinutes, getOrderedChildren,
-} from "../utils/taskUtils.jsx";
-import { TaskRow } from "./TaskRow.jsx";
+import { taskShape } from "../contexts.js";
+import { effortAccuracyColor, effortToMinutes } from "../utils/taskUtils.jsx";
 
-function DropLine({ depth }) {
-  return (
-    <div style={{ height: 2, background: COLORS.project, margin: `1px 18px 1px ${18 + depth * 22}px`, borderRadius: 2, pointerEvents: "none" }} />
-  );
-}
-
-// Read-only hierarchical view for completed tasks.
-// parentId === null  → virtual roots: done tasks whose parent is not also done.
-// parentId !== null  → done children of parentId in childIds order.
-function CompletedTree({ parentId, depth }) {
-  const { allTasks, collapsedNodes } = useContext(TaskRowContext);
-  if (depth > 5) return null;
-
-  let children;
-  if (parentId === null) {
-    const doneIds = new Set(allTasks.filter(t => t.done).map(t => t.id));
-    children = allTasks.filter(t => t.done && (!t.parentId || !doneIds.has(t.parentId)));
-  } else {
-    children = getOrderedChildren(parentId, allTasks).filter(t => t.done);
-  }
-
-  if (!children.length) return null;
-
-  return (
-    <>
-      {children.map(task => (
-        <div key={task.id}>
-          <TaskRow task={task} isSubtask={depth > 0} indentOverride={depth * 22} depth={depth} />
-          {!collapsedNodes?.has(task.id) && (
-            <CompletedTree parentId={task.id} depth={depth + 1} />
-          )}
-        </div>
-      ))}
-    </>
-  );
-}
-
-function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop }) {
-  const { allTasks, collapsedNodes } = useContext(TaskRowContext);
-  if (depth > 5) return null;
-  const children = getOrderedChildren(parentId, allTasks);
-  if (!children.length) return null;
-
-  return (
-    <>
-      {children.map(task => {
-        const dt = dropTarget;
-        const isTarget   = dt?.id === task.id;
-        const isDragging = dragId === task.id;
-
-        return (
-          <div key={task.id}>
-            {isTarget && dt.position === "before" && <DropLine depth={depth} />}
-
-            <div
-              draggable
-              onDragStart={e => { e.stopPropagation(); onDragStart(task.id); }}
-              onDragOver={e => { e.preventDefault(); e.stopPropagation(); onDragOver(e, task.id); }}
-              onDragEnd={e => { e.stopPropagation(); onDragEnd(); }}
-              onDrop={e => { e.preventDefault(); e.stopPropagation(); onDrop(task.id); }}
-              style={{
-                opacity: isDragging ? 0.35 : 1,
-                outline: isTarget && dt.position === "inside" ? `2px solid ${COLORS.project}66` : "none",
-                outlineOffset: -1,
-                borderRadius: 4,
-                transition: "opacity 0.1s",
-              }}
-            >
-              <TaskRow task={task} isSubtask={depth > 0} indentOverride={depth * 22} depth={depth} />
-            </div>
-
-            {/* Recurse into children — skipped when this node is collapsed. */}
-            {!collapsedNodes?.has(task.id) && (
-              <ProjectTree
-                parentId={task.id}
-                depth={depth + 1}
-                dragId={dragId}
-                dropTarget={dropTarget}
-                onDragStart={onDragStart}
-                onDragOver={onDragOver}
-                onDragEnd={onDragEnd}
-                onDrop={onDrop}
-              />
-            )}
-
-            {isTarget && dt.position === "after" && <DropLine depth={depth} />}
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-function GroupDivider({ label, count, effortTotal, isUngrouped }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 18px 5px", borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
-      <span style={{ fontSize: 11, fontWeight: 600, color: isUngrouped ? COLORS.muted : COLORS.text2, letterSpacing: "0.06em", textTransform: isUngrouped ? "none" : "uppercase" }}>
-        {isUngrouped ? `— ${label}` : label}
-      </span>
-      <span style={{ fontSize: 10, color: COLORS.muted, background: COLORS.surface3, padding: "1px 6px", borderRadius: 8 }}>{count}</span>
-      {effortTotal && (
-        <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44` }}>⏱ {effortTotal}</span>
-      )}
-    </div>
-  );
-}
-
-function EmptyState({ bucket }) {
-  const msgs = {
-    inbox:     ["Your inbox is clear", "Add tasks above, or use Brain Dump to surface open loops."],
-    next:      ["No next actions", "Process your inbox and move concrete actions here."],
-    project:   ["No projects", "Multi-step goals go here."],
-    waiting:   ["Nothing waiting", "Track delegated items here."],
-    someday:   ["No someday items", "Capture future ideas without committing to them."],
-    deferred:  ["No deferred tasks", "Open any task's chevron → set a 'Defer Until' date to hide it until you need it."],
-    done:      ["Nothing completed yet", "Complete tasks and they'll appear here."],
-  };
-  const [title, sub] = msgs[bucket] || ["Empty", ""];
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: 40, textAlign: "center", gap: 6, color: COLORS.muted, minHeight: 120 }}>
-      <div style={{ fontSize: 28, opacity: 0.3 }}>○</div>
-      <strong style={{ fontSize: 13 }}>{title}</strong>
-      <div style={{ fontSize: 12 }}>{sub}</div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// TaskDetailPanel — side panel showing full task detail + notes editor
-// ---------------------------------------------------------------------------
-// ── TaskDetailPanel shared styles ─────────────────────────────────────────────
+// Shared style tokens used across the sub-components below.
 const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
 const fieldInput = { width: "100%", background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", boxSizing: "border-box" };
 
-// ── ProjectSelector ───────────────────────────────────────────────────────────
+// Dropdown (and inline "new project" form) for assigning a task to a parent project.
 function ProjectSelector({ taskId, parentId, eligibleProjects, onReassignProject }) {
   const [newProjMode, setNewProjMode] = useState(false);
   const [newProjName, setNewProjName] = useState("");
@@ -212,7 +79,8 @@ ProjectSelector.propTypes = {
   onReassignProject: PropTypes.func.isRequired,
 };
 
-// ── OriginalDueDateField ──────────────────────────────────────────────────────
+// Editable field for the task's original due date, with a confirmation step
+// to guard against accidental variance-tracking resets.
 function OriginalDueDateField({ taskId, originalDueDate, onUpdate }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -261,7 +129,8 @@ OriginalDueDateField.propTypes = {
   onUpdate:        PropTypes.func.isRequired,
 };
 
-// ── RecurrenceEditor ──────────────────────────────────────────────────────────
+// Full recurrence configuration: frequency, interval, weekday picker,
+// until date, reschedule base, and inbox-on-spawn toggle.
 function RecurrenceEditor({ rec, taskId, onUpdate }) {
   return (
     <div>
@@ -306,7 +175,7 @@ function RecurrenceEditor({ rec, taskId, onUpdate }) {
                 {["Su","Mo","Tu","We","Th","Fr","Sa"].map((day, i) => {
                   const active = (rec.weekDays || []).includes(i);
                   return (
-                    <button key={i} onClick={() => {
+                    <button key={day} onClick={() => {
                       const cur = rec.weekDays || [];
                       const next = active ? cur.filter(x => x !== i) : [...cur, i].sort((a,b) => a-b);
                       onUpdate(taskId, { recurrence: { ...rec, weekDays: next.length ? next : undefined } });
@@ -357,14 +226,17 @@ RecurrenceEditor.propTypes = {
   onUpdate: PropTypes.func.isRequired,
 };
 
-// ── TaskDetailPanel ───────────────────────────────────────────────────────────
+// Side panel showing full task detail: editable title and notes, all metadata
+// fields, bucket move, complete/skip/delete actions.
 function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
   const [titleDraft, setTitleDraft] = useState(task.text);
   const [notesDraft, setNotesDraft] = useState(task.notes || "");
-  // Sync drafts if task changes (e.g. another panel opens a different task)
+
+  // Sync drafts when a different task is opened in the panel.
   useEffect(() => { setTitleDraft(task.text); }, [task.id, task.text]);
   useEffect(() => { setNotesDraft(task.notes || ""); }, [task.id, task.notes]);
-  // Close on Escape key
+
+  // Close panel on Escape key.
   useEffect(() => {
     const handler = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -385,8 +257,8 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
   const bucketColor = BUCKETS[task.bucket]?.color || COLORS.muted;
   const bucketLabel = BUCKETS[task.bucket]?.label || task.bucket;
 
-  // Build the list of projects the task can be assigned to.
-  // Excludes: the task itself, and any of its descendants (would create a cycle).
+  // Build the list of projects this task can be assigned to.
+  // Excludes the task itself and all descendants to prevent cycles.
   const getDescendantIds = (taskId, tasks, seen = new Set()) => {
     if (seen.has(taskId)) return seen;
     seen.add(taskId);
@@ -442,7 +314,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={fieldLabel}>Info</div>
 
-          {/* Bucket */}
+          {/* Bucket (read-only label) */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
             <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Bucket</span>
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
@@ -495,7 +367,6 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             );
           })()}
 
-          {/* Recurrence */}
           <RecurrenceEditor rec={task.recurrence || null} taskId={task.id} onUpdate={onUpdate} />
 
           {/* Defer until */}
@@ -509,7 +380,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             />
           </div>
 
-          {/* Effort (expected) */}
+          {/* Effort (estimated) */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
             <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Estimated</span>
             <select
@@ -546,7 +417,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
             })()}
           </div>
 
-          {/* Location */}
+          {/* Location tags */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12 }}>
             <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, paddingTop: 2 }}>Location</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -618,7 +489,4 @@ TaskDetailPanel.propTypes = {
   style:             PropTypes.object,
 };
 
-// ── Email Management View ─────────────────────────────────────────────────────
-
-
-export { DropLine, CompletedTree, ProjectTree, GroupDivider, EmptyState, ProjectSelector, OriginalDueDateField, RecurrenceEditor, TaskDetailPanel };
+export { TaskDetailPanel };
