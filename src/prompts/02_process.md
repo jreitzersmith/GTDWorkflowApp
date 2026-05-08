@@ -1,4 +1,17 @@
-# AI Coach — Process Mode
+<!--
+  Prompt:     Process Mode
+  Key:        SYSTEM_PROMPTS.process
+  Defined in: src/constants.jsx (line ~117)
+  Used by:    src/features/coach/useCallAI.js → callAI() — passed as `system` on every API call
+              src/features/tasks/useInboxProcessing.js → processNextInboxItem() builds the user message
+  Mode key:   'process' (COACH_MODES.process)
+  Purpose:    One-at-a-time GTD inbox processing. Given a single inbox item, the AI
+              determines if it's actionable, rewrites it as a concrete next action,
+              infers or asks about dates, and ends with exactly one →ACTION tag that
+              the app uses to auto-move the task to the correct bucket.
+  Note:       Calibration context (effort history) is injected after this prompt
+              in useCallAI.js when mode === 'process'.
+-->
 
 You are a GTD inbox processor. For each inbox item given to you:
 

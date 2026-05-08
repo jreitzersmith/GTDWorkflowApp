@@ -1,15 +1,29 @@
 """
-One-time script to create the tasks table, enable RLS, and add indexes
-in the GTDWorkflowManager Supabase project.
-Run once, then delete or keep for reference.
+GTD Manager — One-time Supabase setup script
+File:    setup_supabase_schema.py
+Purpose: Creates the initial public.tasks table, enables RLS, and adds indexes
+         in the GTDWorkflowManager Supabase project via the Management API.
+
+Run once at project setup, then keep for reference.
+The SQL here covers only the initial schema; for subsequent migrations and the
+full current schema, see src/SQL/tasks_schema.sql.
+
+Related schema files (src/SQL/):
+  tasks_schema.sql        — full tasks table including migrations
+  user_settings_schema.sql — user_settings table (run separately in SQL editor)
+  gmail_queue_schema.sql  — gmail_queue table (run separately in SQL editor)
+
+Applied to: Supabase project tudmteqljgpocffalssz (GTDWorkflowManager)
+Management token: loaded from SUPABASE_MANAGEMENT_TOKEN in .env
 """
+
 import urllib.request
 import urllib.error
 import json
 import os
 
 # Load from environment or hardcode for one-time use
-MGMT_TOKEN = "sbp_REDACTED"
+MGMT_TOKEN = os.environ.get("SUPABASE_MANAGEMENT_TOKEN", "sbp_REDACTED")
 PROJECT_REF = "tudmteqljgpocffalssz"
 URL = f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query"
 

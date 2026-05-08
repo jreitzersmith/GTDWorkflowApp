@@ -34,23 +34,54 @@ See `Prompts/Resolved_Issues_And_Requests.md` — add an entry after every commi
 
 ## File structure
 ```
-gtd-project/
-├── CLAUDE.md           ← this file
+GTDWorkflowApp/
+├── CLAUDE.md                        ← this file
+├── Prompts/                         ← Claude workflow docs (NOT app prompts)
+│   ├── AI_Pair_Programming.md
+│   ├── Senior_Code_Engineer.md
+│   ├── Known_Issues_And_Requests.md
+│   └── Resolved_Issues_And_Requests.md
 ├── src/
-│   ├── App.jsx         ← main app (single file, ~2500+ lines)
+│   ├── App.jsx                      ← top-level layout + auth gate wiring
+│   ├── constants.jsx                ← COLORS, BUCKETS, COACH_MODES, SYSTEM_PROMPTS
+│   ├── contexts.js                  ← React contexts
+│   ├── main.jsx                     ← Vite entry point
 │   ├── api/
-│   │   └── supabase.js ← Supabase client + mappers
-│   ├── components/
-│   │   ├── email.jsx
-│   │   ├── TaskDetailPanel.jsx
-│   │   └── TaskRow.jsx
-│   └── hooks/
-│       ├── useSupabaseAuth.js
-│       ├── useGoogleAuth.js
-│       ├── useCalendarState.js
-│       └── useGmailState.js
+│   │   └── supabase.js              ← Supabase client + field mappers (taskToDb/dbToTask)
+│   ├── features/                    ← feature-based organisation (one folder per domain)
+│   │   ├── calendar/                ← Google Calendar view, API calls, event display
+│   │   ├── coach/                   ← AI coach panel, callAI hook, project review
+│   │   ├── email/                   ← Gmail inbox, rules, cleanup panels + tools
+│   │   ├── settings/                ← settings panel, usage tracker, app settings hooks
+│   │   └── tasks/                   ← task list, task row, detail panel, CRUD hooks
+│   ├── hooks/                       ← cross-feature hooks (auth, sync)
+│   │   ├── useSupabaseAuth.js
+│   │   ├── useGoogleAuth.js
+│   │   └── useSupabaseSync.js
+│   ├── prompts/                     ← exported copies of all AI system prompts
+│   │   ├── 01_chat.md               ← SYSTEM_PROMPTS.chat
+│   │   ├── 02_process.md            ← SYSTEM_PROMPTS.process
+│   │   ├── 03_weekly_review.md      ← SYSTEM_PROMPTS.review
+│   │   ├── 04_project_review.md     ← SYSTEM_PROMPTS.projectReview
+│   │   ├── 05_project_metadata.md   ← SYSTEM_PROMPTS.projectMetadata
+│   │   ├── 06_brain_dump.md         ← SYSTEM_PROMPTS.dump
+│   │   └── 07_calendar_event.md     ← SYSTEM_PROMPTS.calendarEvent
+│   ├── shared/                      ← reusable UI components (sidebar, auth gate, etc.)
+│   └── SQL/                         ← Supabase schema + migration SQL
+│       ├── tasks_schema.sql         ← public.tasks table + RLS + indexes + migrations
+│       ├── user_settings_schema.sql ← public.user_settings table + RLS
+│       ├── gmail_queue_schema.sql   ← public.gmail_queue table + RLS + indexes
+│       └── setup_supabase_schema.py ← one-time setup script (run via Management API)
 └── README.md
 ```
+
+## File placement conventions
+- **SQL files** (new tables, ALTER TABLE migrations, RLS policies): `src/SQL/`
+  - Add migrations as a new section in the relevant `*_schema.sql` file
+  - Keep `setup_supabase_schema.py` in sync if re-running from scratch
+- **AI system prompts** (any change to `SYSTEM_PROMPTS` in `constants.jsx`): update the corresponding file in `src/prompts/`
+  - `src/constants.jsx` is the source of truth; `src/prompts/` files are reference exports
+- **New features**: add a folder under `src/features/<feature-name>/` — do not create new top-level `components/` or `hooks/` directories
 
 ## Current state of the app
 
