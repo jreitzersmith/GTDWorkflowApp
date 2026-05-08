@@ -93,6 +93,8 @@ When John provides a new Known Issue or Feature Request to add to `Claude_Prompt
 
 After placing the entry, update the **Last used numbers** line at the top of the file.
 
+**Triage on report.** When John says something like "there's an issue", "something isn't behaving correctly", or "I need X", immediately attempt to categorise it using the table above. If the category is ambiguous, ask one clarifying question before recording. Once the category is confirmed, add the entry to `Known_Issues_And_Requests.md` with the next available number and update the Last used numbers line.
+
 ---
 
 ## File edit rules for App.jsx

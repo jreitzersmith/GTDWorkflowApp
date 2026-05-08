@@ -1,7 +1,8 @@
 # GTD Manager — Project Brief for Claude
 
 ## Working instructions
-Before each set of tool calls, briefly explain what you're looking for and why.
+- Before each set of tool calls, briefly explain what you're looking for and why.
+- When John reports an issue or new request, triage and categorise it immediately — see the Backlog management section in `Claude_Prompts/AI_Pair_Programming.md`. Ask one clarifying question if the category is ambiguous before recording it.
 
 ## Ongoing maintenance
 - **Vite timestamp cleanup:** At the start of each session, check for `vite.config.js.timestamp-*.mjs` files in the project root. If 5 or more exist, delete them all with:
