@@ -36,6 +36,12 @@ See `Prompts/Resolved_Issues_And_Requests.md` — add an entry after every commi
 ```
 GTDWorkflowApp/
 ├── CLAUDE.md                        ← this file
+├── Product_Summary/                 ← project overview docs (not committed to dev workflow)
+│   ├── project-summary.html         ← high-level project summary
+│   ├── project-commits.html         ← commit history view
+│   ├── project-snippets.html        ← code snippet reference
+│   ├── GTDWorkflowApp_ProjectSummary.html
+│   └── Project_Summary.md
 ├── Prompts/                         ← Claude workflow docs (NOT app prompts)
 │   ├── AI_Pair_Programming.md
 │   ├── Senior_Code_Engineer.md
