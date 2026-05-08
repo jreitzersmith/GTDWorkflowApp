@@ -7,9 +7,9 @@
 ## Known issues / remaining work
 
 - [x] ~~Issue#1 — Email Rules tab re-fetches on every visit~~ — **fixed** (c3fb23e): lifted `gmailLabels`/`gmailFilters` state into `EmailManagementView`; tab opens instantly after first load
-- [ ] Issue#2 — Brain Dump doesn't auto-add items to inbox — user has to copy manually (Chat mode can create tasks via `→ACTION:create`, but Brain Dump mode is not wired up)
-- [ ] Issue#3 — Weekly Review doesn't check off steps as completed
-- [ ] Issue#4 — No export or sync with Todoist
+- [ ] Issue#2 [GH#1] — Brain Dump doesn't auto-add items to inbox — user has to copy manually (Chat mode can create tasks via `→ACTION:create`, but Brain Dump mode is not wired up)
+- [ ] Issue#3 [GH#2] — Weekly Review doesn't check off steps as completed
+- [ ] Issue#4 [GH#3] — No export or sync with Todoist
 
 ---
 
@@ -34,39 +34,39 @@
 
 #### UI polish / quick wins
 
-- FR#13 — Remove "Process with AI" button from the left sidebar navigation panel
+- FR#13 [GH#4] — Remove "Process with AI" button from the left sidebar navigation panel
 - ~~FR#21 — Collapsible task list in Calendar view~~ — **done** (869e933): CalendarPendingTasksSection uses same `[open, setOpen]` toggle pattern as CalendarNewEventsSection
 - ~~FR#24 — Lighten inactive buttons~~ — **done** (e838488): raised Btn idle bg surface2→surface3; added ToolbarBtn component with active/hover states; raised idle text from muted→text2
 - ~~FR#12 — Dark-theme checkboxes~~ — **done** (d73354f): `StyledCheckbox` shared component added (hidden native input + styled visual div, COLORS tokens); all 6 native checkbox sites replaced; 5-test suite co-located in src/shared/
 
 #### Daily workflow / GTD core
 
-- FR#14 — Daily Review button (replaces FR#13; context-aware: shows "Start Day" in the morning or if start-of-day review hasn't run yet; shows "End Day" in the afternoon/evening or after start-of-day completes; localStorage persistence; must handle incomplete/interrupted reviews gracefully)
-- FR#7 — Daily focus view (pick 3 Most Important Tasks from Next Actions)
-- FR#15 — AI-assisted daily planning (new coach mode; evaluates calendar + tasks + travel time)
-- FR#6 — Brain Dump auto-capture (AI extracts items and adds them directly to Inbox)
+- FR#14 [GH#5] — Daily Review button (replaces FR#13; context-aware: shows "Start Day" in the morning or if start-of-day review hasn't run yet; shows "End Day" in the afternoon/evening or after start-of-day completes; localStorage persistence; must handle incomplete/interrupted reviews gracefully)
+- FR#7 [GH#6] — Daily focus view (pick 3 Most Important Tasks from Next Actions)
+- FR#15 [GH#7] — AI-assisted daily planning (new coach mode; evaluates calendar + tasks + travel time)
+- FR#6 [GH#8] — Brain Dump auto-capture (AI extracts items and adds them directly to Inbox)
 
 #### Inbox / processing improvements
 
-- FR#8 — Inbox Process mode — AI identifies co-related tasks during inbox processing and suggests grouping them into an existing project or a new one (similar to the calendar-event grouping flow)
+- FR#8 [GH#9] — Inbox Process mode — AI identifies co-related tasks during inbox processing and suggests grouping them into an existing project or a new one (similar to the calendar-event grouping flow)
 - ~~FR#8a — "Add & Ask AI" single-task scope~~ — **done** (8d2bdf5): singleTaskMode ref gates auto-chaining; skip loop fixed with skippedInSessionIds; Delete button added to PendingActionBar
-- FR#19 — Inbox History / AI exposure rethink (decide policy on what the AI sees; small code change once decided)
+- FR#19 [GH#10] — Inbox History / AI exposure rethink (decide policy on what the AI sees; small code change once decided)
 
 #### Integrations / data
 
-- FR#25 — Email rules persistence (Supabase + localStorage optimistic cache; well-scoped)
-- FR#17 — Gmail financial detail capture → Google Sheet
-- FR#18 — Gmail rate limiting / backoff
-- FR#22 — Show linked tasks in Calendar event detail
+- FR#25 [GH#11] — Email rules persistence (Supabase + localStorage optimistic cache; well-scoped)
+- FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
+- FR#18 [GH#13] — Gmail rate limiting / backoff
+- FR#22 [GH#14] — Show linked tasks in Calendar event detail
 
 #### Data model expansions
 
-- FR#23 — Project categories (user-defined; filtering/grouping across buckets; Settings UI)
-- FR#10 — Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
-- FR#16 — Shopping list manager (new bucket/sidebar section)
+- FR#23 [GH#15] — Project categories (user-defined; filtering/grouping across buckets; Settings UI)
+- FR#10 [GH#16] — Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
+- FR#16 [GH#17] — Shopping list manager (new bucket/sidebar section)
 
 #### Platform / reach
 
-- FR#9 — Todoist export / two-way sync
+- FR#9 [GH#18] — Todoist export / two-way sync
 - ~~FR#11 — Multi-device sync~~ — **done (Supabase)**
-- FR#20 — Mobile layout (significant; requires media queries throughout)
+- FR#20 [GH#19] — Mobile layout (significant; requires media queries throughout)
