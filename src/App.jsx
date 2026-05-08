@@ -25,12 +25,13 @@ import { useTaskUIState } from "./hooks/useTaskUIState.js";
 import { createEmptyUsageStats } from "./hooks/useAIUsageTracking.js";
 
 import { parseRRULE, calEventStart, isAllDayEvent, genId } from "./api/calendarApi.js";
-import { todayStr, isDeferred, buildNextOccurrence, effortToMinutes, extractSuggestions, extractMetadata, getOrderedChildren, useResizer } from "./utils/taskUtils.jsx";
+import { todayStr, isDeferred, buildNextOccurrence, extractSuggestions, extractMetadata, getOrderedChildren, useResizer } from "./utils/taskUtils.jsx";
 import { useDragDrop } from "./hooks/useDragDrop.js";
 import { useSupabaseSync } from "./hooks/useSupabaseSync.js";
 import { useCallAI } from "./hooks/useCallAI.js";
 import { useInboxProcessing } from "./hooks/useInboxProcessing.js";
 import { useTaskCrud } from "./hooks/useTaskCrud.js";
+import { useSettings } from "./hooks/useSettings.js";
 
 
 
@@ -654,112 +655,17 @@ export default function GTDManager() {
   }, [tasks, reviewProject, reviewProjectMetadata]);
 
 
-
-
-  const addLocation = useCallback((name) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setLocations(prev => prev.includes(trimmed) ? prev : [...prev, trimmed].sort((a, b) => a.localeCompare(b)));
-  }, []);
-
-  const renameLocation = useCallback((oldName, newName) => {
-    const trimmed = newName.trim();
-    if (!trimmed || trimmed === oldName) return;
-    setLocations(prev => prev.map(l => l === oldName ? trimmed : l).sort((a, b) => a.localeCompare(b)));
-    setTasks(prev => prev.map(t => ({
-      ...t,
-      location: (t.location || []).map(l => l === oldName ? trimmed : l),
-    })));
-  }, []);
-
-  const removeLocation = useCallback((name, replaceName) => {
-    setLocations(prev => prev.filter(l => l !== name));
-    setTasks(prev => prev.map(t => {
-      const loc = t.location || [];
-      if (!loc.includes(name)) return t;
-      const next = loc.filter(l => l !== name);
-      if (replaceName && !next.includes(replaceName)) next.push(replaceName);
-      return { ...t, location: next };
-    }));
-  }, []);
-
-  const addEffort = useCallback((name) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setEfforts(prev => {
-      if (prev.includes(trimmed)) return prev;
-      return [...prev, trimmed].sort((a, b) => effortToMinutes(a) - effortToMinutes(b));
-    });
-  }, []);
-
-  const renameEffort = useCallback((oldName, newName) => {
-    const trimmed = newName.trim();
-    if (!trimmed || trimmed === oldName) return;
-    setEfforts(prev => prev.map(e => e === oldName ? trimmed : e));
-    setTasks(prev => prev.map(t => ({
-      ...t,
-      effort:       t.effort       === oldName ? trimmed : t.effort,
-      actualEffort: t.actualEffort === oldName ? trimmed : t.actualEffort,
-    })));
-  }, []);
-
-  const removeEffort = useCallback((name) => {
-    setEfforts(prev => prev.filter(e => e !== name));
-    setTasks(prev => prev.map(t => ({
-      ...t,
-      effort:       t.effort       === name ? null : t.effort,
-      actualEffort: t.actualEffort === name ? null : t.actualEffort,
-    })));
-  }, []);
-
-  const setCalibrationOverride = useCallback((label, overrideLabel) => {
-    setCalibrationOverrides(prev => ({ ...prev, [label]: overrideLabel || null }));
-  }, []);
-
-  const clearCalibrationOverride = useCallback((label) => {
-    setCalibrationOverrides(prev => {
-      const next = { ...prev };
-      delete next[label];
-      return next;
-    });
-  }, []);
-
-  const handleExport = useCallback(() => {
-    const data = { version: 1, exportedAt: new Date().toISOString(), tasks, locations, efforts };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `gtd-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [tasks, locations, efforts]);
-
-  const handleImport = useCallback((data, mode = "replace") => {
-    if (!data || !Array.isArray(data.tasks)) {
-      alert("Invalid backup file — expected a tasks array.");
-      return;
-    }
-    if (mode === "replace") {
-      if (!window.confirm(`Replace all ${tasks.length} current tasks with ${data.tasks.length} imported tasks?`)) return;
-      setTasks(data.tasks);
-      if (Array.isArray(data.locations)) setLocations([...data.locations].sort((a, b) => a.localeCompare(b)));
-      if (Array.isArray(data.efforts)) setEfforts(data.efforts);
-    } else {
-      const existingIds = new Set(tasks.map(t => t.id));
-      const incoming = data.tasks.filter(t => !existingIds.has(t.id));
-      if (!incoming.length) {
-        alert("Nothing to merge — all tasks in this backup already exist.");
-        return;
-      }
-      setTasks(prev => [...incoming, ...prev]);
-      if (Array.isArray(data.locations))
-        setLocations(prev => [...new Set([...prev, ...data.locations])].sort((a, b) => a.localeCompare(b)));
-      if (Array.isArray(data.efforts))
-        setEfforts(prev => { const s = new Set(prev); return [...prev, ...data.efforts.filter(e => !s.has(e))]; });
-      alert(`Merged ${incoming.length} new task${incoming.length !== 1 ? "s" : ""}.`);
-    }
-  }, [tasks]);
+  const {
+    addLocation, renameLocation, removeLocation,
+    addEffort, renameEffort, removeEffort,
+    setCalibrationOverride, clearCalibrationOverride,
+    handleExport, handleImport,
+  } = useSettings({
+    tasks, setTasks,
+    locations, setLocations,
+    efforts, setEfforts,
+    setCalibrationOverrides,
+  });
 
   // "deferred" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
   const bucketTasks = currentBucket === "deferred"
