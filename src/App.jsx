@@ -30,6 +30,7 @@ import { todayStr, isDeferred, buildNextOccurrence, effortToMinutes, extractSugg
 import { useDragDrop } from "./hooks/useDragDrop.js";
 import { useSupabaseSync } from "./hooks/useSupabaseSync.js";
 import { useCallAI } from "./hooks/useCallAI.js";
+import { useInboxProcessing } from "./hooks/useInboxProcessing.js";
 
 
 
@@ -206,107 +207,21 @@ export default function GTDManager() {
     setMessages([{ role: "assistant", text: introMsg }]);
   }, []);
 
-  const processNextInboxItem = useCallback(async (task) => {
-    processingTaskId.current = task.id;
-    setPendingAction(null);
-    setChatHistory([]);
-    const prompt = `Process this GTD inbox item: "${task.text}"`;
-    setMessages(prev => [...prev, { role: "user", text: `Processing: **"${task.text}"**` }]);
-    await callAI(prompt, "process", []);
-  }, [callAI]);
-
-  const handleConfirmMove = useCallback(() => {
-    if (!pendingAction) return;
-    const { type, title, nextAction, dueDate: aiDue, deferUntil: aiDefer } = pendingAction;
-
-    const current = tasks.find(t => t.id === processingTaskId.current)
-      ?? tasks.filter(t => t.bucket === "inbox")[0];
-    const nextItem = tasks.filter(t => t.bucket === "inbox" && t.id !== current?.id && !skippedInSessionIds.current.has(t.id))[0];
-
-    if (!current) return;
-
-    // Archive the original inbox item
-    setTasks(prev => prev.map(t =>
-      t.id === current.id ? { ...t, bucket: "inboxHistory" } : t
-    ));
-
-    // Create new tasks based on action type, applying any AI-suggested dates
-    if (type === "next") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "next", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
-    } else if (type === "project") {
-      const projectId = genId();
-      const actionId = genId();
-      setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: "project", done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null },
-        { id: actionId, text: nextAction || title, bucket: "next", done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null },
-        ...prev,
-      ]);
-    } else if (type === "someday") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "someday", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
-    } else if (type === "waiting") {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: "waiting", done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null }, ...prev]);
-    }
-    // type === "delete": just archive, no new task
-
-    setPendingAction(null);
-
-    // Auto-continue to next inbox item (skip in single-task mode)
-    if (nextItem && !singleTaskMode.current) {
-      setTimeout(() => processNextInboxItem(nextItem), 300);
-    } else if (singleTaskMode.current) {
-      singleTaskMode.current = false;
-      setMessages(prev => [...prev, { role: "assistant", text: "✅ **Done!** Your task has been processed and filed." }]);
-    } else {
-      setMessages(prev => [...prev, { role: "assistant", text: "🎉 **Inbox is clear!** Every item has been processed. Well done." }]);
-    }
-  }, [pendingAction, tasks, processNextInboxItem]);
-
-  const handleSkipPendingAction = useCallback(() => {
-    const current = tasks.find(t => t.id === processingTaskId.current);
-    skippedInSessionIds.current.add(processingTaskId.current);
-    const nextItem = tasks.filter(t => t.bucket === "inbox" && t.id !== processingTaskId.current && !skippedInSessionIds.current.has(t.id))[0];
-    setPendingAction(null);
-    if (current) {
-      setMessages(prev => [...prev, { role: "assistant", text: `⏭ Skipping **"${current.text}"** — it stays in your inbox for later.` }]);
-    }
-    if (nextItem && !singleTaskMode.current) {
-      setTimeout(() => processNextInboxItem(nextItem), 300);
-    } else if (singleTaskMode.current) {
-      singleTaskMode.current = false;
-    } else {
-      setMessages(prev => [...prev, { role: "assistant", text: "🎉 **All caught up!** Any skipped items remain in your inbox." }]);
-    }
-  }, [tasks, processNextInboxItem]);
-
-  const handleDeleteInboxItem = useCallback(() => {
-    const current = tasks.find(t => t.id === processingTaskId.current)
-      ?? tasks.filter(t => t.bucket === "inbox")[0];
-    if (!current) return;
-    setTasks(prev => prev.map(t => t.id === current.id ? { ...t, bucket: "inboxHistory" } : t));
-    const nextItem = tasks.filter(t => t.bucket === "inbox" && t.id !== current.id && !skippedInSessionIds.current.has(t.id))[0];
-    setPendingAction(null);
-    setMessages(prev => [...prev, { role: "assistant", text: `🗑 Deleted **"${current.text}"**.` }]);
-    if (nextItem && !singleTaskMode.current) {
-      setTimeout(() => processNextInboxItem(nextItem), 300);
-    } else if (singleTaskMode.current) {
-      singleTaskMode.current = false;
-    } else {
-      setMessages(prev => [...prev, { role: "assistant", text: "🎉 **All caught up!** Inbox fully processed." }]);
-    }
-  }, [tasks, processNextInboxItem]);
-
-  const startProcessInbox = useCallback(async () => {
-    singleTaskMode.current = false;
-    skippedInSessionIds.current = new Set();
-    setCurrentBucket("inbox");
-    const inbox = tasks.filter(t => t.bucket === "inbox");
-    if (inbox.length === 0) {
-      switchCoachMode("process", "Your inbox is empty — nothing to process! Add some tasks first or do a Brain Dump.");
-      return;
-    }
-    switchCoachMode("process", `You have **${inbox.length} item${inbox.length > 1 ? "s" : ""}** in your inbox. Processing them one by one…`);
-    setTimeout(() => processNextInboxItem(inbox[0]), 100);
-  }, [tasks, switchCoachMode, processNextInboxItem]);
+  const {
+    processNextInboxItem,
+    handleConfirmMove,
+    handleSkipPendingAction,
+    handleDeleteInboxItem,
+    startProcessInbox,
+    askAIAboutTask,
+  } = useInboxProcessing({
+    tasks, pendingAction,
+    singleTaskMode, processingTaskId, skippedInSessionIds,
+    setTasks, setCurrentBucket,
+    setMessages, setChatHistory,
+    setPendingAction,
+    callAI, switchCoachMode,
+  });
 
   const handleRecurringStillFine = useCallback((masterId) => {
     setRecurringAcknowledgedMap(prev => {
@@ -744,12 +659,6 @@ export default function GTDManager() {
     }
   }, [tasks, reviewProject, reviewProjectMetadata]);
 
-  const askAIAboutTask = useCallback(async (task) => {
-    setCurrentBucket("inbox");
-    singleTaskMode.current = true;
-    switchCoachMode("process", `Let's clarify: **"${task.text}"**`);
-    setTimeout(() => processNextInboxItem(task), 100);
-  }, [switchCoachMode, processNextInboxItem]);
 
   const addTask = (bucket) => {
     const text = addText.trim();
