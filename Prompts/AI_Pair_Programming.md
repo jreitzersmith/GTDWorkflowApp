@@ -28,17 +28,25 @@ npx vite build --outDir /sessions/eloquent-upbeat-darwin/mnt/outputs/gtd-dist-<f
 
 Do not proceed to Step 4 until the build is green.
 
-### Step 4 — Testing Guidance
+### Step 4 — Automated Tests
+After the build passes, run `npx vitest run` via desktop-commander (Windows binary — the Linux sandbox cannot execute it). Evaluate the result:
+
+- **All pass:** note the count (e.g. "85/85 passing") and proceed to Step 5.
+- **Any fail:** make one self-contained fix attempt — code change, build, re-run tests. If tests still fail after that single pass, report the remaining failures with a brief diagnosis and ask John how to proceed. Do not iterate silently beyond one attempt.
+
+Open Step 5 with the test result line (e.g. "85/85 tests passing ✓").
+
+### Step 5 — Testing Guidance
 Provide specific, concrete manual testing steps — not generic advice. Format: "click here, expect to see this." Every instruction should be feature-specific.
 
-### Step 5 — John's Testing & Feedback
+### Step 6 — John's Testing & Feedback
 John tests. If something is off, iterate back to Step 3. If it passes, he confirms it is working.
 
-**If testing reveals an issue and a fix is applied:** run the build, then explicitly ask John to re-test and confirm the fix before moving to Step 6. A passing build is not sufficient — re-confirmation is required after every mid-testing fix, no matter how small. Do not commit until that second confirmation arrives.
+**If testing reveals an issue and a fix is applied:** run the build, then explicitly ask John to re-test and confirm the fix before moving to Step 7. A passing build is not sufficient — re-confirmation is required after every mid-testing fix, no matter how small. Do not commit until that second confirmation arrives.
 
 Do **not** touch the three HTML doc files (`project-summary.html`, `project-snippets.html`, `project-commits.html`) until John says "looks good" or equivalent. Misleading docs are worse than no docs.
 
-### Step 6 — Commit
+### Step 7 — Commit
 Once John confirms, commit via `mcp__git__git_commit` (not bash git — bash can hit HEAD.lock on the Windows mount).
 
 ```
@@ -50,8 +58,8 @@ feat: short description
 
 Use `fix:` for bug fixes, `docs:` for documentation-only commits.
 
-### Step 7 — Documentation (append only)
-After the commit, update all three project doc files — **but only if John has already confirmed the feature works in Step 5.** If for any reason he hasn't confirmed yet, explicitly say docs will be updated once he does. Do not update docs speculatively.
+### Step 8 — Documentation (append only)
+After the commit, update all three project doc files — **but only if John has already confirmed the feature works in Step 6.** If for any reason he hasn't confirmed yet, explicitly say docs will be updated once he does. Do not update docs speculatively.
 
 When ready: read the tail of each HTML file to find the last documented state, then append new content (TOC entry, feature section, snippets, commit entry). Never rewrite existing sections. Update all three files in one Python pass.
 

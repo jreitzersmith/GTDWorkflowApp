@@ -20,6 +20,7 @@ TESTABILITY
 - Prefer pure functions: same input always produces same output
 - Never mix business logic with rendering logic
 - Isolate all side effects so they can be tested independently
+- When introducing new pure functions or custom hooks, identify test candidates and list proposed test cases as part of the Step 2 proposal. Upon approval, write tests in the same implementation pass — co-located in the feature folder — not as a deferred follow-up task.
 
 DRY (Don't Repeat Yourself)
 - Never duplicate logic — extract shared logic into utility functions or custom hooks
@@ -101,3 +102,5 @@ Check your output against this list:
 [ ] Folder/file structure follows feature-based organization
 [ ] TypeScript types or PropTypes are defined for all props
 [ ] No console.logs left in the code
+[ ] New pure functions and hooks have test candidates identified and proposed in Step 2
+[ ] Approved tests are written, passing, and co-located in the feature folder
