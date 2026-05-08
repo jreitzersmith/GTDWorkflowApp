@@ -1,4 +1,5 @@
-import { useState, useEffect, useContext } from "react";
+import { useContext } from "react";
+import { useTaskRowState } from "../hooks/useTaskRowState.js";
 import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../constants.jsx";
 import { TaskActionsContext, TaskRowContext, taskShape } from "../contexts.js";
@@ -13,14 +14,14 @@ const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelected }) {
   const { onComplete, onDelete, onMove, onAskAI, onUpdateTask, onAssignToProject, onSkipRecurrence, onNavigate, onOpenDetail, onToggleCollapse, onToggleCollapseLevel } = useContext(TaskActionsContext);
   const { currentBucket, allTasks, moveMenu, setMoveMenu, pendingAction, collapsedNodes, selectedTaskId, locations, efforts, tagDisplay } = useContext(TaskRowContext);
-  const [hover, setHover] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const [showAssign, setShowAssign] = useState(false);
-  const [assignTarget, setAssignTarget] = useState("__new__");
-  const [newProjName, setNewProjName] = useState("");
-  const [editTitle, setEditTitle] = useState(task.text);
-  // Keep draft in sync if the task text is changed externally
-  useEffect(() => { setEditTitle(task.text); }, [task.text]);
+  const {
+    hover, setHover,
+    expanded, setExpanded,
+    showAssign, setShowAssign,
+    assignTarget, setAssignTarget,
+    newProjName, setNewProjName,
+    editTitle, setEditTitle,
+  } = useTaskRowState(task);
   const highlight = pendingAction && task.bucket === "inbox";
   const parentProject = task.parentId ? (allTasks || []).find(t => t.id === task.parentId) : null;
   const indent = indentOverride !== undefined ? indentOverride : (isSubtask ? 28 : 0);

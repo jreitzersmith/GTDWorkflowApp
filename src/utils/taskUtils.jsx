@@ -90,13 +90,13 @@ function extractUpdateAction(text) {
     const colon = pair.indexOf(':');
     if (colon === -1) return;
     const key = pair.slice(0, colon).trim();
-    const val = pair.slice(colon + 1).trim();
+    const val = pair.slice(colon + 1).trim().replace(/\]$/, '');
     if (key === 'due')          changes.dueDate      = val;
     if (key === 'defer')        changes.deferUntil   = val;
     if (key === 'effort')       changes.effort       = val;
     if (key === 'actualEffort') changes.actualEffort = val;
     if (key === 'bucket')       changes.bucket       = val;
-    if (key === 'title')        changes.text         = val;
+    if (key === 'title')        changes.text         = val.replace(/[\[\]]/g, '');
     if (key === 'priority')     changes.priority     = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'location')     changes.location     = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') changes.recurrence = parseRecurrenceValue(val);
@@ -111,14 +111,14 @@ function extractUpdateAction(text) {
 function extractAddAction(text) {
   const m = text.match(/→ACTION:add\|([^|\n]+)\|(.*)/s);
   if (!m) return null;
-  const title = m[1].trim().replace(/`/g, '');
+  const title = m[1].trim().replace(/`/g, '').replace(/[\[\]]/g, '');
   const rest = m[2];
   const fields = {};
   rest.split('|').filter(Boolean).forEach(pair => {
     const colon = pair.indexOf(':');
     if (colon === -1) return;
     const key = pair.slice(0, colon).trim();
-    const val = pair.slice(colon + 1).trim();
+    const val = pair.slice(colon + 1).trim().replace(/\]$/, '');
     if (key === 'parent')   fields.parentId   = val.replace(/`/g, '').trim();
     if (key === 'bucket')   fields.bucket     = val;
     if (key === 'due')      fields.dueDate    = val;
@@ -136,7 +136,7 @@ function extractAddAction(text) {
 function extractCreateAction(text) {
   const m = text.match(/→ACTION:create\|([^|\n]+)\|(.*)/s);
   if (!m) return null;
-  const title = m[1].trim().replace(/`/g, '');
+  const title = m[1].trim().replace(/`/g, '').replace(/[\[\]]/g, '');
   const rest = m[2];
   const VALID_BUCKETS = new Set(['inbox', 'next', 'project', 'someday', 'waiting']);
   const fields = {};
@@ -144,7 +144,7 @@ function extractCreateAction(text) {
     const colon = pair.indexOf(':');
     if (colon === -1) return;
     const key = pair.slice(0, colon).trim();
-    const val = pair.slice(colon + 1).trim();
+    const val = pair.slice(colon + 1).trim().replace(/\]$/, '');
     if (key === 'bucket' && VALID_BUCKETS.has(val)) fields.bucket = val;
     if (key === 'due')      fields.dueDate    = val;
     if (key === 'defer')    fields.deferUntil = val;
@@ -446,6 +446,17 @@ function getOrderedChildren(parentId, allTasks) {
   return (parent.childIds || []).map(id => allTasks.find(t => t.id === id)).filter(Boolean);
 }
 
+// Recursively collects the IDs of a task and all its descendants.
+// Used to build an exclusion set when listing eligible parent projects,
+// preventing circular references in the project hierarchy.
+function collectDescendantIds(taskId, allTasks, seen = new Set()) {
+  if (seen.has(taskId)) return seen;
+  seen.add(taskId);
+  const task = allTasks.find(t => t.id === taskId);
+  (task?.childIds || []).forEach(cid => collectDescendantIds(cid, allTasks, seen));
+  return seen;
+}
+
 // Pure function: returns a new tasks array after moving dragId to targetId at position.
 // position: "before" | "inside" | "after"
 // Handles: reorder within level, reparent, promote to root, demote into project.
@@ -546,4 +557,4 @@ function useResizer(storageKey, defaultSize, { min, max, direction = 'h', sign =
 }
 
 
-export { todayStr, isDeferred, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, moveTaskInTree, useResizer };
+export { todayStr, isDeferred, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, collectDescendantIds, moveTaskInTree, useResizer };

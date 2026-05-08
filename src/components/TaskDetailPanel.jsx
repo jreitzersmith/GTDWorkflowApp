@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useTaskDetailDrafts } from "../hooks/useTaskDetailDrafts.js";
 import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../constants.jsx";
 import { taskShape } from "../contexts.js";
-import { effortAccuracyColor, effortToMinutes } from "../utils/taskUtils.jsx";
+import { collectDescendantIds, effortAccuracyColor, effortToMinutes } from "../utils/taskUtils.jsx";
 
 // Shared style tokens used across the sub-components below.
 const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
@@ -229,44 +230,17 @@ RecurrenceEditor.propTypes = {
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
 function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
-  const [titleDraft, setTitleDraft] = useState(task.text);
-  const [notesDraft, setNotesDraft] = useState(task.notes || "");
-
-  // Sync drafts when a different task is opened in the panel.
-  useEffect(() => { setTitleDraft(task.text); }, [task.id, task.text]);
-  useEffect(() => { setNotesDraft(task.notes || ""); }, [task.id, task.notes]);
-
-  // Close panel on Escape key.
-  useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
-
-  const saveTitle = () => {
-    const t = titleDraft.trim();
-    if (t && t !== task.text) onUpdate(task.id, { text: t });
-    else setTitleDraft(task.text);
-  };
-
-  const saveNotes = () => {
-    const val = notesDraft.trim() || null;
-    if (val !== (task.notes || null)) onUpdate(task.id, { notes: val });
-  };
+  const {
+    titleDraft, setTitleDraft, saveTitle,
+    notesDraft, setNotesDraft, saveNotes,
+  } = useTaskDetailDrafts({ task, onUpdate, onClose });
 
   const bucketColor = BUCKETS[task.bucket]?.color || COLORS.muted;
   const bucketLabel = BUCKETS[task.bucket]?.label || task.bucket;
 
-  // Build the list of projects this task can be assigned to.
-  // Excludes the task itself and all descendants to prevent cycles.
-  const getDescendantIds = (taskId, tasks, seen = new Set()) => {
-    if (seen.has(taskId)) return seen;
-    seen.add(taskId);
-    const t = tasks.find(x => x.id === taskId);
-    (t?.childIds || []).forEach(cid => getDescendantIds(cid, tasks, seen));
-    return seen;
-  };
-  const excludedIds = getDescendantIds(task.id, allTasks);
+  // Exclude the task and all its descendants from eligible parent projects
+  // to prevent circular references in the project hierarchy.
+  const excludedIds = collectDescendantIds(task.id, allTasks);
   const eligibleProjects = allTasks.filter(
     t => (t.bucket === "project" && !t.parentId || t.id === task.parentId) && !t.done && !excludedIds.has(t.id)
   );
