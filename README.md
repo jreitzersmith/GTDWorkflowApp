@@ -44,4 +44,23 @@ See `.env.example` for the full list.
 
 ## Project brief
 
-See `CLAUDE.md` for full context, tech stack, file structure, and development workflow.
+**Tech stack:** React (functional components + hooks), inline styles only, Anthropic Claude API (`claude-sonnet-4-6`), Supabase for persistence, Vite for dev.
+
+**File structure:**
+```
+src/
+├── features/        # Feature-based organisation (calendar, coach, email, settings, tasks)
+├── hooks/           # Cross-feature hooks (Supabase auth, Google auth, sync)
+├── api/             # Supabase client + field mappers
+├── prompts/         # Exported copies of all AI system prompts
+├── shared/          # Reusable UI components
+└── SQL/             # Supabase schema + migration SQL
+Claude_Prompts/      # Claude workflow docs (pairing process, code standards, backlog)
+Product_Summary/     # HTML project documentation (summary, commits, code snippets)
+```
+
+**Development workflow:** See `Claude_Prompts/AI_Pair_Programming.md` — every change follows an 8-step process (propose → approve → implement → build → test → confirm → commit → document).
+
+**Coding standards:** See `Claude_Prompts/Senior_Code_Engineer.md`.
+
+**Backlog:** See `Claude_Prompts/Known_Issues_And_Requests.md` — tracked locally and mirrored to GitHub Issues.
