@@ -23,11 +23,12 @@ import { useGmailState } from "./hooks/useGmailState.js";
 import { useAICoachState } from "./hooks/useAICoachState.js";
 import { useTaskUIState } from "./hooks/useTaskUIState.js";
 import { createEmptyUsageStats } from "./hooks/useAIUsageTracking.js";
-import { DEFAULT_EFFORTS } from "./hooks/useAppSettings.js";
-import { supabase, queueEntryToRow, rowToQueueEntry, taskToDb, dbToTask } from "./api/supabase.js";
+import { supabase, queueEntryToRow } from "./api/supabase.js";
 import { TOOLS, doWebSearch, GMAIL_SEARCH_TOOL, generateCodeVerifier, generateCodeChallenge, doGmailSearch, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL, GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL, GMAIL_LIST_FILTERS_TOOL, GMAIL_CREATE_FILTER_TOOL, GMAIL_DELETE_FILTER_TOOL, GMAIL_BULK_ACTION_TOOL, GMAIL_QUEUE_ADD_TOOL, GMAIL_SCOPE_OPTS, GMAIL_SCOPE_DISPLAY, doGmailListLabels, doGmailFetchLabelsRaw, doGmailLabel, doGmailBatchLabel, buildRawMessage, doGmailCompose, doGmailSend, doGmailCreateLabel, doGmailListFilters, doGmailCreateFilter, doGmailDeleteFilter, doGmailBulkAction, extractGmailPlainText, doGmailFetchInbox, doGmailGetMessageBody, doGmailFetchFilters } from "./api/gmailTools.js";
 import { CALENDAR_SCOPE, doCalendarFetchEvents, buildRRULE, firstOccurrenceDate, parseRRULE, doCalendarCreateEvent, doCalendarDeleteEvent, doCalendarUpdateEvent, calEventStart, calEventEnd, isAllDayEvent, fmtCalTime, eventsForDay, isSameDay, getMondayOfWeek, genId, DAY_MAP, parseRecurrenceValue, parseApiResponse } from "./api/calendarApi.js";
-import { todayStr, isDeferred, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, moveTaskInTree, useResizer } from "./utils/taskUtils.jsx";
+import { todayStr, isDeferred, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, useResizer } from "./utils/taskUtils.jsx";
+import { useDragDrop } from "./hooks/useDragDrop.js";
+import { useSupabaseSync } from "./hooks/useSupabaseSync.js";
 
 
 
@@ -60,28 +61,29 @@ export default function GTDManager() {
   const { googleToken, googleScope, calendarEnabled, gmailError,
           signInWithGoogle, disconnectGmail, connectCalendar, disconnectCalendar,
           refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
-  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, dragId, setDragId, dropTarget, setDropTarget, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion } = useTaskUIState();
+  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
 
   // ── Auth ───────────────────────────────────────────────────────────────
   const { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink } = useSupabaseAuth();
 
-  // true once the initial Supabase read (or migration) has completed
-  const [supabaseReady, setSupabaseReady] = useState(false);
-  // tracks previous tasks snapshot for write-sync diffing
-  const prevTasksRef = useRef(null);
-  // gates settings write-sync — flipped true after initial load/migration completes
-  const settingsReadyRef = useRef(false);
-  // debounce timer for settings upsert
-  const settingsDebounceRef = useRef(null);
   // true when processing was triggered by 'Add & Ask AI' (single-task scope)
   const singleTaskMode = useRef(false);
   // id of the inbox task currently being processed by the AI coach
   const processingTaskId = useRef(null);
   // inbox task IDs skipped in the current processing session; reset on fresh startProcessInbox
   const skippedInSessionIds = useRef(new Set());
-  // 'synced' | 'offline'
-  const [syncStatus, setSyncStatus] = useState('synced');
+
+  const { syncStatus, supabaseReady } = useSupabaseSync({
+    authUser, tasks, setTasks,
+    locations, efforts, calibrationOverrides,
+    skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
+    setLocations, setEfforts, setCalibrationOverrides,
+    setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
+    setGmailQueue,
+  });
+
+  const { dragId, dropTarget, setDropTarget, handleProjectDragStart, handleProjectDragOver, handleProjectDragEnd, handleProjectDrop } = useDragDrop({ setTasks });
 
   // Panel resize state — persisted across sessions
   const [sidebarWidth, sidebarDragDown]      = useResizer("gtd_sidebar_w",     240,                                    { min: 160, max: 420, direction: 'h', sign:  1 });
@@ -89,251 +91,7 @@ export default function GTDManager() {
   const [detailWidth,  detailDragDown]        = useResizer("gtd_detail_w",      360,                                   { min: 240, max: 600, direction: 'h', sign: -1 });
   const [chatInputHeight, chatInputDragDown]  = useResizer("gtd_chat_input_h",  60,                                    { min: 36,  max: 300, direction: 'v', sign: -1 });
 
-  useEffect(() => {
-    localStorage.setItem("gtd_tasks", JSON.stringify(tasks));
-  }, [tasks]);
 
-  // Supabase read: fetch tasks once auth resolves; auto-migrate localStorage if empty
-  useEffect(() => {
-    if (!authUser) return;
-    supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', authUser.id)
-      .order('created', { ascending: true })
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('Supabase read error:', error);
-          setSupabaseReady(true);
-          return;
-        }
-        if (data && data.length > 0) {
-          // Supabase has data — use it as the source of truth
-          setTasks(data.map(dbToTask));
-          setSupabaseReady(true);
-        } else {
-          // Supabase is empty — migrate from localStorage
-          const local = (() => {
-            try { return JSON.parse(localStorage.getItem('gtd_tasks') || '[]'); } catch { return []; }
-          })();
-          if (local.length > 0) {
-            const rows = local.map(t => taskToDb(t, authUser.id));
-            supabase.from('tasks').insert(rows).then(({ error: e2 }) => {
-              if (e2) console.error('Migration failed:', e2);
-              setSupabaseReady(true);
-            });
-          } else {
-            setSupabaseReady(true);
-          }
-        }
-      });
-  }, [authUser]);
-
-  // Supabase read: fetch user_settings once auth resolves; auto-migrate localStorage if empty
-  useEffect(() => {
-    if (!authUser) return;
-    supabase
-      .from('user_settings')
-      .select('*')
-      .eq('user_id', authUser.id)
-      .single()
-      .then(({ data, error }) => {
-        // PGRST116 = no rows returned — treat as "not yet migrated"
-        if (error && error.code !== 'PGRST116') {
-          console.error('Settings load error:', error);
-          settingsReadyRef.current = true;
-          return;
-        }
-        if (data) {
-          // Server wins — overwrite local state
-          if (Array.isArray(data.locations)) setLocations([...data.locations].sort((a, b) => a.localeCompare(b)));
-          if (Array.isArray(data.efforts)) setEfforts(data.efforts);
-          if (data.calibration_overrides && typeof data.calibration_overrides === 'object')
-            setCalibrationOverrides(data.calibration_overrides);
-          if (Array.isArray(data.cal_skipped_tasks)) setSkippedCalendarIds(new Set(data.cal_skipped_tasks));
-          if (Array.isArray(data.cal_seen_events))   setSeenCalendarEventIds(new Set(data.cal_seen_events));
-          if (Array.isArray(data.cal_recurring_acknowledged)) setRecurringAcknowledgedMap(new Map(data.cal_recurring_acknowledged));
-          if (typeof data.recurring_review_days === 'number') setRecurringReviewDays(data.recurring_review_days);
-          settingsReadyRef.current = true;
-        } else {
-          // Supabase empty — migrate from localStorage
-          const localLocations = (() => { try { return JSON.parse(localStorage.getItem('gtd_locations') || 'null') || ["Home","Work","Phone","Computer"]; } catch { return ["Home","Work","Phone","Computer"]; } })();
-          const localEfforts   = (() => { try { return JSON.parse(localStorage.getItem('gtd_efforts')   || 'null') || DEFAULT_EFFORTS; } catch { return DEFAULT_EFFORTS; } })();
-          const localCalib     = (() => { try { return JSON.parse(localStorage.getItem('gtd_effort_calibration') || 'null') || {}; } catch { return {}; } })();
-          const localSkipped = (() => { try { return JSON.parse(localStorage.getItem('gtd_cal_skipped') || '[]'); } catch { return []; } })();
-          supabase.from('user_settings').insert({
-            user_id: authUser.id,
-            locations: localLocations,
-            efforts: localEfforts,
-            calibration_overrides: localCalib,
-            cal_skipped_tasks: localSkipped,
-            cal_seen_events: [],
-          }).then(({ error: e2 }) => {
-            if (e2) console.error('Settings migration failed:', e2);
-            settingsReadyRef.current = true;
-          });
-        }
-      });
-  }, [authUser]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Supabase write: diff tasks on every change and sync inserts/updates/deletes
-  useEffect(() => {
-    if (!authUser || !supabaseReady) { prevTasksRef.current = tasks; return; }
-    const prev = prevTasksRef.current;
-    prevTasksRef.current = tasks;
-    if (!prev) return;
-
-    const prevMap = new Map(prev.map(t => [t.id, t]));
-    const currMap = new Map(tasks.map(t => [t.id, t]));
-
-    const upserts = tasks.filter(t => {
-      const old = prevMap.get(t.id);
-      return !old || JSON.stringify(old) !== JSON.stringify(t);
-    });
-    const deletes = prev.filter(t => !currMap.has(t.id));
-    if (!upserts.length && !deletes.length) return;
-
-    const queuePending = (ops) => {
-      const existing = JSON.parse(localStorage.getItem('gtd_pending_writes') || '[]');
-      localStorage.setItem('gtd_pending_writes', JSON.stringify([...existing, ...ops]));
-      setSyncStatus('offline');
-    };
-
-    if (upserts.length) {
-      supabase.from('tasks')
-        .upsert(upserts.map(t => taskToDb(t, authUser.id)), { onConflict: 'id' })
-        .then(({ error }) => {
-          if (error) {
-            console.error('Supabase upsert:', error);
-            queuePending(upserts.map(t => ({ type: 'upsert', row: taskToDb(t, authUser.id) })));
-          } else { setSyncStatus('synced'); }
-        });
-    }
-    if (deletes.length) {
-      supabase.from('tasks').delete()
-        .in('id', deletes.map(t => t.id)).eq('user_id', authUser.id)
-        .then(({ error }) => {
-          if (error) {
-            console.error('Supabase delete:', error);
-            queuePending(deletes.map(t => ({ type: 'delete', id: t.id })));
-          } else if (!upserts.length) { setSyncStatus('synced'); }
-        });
-    }
-  }, [tasks, authUser, supabaseReady]);
-
-  // Supabase write: debounced upsert of settings whenever locations/efforts/calibration change
-  useEffect(() => {
-    if (!authUser || !settingsReadyRef.current) return;
-    clearTimeout(settingsDebounceRef.current);
-    settingsDebounceRef.current = setTimeout(() => {
-      supabase.from('user_settings')
-        .upsert({
-          user_id: authUser.id,
-          locations,
-          efforts,
-          calibration_overrides: calibrationOverrides,
-          cal_skipped_tasks: [...skippedCalendarIds],
-          cal_seen_events:   [...seenCalendarEventIds],
-          cal_recurring_acknowledged: [...recurringAcknowledgedMap.entries()],
-          recurring_review_days: recurringReviewDays,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' })
-        .then(({ error }) => {
-          if (error) console.error('Settings sync error:', error);
-          else setSyncStatus('synced');
-        });
-    }, 1500);
-    return () => clearTimeout(settingsDebounceRef.current);
-  }, [locations, efforts, calibrationOverrides, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fallback: keep localStorage in sync for unauthenticated sessions
-  useEffect(() => {
-    if (!authUser) localStorage.setItem('gtd_cal_skipped',     JSON.stringify([...skippedCalendarIds]));
-  }, [skippedCalendarIds, authUser]);
-  useEffect(() => {
-    if (!authUser) localStorage.setItem('gtd_cal_seen_events', JSON.stringify([...seenCalendarEventIds]));
-  }, [seenCalendarEventIds, authUser]);
-  useEffect(() => {
-    if (!authUser) localStorage.setItem('gtd_cal_recurring_ack', JSON.stringify([...recurringAcknowledgedMap.entries()]));
-  }, [recurringAcknowledgedMap, authUser]);
-  useEffect(() => {
-    if (!authUser) localStorage.setItem('gtd_recurring_review_days', String(recurringReviewDays));
-  }, [recurringReviewDays, authUser]);
-
-  // Phase 6 — offline resilience: flush pending writes when connectivity returns
-  useEffect(() => {
-    const flushPending = async () => {
-      const raw = localStorage.getItem('gtd_pending_writes');
-      if (!raw || !authUser) return;
-      const pending = JSON.parse(raw);
-      if (!pending?.length) return;
-      const upserts = pending.filter(p => p.type === 'upsert');
-      const deletes = pending.filter(p => p.type === 'delete');
-      let ok = true;
-      if (upserts.length) {
-        const { error } = await supabase.from('tasks')
-          .upsert(upserts.map(p => p.row), { onConflict: 'id' });
-        if (error) { console.error('Flush upsert failed:', error); ok = false; }
-      }
-      if (ok && deletes.length) {
-        const { error } = await supabase.from('tasks').delete()
-          .in('id', deletes.map(p => p.id)).eq('user_id', authUser.id);
-        if (error) { console.error('Flush delete failed:', error); ok = false; }
-      }
-      if (ok) {
-        localStorage.removeItem('gtd_pending_writes');
-        setSyncStatus('synced');
-      }
-    };
-    setSyncStatus(navigator.onLine ? 'synced' : 'offline');
-    window.addEventListener('online', flushPending);
-    window.addEventListener('offline', () => setSyncStatus('offline'));
-    return () => {
-      window.removeEventListener('online', flushPending);
-      window.removeEventListener('offline', () => setSyncStatus('offline'));
-    };
-  }, [authUser]);
-
-  // Phase 7 — realtime: receive changes from other devices
-  useEffect(() => {
-    if (!authUser || !supabaseReady) return;
-    const channel = supabase
-      .channel(`tasks-${authUser.id}`)
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'tasks',
-        filter: `user_id=eq.${authUser.id}`,
-      }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const incoming = dbToTask(payload.new);
-          setTasks(prev => {
-            const idx = prev.findIndex(t => t.id === incoming.id);
-            if (idx === -1) return [incoming, ...prev];
-            const next = [...prev];
-            next[idx] = incoming;
-            return next;
-          });
-        } else if (payload.eventType === 'DELETE') {
-          setTasks(prev => prev.filter(t => t.id !== payload.old.id));
-        }
-      })
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, [authUser, supabaseReady]);
-
-  // Load gmail_queue from Supabase on auth ready, merge with any localStorage entries
-  useEffect(() => {
-    if (!authUser || !supabaseReady) return;
-    supabase.from('gmail_queue').select('*').eq('user_id', authUser.id).then(({ data, error }) => {
-      if (error) { console.error('gmail_queue load error', error); return; }
-      if (!data || data.length === 0) return;
-      const fromServer = data.map(rowToQueueEntry);
-      setGmailQueue(prev => {
-        const serverIds = new Set(fromServer.map(e => e.id));
-        const localOnly = prev.filter(e => !serverIds.has(e.id));
-        return [...fromServer, ...localOnly];
-      });
-    });
-  }, [authUser, supabaseReady]); // eslint-disable-line
 
   // Fetch unread inbox count whenever the Gmail token changes
   // Use labels/INBOX endpoint — messagesUnread is exact; resultSizeEstimate on messages.list is unreliable
@@ -1740,36 +1498,6 @@ export default function GTDManager() {
       location: (t.location || []).map(l => l === oldName ? trimmed : l),
     })));
   }, []);
-
-  const handleProjectDragStart = useCallback((id) => {
-    setDragId(id);
-    setDropTarget(null);
-  }, []);
-
-  const handleProjectDragOver = useCallback((e, taskId) => {
-    if (taskId === dragId) return;                          // don't target self
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = (e.clientY - rect.top) / rect.height;
-    const position = ratio < 0.33 ? "before" : ratio > 0.67 ? "after" : "inside";
-    setDropTarget(prev =>
-      prev?.id === taskId && prev?.position === position ? prev : { id: taskId, position }
-    );
-  }, [dragId]);
-
-  const handleProjectDragEnd = useCallback(() => {
-    setDragId(null);
-    setDropTarget(null);
-  }, []);
-
-  const handleProjectDrop = useCallback((targetId) => {
-    setDropTarget(prev => {
-      if (prev && dragId) {
-        setTasks(all => moveTaskInTree(all, dragId, targetId, prev.position));
-      }
-      return null;
-    });
-    setDragId(null);
-  }, [dragId]);
 
   const removeLocation = useCallback((name, replaceName) => {
     setLocations(prev => prev.filter(l => l !== name));

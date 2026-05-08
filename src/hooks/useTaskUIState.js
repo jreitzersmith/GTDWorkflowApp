@@ -12,8 +12,6 @@ function useTaskUIState() {
   const [actualEffortPrompt, setActualEffortPrompt] = useState(null);
   const [pendingRollup, setPendingRollup] = useState(null);
   const [pendingDeferCheck, setPendingDeferCheck] = useState(null);
-  const [dragId, setDragId] = useState(null);
-  const [dropTarget, setDropTarget] = useState(null);
   const [inboxSelectedIds, setInboxSelectedIds] = useState(new Set());
   const [pendingGroupSuggestion, setPendingGroupSuggestion] = useState(null);
 
@@ -29,8 +27,6 @@ function useTaskUIState() {
     actualEffortPrompt, setActualEffortPrompt,
     pendingRollup, setPendingRollup,
     pendingDeferCheck, setPendingDeferCheck,
-    dragId, setDragId,
-    dropTarget, setDropTarget,
     inboxSelectedIds, setInboxSelectedIds,
     pendingGroupSuggestion, setPendingGroupSuggestion,
   };
