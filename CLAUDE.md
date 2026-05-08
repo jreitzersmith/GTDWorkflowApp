@@ -3,6 +3,10 @@
 ## Working instructions
 Before each set of tool calls, briefly explain what you're looking for and why.
 
+## Ongoing maintenance
+- **Vite timestamp cleanup:** At the start of each session, check for `vite.config.js.timestamp-*.mjs` files in the project root. If 5 or more exist, delete them all with:
+  `Remove-Item "C:\Programming_Projects\GTDWorkflowApp\vite.config.js.timestamp-*.mjs" -Force`
+
 ## What this project is
 A personal GTD (Getting Things Done) task manager built as a React app. It combines a full task list with an AI coach powered by the Anthropic Claude API.
 
