@@ -89,7 +89,7 @@ function TypingIndicator() {
   );
 }
 
-function PendingActionBar({ action, onConfirm, onDismiss }) {
+function PendingActionBar({ action, onConfirm, onDismiss, onDelete }) {
   if (!action) return null;
   const { type, title, nextAction } = action;
 
@@ -121,6 +121,9 @@ function PendingActionBar({ action, onConfirm, onDismiss }) {
         </button>
         <button onClick={onDismiss} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>
           Skip
+        </button>
+        <button onClick={onDelete} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #c4606044", background: "transparent", color: "#c46060", fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>
+          🗑 Delete
         </button>
       </div>
     </div>

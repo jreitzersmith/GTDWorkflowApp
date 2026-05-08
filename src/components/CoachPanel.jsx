@@ -41,6 +41,7 @@ function CoachPanel({
   onSendChat,
   onConfirmMove,
   onDismissPendingAction,
+  onDeleteInboxItem,
   onRecurringStillFine,
   onRecurringNeedsWork,
   onSelectReviewMode,
@@ -104,6 +105,7 @@ function CoachPanel({
             action={pendingAction}
             onConfirm={onConfirmMove}
             onDismiss={onDismissPendingAction}
+            onDelete={onDeleteInboxItem}
           />
         )}
         {coachMode === "projectReview" && reviewMode === null && !loading && (
@@ -209,6 +211,7 @@ CoachPanel.propTypes = {
   onSendChat:             PropTypes.func.isRequired,
   onConfirmMove:          PropTypes.func.isRequired,
   onDismissPendingAction: PropTypes.func.isRequired,
+  onDeleteInboxItem:      PropTypes.func.isRequired,
   onRecurringStillFine:   PropTypes.func.isRequired,
   onRecurringNeedsWork:   PropTypes.func.isRequired,
   onSelectReviewMode:     PropTypes.func.isRequired,
