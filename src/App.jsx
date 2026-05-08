@@ -1,23 +1,18 @@
-import { useState, useEffect, useRef, useCallback, useMemo, useContext, Component } from "react";
-import PropTypes from "prop-types";
-import { TaskActionsContext, TaskRowContext, taskShape } from "./contexts.js";
+import { useState, useEffect, useRef, useCallback, useMemo, useContext } from "react";
+import { TaskActionsContext, TaskRowContext } from "./contexts.js";
 import { COLORS, BUCKETS, COACH_MODES, SYSTEM_PROMPTS, OPENWEBUI_URL } from "./constants.jsx";
 import { EmailManagementView } from "./components/email.jsx";
-import { InboxBulkBar, ProjectGroupSuggestionBar } from "./components/InboxBars.jsx";
-import { CalendarSuggestionsBar } from "./components/CalendarSuggestionsBar.jsx";
 import { CalendarManagementView } from "./components/CalendarManagementView.jsx";
-import { BucketItem, SidebarBtn, Btn } from "./components/SidebarComponents.jsx";
-import { PRIORITIES, TaskRow } from "./components/TaskRow.jsx";
-import {
-  ActionBtn, RecurringReviewCard, ChatBubble, TypingIndicator,
-  PendingActionBar, DeferCheckPrompt, NoteRollupPrompt, ActualEffortPrompt,
-  ReviewModeBar, MetadataReviewBar, ProjectReviewBar,
-  ProviderSelector, ProviderOption,
-} from "./components/AICoach.jsx";
+import { DeferCheckPrompt, NoteRollupPrompt, ActualEffortPrompt } from "./components/AICoach.jsx";
 import { SettingsPanel } from "./components/SettingsPanel.jsx";
 import { UsagePanel } from "./components/UsagePanel.jsx";
-import { CompletedTree, ProjectTree, GroupDivider, EmptyState } from "./components/TaskListHelpers.jsx";
 import { TaskDetailPanel } from "./components/TaskDetailPanel.jsx";
+import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
+import { ResizeHandle } from "./components/ResizeHandle.jsx";
+import { AuthGate } from "./components/AuthGate.jsx";
+import { AppSidebar } from "./components/AppSidebar.jsx";
+import { TaskBucketView } from "./components/TaskBucketView.jsx";
+import { CoachPanel } from "./components/CoachPanel.jsx";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth.js";
 import { useGoogleAuth } from "./hooks/useGoogleAuth.js";
 import { useAppSettings } from "./hooks/useAppSettings.js";
@@ -27,7 +22,7 @@ import { useCalendarState } from "./hooks/useCalendarState.js";
 import { useGmailState } from "./hooks/useGmailState.js";
 import { useAICoachState } from "./hooks/useAICoachState.js";
 import { useTaskUIState } from "./hooks/useTaskUIState.js";
-import { createEmptyUsageStats, fmtTokens, fmtCost } from "./hooks/useAIUsageTracking.js";
+import { createEmptyUsageStats } from "./hooks/useAIUsageTracking.js";
 import { DEFAULT_EFFORTS } from "./hooks/useAppSettings.js";
 import { supabase, queueEntryToRow, rowToQueueEntry, taskToDb, dbToTask } from "./api/supabase.js";
 import { TOOLS, doWebSearch, GMAIL_SEARCH_TOOL, generateCodeVerifier, generateCodeChallenge, doGmailSearch, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL, GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL, GMAIL_LIST_FILTERS_TOOL, GMAIL_CREATE_FILTER_TOOL, GMAIL_DELETE_FILTER_TOOL, GMAIL_BULK_ACTION_TOOL, GMAIL_QUEUE_ADD_TOOL, GMAIL_SCOPE_OPTS, GMAIL_SCOPE_DISPLAY, doGmailListLabels, doGmailFetchLabelsRaw, doGmailLabel, doGmailBatchLabel, buildRawMessage, doGmailCompose, doGmailSend, doGmailCreateLabel, doGmailListFilters, doGmailCreateFilter, doGmailDeleteFilter, doGmailBulkAction, extractGmailPlainText, doGmailFetchInbox, doGmailGetMessageBody, doGmailFetchFilters } from "./api/gmailTools.js";
@@ -35,40 +30,6 @@ import { CALENDAR_SCOPE, doCalendarFetchEvents, buildRRULE, firstOccurrenceDate,
 import { todayStr, isDeferred, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, moveTaskInTree, useResizer } from "./utils/taskUtils.jsx";
 
 
-// ── Error Boundary ────────────────────────────────────────────────────────────
-class ErrorBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, info) {
-    console.error(`[ErrorBoundary: ${this.props.label}]`, error, info);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start' }}>
-          <div style={{ fontSize: 13, color: '#ef4444', fontWeight: 600 }}>
-            ⚠ {this.props.label || 'This section'} crashed
-          </div>
-          <div style={{ fontSize: 12, color: '#888', fontFamily: 'monospace', maxWidth: 400, wordBreak: 'break-word' }}>
-            {this.state.error?.message}
-          </div>
-          <button
-            onClick={() => this.setState({ hasError: false, error: null })}
-            style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #555', background: 'transparent', color: '#ccc', cursor: 'pointer' }}
-          >
-            Try again
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -76,26 +37,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 
 
-function ResizeHandle({ onMouseDown, direction = 'h' }) {
-  const [hovered, setHovered] = useState(false);
-  const isH = direction === 'h';
-  return (
-    <div
-      onMouseDown={onMouseDown}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        flexShrink: 0,
-        width:  isH ? 4 : '100%',
-        height: isH ? '100%' : 4,
-        cursor: isH ? 'col-resize' : 'row-resize',
-        background: hovered ? COLORS.border2 : COLORS.border,
-        transition: 'background 0.15s',
-        zIndex: 10,
-      }}
-    />
-  );
-}
 
 
 
@@ -1892,26 +1833,12 @@ export default function GTDManager() {
   })();
 
   const s = {
-    app: { display: "flex", height: "100vh", background: COLORS.bg, color: COLORS.text, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif", fontSize: 14, overflow: "hidden" },
-    sidebar: { width: sidebarWidth, background: COLORS.surface, display: "flex", flexDirection: "column", flexShrink: 0 },
-    sidebarHeader: { padding: "18px 16px 14px", borderBottom: `1px solid ${COLORS.border}` },
-    logo: { fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 300, color: COLORS.text },
-    logoEm: { fontStyle: "italic", color: COLORS.inbox },
-    sidebarSub: { fontSize: 11, color: COLORS.muted, marginTop: 3 },
-    bucketList: { flex: 1, padding: "8px 0", overflowY: "auto" },
-    sidebarActions: { padding: 10, borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", gap: 6 },
-    main: { flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" },
-    mainLeft: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
-    taskRow: { flex: 1, display: "flex", overflow: "hidden" },
-    taskPanel: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
+    app:         { display: "flex", height: "100vh", background: COLORS.bg, color: COLORS.text, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif", fontSize: 14, overflow: "hidden" },
+    main:        { flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" },
+    mainLeft:    { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
+    taskRow:     { flex: 1, display: "flex", overflow: "hidden" },
+    taskPanel:   { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
     detailPanel: { width: detailWidth, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" },
-    panelHeader: { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 },
-    addRow: { display: "flex", gap: 6, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}` },
-    taskList: { flex: 1, overflowY: "auto", padding: "4px 0" },
-    coachPanel: { height: coachHeight, display: "flex", flexDirection: "column", flexShrink: 0 },
-    coachHeader: { padding: "8px 14px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 },
-    chatMessages: { flex: 1, overflowY: "auto", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 },
-    chatInputRow: { display: "flex", gap: 6, padding: "8px 12px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, alignItems: "flex-end" },
   };
 
   // ── Context values ─────────────────────────────────────────────────────
@@ -1941,640 +1868,273 @@ export default function GTDManager() {
     tagDisplay,
   };
 
-  // ── Auth gate ────────────────────────────────────────────────────────
-  if (authLoading) return (
-    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center",
-                  background: COLORS.bg, color: COLORS.muted,
-                  fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif" }}>
-      Loading…
-    </div>
-  );
-
-  if (!authUser) return (
-    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center",
-                  background: COLORS.bg, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif" }}>
-      <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12,
-                    padding: "36px 40px", width: 340, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.text }}>
-          GTD <em style={{ fontStyle: "italic", color: COLORS.next }}>Manager</em>
-        </div>
-        <div style={{ fontSize: 13, color: COLORS.text2 }}>Sign in with a magic link — no password needed.</div>
-        {authSent ? (
-          <div style={{ fontSize: 13, color: COLORS.next, padding: "10px 14px",
-                        background: COLORS.nextBg, borderRadius: 8 }}>
-            Check your email for a login link.
-          </div>
-        ) : (
-          <>
-            <input
-              type="email"
-              placeholder="your@email.com"
-              value={authEmail}
-              onChange={e => setAuthEmail(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") sendMagicLink(); }}
-              autoFocus
-              style={{ padding: "8px 12px", borderRadius: 7, border: `1px solid ${COLORS.border}`,
-                       background: COLORS.surface2, color: COLORS.text,
-                       fontFamily: "inherit", fontSize: 13, outline: "none" }}
-            />
-            <button
-              onClick={sendMagicLink}
-              style={{ padding: "9px 0", borderRadius: 7, border: "none", background: COLORS.next,
-                       color: "#111", fontFamily: "inherit", fontSize: 13,
-                       fontWeight: 600, cursor: "pointer" }}
-            >Send login link</button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-
   return (
-    <div style={s.app} onClick={() => setMoveMenu(null)}>
-      {/* SIDEBAR */}
-      <div style={s.sidebar}>
-        <div style={s.sidebarHeader}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={s.logo}>GTD <em style={s.logoEm}>Manager</em></div>
-            {supabaseReady && (
-              <div title={syncStatus === 'synced' ? 'Synced to cloud' : 'Offline — changes queued'}
-                   style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'default' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                               background: syncStatus === 'synced' ? COLORS.next : COLORS.waiting }} />
-                <span style={{ fontSize: 10, color: syncStatus === 'synced' ? COLORS.next : COLORS.waiting }}>
-                  {syncStatus === 'synced' ? 'synced' : 'offline'}
-                </span>
-              </div>
-            )}
-          </div>
-          <div style={s.sidebarSub}>Knowledge Worker Edition</div>
-        </div>
+    <AuthGate
+      authLoading={authLoading}
+      authUser={authUser}
+      authSent={authSent}
+      authEmail={authEmail}
+      setAuthEmail={setAuthEmail}
+      sendMagicLink={sendMagicLink}
+    >
+      <div style={s.app} onClick={() => setMoveMenu(null)}>
+        <AppSidebar
+          sidebarWidth={sidebarWidth}
+          supabaseReady={supabaseReady}
+          syncStatus={syncStatus}
+          counts={counts}
+          currentBucket={currentBucket}
+          currentView={currentView}
+          gmailUnreadCount={gmailUnreadCount}
+          calendarEnabled={calendarEnabled}
+          onSelectBucket={key => () => { setCurrentBucket(key); setCurrentView("gtd"); setShowSettings(false); }}
+          onSelectEmail={() => { setCurrentView("email"); setShowSettings(false); setSelectedTaskId(null); }}
+          onSelectCalendar={() => { setCurrentView("calendar"); setShowSettings(false); setSelectedTaskId(null); }}
+          onToggleSettings={() => { setShowSettings(v => !v); setShowUsage(false); }}
+          onToggleUsage={() => { setShowUsage(v => !v); setShowSettings(false); }}
+          onProcessInbox={startProcessInbox}
+          onWeeklyReview={startWeeklyReview}
+          onBrainDump={startBrainDump}
+        />
+        <ResizeHandle onMouseDown={sidebarDragDown} direction="h" />
 
-        <div style={s.bucketList}>
-          {Object.entries(BUCKETS).map(([key, cfg]) => (
-            <BucketItem key={key} bkey={key} cfg={cfg} count={counts[key]} active={currentBucket === key && currentView === "gtd"} onClick={() => { setCurrentBucket(key); setCurrentView("gtd"); setShowSettings(false); }} />
-          ))}
-
-          {/* ── Tools section separator ── */}
-          <div style={{ margin: "10px 14px 4px", borderTop: `1px solid ${COLORS.border}` }} />
-          <div style={{ padding: "0 16px 4px", fontSize: 10, color: COLORS.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Tools</div>
-          <div
-            onClick={() => { setCurrentView("email"); setShowSettings(false); }}
-            style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "email" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "email" ? COLORS.inbox : "transparent"}`, transition: "background 0.1s" }}
-          >
-            <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.inbox, flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: 13, color: currentView === "email" ? COLORS.text : COLORS.text2 }}>📧 Email</span>
-            {gmailUnreadCount != null && gmailUnreadCount > 0 && (
-              <span style={{ fontSize: 11, background: COLORS.inbox + "22", color: COLORS.inbox, padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{gmailUnreadCount}</span>
-            )}
-          </div>
-          <div
-            onClick={() => { setCurrentView("calendar"); setShowSettings(false); }}
-            style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "calendar" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "calendar" ? COLORS.calendar : "transparent"}`, transition: "background 0.1s" }}
-          >
-            <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.calendar, flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: 13, color: currentView === "calendar" ? COLORS.text : COLORS.text2 }}>📅 Calendar</span>
-            {calendarEnabled && <span style={{ fontSize: 9, background: COLORS.calendar + "33", color: COLORS.calendar, padding: "1px 5px", borderRadius: 8, fontWeight: 500 }}>✓</span>}
-          </div>
-        </div>
-
-        <div style={s.sidebarActions}>
-          <SidebarBtn primary onClick={startProcessInbox}>🤖 Process Inbox with AI</SidebarBtn>
-          <SidebarBtn onClick={startWeeklyReview}>📋 Weekly Review</SidebarBtn>
-          <SidebarBtn onClick={startBrainDump}>🧠 Brain Dump</SidebarBtn>
-        </div>
-
-        <div style={{ padding: "8px 10px", borderTop: `1px solid ${COLORS.border}`, display: "flex", gap: 6 }}>
-          <div style={{ flex: 1 }}><SidebarBtn onClick={() => { setShowSettings(v => !v); setShowUsage(false); }}>⚙ Settings</SidebarBtn></div>
-          <div style={{ flex: 1 }}><SidebarBtn onClick={() => { setShowUsage(v => !v); setShowSettings(false); }}>📊 Usage</SidebarBtn></div>
-        </div>
-      </div>
-      <ResizeHandle onMouseDown={sidebarDragDown} direction="h" />
-
-      {/* MAIN */}
-      <div style={s.main}>
-        {/* LEFT COLUMN: task panel + coach panel */}
-        <div style={s.mainLeft}>
-        {/* TASK ROW */}
-        <div style={s.taskRow}>
-        {/* TASK PANEL */}
-        <ErrorBoundary label="Task Panel">
-        <TaskActionsContext.Provider value={taskActionsValue}>
-        <TaskRowContext.Provider value={taskRowValue}>
-        <div style={s.taskPanel}>
-          {showSettings ? (
-            <SettingsPanel
-              locations={locations}
-              tasks={tasks}
-              onAdd={addLocation}
-              onRename={renameLocation}
-              onRemove={removeLocation}
-              efforts={efforts}
-              onAddEffort={addEffort}
-              onRenameEffort={renameEffort}
-              onRemoveEffort={removeEffort}
-              calibrationOverrides={calibrationOverrides}
-              onSetCalibrationOverride={setCalibrationOverride}
-              onClearCalibrationOverride={clearCalibrationOverride}
-              tagDisplay={tagDisplay}
-              onSetTagDisplay={setTagDisplay}
-              onExport={handleExport}
-              onImport={handleImport}
-              onClose={() => setShowSettings(false)}
-              googleToken={googleToken}
-              googleScope={googleScope}
-              onConnectGmail={signInWithGoogle}
-              onDisconnectGmail={disconnectGmail}
-              gmailError={gmailError}
-              calendarEnabled={calendarEnabled}
-              onConnectCalendar={connectCalendar}
-              onDisconnectCalendar={disconnectCalendar}
-              recurringReviewDays={recurringReviewDays}
-              onSetRecurringReviewDays={setRecurringReviewDays}
-            />
-          ) : showUsage ? (
-            <UsagePanel
-              stats={aiUsageStats}
-              onClear={() => setAiUsageStats(createEmptyUsageStats())}
-              onClose={() => setShowUsage(false)}
-            />
-          ) : currentView === "email" ? (
-            <EmailManagementView
-              googleToken={googleToken}
-              googleScope={googleScope}
-              gmailQueue={gmailQueue}
-              setGmailQueue={setGmailQueue}
-              emailTab={emailTab}
-              setEmailTab={setEmailTab}
-              processEmailWithAI={processEmailWithAI}
-              openCoachChat={openCoachChat}
-              authUser={authUser}
-            />
-          ) : currentView === "calendar" ? (
-            <CalendarManagementView
-              googleToken={googleToken}
-              calendarEnabled={calendarEnabled}
-              calendarTab={calendarTab}
-              setCalendarTab={setCalendarTab}
-              tasks={tasks}
-              setTasks={setTasks}
-              calendarEvents={calendarEvents}
-              setCalendarEvents={setCalendarEvents}
-              processCalendarEventWithAI={processCalendarEventWithAI}
-              onConnectCalendar={connectCalendar}
-              onOpenDetail={setSelectedTaskId}
-              selectedTaskId={selectedTaskId}
-              skippedCalendarIds={skippedCalendarIds}
-              setSkippedCalendarIds={setSkippedCalendarIds}
-              seenCalendarEventIds={seenCalendarEventIds}
-              setSeenCalendarEventIds={setSeenCalendarEventIds}
-              recurringAcknowledgedMap={recurringAcknowledgedMap}
-              recurringReviewDays={recurringReviewDays}
-              setRecurringAcknowledgedMap={setRecurringAcknowledgedMap}
-            />
-          ) : (
-            <>
-              <div style={s.panelHeader}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 300 }}>{BUCKETS[currentBucket].label}</div>
-                  <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{BUCKETS[currentBucket].desc}</div>
-                </div>
-                {currentBucket === "project" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                    <button
-                      onClick={() => {
-                        // Projects only: add every root project's own ID so its children are hidden.
-                        const next = new Set();
-                        tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done)
-                          .forEach(p => next.add(p.id));
-                        setCollapsedNodes(next);
-                      }}
-                      title="Show project names only"
-                      style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
-                    >
-                      ≡ Projects Only
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Collapse all root projects to "next level" view: collapse every direct child.
-                        const next = new Set();
-                        tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done)
-                          .forEach(p => (p.childIds || []).forEach(cid => next.add(cid)));
-                        setCollapsedNodes(next);
-                      }}
-                      title="Collapse all projects to top-level tasks"
-                      style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
-                    >
-                      ⊖ Collapse All
-                    </button>
-                    <button
-                      onClick={() => setCollapsedNodes(new Set())}
-                      title="Expand all projects fully"
-                      style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
-                    >
-                      ⊕ Expand All
-                    </button>
-                    <button
-                      onClick={startProjectReview}
-                      disabled={loading}
-                      style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${COLORS.project}55`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.5 : 1, flexShrink: 0, display: "flex", alignItems: "center", gap: 5 }}
-                    >
-                      🔍 Review Projects
-                    </button>
-                  </div>
-                )}
-                {currentBucket === "next" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
-                    <span style={{ fontSize: 11, color: COLORS.muted, marginRight: 2 }}>Group:</span>
-                    {[
-                      { key: "none",     label: "None" },
-                      { key: "project",  label: "Project" },
-                      { key: "location", label: "Location" },
-                      { key: "dueDate",  label: "Due Date" },
-                      { key: "priority", label: "Priority" },
-                      { key: "effort",   label: "Effort" },
-                    ].map(opt => (
-                      <button
-                        key={opt.key}
-                        onClick={() => setNextGroupBy(opt.key)}
-                        style={{ padding: "3px 9px", borderRadius: 6, border: `1px solid ${nextGroupBy === opt.key ? COLORS.border2 : COLORS.border}`, background: nextGroupBy === opt.key ? COLORS.surface3 : "transparent", color: nextGroupBy === opt.key ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "all 0.1s" }}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {currentBucket === "deferred" ? null : currentBucket === "project" ? (() => {
-                const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
-                const selectedProject = rootProjects.find(t => t.id === projectParentId);
-                const placeholder = projectParentId === "__new__"
-                  ? "New project name… (Enter to add)"
-                  : `Subtask for "${selectedProject?.text ?? ""}"…`;
-                return (
-                  <div style={s.addRow}>
-                    <input
-                      value={addText}
-                      onChange={e => setAddText(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && addProjectTask()}
-                      placeholder={placeholder}
-                      style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" }}
-                    />
-                    <select
-                      value={projectParentId}
-                      onChange={e => setProjectParentId(e.target.value)}
-                      style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", fontFamily: "inherit", fontSize: 12, color: projectParentId === "__new__" ? COLORS.text2 : COLORS.project, outline: "none", cursor: "pointer", maxWidth: 180, colorScheme: "dark" }}
-                    >
-                      <option value="__new__">+ New project</option>
-                      {rootProjects.map(p => (
-                        <option key={p.id} value={p.id}>{p.text.length > 30 ? p.text.slice(0, 28) + "…" : p.text}</option>
-                      ))}
-                    </select>
-                    <Btn onClick={addProjectTask} style={{ fontSize: 12, borderColor: projectParentId === "__new__" ? COLORS.border : COLORS.project, color: projectParentId === "__new__" ? COLORS.text2 : COLORS.project }}>
-                      {projectParentId === "__new__" ? "+ Add Project" : "+ Add Task"}
-                    </Btn>
-                  </div>
-                );
-              })() : (
-                <>
-                  <div style={s.addRow}>
-                    <input
-                      value={addText}
-                      onChange={e => setAddText(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && addTask()}
-                      placeholder="Add a task… (Enter to add)"
-                      style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" }}
-                    />
-                    <Btn onClick={() => addTask()} style={{ fontSize: 12 }}>+ Add</Btn>
-                    <Btn onClick={addAndProcess} style={{ fontSize: 12, borderColor: COLORS.inbox, color: COLORS.inbox }}>+ Add & Ask AI</Btn>
-                  </div>
-                  {deferredDupeWarning && (
-                    <div style={{ padding: "3px 16px 6px", fontSize: 11, color: COLORS.deferred, display: "flex", alignItems: "center", gap: 6 }}>
-                      <span>⏰</span>
-                      <span>Similar deferred task: <strong>"{deferredDupeWarning.text}"</strong> (wakes {deferredDupeWarning.deferUntil})</span>
-                      <button onClick={() => setCurrentBucket("deferred")} style={{ background: "none", border: "none", color: COLORS.deferred, cursor: "pointer", fontFamily: "inherit", fontSize: 11, padding: "0 2px", textDecoration: "underline" }}>View it</button>
+        <div style={s.main}>
+          <div style={s.mainLeft}>
+            <div style={s.taskRow}>
+              <ErrorBoundary label="Task Panel">
+                <TaskActionsContext.Provider value={taskActionsValue}>
+                  <TaskRowContext.Provider value={taskRowValue}>
+                    <div style={s.taskPanel}>
+                      {showSettings ? (
+                        <SettingsPanel
+                          locations={locations}
+                          tasks={tasks}
+                          onAdd={addLocation}
+                          onRename={renameLocation}
+                          onRemove={removeLocation}
+                          efforts={efforts}
+                          onAddEffort={addEffort}
+                          onRenameEffort={renameEffort}
+                          onRemoveEffort={removeEffort}
+                          calibrationOverrides={calibrationOverrides}
+                          onSetCalibrationOverride={setCalibrationOverride}
+                          onClearCalibrationOverride={clearCalibrationOverride}
+                          tagDisplay={tagDisplay}
+                          onSetTagDisplay={setTagDisplay}
+                          onExport={handleExport}
+                          onImport={handleImport}
+                          onClose={() => setShowSettings(false)}
+                          googleToken={googleToken}
+                          googleScope={googleScope}
+                          onConnectGmail={signInWithGoogle}
+                          onDisconnectGmail={disconnectGmail}
+                          gmailError={gmailError}
+                          calendarEnabled={calendarEnabled}
+                          onConnectCalendar={connectCalendar}
+                          onDisconnectCalendar={disconnectCalendar}
+                          recurringReviewDays={recurringReviewDays}
+                          onSetRecurringReviewDays={setRecurringReviewDays}
+                        />
+                      ) : showUsage ? (
+                        <UsagePanel
+                          stats={aiUsageStats}
+                          onClear={() => setAiUsageStats(createEmptyUsageStats())}
+                          onClose={() => setShowUsage(false)}
+                        />
+                      ) : currentView === "email" ? (
+                        <EmailManagementView
+                          googleToken={googleToken}
+                          googleScope={googleScope}
+                          gmailQueue={gmailQueue}
+                          setGmailQueue={setGmailQueue}
+                          emailTab={emailTab}
+                          setEmailTab={setEmailTab}
+                          processEmailWithAI={processEmailWithAI}
+                          openCoachChat={openCoachChat}
+                          authUser={authUser}
+                        />
+                      ) : currentView === "calendar" ? (
+                        <CalendarManagementView
+                          googleToken={googleToken}
+                          calendarEnabled={calendarEnabled}
+                          calendarTab={calendarTab}
+                          setCalendarTab={setCalendarTab}
+                          tasks={tasks}
+                          setTasks={setTasks}
+                          calendarEvents={calendarEvents}
+                          setCalendarEvents={setCalendarEvents}
+                          processCalendarEventWithAI={processCalendarEventWithAI}
+                          onConnectCalendar={connectCalendar}
+                          onOpenDetail={setSelectedTaskId}
+                          selectedTaskId={selectedTaskId}
+                          skippedCalendarIds={skippedCalendarIds}
+                          setSkippedCalendarIds={setSkippedCalendarIds}
+                          seenCalendarEventIds={seenCalendarEventIds}
+                          setSeenCalendarEventIds={setSeenCalendarEventIds}
+                          recurringAcknowledgedMap={recurringAcknowledgedMap}
+                          recurringReviewDays={recurringReviewDays}
+                          setRecurringAcknowledgedMap={setRecurringAcknowledgedMap}
+                        />
+                      ) : (
+                        <TaskBucketView
+                          currentBucket={currentBucket}
+                          tasks={tasks}
+                          bucketTasks={bucketTasks}
+                          addText={addText}
+                          setAddText={setAddText}
+                          addTask={addTask}
+                          addAndProcess={addAndProcess}
+                          addProjectTask={addProjectTask}
+                          projectParentId={projectParentId}
+                          setProjectParentId={setProjectParentId}
+                          nextGroupBy={nextGroupBy}
+                          setNextGroupBy={setNextGroupBy}
+                          setCollapsedNodes={setCollapsedNodes}
+                          setDropTarget={setDropTarget}
+                          inboxSelectedIds={inboxSelectedIds}
+                          setInboxSelectedIds={setInboxSelectedIds}
+                          dragId={dragId}
+                          dropTarget={dropTarget}
+                          onDragStart={handleProjectDragStart}
+                          onDragOver={handleProjectDragOver}
+                          onDragEnd={handleProjectDragEnd}
+                          onDrop={handleProjectDrop}
+                          deferredDupeWarning={deferredDupeWarning}
+                          onViewDeferred={() => setCurrentBucket("deferred")}
+                          loading={loading}
+                          onStartProjectReview={startProjectReview}
+                          onBulkAssign={bulkAssignToProject}
+                        />
+                      )}
                     </div>
-                  )}
-                </>
-              )}
-
-              <div style={s.taskList}>
-                {bucketTasks.length === 0 ? (
-                  <EmptyState bucket={currentBucket} />
-                ) : currentBucket === "project" ? (
-                  <div
-                    onDragLeave={e => {
-                      if (!e.currentTarget.contains(e.relatedTarget)) setDropTarget(null);
-                    }}
-                  >
-                    <ProjectTree
-                      parentId={null}
-                      depth={0}
-                      dragId={dragId}
-                      dropTarget={dropTarget}
-                      onDragStart={handleProjectDragStart}
-                      onDragOver={handleProjectDragOver}
-                      onDragEnd={handleProjectDragEnd}
-                      onDrop={handleProjectDrop}
-                    />
-                  </div>
-                ) : currentBucket === "next" ? (() => {
-                  // Deferred tasks are hidden from Next Actions; they live in the Deferred view.
-                  const visible = waterfallFilter(bucketTasks, tasks).filter(t => !isDeferred(t));
-                  if (!visible.length) {
-                    return (
-                      <div style={{ padding: "28px 24px", textAlign: "center", color: COLORS.muted, fontSize: 12 }}>
-                        <div style={{ fontSize: 22, opacity: 0.3, marginBottom: 8 }}>○</div>
-                        <strong style={{ fontSize: 13, display: "block", marginBottom: 4 }}>All actions are waiting</strong>
-                        Complete parent tasks to unlock the next step.
-                      </div>
-                    );
-                  }
-                  if (nextGroupBy === "none") {
-                    return visible.map(task => (
-                      <TaskRow key={task.id} task={task} />
-                    ));
-                  }
-                  return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => {
-                    const groupMin = items.reduce((sum, t) => sum + effortToMinutes(t.effort), 0);
-                    // Always show the effort chip for every group — use "0m" when no tasks have effort set.
-                    const groupEffortLabel = minutesToEffortLabel(groupMin) || "0m";
-                    return (
-                      <div key={key}>
-                        <GroupDivider label={label} count={items.length} effortTotal={groupEffortLabel} isUngrouped={key === "__ungrouped__"} />
-                        {items.map(task => (
-                          <TaskRow key={task.id} task={task} />
-                        ))}
-                      </div>
-                    );
-                  });
-                })() : currentBucket === "deferred" ? (
-                  bucketTasks.length === 0 ? (
-                    <EmptyState bucket="deferred" />
-                  ) : (
-                    <div>
-                      <div style={{ padding: "6px 18px 4px", fontSize: 11, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
-                        Sorted by wake date — earliest first. Tasks move to Inbox automatically when their date arrives.
-                      </div>
-                      {bucketTasks.map(task => (
-                        <TaskRow key={task.id} task={task} />
-                      ))}
-                    </div>
-                  )
-                ) : (
-                  <>
-                    {currentBucket === "done" && (() => {
-                      const withBoth = bucketTasks.filter(t => t.effort && t.actualEffort);
-                      if (!withBoth.length) return null;
-                      const byLabel = {};
-                      withBoth.forEach(t => {
-                        if (!byLabel[t.effort]) byLabel[t.effort] = { totalActual: 0, count: 0 };
-                        byLabel[t.effort].totalActual += effortToMinutes(t.actualEffort);
-                        byLabel[t.effort].count += 1;
-                      });
-                      const entries = Object.entries(byLabel);
-                      return (
-                        <div style={{ padding: "6px 18px 6px", fontSize: 11, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}`, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                          <span style={{ color: COLORS.text2, fontWeight: 600 }}>⏱ Accuracy:</span>
-                          {entries.map(([label, { totalActual, count }]) => {
-                            const avgActual = totalActual / count;
-                            const estMin = effortToMinutes(label);
-                            const color = effortAccuracyColor(estMin, avgActual);
-                            const pct = estMin ? Math.round(((avgActual - estMin) / estMin) * 100) : null;
-                            const pctStr = pct === null ? "" : pct > 0 ? ` +${pct}%` : ` ${pct}%`;
-                            return (
-                              <span key={label} style={{ padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color, border: `1px solid ${color}44`, whiteSpace: "nowrap" }}>
-                                {label} → avg {minutesToEffortLabel(Math.round(avgActual))}{pctStr} <span style={{ opacity: 0.6 }}>({count})</span>
-                              </span>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-                    {currentBucket === "done" ? (
-                      <CompletedTree parentId={null} depth={0} />
-                    ) : currentBucket === "inbox" ? (
-                      <>
-                        {/* Bulk-selection toolbar — visible when ≥1 task is checked */}
-                        {inboxSelectedIds.size > 0 && (
-                          <InboxBulkBar
-                            selectedCount={inboxSelectedIds.size}
-                            allTasks={tasks}
-                            onAssign={(projectId, newProjectName) => bulkAssignToProject(inboxSelectedIds, projectId, newProjectName)}
-                            onClear={() => setInboxSelectedIds(new Set())}
-                          />
-                        )}
-                        {bucketTasks.map(task => (
-                          <TaskRow key={task.id} task={task}
-                            onSelect={(id, checked) => setInboxSelectedIds(prev => { const next = new Set(prev); if (checked) next.add(id); else next.delete(id); return next; })}
-                            isSelected={inboxSelectedIds.has(task.id)} />
-                        ))}
-                      </>
-                    ) : (
-                      bucketTasks.map(task => (
-                        <TaskRow key={task.id} task={task} />
-                      ))
-                    )}
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-        </TaskRowContext.Provider>
-        </TaskActionsContext.Provider>
-        </ErrorBoundary>
-        </div>{/* end taskRow */}
-        <ResizeHandle onMouseDown={coachDragDown} direction="v" />
-
-        {/* COACH PANEL */}
-        <ErrorBoundary label="AI Coach">
-        <div style={s.coachPanel}>
-          <div style={s.coachHeader}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.06em", textTransform: "uppercase" }}>🤖 AI Coach</span>
-          <ProviderSelector
-            provider={provider} setProvider={setProvider}
-            localModel={localModel} setLocalModel={setLocalModel}
-            availableModels={availableModels} fetchModels={fetchModels}
-          />
-            <div style={{ display: "flex", gap: 4 }}>
-              {Object.entries(COACH_MODES).map(([key, cfg]) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    if (key === "process") startProcessInbox();
-                    else if (key === "review") startWeeklyReview();
-                    else if (key === "dump") startBrainDump();
-                    else if (key === "projectReview") startProjectReview();  // mode picked in ReviewModeBar
-                    else switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.");
-                  }}
-                  style={{ padding: "3px 9px", borderRadius: 6, border: `1px solid ${coachMode === key ? COLORS.border2 : COLORS.border}`, background: coachMode === key ? COLORS.surface3 : "transparent", color: coachMode === key ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
-                >
-                  {cfg.label}
-                </button>
-              ))}
+                  </TaskRowContext.Provider>
+                </TaskActionsContext.Provider>
+              </ErrorBoundary>
             </div>
-          </div>
-
-          <div style={s.chatMessages}>
-            {messages.map((msg, i) => (
-              <ChatBubble key={i} msg={msg} onRecurringStillFine={handleRecurringStillFine} onRecurringNeedsWork={handleRecurringNeedsWork} />
-            ))}
-            {loading && <TypingIndicator />}
-            {pendingAction && (
-              <PendingActionBar
-                action={pendingAction}
-                onConfirm={handleConfirmMove}
-                onDismiss={() => setPendingAction(null)}
-              />
-            )}
-            {coachMode === "projectReview" && reviewMode === null && !loading && (
-              <ReviewModeBar onSelect={selectReviewMode} />
-            )}
-            {coachMode === "projectReview" && reviewMode === "tasks" && reviewReady && (
-              <ProjectReviewBar
-                suggestions={reviewSuggestions}
-                onToggle={idx => setReviewSuggestions(prev =>
-                  prev.map((s, i) => i === idx ? { ...s, checked: !s.checked } : s)
+            <ResizeHandle onMouseDown={coachDragDown} direction="v" />
+            <ErrorBoundary label="AI Coach">
+              <CoachPanel
+                coachHeight={coachHeight}
+                coachMode={coachMode}
+                messages={messages}
+                loading={loading}
+                pendingAction={pendingAction}
+                reviewMode={reviewMode}
+                reviewReady={reviewReady}
+                reviewSuggestions={reviewSuggestions}
+                metadataSuggestions={metadataSuggestions}
+                calendarSuggestionsReady={calendarSuggestionsReady}
+                calendarSuggestions={calendarSuggestions}
+                pendingGroupSuggestion={pendingGroupSuggestion}
+                reviewProjectIdx={reviewProjectIdx}
+                totalReviewProjects={tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done).length}
+                provider={provider}
+                setProvider={setProvider}
+                localModel={localModel}
+                setLocalModel={setLocalModel}
+                availableModels={availableModels}
+                fetchModels={fetchModels}
+                chatInput={chatInput}
+                setChatInput={setChatInput}
+                chatInputHeight={chatInputHeight}
+                chatInputDragDown={chatInputDragDown}
+                chatEndRef={chatEndRef}
+                chatInputRef={chatInputRef}
+                sessionUsage={sessionUsage}
+                onSendChat={sendChat}
+                onConfirmMove={handleConfirmMove}
+                onDismissPendingAction={() => setPendingAction(null)}
+                onRecurringStillFine={handleRecurringStillFine}
+                onRecurringNeedsWork={handleRecurringNeedsWork}
+                onSelectReviewMode={selectReviewMode}
+                onToggleReviewSuggestion={idx => setReviewSuggestions(prev =>
+                  prev.map((sg, i) => i === idx ? { ...sg, checked: !sg.checked } : sg)
                 )}
-                onNext={advanceProjectReview}
-                onSkip={skipProjectReview}
-                projectIdx={reviewProjectIdx}
-                totalProjects={tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done).length}
-              />
-            )}
-            {coachMode === "projectReview" && reviewMode === "metadata" && reviewReady && (
-              <MetadataReviewBar
-                suggestions={metadataSuggestions}
-                onToggleAccepted={idx => setMetadataSuggestions(prev =>
-                  prev.map((s, i) => i === idx ? { ...s, accepted: !s.accepted } : s)
+                onAdvanceProjectReview={advanceProjectReview}
+                onSkipProjectReview={skipProjectReview}
+                onToggleMetadataSuggestion={idx => setMetadataSuggestions(prev =>
+                  prev.map((sg, i) => i === idx ? { ...sg, accepted: !sg.accepted } : sg)
                 )}
-                onChangeOverride={(idx, field, value) => setMetadataSuggestions(prev =>
-                  prev.map((s, i) => i === idx ? { ...s, overrides: { ...s.overrides, [field]: value } } : s)
+                onChangeMetadataOverride={(idx, field, value) => setMetadataSuggestions(prev =>
+                  prev.map((sg, i) => i === idx ? { ...sg, overrides: { ...sg.overrides, [field]: value } } : sg)
                 )}
-                onNext={advanceMetadataReview}
-                onSkip={skipMetadataReview}
-                projectIdx={reviewProjectIdx}
-                totalProjects={tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done).length}
-              />
-            )}
-            {calendarSuggestionsReady && (
-              <CalendarSuggestionsBar
-                suggestions={calendarSuggestions}
-                onToggle={idx => setCalendarSuggestions(prev =>
-                  prev.map((s, i) => i === idx ? { ...s, checked: !s.checked } : s)
+                onAdvanceMetadataReview={advanceMetadataReview}
+                onSkipMetadataReview={skipMetadataReview}
+                onToggleCalendarSuggestion={idx => setCalendarSuggestions(prev =>
+                  prev.map((sg, i) => i === idx ? { ...sg, checked: !sg.checked } : sg)
                 )}
-                onChangeBucket={(idx, bucket) => setCalendarSuggestions(prev =>
-                  prev.map((s, i) => i === idx ? { ...s, bucket } : s)
+                onChangeCalendarSuggestionBucket={(idx, bucket) => setCalendarSuggestions(prev =>
+                  prev.map((sg, i) => i === idx ? { ...sg, bucket } : sg)
                 )}
-                onAccept={acceptCalendarSuggestions}
-                onDismiss={() => { setCalendarSuggestions([]); setCalendarSuggestionsReady(false); }}
-              />
-            )}
-            {pendingGroupSuggestion && (
-              <ProjectGroupSuggestionBar
-                suggestion={pendingGroupSuggestion.suggestion}
-                taskCount={pendingGroupSuggestion.taskIds.length}
-                allTasks={tasks}
-                onAccept={(projectId, newProjectName) => {
+                onAcceptCalendarSuggestions={acceptCalendarSuggestions}
+                onDismissCalendarSuggestions={() => { setCalendarSuggestions([]); setCalendarSuggestionsReady(false); }}
+                onAcceptGroupSuggestion={(projectId, newProjectName) => {
                   bulkAssignToProject(new Set(pendingGroupSuggestion.taskIds), projectId, newProjectName);
                   setPendingGroupSuggestion(null);
                 }}
-                onDismiss={() => setPendingGroupSuggestion(null)}
+                onDismissGroupSuggestion={() => setPendingGroupSuggestion(null)}
+                tasks={tasks}
+                onStartProcessInbox={startProcessInbox}
+                onStartWeeklyReview={startWeeklyReview}
+                onStartBrainDump={startBrainDump}
+                onStartProjectReview={startProjectReview}
+                onSwitchToChat={() => switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.")}
               />
-            )}
-            <div ref={chatEndRef} />
+            </ErrorBoundary>
           </div>
 
-          <ResizeHandle onMouseDown={chatInputDragDown} direction="v" />
-          <div style={s.chatInputRow}>
-            <textarea
-              ref={chatInputRef}
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
-              placeholder="Ask the coach anything…"
-              style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none", resize: "none", height: chatInputHeight, minHeight: 36 }}
-            />
-            <button
-              onClick={sendChat}
-              disabled={loading}
-              style={{ width: 34, height: 34, background: loading ? COLORS.surface3 : COLORS.inbox, color: "#111", border: "none", borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-            >↑</button>
-          </div>
-          {/* Usage footer strip */}
-          <div style={{ padding: '3px 14px', borderTop: `1px solid ${COLORS.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, color: COLORS.muted, flexShrink: 0, gap: 8 }}>
-            <span>Session · ↑ {fmtTokens(sessionUsage.inputTokens)} in · ↓ {fmtTokens(sessionUsage.outputTokens)} out · {sessionUsage.requests} req</span>
-            {sessionUsage.costUsd > 0 && <span style={{ color: COLORS.text2 }}>{fmtCost(sessionUsage.costUsd)}</span>}
-          </div>
-        </div>{/* end coachPanel */}
-        </ErrorBoundary>
-        </div>{/* end mainLeft */}
+          <ErrorBoundary label="Task Detail">
+            {selectedTaskId && currentView !== "email" && (() => {
+              const selTask = tasks.find(t => t.id === selectedTaskId);
+              return selTask ? (
+                <>
+                  <ResizeHandle onMouseDown={detailDragDown} direction="h" />
+                  <TaskDetailPanel
+                    task={selTask}
+                    allTasks={tasks}
+                    locations={locations}
+                    efforts={efforts}
+                    onUpdate={updateTask}
+                    onComplete={(id) => { completeTask(id); setSelectedTaskId(null); }}
+                    onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
+                    onReassignProject={reassignProject}
+                    onSkipRecurrence={(id) => { skipRecurrence(id); setSelectedTaskId(null); }}
+                    onClose={() => setSelectedTaskId(null)}
+                    style={s.detailPanel}
+                  />
+                </>
+              ) : null;
+            })()}
+          </ErrorBoundary>
+        </div>
 
-        {/* TASK DETAIL PANEL — full height alongside both task list and coach */}
-        <ErrorBoundary label="Task Detail">
-        {selectedTaskId && currentView !== "email" && (() => {
-          const selTask = tasks.find(t => t.id === selectedTaskId);
-          return selTask ? (
-            <>
-              <ResizeHandle onMouseDown={detailDragDown} direction="h" />
-              <TaskDetailPanel
-                task={selTask}
-                allTasks={tasks}
-                locations={locations}
-                efforts={efforts}
-                onUpdate={updateTask}
-                onComplete={(id) => { completeTask(id); setSelectedTaskId(null); }}
-                onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
-                onReassignProject={reassignProject}
-                onSkipRecurrence={(id) => { skipRecurrence(id); setSelectedTaskId(null); }}
-                onClose={() => setSelectedTaskId(null)}
-                style={s.detailPanel}
-              />
-            </>
-          ) : null;
-        })()}
-        </ErrorBoundary>
-      </div>{/* end main */}
-
-      {/* Note roll-up prompt — shown when completing a subtask that has notes */}
-      {pendingRollup && (
-        <NoteRollupPrompt
-          taskText={pendingRollup.taskText}
-          notes={pendingRollup.notes}
-          parentText={pendingRollup.parentText}
-          onConfirm={handleRollupConfirm}
-          onSkip={handleRollupSkip}
-        />
-      )}
-
-      {/* Deferred child check — shown when completing a task with deferred or someday subtasks */}
-      {pendingDeferCheck && (
-        <DeferCheckPrompt
-          taskText={pendingDeferCheck.taskText}
-          deferredChildren={pendingDeferCheck.deferredChildren}
-          onSkip={handleDeferCheckSkip}
-          onReview={handleDeferCheckReview}
-        />
-      )}
-
-      {/* Actual effort prompt — modal overlay shown when completing a task with an estimate */}
-      {actualEffortPrompt && (
-        <ActualEffortPrompt
-          taskText={actualEffortPrompt.taskText}
-          estimatedEffort={actualEffortPrompt.estimatedEffort}
-          efforts={efforts}
-          onSave={handleActualEffortSave}
-          onSkip={handleActualEffortSkip}
-        />
-      )}
-    </div>
+        {pendingRollup && (
+          <NoteRollupPrompt
+            taskText={pendingRollup.taskText}
+            notes={pendingRollup.notes}
+            parentText={pendingRollup.parentText}
+            onConfirm={handleRollupConfirm}
+            onSkip={handleRollupSkip}
+          />
+        )}
+        {pendingDeferCheck && (
+          <DeferCheckPrompt
+            taskText={pendingDeferCheck.taskText}
+            deferredChildren={pendingDeferCheck.deferredChildren}
+            onSkip={handleDeferCheckSkip}
+            onReview={handleDeferCheckReview}
+          />
+        )}
+        {actualEffortPrompt && (
+          <ActualEffortPrompt
+            taskText={actualEffortPrompt.taskText}
+            estimatedEffort={actualEffortPrompt.estimatedEffort}
+            efforts={efforts}
+            onSave={handleActualEffortSave}
+            onSkip={handleActualEffortSkip}
+          />
+        )}
+      </div>
+    </AuthGate>
   );
 }
-
-
-
-
-
-
