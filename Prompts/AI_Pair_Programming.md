@@ -34,6 +34,8 @@ Provide specific, concrete manual testing steps — not generic advice. Format: 
 ### Step 5 — John's Testing & Feedback
 John tests. If something is off, iterate back to Step 3. If it passes, he confirms it is working.
 
+**If testing reveals an issue and a fix is applied:** run the build, then explicitly ask John to re-test and confirm the fix before moving to Step 6. A passing build is not sufficient — re-confirmation is required after every mid-testing fix, no matter how small. Do not commit until that second confirmation arrives.
+
 Do **not** touch the three HTML doc files (`project-summary.html`, `project-snippets.html`, `project-commits.html`) until John says "looks good" or equivalent. Misleading docs are worse than no docs.
 
 ### Step 6 — Commit

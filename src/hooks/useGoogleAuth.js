@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { generateCodeVerifier, generateCodeChallenge } from "../api/gmailTools.js";
-import { CALENDAR_SCOPE } from "../api/calendarApi.js";
+import { generateCodeVerifier, generateCodeChallenge } from "../features/email/gmailTools.js";
+import { CALENDAR_SCOPE } from "../features/calendar/calendarApi.js";
 
 // ── useGoogleAuth ─────────────────────────────────────────────────────────────
 // Manages Google OAuth: token storage, PKCE exchange, silent refresh, and the

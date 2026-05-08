@@ -319,6 +319,7 @@ Every task object: `{ id, text, bucket, done, created, priority[], location[], d
 22. Show linked tasks in Calendar event detail — when an event is selected and `EventDetailPanel` opens, display any tasks whose `calendarEventId` matches the event's `id`, so the user can see associated work at a glance.
 23. Project categories — user-defined categories (e.g. Workshop, Lodge Maintenance, Lodge Business, Home Maintenance, Programming) that can be assigned to projects and tasks. Enables filtering/grouping by category across buckets. Categories should be configurable in Settings.
 24. Increase lightness of inactive buttons — currently inactive/secondary buttons are too dark; raise their background lightness to improve visual hierarchy and reduce visual noise.
+25. Email rules persistence — email rules are currently lost on page reload. Persist them to Supabase (new `email_rules` table or a JSONB column on `user_settings`) so they survive between sessions. On load, hydrate immediately from localStorage as an optimistic cache, then fetch from Supabase in the background and reconcile — same pattern used for tasks.
 
 ## API Key setup (local dev)
 Create a `.env` file:

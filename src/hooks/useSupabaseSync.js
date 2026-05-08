@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase, taskToDb, dbToTask, rowToQueueEntry } from '../api/supabase.js';
-import { DEFAULT_EFFORTS } from './useAppSettings.js';
+import { DEFAULT_EFFORTS } from '../features/settings/useAppSettings.js';
 
 /**
  * Owns all Supabase persistence effects: initial task/settings reads,
