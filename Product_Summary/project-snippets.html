@@ -5691,3 +5691,106 @@ function EmailRulesPanel({
   }, [googleToken]);
 }</code></pre>
 </section>
+
+
+<section id="snip-styled-checkbox">
+  <h2>StyledCheckbox — theme-aware checkbox component</h2>
+  <p>Commit <code>d73354f</code> &mdash; <code>shared/StyledCheckbox.jsx</code></p>
+  <pre><code class="language-jsx">function StyledCheckbox({ checked, onChange, accentColor, disabled }) {
+  return (
+    &lt;label style={{ position: 'relative', width: 15, height: 15,
+                    display: 'inline-flex', cursor: disabled ? 'not-allowed' : 'pointer' }}&gt;
+      &lt;input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        disabled={disabled}
+        style={{ opacity: 0, position: 'absolute', width: '100%', height: '100%',
+                 margin: 0, cursor: 'inherit' }}
+      /&gt;
+      &lt;div style={{
+        width: 15, height: 15, borderRadius: 3,
+        border: `1px solid ${checked ? accentColor : COLORS.border2}`,
+        background: checked ? accentColor : COLORS.surface2,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'all 0.1s',
+      }}&gt;
+        {checked &amp;&amp; &lt;span style={{ color: '#111', fontSize: 10, fontWeight: 700 }}&gt;✓&lt;/span&gt;}
+      &lt;/div&gt;
+    &lt;/label&gt;
+  );
+}</code></pre>
+</section>
+
+<section id="snip-vitest-example">
+  <h2>Vitest test examples — taskUtils and useTaskDetailDrafts</h2>
+  <p>Commit <code>ee0ce86</code> &mdash; co-located in <code>src/features/tasks/</code></p>
+  <pre><code class="language-js">// taskUtils.test.js — pure function tests
+describe('effortToMinutes', () =&gt; {
+  it('converts "30 min" to 30', () =&gt; expect(effortToMinutes('30 min')).toBe(30));
+  it('converts "1 day" to 1440', () =&gt; expect(effortToMinutes('1 day')).toBe(1440));
+  it('returns 0 for unknown input', () =&gt; expect(effortToMinutes('unknown')).toBe(0));
+});
+
+// useTaskDetailDrafts.test.js — hook tests
+it('resets drafts when task changes', () =&gt; {
+  const { result, rerender } = renderHook(
+    ({ task }) =&gt; useTaskDetailDrafts(task, false, jest.fn(), jest.fn()),
+    { initialProps: { task: { id: '1', text: 'First', notes: '' } } }
+  );
+  rerender({ task: { id: '2', text: 'Second', notes: 'note' } });
+  expect(result.current.titleDraft).toBe('Second');
+  expect(result.current.notesDraft).toBe('note');
+});</code></pre>
+</section>
+
+<section id="snip-toolbar-btn">
+  <h2>ToolbarBtn — shared toolbar toggle component</h2>
+  <p>Commit <code>2ea7a8e</code> &mdash; moved to <code>shared/SidebarComponents.jsx</code></p>
+  <pre><code class="language-jsx">// shared/SidebarComponents.jsx
+function ToolbarBtn({ children, onClick, active, color, disabled, title, style }) {
+  const [hover, setHover] = useState(false);
+  const resolvedColor = color || (active ? COLORS.inbox : COLORS.text2);
+  const borderColor   = color ? `${color}55` : (active ? COLORS.inbox : COLORS.border);
+  const bg = active
+    ? (hover &amp;&amp; !disabled ? '#363830' : COLORS.surface3)
+    : (hover &amp;&amp; !disabled ? COLORS.surface3 : 'transparent');
+  return (
+    &lt;button
+      onClick={onClick} disabled={disabled} title={title}
+      onMouseEnter={() =&gt; setHover(true)}
+      onMouseLeave={() =&gt; setHover(false)}
+      style={{ padding: '5px 10px', borderRadius: 7,
+        border: `1px solid ${borderColor}`, background: bg,
+        color: resolvedColor, fontFamily: 'inherit', fontSize: 11,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        flexShrink: 0, opacity: disabled ? 0.5 : 1, transition: 'all 0.1s',
+        ...style }}
+    &gt;
+      {children}
+    &lt;/button&gt;
+  );
+}
+
+// CoachPanel.jsx — mode tabs now use ToolbarBtn
+{Object.entries(COACH_MODES).map(([key, cfg]) =&gt; (
+  &lt;ToolbarBtn
+    key={key}
+    active={coachMode === key}
+    onClick={() =&gt; { /* dispatch to correct start handler */ }}
+  &gt;
+    {cfg.label}
+  &lt;/ToolbarBtn&gt;
+))}</code></pre>
+</section>
+
+<section id="snip-triage-on-report">
+  <h2>Triage-on-report — backlog management rule</h2>
+  <p>Commit <code>2606d59</code> &mdash; <code>Claude_Prompts/AI_Pair_Programming.md</code></p>
+  <pre><code class="language-markdown">**Triage on report.** When John says something like "there's an issue",
+"something isn't behaving correctly", or "I need X", immediately attempt
+to categorise it using the table above. If the category is ambiguous,
+ask one clarifying question before recording. Once the category is
+confirmed, add the entry to `Known_Issues_And_Requests.md` with the
+next available number and update the Last used numbers line.</code></pre>
+</section>

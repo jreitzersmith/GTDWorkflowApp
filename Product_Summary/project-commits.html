@@ -2429,3 +2429,116 @@
     behaviour unchanged (fetches from Gmail API on mount).
   </td>
 </tr>
+
+
+<tr>
+  <td><code>d73354f</code></td>
+  <td>feat</td>
+  <td>dark-theme styled checkboxes (FR#12)</td>
+  <td>
+    Added <code>StyledCheckbox</code> to <code>shared/</code>: a hidden native
+    <code>&lt;input type="checkbox"&gt;</code> paired with a styled visual
+    <code>&lt;div&gt;</code> that uses <code>COLORS</code> tokens for borders,
+    backgrounds, and the checked fill. Replaced all 6 native checkbox sites across
+    <code>CalendarSuggestionsBar</code>, <code>AICoach</code> (MetadataReviewBar +
+    ProjectReviewBar), <code>TaskDetailPanel</code> (recurrence enable +
+    sendToInbox), and <code>TaskRow</code> (bulk-selection). Includes a 5-test
+    suite co-located in <code>src/shared/StyledCheckbox.test.jsx</code>.
+  </td>
+</tr>
+
+<tr>
+  <td><code>e838488</code></td>
+  <td>feat</td>
+  <td>inactive button visual improvements (FR#24)</td>
+  <td>
+    <code>Btn</code> (SidebarComponents): idle background raised
+    <code>surface2</code> → <code>surface3</code>; hover goes to
+    <code>#363830</code> for clearer depth. Added <code>ToolbarBtn</code> in
+    <code>TaskBucketView</code>: transparent idle, <code>surface3</code> on hover,
+    <code>#363830</code> on hover-when-active; active state uses inbox yellow for
+    text and border. Replaced all Projects toolbar buttons and Next Actions groupBy
+    buttons with <code>ToolbarBtn</code>. Idle text raised from
+    <code>COLORS.muted</code> to <code>COLORS.text2</code>.
+  </td>
+</tr>
+
+<tr>
+  <td><code>ee0ce86</code></td>
+  <td>feat</td>
+  <td>add Vitest test suite (85 tests)</td>
+  <td>
+    Installed vitest, @vitest/coverage-v8, @testing-library/react, jsdom.
+    Added <code>test</code> and <code>test:coverage</code> scripts; configured
+    <code>vite.config.js</code> with jsdom environment. Fixed missing
+    <code>parseRecurrenceValue</code> import in <code>taskUtils.jsx</code>
+    uncovered during test authoring. 85 tests across three co-located files:
+    <code>taskUtils.test.js</code> (69 tests — effortToMinutes, waterfallFilter,
+    action extractors, tree helpers),
+    <code>useTaskRowState.test.js</code> (4 tests),
+    <code>useTaskDetailDrafts.test.js</code> (12 tests — draft sync, Escape key,
+    saveTitle/saveNotes edge cases).
+  </td>
+</tr>
+
+<tr>
+  <td><code>0b1f8f2</code></td>
+  <td>fix</td>
+  <td>strip stray brackets from AI coach action-line parser</td>
+  <td>
+    Root cause: system prompt used <code>[|field]</code> bracket notation for
+    optional fields; the AI occasionally interpreted the brackets literally,
+    writing e.g. <code>task title[|due:2026-05-15]</code> so the
+    <code>[</code> landed in the task title. Two-part fix: (1) system prompt
+    updated to use plain prose instead of bracket notation; (2) parser defence
+    added to <code>extractCreateAction</code>, <code>extractAddAction</code>, and
+    <code>extractUpdateAction</code> in <code>taskUtils.jsx</code> — strips
+    <code>[ ]</code> from title strings and trailing <code>]</code> from field
+    values.
+  </td>
+</tr>
+
+<tr>
+  <td><code>2d597ac</code></td>
+  <td>fix</td>
+  <td>expose fetchModels from useCallAI (runtime ReferenceError)</td>
+  <td>
+    <code>fetchModels</code> was extracted into <code>useCallAI</code> in the
+    CQ#2g phase-2 refactor but accidentally omitted from the hook's return
+    object. <code>CoachPanel</code> received it as a prop from
+    <code>App.jsx</code>, which tried to destructure it from
+    <code>useCallAI()</code> — causing a <code>ReferenceError</code> at runtime.
+    Fix: add <code>fetchModels</code> to <code>useCallAI</code>'s return value.
+  </td>
+</tr>
+
+<tr>
+  <td><code>2ea7a8e</code></td>
+  <td>feat</td>
+  <td>unify coach mode buttons with ToolbarBtn</td>
+  <td>
+    Moved <code>ToolbarBtn</code> from <code>features/tasks/TaskBucketView.jsx</code>
+    to <code>shared/SidebarComponents.jsx</code>. Updated
+    <code>TaskBucketView.jsx</code> to import from shared (removed now-unused
+    <code>useState</code> import). Replaced raw <code>&lt;button&gt;</code>
+    elements in <code>CoachPanel.jsx</code> mode-tab row with
+    <code>&lt;ToolbarBtn active={coachMode === key}&gt;</code>; coach tabs now
+    share the same hover state, transition, and inbox-accent active highlight as
+    the groupBy buttons.
+  </td>
+</tr>
+
+<tr>
+  <td><code>2606d59</code></td>
+  <td>docs</td>
+  <td>add triage-on-report rule to backlog management workflow</td>
+  <td>
+    <code>AI_Pair_Programming.md</code>: added "Triage on report" paragraph
+    after the category table — categorise reported issues and requests
+    immediately, ask one clarifying question if the category is ambiguous, then
+    record with the next available number.
+    <code>CLAUDE.md</code>: matching one-liner cross-reference added under
+    Working instructions.
+  </td>
+</tr>
+

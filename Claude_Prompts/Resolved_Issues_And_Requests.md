@@ -21,3 +21,7 @@ One row per item: date · type · # · name · commit hash(es).
 | 2026-05-08 | Bug Fix      | Issue#1 | Email Rules tab re-fetches on every visit                         | c3fb23e           |
 | 2026-05-08 | Feature      | FR#12   | Dark-theme checkboxes (StyledCheckbox shared component)           | d73354f           |
 | 2026-05-08 | Feature      | FR#24   | Inactive button visual improvements (Btn + ToolbarBtn)            | e838488           |
+| 2026-05-08 | Bug Fix      | —       | Strip stray [ ] brackets from AI coach action-line parsed values  | 0b1f8f2           |
+| 2026-05-08 | Bug Fix      | —       | Expose fetchModels from useCallAI (runtime ReferenceError fix)    | 2d597ac           |
+| 2026-05-08 | Infra        | —       | Add Vitest test suite — 85 tests across taskUtils, useTaskRowState, useTaskDetailDrafts | ee0ce86 |
+| 2026-05-08 | Polish       | —       | Unify coach mode tabs with ToolbarBtn; move to shared/            | 2ea7a8e           |

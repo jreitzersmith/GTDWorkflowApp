@@ -3230,3 +3230,172 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
     of a shell function so it survives repeated calls to an inner function.
   </div>
 </section>
+
+
+<section id="feat-styled-checkbox">
+  <h2>Dark-theme styled checkboxes (FR#12)</h2>
+  <p>Commit <code>d73354f</code></p>
+  <p>
+    Native HTML checkboxes ignore the page's colour theme — they render in
+    the browser's default OS style, which looks out of place on a dark UI.
+    The fix was a <code>StyledCheckbox</code> shared component: a hidden
+    <code>&lt;input type="checkbox"&gt;</code> absolutely positioned behind a
+    styled <code>&lt;div&gt;</code> that uses <code>COLORS</code> design tokens
+    for its border, background, and checked fill. Clicking anywhere on the
+    visible div toggles the hidden input, preserving full keyboard and
+    accessibility behaviour.
+  </p>
+  <p>
+    The component accepts an <code>accentColor</code> prop so different
+    sections of the app can use their own highlight colour. All six native
+    checkbox sites were replaced: the calendar suggestions bar, the AI coach's
+    metadata and project review bars, the task detail panel's recurrence-enable
+    and send-to-inbox toggles, and the task row's bulk-selection tick.
+  </p>
+  <p>
+    A five-test suite was co-located in
+    <code>src/shared/StyledCheckbox.test.jsx</code>, covering render,
+    checked/unchecked state, the onChange callback, and disabled state.
+  </p>
+  <div class="commit-lesson"><strong>React concept — visually hidden inputs:</strong>
+    Hiding a native input with <code>opacity: 0; position: absolute</code>
+    and layering a styled element on top is the standard pattern for custom
+    form controls. The native input remains in the DOM and in the accessibility
+    tree, so screen readers and keyboard navigation continue to work exactly as
+    expected — you are only replacing the visual rendering, not the behaviour.
+  </div>
+</section>
+
+<section id="feat-toolbar-btn-fr24">
+  <h2>Inactive button visual improvements (FR#24)</h2>
+  <p>Commit <code>e838488</code></p>
+  <p>
+    Several toolbar and groupBy buttons were visually hard to distinguish from
+    disabled or inactive UI — their idle colour was too close to the
+    background. Two improvements were made. First, the generic <code>Btn</code>
+    component's idle background was raised from <code>surface2</code> to
+    <code>surface3</code>, making it sit slightly above the page background.
+    Second, a new <code>ToolbarBtn</code> component was introduced for toggle
+    buttons (groupBy, Projects tree controls): transparent when idle, rises to
+    <code>surface3</code> on hover, and shows an inbox-yellow text and border
+    accent when active. Idle text colour across all toolbar buttons was raised
+    from <code>COLORS.muted</code> to <code>COLORS.text2</code>, improving
+    readability without competing with active states.
+  </p>
+  <div class="commit-lesson"><strong>Design concept — affordance through contrast:</strong>
+    Interactive elements need to look interactive. A button that blends into
+    the background creates no affordance — users cannot tell it is clickable.
+    The two-level contrast approach used here (idle → hover → active) gives
+    the user continuous visual feedback about what state each button is in
+    without requiring colour alone to communicate it.
+  </div>
+</section>
+
+<section id="feat-vitest-suite">
+  <h2>Vitest test suite — 85 tests</h2>
+  <p>Commit <code>ee0ce86</code></p>
+  <p>
+    No automated tests existed before this commit, which made every refactor a
+    manual verification exercise. The test suite was bootstrapped by installing
+    Vitest, @testing-library/react, and jsdom, then configuring
+    <code>vite.config.js</code> with a jsdom test environment and a
+    <code>src/test-setup.js</code> file that imports jest-dom matchers.
+  </p>
+  <p>
+    85 tests were written across three co-located files in
+    <code>src/features/tasks/</code>. <code>taskUtils.test.js</code> covers the
+    pure utility functions: <code>effortToMinutes</code>,
+    <code>minutesToEffortLabel</code>, <code>collectDescendantIds</code>,
+    <code>waterfallFilter</code>, and the three action-line extractors
+    (<code>extractCreateAction</code>, <code>extractUpdateAction</code>,
+    <code>extractAddAction</code>). <code>useTaskRowState.test.js</code>
+    verifies the hook's initial state and external text sync.
+    <code>useTaskDetailDrafts.test.js</code> covers draft sync on task switch,
+    Escape-key cancellation, listener cleanup, and the
+    whitespace-as-null edge case in <code>saveTitle</code> and
+    <code>saveNotes</code>.
+  </p>
+  <div class="commit-lesson"><strong>Testing concept — co-location:</strong>
+    Test files live in the same folder as the code they test
+    (e.g. <code>taskUtils.test.js</code> next to <code>taskUtils.jsx</code>).
+    This makes it obvious which tests cover which file, simplifies imports,
+    and ensures tests are updated when the file is moved — because they move
+    with it. Keeping tests beside the source is the modern React convention
+    and the approach enforced by the project's coding standards.
+  </div>
+</section>
+
+<section id="fix-action-line-brackets">
+  <h2>Fix stray brackets in AI coach action-line parser</h2>
+  <p>Commit <code>0b1f8f2</code></p>
+  <p>
+    The AI coach's system prompt used <code>[|field]</code> bracket notation to
+    mark optional fields in its action-line format examples. Occasionally the
+    model interpreted the brackets literally and included them in its output —
+    writing something like <code>task title[|due:2026-05-15]</code> — which
+    caused the opening bracket to appear verbatim in the created task's title.
+  </p>
+  <p>
+    The fix was two-part. The system prompt was updated to describe optional
+    fields in plain prose rather than using bracket notation, removing the
+    ambiguity at the source. A defensive strip was also added to the three
+    action-line parser functions in <code>taskUtils.jsx</code>
+    (<code>extractCreateAction</code>, <code>extractAddAction</code>,
+    <code>extractUpdateAction</code>): any <code>[</code> or <code>]</code>
+    characters in extracted title strings are stripped, and trailing
+    <code>]</code> characters are removed from field values.
+  </p>
+  <div class="commit-lesson"><strong>Engineering principle — defence in depth:</strong>
+    Fixing the root cause (the prompt) and adding a parser safeguard are not
+    mutually exclusive. The prompt fix prevents the problem from occurring; the
+    parser strip handles any residual malformed output from older context
+    windows or model drift. Both layers together are more robust than either
+    alone.
+  </div>
+</section>
+
+<section id="unify-toolbar-btn">
+  <h2>Unify coach mode buttons with ToolbarBtn</h2>
+  <p>Commit <code>2ea7a8e</code></p>
+  <p>
+    The five AI Coach mode tabs (Chat, Process, Review, Brain Dump, Project
+    Review) were rendered as plain <code>&lt;button&gt;</code> elements with
+    hard-coded inline styles. They had no hover state, used different colour
+    tokens than the rest of the toolbar, and lacked the transition animation
+    present on the groupBy buttons.
+  </p>
+  <p>
+    <strong>The fix.</strong> <code>ToolbarBtn</code> — the component already
+    used for groupBy and tree-control buttons in <code>TaskBucketView.jsx</code>
+    — was moved to <code>src/shared/SidebarComponents.jsx</code> so it can be
+    imported by any feature. <code>TaskBucketView.jsx</code> was updated to
+    import it from the shared location (no behaviour change). <code>CoachPanel.jsx</code>
+    then replaced its raw <code>&lt;button&gt;</code> loop with
+    <code>&lt;ToolbarBtn active={coachMode === key}&gt;</code>, giving the mode
+    tabs the same hover state, transition, and inbox-accent active highlight as
+    every other toolbar button in the app.
+  </p>
+  <div class="commit-lesson"><strong>React concept — shared presentational components:</strong>
+    When the same visual pattern appears in more than one feature, extracting it
+    into a shared component is the right call. The component goes in
+    <code>src/shared/</code> rather than inside either feature folder, because it
+    belongs to neither feature specifically. The consuming components import it
+    from the shared location; the visual contract stays consistent everywhere
+    without duplicating any code.
+  </div>
+</section>
+
+<section id="docs-triage-on-report">
+  <h2>Triage-on-report workflow rule</h2>
+  <p>Commit <code>2606d59</code></p>
+  <p>
+    Added a "Triage on report" instruction to <code>AI_Pair_Programming.md</code>
+    and a matching one-liner to <code>CLAUDE.md</code>. When John reports
+    something — an issue, unexpected behaviour, or new request — Claude now
+    immediately attempts to categorise it using the backlog table, asks one
+    clarifying question only if the category is ambiguous, and records it in
+    <code>Known_Issues_And_Requests.md</code> with the next available number.
+    This removes the manual step of separately asking Claude to log a report
+    after discussing it.
+  </p>
+</section>
