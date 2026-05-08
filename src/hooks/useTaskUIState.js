@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 function useTaskUIState() {
   const [currentBucket, setCurrentBucket] = useState('inbox');
@@ -15,6 +15,28 @@ function useTaskUIState() {
   const [inboxSelectedIds, setInboxSelectedIds] = useState(new Set());
   const [pendingGroupSuggestion, setPendingGroupSuggestion] = useState(null);
 
+  const toggleCollapse = useCallback((id) => {
+    setCollapsedNodes(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  // If all children are already collapsed, expand them; otherwise collapse all.
+  const toggleCollapseLevel = useCallback((childIds) => {
+    setCollapsedNodes(prev => {
+      const allCollapsed = childIds.length > 0 && childIds.every(id => prev.has(id));
+      const next = new Set(prev);
+      if (allCollapsed) {
+        childIds.forEach(id => next.delete(id));
+      } else {
+        childIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  }, []);
+
   return {
     currentBucket, setCurrentBucket,
     addText, setAddText,
@@ -23,6 +45,7 @@ function useTaskUIState() {
     nextGroupBy, setNextGroupBy,
     projectParentId, setProjectParentId,
     collapsedNodes, setCollapsedNodes,
+    toggleCollapse, toggleCollapseLevel,
     selectedTaskId, setSelectedTaskId,
     actualEffortPrompt, setActualEffortPrompt,
     pendingRollup, setPendingRollup,
