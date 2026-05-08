@@ -1,3 +1,4 @@
+import { useState } from "react";
 import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../../constants.jsx";
 import { Btn } from "../../shared/SidebarComponents.jsx";
@@ -10,7 +11,48 @@ const ADD_ROW_STYLE = { display: "flex", gap: 6, padding: "8px 16px", borderBott
 const PANEL_HEADER_STYLE = { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 };
 const TASK_LIST_STYLE = { flex: 1, overflowY: "auto", padding: "4px 0" };
 const INPUT_STYLE = { flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" };
-const TOOLBAR_BTN_STYLE = { padding: "5px 10px", borderRadius: 7, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", flexShrink: 0 };
+// Toolbar and groupBy buttons: transparent idle, surface3 on hover;
+// active variant shows surface3 idle / darker on hover with inbox accent.
+function ToolbarBtn({ children, onClick, active, color, disabled, title, style }) {
+  const [hover, setHover] = useState(false);
+  const resolvedColor = color || (active ? COLORS.inbox : COLORS.text2);
+  const borderColor   = color ? `${color}55` : (active ? COLORS.inbox : COLORS.border);
+  const bg = active
+    ? (hover && !disabled ? '#363830' : COLORS.surface3)
+    : (hover && !disabled ? COLORS.surface3 : 'transparent');
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        padding: '5px 10px', borderRadius: 7,
+        border: `1px solid ${borderColor}`,
+        background: bg,
+        color: resolvedColor,
+        fontFamily: 'inherit', fontSize: 11,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        flexShrink: 0,
+        opacity: disabled ? 0.5 : 1,
+        transition: 'all 0.1s',
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+ToolbarBtn.propTypes = {
+  children:  PropTypes.node.isRequired,
+  onClick:   PropTypes.func.isRequired,
+  active:    PropTypes.bool,
+  color:     PropTypes.string,
+  disabled:  PropTypes.bool,
+  title:     PropTypes.string,
+  style:     PropTypes.object,
+};
 
 const GROUP_OPTS = [
   { key: "none",     label: "None" },
@@ -95,42 +137,40 @@ function TaskBucketView({
 
         {currentBucket === "project" && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            <button
+            <ToolbarBtn
               onClick={() => {
                 const next = new Set();
                 rootProjects.forEach(p => next.add(p.id));
                 setCollapsedNodes(next);
               }}
               title="Show project names only"
-              style={TOOLBAR_BTN_STYLE}
             >
               ≡ Projects Only
-            </button>
-            <button
+            </ToolbarBtn>
+            <ToolbarBtn
               onClick={() => {
                 const next = new Set();
                 rootProjects.forEach(p => (p.childIds || []).forEach(cid => next.add(cid)));
                 setCollapsedNodes(next);
               }}
               title="Collapse all projects to top-level tasks"
-              style={TOOLBAR_BTN_STYLE}
             >
               ⊖ Collapse All
-            </button>
-            <button
+            </ToolbarBtn>
+            <ToolbarBtn
               onClick={() => setCollapsedNodes(new Set())}
               title="Expand all projects fully"
-              style={TOOLBAR_BTN_STYLE}
             >
               ⊕ Expand All
-            </button>
-            <button
+            </ToolbarBtn>
+            <ToolbarBtn
               onClick={onStartProjectReview}
               disabled={loading}
-              style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${COLORS.project}55`, background: "transparent", color: COLORS.project, fontFamily: "inherit", fontSize: 12, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.5 : 1, flexShrink: 0, display: "flex", alignItems: "center", gap: 5 }}
+              color={COLORS.project}
+              style={{ fontSize: 12, padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 5 }}
             >
               🔍 Review Projects
-            </button>
+            </ToolbarBtn>
           </div>
         )}
 
@@ -138,13 +178,14 @@ function TaskBucketView({
           <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
             <span style={{ fontSize: 11, color: COLORS.muted, marginRight: 2 }}>Group:</span>
             {GROUP_OPTS.map(opt => (
-              <button
+              <ToolbarBtn
                 key={opt.key}
                 onClick={() => setNextGroupBy(opt.key)}
-                style={{ padding: "3px 9px", borderRadius: 6, border: `1px solid ${nextGroupBy === opt.key ? COLORS.border2 : COLORS.border}`, background: nextGroupBy === opt.key ? COLORS.surface3 : "transparent", color: nextGroupBy === opt.key ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "all 0.1s" }}
+                active={nextGroupBy === opt.key}
+                style={{ padding: '3px 9px', borderRadius: 6 }}
               >
                 {opt.label}
-              </button>
+              </ToolbarBtn>
             ))}
           </div>
         )}
