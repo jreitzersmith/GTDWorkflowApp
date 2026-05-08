@@ -1,6 +1,6 @@
 # GTD Workflow App — AI Pair Programming Process
 
-**Project:** `C:\Programming_Projects\GTDWorkflowApp` — a React single-page GTD task manager with an AI coach (Claude API). Entire app is one file: `src/App.jsx` (~7200 lines). Docs live in the project root: `project-summary.html`, `project-snippets.html`, `project-commits.html`.
+**Project:** `C:\Programming_Projects\GTDWorkflowApp` — a React single-page GTD task manager with an AI coach (Claude API). Entire app is one file: `src/App.jsx` (~7200 lines). HTML summary docs live in `Product_Summary/`: `project-summary.html`, `project-snippets.html`, `project-commits.html`.
 
 **CLAUDE.md** is checked in and contains the full project brief — always read it at session start.
 
@@ -44,7 +44,7 @@ John tests. If something is off, iterate back to Step 3. If it passes, he confir
 
 **If testing reveals an issue and a fix is applied:** run the build, then explicitly ask John to re-test and confirm the fix before moving to Step 7. A passing build is not sufficient — re-confirmation is required after every mid-testing fix, no matter how small. Do not commit until that second confirmation arrives.
 
-Do **not** touch the three HTML doc files (`project-summary.html`, `project-snippets.html`, `project-commits.html`) until John says "looks good" or equivalent. Misleading docs are worse than no docs.
+Do **not** touch the three HTML doc files (`Product_Summary/project-summary.html`, `Product_Summary/project-snippets.html`, `Product_Summary/project-commits.html`) until John says "looks good" or equivalent. Misleading docs are worse than no docs.
 
 ### Step 7 — Commit
 Once John confirms, commit via `mcp__git__git_commit` (not bash git — bash can hit HEAD.lock on the Windows mount).
@@ -66,7 +66,7 @@ After committing, if the change resolves a tracked known issue or completes a fe
 ### Step 8 — Documentation (append only)
 After the commit, update all three project doc files — **but only if John has already confirmed the feature works in Step 6.** If for any reason he hasn't confirmed yet, explicitly say docs will be updated once he does. Do not update docs speculatively.
 
-When ready: read the tail of each HTML file to find the last documented state, then append new content (TOC entry, feature section, snippets, commit entry). Never rewrite existing sections. Update all three files in one Python pass.
+When ready: read the tail of each HTML file in `Product_Summary/` to find the last documented state, then append new content (TOC entry, feature section, snippets, commit entry). Never rewrite existing sections. Update all three files in one Python pass.
 
 Authoring rules (from `Prompts/Project_Summary.md`):
 - Audience: total beginner to React/Node.js, but experienced sysadmin (Linux/macOS/Windows/AWS)
@@ -103,6 +103,13 @@ After placing the entry, update the **Last used numbers** line at the top of the
 - Use `str.replace(old, new)` — never regex on JSX (too fragile)
 - Verify each replacement succeeded by checking for `✗` in the output before writing
 - After write, confirm line count grew (not shrank)
+
+---
+
+## File placement conventions
+
+- **HTML summary docs** (`project-summary.html`, `project-snippets.html`, `project-commits.html`): `Product_Summary/`
+- **Visual mockups** (HTML wireframes or design mockups of the app): `Visual_Mockups/`
 
 ---
 

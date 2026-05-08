@@ -32,6 +32,9 @@ See `Prompts/Known_Issues_And_Requests.md` — read this when planning new featu
 ## Resolved issues & requests
 See `Prompts/Resolved_Issues_And_Requests.md` — add an entry after every commit that closes a known issue or completes a feature request.
 
+## Project documentation
+See `Prompts/Project_Summary.md` — read this when updating the HTML summary docs in `Product_Summary/` (`project-summary.html`, `project-snippets.html`, `project-commits.html`).
+
 ## File structure
 ```
 GTDWorkflowApp/
@@ -87,6 +90,7 @@ GTDWorkflowApp/
   - Keep `setup_supabase_schema.py` in sync if re-running from scratch
 - **AI system prompts** (any change to `SYSTEM_PROMPTS` in `constants.jsx`): update the corresponding file in `src/prompts/`
   - `src/constants.jsx` is the source of truth; `src/prompts/` files are reference exports
+- **Visual mockups** (HTML wireframes or design mockups): `Visual_Mockups/`
 - **New features**: add a folder under `src/features/<feature-name>/` — do not create new top-level `components/` or `hooks/` directories
 
 ## Current state of the app

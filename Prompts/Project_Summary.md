@@ -1,4 +1,4 @@
-You are updating or creating a three-file project documentation system. The files are project-summary.html, project-snippets.html, and project-commits.html. All three files live in the project root and are interlinked — links in one file should point to named anchors in the appropriate file. Before beginning, repeat your understanding of this request.
+You are updating or creating a three-file project documentation system. The files are project-summary.html, project-snippets.html, and project-commits.html. All three files live in the `Product_Summary/` directory and are interlinked — links in one file should point to named anchors in the appropriate file. Before beginning, repeat your understanding of this request.
 
 
 

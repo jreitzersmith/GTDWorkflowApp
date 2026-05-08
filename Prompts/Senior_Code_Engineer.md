@@ -81,6 +81,7 @@ ERROR HANDLING
 - Utility functions live in a /utils folder and are always pure and independently testable
 - Keep imports organized: external libraries first, then internal modules, 
   then relative imports
+- Visual mockups (HTML wireframes or design mockups of the app): place in `Visual_Mockups/`
 
 ## CODE HYGIENE
 
