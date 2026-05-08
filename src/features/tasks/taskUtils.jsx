@@ -1,7 +1,7 @@
 // Pure task utilities: date helpers, recurrence, action-line parsers,
 // waterfall filter, group-by, effort helpers, and calibration context.
 import { useState, useRef, useEffect, useCallback } from "react";
-import { genId } from "../calendar/calendarApi.js";
+import { genId, parseRecurrenceValue } from "../calendar/calendarApi.js";
 import { COLORS } from "../../constants.jsx";
 
 // Returns today as "YYYY-MM-DD" in local time (for deferred-date comparisons).
