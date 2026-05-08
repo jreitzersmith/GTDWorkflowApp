@@ -343,6 +343,7 @@
     <li><a href="#refactor-2g-phase1">Hook Extraction Phase 1 (2g): useDragDrop &amp; useSupabaseSync</a></li>
     <li><a href="#phase2g2">Hook Extraction Phase 2 (2g): useCallAI</a></li>
     <li><a href="#phase2g3">Hook Extraction Phase 3 (2g): useInboxProcessing</a></li>
+    <li><a href="#phase2g4">Hook Extraction Phase 4 (2g): useTaskCrud</a></li>
   </ul>
 
   <div class="section-label">May 7 &#8212; Fixes</div>
@@ -2916,5 +2917,131 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
   setMessages, setChatHistory,
   setPendingAction,
   callAI, switchCoachMode,
+});</code></pre>
+</section>
+
+<section id="phase2g4">
+  <h2>2g-4 &mdash; Extract <code>useTaskCrud</code> Hook</h2>
+  <p><strong>Commits:</strong> <code>55a0e38</code> (extraction) &amp; <code>2d597ac</code> (fix: expose fetchModels)</p>
+  <p>App.jsx: <strong>1,395 &rarr; 1,090 lines</strong></p>
+
+  <h3>What changed</h3>
+  <p>
+    19 task-mutation callbacks were extracted from <code>GTDManager</code> into
+    <code>src/hooks/useTaskCrud.js</code>, grouped into five logical sections:
+    creation (<code>addTask</code>, <code>addAndProcess</code>, <code>addProjectTask</code>),
+    simple mutations (<code>moveTask</code>, <code>deleteTask</code>),
+    the multi-step completion flow
+    (<code>completeTask</code>, <code>finishComplete</code>, rollup / defer-check / effort prompt handlers),
+    recurring task lifecycle (<code>handleRecurringStillFine</code>, <code>handleRecurringNeedsWork</code>),
+    and project hierarchy mutations (<code>reassignProject</code>, <code>assignToProject</code>, <code>bulkAssignToProject</code>).
+  </p>
+  <p>
+    <code>toggleCollapse</code> and <code>toggleCollapseLevel</code> were moved into
+    <code>useTaskUIState</code> rather than <code>useTaskCrud</code>, because they operate
+    solely on <code>collapsedNodes</code> state already owned by that hook.
+  </p>
+  <p>
+    The dead <code>supabase</code> / <code>queueEntryToRow</code> import was also removed from
+    App.jsx — those symbols had been unused since Phase 2 moved them into
+    <code>useCallAI</code> and <code>useSupabaseSync</code>.
+  </p>
+
+  <h3>Design decisions</h3>
+  <details><summary>Why does <code>addAndProcess</code> live in <code>useTaskCrud</code> rather than <code>useInboxProcessing</code>?</summary>
+  <p>
+    <code>addAndProcess</code> is primarily a creation operation — it creates a task and
+    immediately hands it off to <code>askAIAboutTask</code> (from <code>useInboxProcessing</code>).
+    Keeping it in <code>useTaskCrud</code> keeps all task-creation logic in one place and
+    lets it receive <code>askAIAboutTask</code> as a parameter, preserving a clean one-way
+    dependency from CRUD &rarr; inbox processing.
+  </p>
+  </details>
+  <details><summary>Why are the three session-coordination refs still in App.jsx after this phase?</summary>
+  <p>
+    <code>singleTaskMode</code>, <code>processingTaskId</code>, and <code>skippedInSessionIds</code>
+    coordinate state across inbox-processing callbacks only. They belong to
+    <code>useInboxProcessing</code>'s domain and are defined in App.jsx purely because
+    multiple hooks need to read or write the same ref objects. Moving them into the hook
+    that owns them most would have required exposing them to App.jsx anyway, so they stay
+    at the coordinator level.
+  </p>
+  </details>
+  <details><summary>Bug fix: <code>fetchModels</code> not exposed from <code>useCallAI</code></summary>
+  <p>
+    <code>fetchModels</code> was extracted into <code>useCallAI</code> during Phase 2 but
+    inadvertently omitted from the hook's return value. App.jsx referenced it as a prop
+    for <code>CoachPanel</code>, causing a <code>ReferenceError</code> at runtime.
+    Fixed by adding <code>fetchModels</code> to the return object of <code>useCallAI</code>
+    and destructuring it in App.jsx.
+  </p>
+  </details>
+
+  <h3>Hook signature</h3>
+  <pre><code class="language-js">const {
+  addTask, addAndProcess, addProjectTask,
+  moveTask, deleteTask,
+  completeTask, finishComplete,
+  handleRollupConfirm, handleRollupSkip,
+  handleDeferCheckSkip, handleDeferCheckReview,
+  handleActualEffortSave, handleActualEffortSkip,
+  handleRecurringStillFine, handleRecurringNeedsWork,
+  reassignProject, assignToProject, bulkAssignToProject,
+} = useTaskCrud({
+  tasks,
+  addText, setAddText,
+  currentBucket, setCurrentBucket,
+  projectParentId,
+  pendingRollup, setPendingRollup,
+  pendingDeferCheck, setPendingDeferCheck,
+  actualEffortPrompt, setActualEffortPrompt,
+  setTasks, setMoveMenu, setPendingAction,
+  setInboxSelectedIds, setSelectedTaskId,
+  setRecurringAcknowledgedMap,
+  askAIAboutTask,
+});</code></pre>
+</section>
+
+<section id="phase2g5">
+  <h2>Code quality: extract <code>useSettings</code> hook (item 2g, phase 5)</h2>
+  <p>Commit <code>2277d43</code> &mdash; 2026-05-08</p>
+  <p>
+    The final hook-extraction phase of item 2g. Ten settings-mutation callbacks
+    that lived inline in <code>GTDManager</code> were moved into a dedicated
+    <code>src/hooks/useSettings.js</code>: location management
+    (<code>addLocation</code>, <code>renameLocation</code>, <code>removeLocation</code>),
+    effort management (<code>addEffort</code>, <code>renameEffort</code>, <code>removeEffort</code>),
+    calibration overrides (<code>setCalibrationOverride</code>, <code>clearCalibrationOverride</code>),
+    and data I/O (<code>handleExport</code>, <code>handleImport</code>).
+  </p>
+  <p>
+    <code>effortToMinutes</code> moved with the hook — it&#8217;s only needed there — so
+    the import in App.jsx was trimmed. App.jsx drops from 1,090 to 995 lines.
+    All six planned hooks for item 2g are now complete; <code>GTDManager</code> is
+    predominantly state wiring and JSX rendering.
+  </p>
+  <details>
+    <summary>React concept: why setters are safe to omit from dep arrays</summary>
+    <p>
+      The original callbacks had empty <code>[]</code> dep arrays even though they
+      called <code>setLocations</code>, <code>setTasks</code>, etc. This is technically
+      correct — React guarantees that setter functions returned by <code>useState</code>
+      are stable references that never change between renders, so including or omitting
+      them has no behavioural effect. The hook adds them explicitly for documentation
+      purposes, following the Senior Code Engineer guideline of &#8220;complete and
+      accurate dependency arrays&#8221;.
+    </p>
+  </details>
+  <h3>Hook signature</h3>
+  <pre><code class="language-js">const {
+  addLocation, renameLocation, removeLocation,
+  addEffort, renameEffort, removeEffort,
+  setCalibrationOverride, clearCalibrationOverride,
+  handleExport, handleImport,
+} = useSettings({
+  tasks, setTasks,
+  locations, setLocations,
+  efforts, setEfforts,
+  setCalibrationOverrides,
 });</code></pre>
 </section>

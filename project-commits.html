@@ -2326,3 +2326,36 @@
     App.jsx and are threaded in as parameters. App.jsx: 1,485 &rarr; 1,395 lines.
   </td>
 </tr>
+
+<tr>
+  <td><code>55a0e38</code></td>
+  <td>refactor</td>
+  <td>extract useTaskCrud hook and move toggleCollapse to useTaskUIState (2g phase 4)</td>
+  <td>
+    New <code>src/hooks/useTaskCrud.js</code> owns all 19 task-mutation callbacks.
+    <code>toggleCollapse</code> / <code>toggleCollapseLevel</code> moved into
+    <code>useTaskUIState</code>. Dead supabase import removed from App.jsx.
+    App.jsx: 1,395 &rarr; 1,090 lines.
+  </td>
+</tr>
+<tr>
+  <td><code>2d597ac</code></td>
+  <td>fix</td>
+  <td>expose fetchModels from useCallAI and destructure in App.jsx</td>
+  <td>
+    <code>fetchModels</code> was extracted in phase 2 but not included in the hook's
+    return value, causing a <code>ReferenceError</code> crash at runtime.
+  </td>
+</tr>
+
+<tr>
+  <td><code>2277d43</code></td>
+  <td>feat</td>
+  <td>extract useSettings hook (2g phase 5)</td>
+  <td>
+    New <code>src/hooks/useSettings.js</code> owns 10 settings callbacks:
+    location CRUD, effort CRUD, calibration overrides, and export/import.
+    <code>effortToMinutes</code> moved into the hook; App.jsx drops from
+    1,090 &rarr; 995 lines. All six item-2g hooks are now complete.
+  </td>
+</tr>

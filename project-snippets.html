@@ -5515,3 +5515,58 @@ function useInboxProcessing({
 
 export { useInboxProcessing };</code></pre>
 </section>
+
+<section id="snippet-useTaskCrud">
+  <h2>useTaskCrud hook — completion flow (completeTask → finishComplete)</h2>
+  <p>Commits <code>55a0e38</code>, <code>2d597ac</code> &mdash; Phase 2g-4</p>
+  <pre><code class="language-js">// Multi-step completion: deferred-child check → rollup → effort prompt → done
+const completeTask = useCallback((id, options = {}) => {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  if (!task.done) {
+    if (!options.skipDeferCheck) {
+      const deferredKids = tasks.filter(
+        t => t.parentId === id && (t.bucket === 'deferred' || t.bucket === 'someday') && !t.done
+      );
+      if (deferredKids.length > 0) { setPendingDeferCheck({...}); return; }
+    }
+    if (task.notes && task.parentId) { setPendingRollup({...}); return; }
+    if (task.effort && !task.actualEffort) { setActualEffortPrompt({...}); return; }
+  }
+  // ... mark done or un-done, spawn next recurrence
+}, [tasks, setPendingDeferCheck, setPendingRollup, setActualEffortPrompt, setTasks]);</code></pre>
+</section>
+
+<section id="snippet-useSettings">
+  <h2>useSettings hook — export/import handlers</h2>
+  <p>Commit <code>2277d43</code> &mdash; Phase 2g-5</p>
+  <pre><code class="language-js">const handleExport = useCallback(() => {
+  const data = { version: 1, exportedAt: new Date().toISOString(), tasks, locations, efforts };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `gtd-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}, [tasks, locations, efforts]);
+
+const handleImport = useCallback((data, mode = 'replace') => {
+  if (!data || !Array.isArray(data.tasks)) {
+    alert('Invalid backup file — expected a tasks array.');
+    return;
+  }
+  if (mode === 'replace') {
+    if (!window.confirm(`Replace all ${tasks.length} current tasks with ${data.tasks.length} imported tasks?`)) return;
+    setTasks(data.tasks);
+    if (Array.isArray(data.locations)) setLocations([...data.locations].sort((a, b) => a.localeCompare(b)));
+    if (Array.isArray(data.efforts)) setEfforts(data.efforts);
+  } else {
+    const existingIds = new Set(tasks.map(t => t.id));
+    const incoming = data.tasks.filter(t => !existingIds.has(t.id));
+    if (!incoming.length) { alert('Nothing to merge — all tasks in this backup already exist.'); return; }
+    setTasks(prev => [...incoming, ...prev]);
+    // merge locations and efforts without duplicates
+  }
+}, [tasks, setTasks, setLocations, setEfforts]);</code></pre>
+</section>
