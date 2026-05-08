@@ -40,13 +40,13 @@ GTDWorkflowApp/
 │   ├── project-summary.html         ← high-level project summary
 │   ├── project-commits.html         ← commit history view
 │   ├── project-snippets.html        ← code snippet reference
-│   ├── GTDWorkflowApp_ProjectSummary.html
-│   └── Project_Summary.md
+│   └── GTDWorkflowApp_ProjectSummary.html
 ├── Prompts/                         ← Claude workflow docs (NOT app prompts)
 │   ├── AI_Pair_Programming.md
 │   ├── Senior_Code_Engineer.md
 │   ├── Known_Issues_And_Requests.md
-│   └── Resolved_Issues_And_Requests.md
+│   ├── Resolved_Issues_And_Requests.md
+│   └── Project_Summary.md
 ├── src/
 │   ├── App.jsx                      ← top-level layout + auth gate wiring
 │   ├── constants.jsx                ← COLORS, BUCKETS, COACH_MODES, SYSTEM_PROMPTS
