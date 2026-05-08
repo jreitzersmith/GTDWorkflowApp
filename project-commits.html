@@ -2359,3 +2359,26 @@
     1,090 &rarr; 995 lines. All six item-2g hooks are now complete.
   </td>
 </tr>
+
+<tr>
+  <td><code>275f250</code></td>
+  <td>refactor</td>
+  <td>item 3 — presentational/container separation for TaskRow and TaskDetailPanel</td>
+  <td>
+    New <code>useTaskRowState.js</code> owns 6 state vars + sync effect for TaskRow.
+    New <code>useTaskDetailDrafts.js</code> owns draft state, 3 effects, and save
+    handlers for TaskDetailPanel. <code>collectDescendantIds</code> added to
+    taskUtils.jsx. SettingsPanel unchanged (already clean).
+  </td>
+</tr>
+<tr>
+  <td><code>0b1f8f2</code></td>
+  <td>fix</td>
+  <td>strip stray [ ] from AI coach action line parsed values</td>
+  <td>
+    System prompt replaced <code>[|field]</code> optional notation with prose.
+    Parser defence added to <code>extractCreateAction</code>,
+    <code>extractAddAction</code>, <code>extractUpdateAction</code> — strips
+    <code>[ ]</code> from titles and trailing <code>]</code> from field values.
+  </td>
+</tr>

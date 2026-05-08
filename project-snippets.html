@@ -5570,3 +5570,34 @@ const handleImport = useCallback((data, mode = 'replace') => {
   }
 }, [tasks, setTasks, setLocations, setEfforts]);</code></pre>
 </section>
+
+<section id="snippet-useTaskRowState">
+  <h2>useTaskRowState hook</h2>
+  <p>Commit <code>275f250</code> &mdash; Item 3</p>
+  <pre><code class="language-js">function useTaskRowState(task) {
+  const [hover, setHover] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
+  const [assignTarget, setAssignTarget] = useState('__new__');
+  const [newProjName, setNewProjName] = useState('');
+  const [editTitle, setEditTitle] = useState(task.text);
+
+  // Keep the title draft in sync when the task text is changed externally
+  useEffect(() => { setEditTitle(task.text); }, [task.text]);
+
+  return { hover, setHover, expanded, setExpanded, showAssign, setShowAssign,
+           assignTarget, setAssignTarget, newProjName, setNewProjName,
+           editTitle, setEditTitle };
+}</code></pre>
+</section>
+
+<section id="snippet-fix-bracket-strip">
+  <h2>Defensive bracket stripping in action parsers</h2>
+  <p>Commit <code>0b1f8f2</code> &mdash; AI coach bracket bug fix</p>
+  <pre><code class="language-js">// extractCreateAction — title and field value strip
+const title = m[1].trim().replace(/`/g, '').replace(/[\[\]]/g, '');
+const val = pair.slice(colon + 1).trim().replace(/\]$/, '');
+
+// extractUpdateAction — title field strip
+if (key === 'title') changes.text = val.replace(/[\[\]]/g, '');</code></pre>
+</section>

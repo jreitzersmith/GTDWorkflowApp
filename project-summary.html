@@ -3045,3 +3045,69 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
   setCalibrationOverrides,
 });</code></pre>
 </section>
+
+<section id="refactor-item3-pres-container">
+  <h2>Code quality: presentational/container separation (item 3)</h2>
+  <p>Commit <code>275f250</code> &mdash; 2026-05-08</p>
+  <p>
+    Item 3 of the Senior Code Engineer backlog. Three components were
+    identified as mixing rendering with state management:
+    <code>TaskRow</code>, <code>TaskDetailPanel</code>, and
+    <code>SettingsPanel</code>. The first two were refactored; the third
+    was found to be already clean.
+  </p>
+  <p>
+    <strong>TaskRow</strong> previously declared six state variables and a sync
+    <code>useEffect</code> directly in the rendering function. These are now owned
+    by a dedicated <code>useTaskRowState(task)</code> hook in
+    <code>src/hooks/useTaskRowState.js</code>. The hook returns all state values
+    and setters; <code>TaskRow</code> destructures them and focuses purely on
+    rendering.
+  </p>
+  <p>
+    <strong>TaskDetailPanel</strong> previously declared <code>titleDraft</code>,
+    <code>notesDraft</code>, three <code>useEffect</code> hooks (draft sync +
+    Escape listener), and <code>saveTitle</code>/<code>saveNotes</code> inline.
+    These moved into <code>useTaskDetailDrafts({ task, onUpdate, onClose })</code>
+    in <code>src/hooks/useTaskDetailDrafts.js</code>. Additionally, the inline
+    <code>getDescendantIds</code> pure function was extracted to
+    <code>taskUtils.jsx</code> as the exported <code>collectDescendantIds</code>.
+  </p>
+  <details>
+    <summary>React concept: when to extract a hook vs. keep state local</summary>
+    <p>
+      React hooks are often described as a reusability tool, but their other
+      purpose is <em>separation of concerns</em>. A hook used by exactly one
+      component is still valuable if it makes that component easier to read:
+      the component tells you <em>what</em> to render; the hook tells you
+      <em>why state changes</em>. If you can read the component&#8217;s JSX
+      without mentally parsing six <code>useState</code> declarations, the
+      extraction paid for itself.
+    </p>
+  </details>
+</section>
+
+<section id="fix-bracket-in-ai-titles">
+  <h2>Bug fix: trailing [ character in AI-created task titles</h2>
+  <p>Commit <code>0b1f8f2</code> &mdash; 2026-05-08</p>
+  <p>
+    Tasks created or modified by the AI coach were sometimes arriving with a
+    trailing <code>[</code> character in their title (e.g. &#8220;Review report
+    [&#8221;). The root cause was in the system prompt: optional fields were
+    described with bracket notation (<code>[|due:YYYY-MM-DD]</code>), which
+    the model occasionally interpreted literally, generating action lines like
+    <code>&#8594;ACTION:create|Review report[|bucket:next</code>. The regex
+    <code>([^|
+]+)</code> then captured <code>Review report[</code> as the title.
+  </p>
+  <p>
+    Two-part fix: (1) the system prompt in <code>constants.jsx</code> now lists
+    optional fields as prose rather than bracket-delimited format strings, so no
+    <code>[</code> or <code>]</code> characters appear in the action-line examples;
+    (2) the three extract functions in <code>taskUtils.jsx</code>
+    (<code>extractCreateAction</code>, <code>extractAddAction</code>,
+    <code>extractUpdateAction</code>) now strip <code>[</code><code>]</code> from
+    parsed title strings and trailing <code>]</code> from field values as a
+    defensive guard against any residual malformed output.
+  </p>
+</section>
