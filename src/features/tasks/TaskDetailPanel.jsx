@@ -4,6 +4,7 @@ import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { collectDescendantIds, effortAccuracyColor, effortToMinutes } from "./taskUtils.jsx";
+import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
 
 // Shared style tokens used across the sub-components below.
 const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
@@ -138,12 +139,12 @@ function RecurrenceEditor({ rec, taskId, onUpdate }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, fontSize: 12 }}>Repeat</span>
         <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 12 }}>
-          <input
-            type="checkbox"
+          <StyledCheckbox
             checked={!!rec}
             onChange={e => onUpdate(taskId, { recurrence: e.target.checked
               ? { frequency: "weekly", interval: 1, rescheduleFrom: "completion", sendToInbox: false }
               : null })}
+            accentColor={COLORS.project}
           />
           {rec ? "Enabled" : "Off"}
         </label>
@@ -211,8 +212,11 @@ function RecurrenceEditor({ rec, taskId, onUpdate }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
             <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>On spawn</span>
             <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
-              <input type="checkbox" checked={!!rec.sendToInbox}
-                onChange={e => onUpdate(taskId, { recurrence: { ...rec, sendToInbox: e.target.checked } })} />
+              <StyledCheckbox
+                checked={!!rec.sendToInbox}
+                onChange={e => onUpdate(taskId, { recurrence: { ...rec, sendToInbox: e.target.checked } })}
+                accentColor={COLORS.project}
+              />
               Send to Inbox
             </label>
           </div>

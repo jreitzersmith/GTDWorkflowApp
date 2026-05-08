@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 import { formatBubble } from "../tasks/taskUtils.jsx";
+import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
 
 function ActionBtn({ children, onClick, color }) {
   const [hover, setHover] = useState(false);
@@ -302,11 +303,10 @@ function MetadataReviewBar({ suggestions, onToggleAccepted, onChangeOverride, on
             <div key={s.taskId} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "7px 9px", borderRadius: 7, background: s.accepted ? COLORS.surface2 : COLORS.surface, border: `1px solid ${s.accepted ? COLORS.border2 : COLORS.border}`, opacity: s.accepted ? 1 : 0.5 }}>
               {/* Task row header */}
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <input
-                  type="checkbox"
+                <StyledCheckbox
                   checked={s.accepted}
                   onChange={() => onToggleAccepted(idx)}
-                  style={{ accentColor: COLORS.project, flexShrink: 0 }}
+                  accentColor={COLORS.project}
                 />
                 <span style={{ fontSize: 12, color: COLORS.text, fontWeight: 500, lineHeight: 1.35 }}>{s.taskText}</span>
               </div>
@@ -387,11 +387,11 @@ function ProjectReviewBar({ suggestions, onToggle, onNext, onSkip, projectIdx, t
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {suggestions.map((s, idx) => (
             <label key={s.text} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
-              <input
-                type="checkbox"
+              <StyledCheckbox
                 checked={s.checked}
                 onChange={() => onToggle(idx)}
-                style={{ marginTop: 2, accentColor: COLORS.project, flexShrink: 0 }}
+                accentColor={COLORS.project}
+                style={{ marginTop: 2 }}
               />
               <span style={{ fontSize: 12, color: s.checked ? COLORS.text : COLORS.muted, textDecoration: s.checked ? "none" : "line-through", lineHeight: 1.45 }}>
                 {s.text}

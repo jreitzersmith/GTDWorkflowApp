@@ -8,6 +8,7 @@ import {
   minutesToEffortLabel, subtractFromDate, sumDescendantEffort,
 } from "./taskUtils.jsx";
 import { ActionBtn } from "../coach/AICoach.jsx";
+import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
 
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
@@ -129,12 +130,12 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
       <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: highlight ? COLORS.inboxBg : (selectedTaskId === task.id ? COLORS.surface3 : hover ? COLORS.surface2 : "transparent") }}>
         {/* Bulk-selection checkbox — shown in Inbox when a selection handler is provided */}
         {onSelect && (
-          <input
-            type="checkbox"
+          <StyledCheckbox
             checked={!!isSelected}
             onChange={e => { e.stopPropagation(); onSelect(task.id, e.target.checked); }}
             onClick={e => e.stopPropagation()}
-            style={{ marginTop: 3, flexShrink: 0, cursor: "pointer", accentColor: COLORS.project, width: 13, height: 13 }}
+            accentColor={COLORS.project}
+            style={{ marginTop: 3 }}
           />
         )}
         {isSubtask && <span style={{ color: COLORS.project, fontSize: 10, marginTop: 3, flexShrink: 0 }}>↳</span>}

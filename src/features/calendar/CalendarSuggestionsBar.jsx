@@ -1,6 +1,7 @@
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 import { BUCKET_OPTS } from "../tasks/InboxBars.jsx";
+import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
 
 function CalendarSuggestionsBar({ suggestions, onToggle, onChangeBucket, onAccept, onDismiss }) {
   const selectedCount = suggestions.filter(s => s.checked).length;
@@ -16,11 +17,11 @@ function CalendarSuggestionsBar({ suggestions, onToggle, onChangeBucket, onAccep
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {suggestions.map((s, idx) => (
             <div key={s.text} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <input
-                type="checkbox"
+              <StyledCheckbox
                 checked={s.checked}
                 onChange={() => onToggle(idx)}
-                style={{ marginTop: 3, accentColor: COLORS.calendar, flexShrink: 0, cursor: 'pointer' }}
+                accentColor={COLORS.calendar}
+                style={{ marginTop: 3 }}
               />
               <span style={{ flex: 1, fontSize: 12, color: s.checked ? COLORS.text : COLORS.muted, textDecoration: s.checked ? 'none' : 'line-through', lineHeight: 1.45 }}>
                 {s.text}
