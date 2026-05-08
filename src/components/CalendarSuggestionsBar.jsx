@@ -15,7 +15,7 @@ function CalendarSuggestionsBar({ suggestions, onToggle, onChangeBucket, onAccep
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {suggestions.map((s, idx) => (
-            <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <div key={s.text} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <input
                 type="checkbox"
                 checked={s.checked}

@@ -177,7 +177,7 @@ function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, s
           const overflow = dayEvents.length - maxShow;
           return (
             <div
-              key={i}
+              key={d.toISOString()}
               onClick={() => onDayClick(new Date(d))}
               style={{
                 minHeight: 80, padding: '4px 4px 2px', borderRight: (i + 1) % 7 !== 0 ? `1px solid ${COLORS.border}` : 'none',
@@ -217,7 +217,7 @@ function CalendarWeekView({ navDate, events, today, onDayClick, onEventClick, se
           const isToday = isSameDay(d, today);
           const dayEvents = eventsForDay(events, d.getFullYear(), d.getMonth(), d.getDate());
           return (
-            <div key={i} style={{ borderRight: i < 6 ? `1px solid ${COLORS.border}` : 'none', padding: '0 4px' }}>
+            <div key={d.toISOString()} style={{ borderRight: i < 6 ? `1px solid ${COLORS.border}` : 'none', padding: '0 4px' }}>
               <div
                 onClick={() => onDayClick(new Date(d))}
                 style={{ padding: '6px 4px 4px', textAlign: 'center', cursor: 'pointer', marginBottom: 4 }}

@@ -386,7 +386,7 @@ function ProjectReviewBar({ suggestions, onToggle, onNext, onSkip, projectIdx, t
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {suggestions.map((s, idx) => (
-            <label key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+            <label key={s.text} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
               <input
                 type="checkbox"
                 checked={s.checked}

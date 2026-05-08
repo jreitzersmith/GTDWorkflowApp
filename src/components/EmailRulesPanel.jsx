@@ -101,12 +101,12 @@ function EmailRulesPanel({ googleToken, googleScope }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 5 }}>
                     {criteriaChips.map((ch, i) => (
-                      <span key={i} style={{ fontSize: 11, background: COLORS.projectBg, color: COLORS.project, padding: '1px 6px', borderRadius: 4, fontFamily: 'monospace' }}>{ch.label}</span>
+                      <span key={ch.label} style={{ fontSize: 11, background: COLORS.projectBg, color: COLORS.project, padding: '1px 6px', borderRadius: 4, fontFamily: 'monospace' }}>{ch.label}</span>
                     ))}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {[...addChips, ...removeChips].map((ch, i) => (
-                      <span key={i} style={{ fontSize: 11, background: ch.bg, color: ch.color, padding: '2px 8px', borderRadius: 99 }}>{ch.label}</span>
+                      <span key={ch.label} style={{ fontSize: 11, background: ch.bg, color: ch.color, padding: '2px 8px', borderRadius: 99 }}>{ch.label}</span>
                     ))}
                   </div>
                 </div>
