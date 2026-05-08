@@ -1,3 +1,4 @@
+import { useState } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 import { EmailInboxPanel } from "./EmailInboxPanel.jsx";
@@ -7,6 +8,9 @@ import { EmailRulesPanel } from "./EmailRulesPanel.jsx";
 // Tab container for the Email Management view — renders one of three panels
 // (Inbox, Cleanup, Rules) based on the active emailTab prop.
 function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, processEmailWithAI, openCoachChat, authUser }) {
+  const [gmailLabels, setGmailLabels] = useState([]);
+  const [gmailFilters, setGmailFilters] = useState([]);
+
   const tabStyle = (t) => ({
     padding: '9px 14px', fontSize: 13, cursor: 'pointer',
     color: emailTab === t ? COLORS.text : COLORS.text2,
@@ -41,7 +45,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
 
       {emailTab === 'inbox'   && <EmailInboxPanel   googleToken={googleToken} googleScope={googleScope} processEmailWithAI={processEmailWithAI} />}
       {emailTab === 'cleanup' && <EmailCleanupPanel gmailQueue={gmailQueue} setGmailQueue={setGmailQueue} googleToken={googleToken} authUser={authUser} openCoachChat={openCoachChat} />}
-      {emailTab === 'rules'   && <EmailRulesPanel   googleToken={googleToken} googleScope={googleScope} />}
+      {emailTab === 'rules'   && <EmailRulesPanel   googleToken={googleToken} googleScope={googleScope} gmailLabels={gmailLabels} setGmailLabels={setGmailLabels} gmailFilters={gmailFilters} setGmailFilters={setGmailFilters} />}
     </div>
   );
 }

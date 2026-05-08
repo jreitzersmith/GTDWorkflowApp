@@ -5,9 +5,7 @@ import { doGmailFetchLabelsRaw, doGmailFetchFilters, doGmailDeleteFilter } from 
 import { gmailBtnSm, gmailBtnSmDanger } from "./emailUtils.js";
 
 // Displays Gmail filters and labels with search/filter and letter quicklinks.
-function EmailRulesPanel({ googleToken, googleScope }) {
-  const [gmailLabels, setGmailLabels] = useState([]);
-  const [gmailFilters, setGmailFilters] = useState([]);
+function EmailRulesPanel({ googleToken, googleScope, gmailLabels, setGmailLabels, gmailFilters, setGmailFilters }) {
   const [rulesLoading, setRulesLoading] = useState(false);
   const [rulesError, setRulesError] = useState(null);
   const [deletingFilterId, setDeletingFilterId] = useState(null);
@@ -227,8 +225,12 @@ function EmailRulesPanel({ googleToken, googleScope }) {
 }
 
 EmailRulesPanel.propTypes = {
-  googleToken: PropTypes.string.isRequired,
-  googleScope: PropTypes.string,
+  googleToken:     PropTypes.string.isRequired,
+  googleScope:     PropTypes.string,
+  gmailLabels:     PropTypes.array.isRequired,
+  setGmailLabels:  PropTypes.func.isRequired,
+  gmailFilters:    PropTypes.array.isRequired,
+  setGmailFilters: PropTypes.func.isRequired,
 };
 
 export { EmailRulesPanel };
