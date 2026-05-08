@@ -8,6 +8,7 @@ import {
 import { CalendarSuggestionsBar } from "../calendar/CalendarSuggestionsBar.jsx";
 import { ProjectGroupSuggestionBar } from "../tasks/InboxBars.jsx";
 import { ResizeHandle } from "../../shared/ResizeHandle.jsx";
+import { ToolbarBtn } from "../../shared/SidebarComponents.jsx";
 import { fmtTokens, fmtCost } from "../settings/useAIUsageTracking.js";
 
 function CoachPanel({
@@ -77,8 +78,9 @@ function CoachPanel({
         />
         <div style={{ display: "flex", gap: 4 }}>
           {Object.entries(COACH_MODES).map(([key, cfg]) => (
-            <button
+            <ToolbarBtn
               key={key}
+              active={coachMode === key}
               onClick={() => {
                 if (key === "process") onStartProcessInbox();
                 else if (key === "review") onStartWeeklyReview();
@@ -86,10 +88,9 @@ function CoachPanel({
                 else if (key === "projectReview") onStartProjectReview();
                 else onSwitchToChat();
               }}
-              style={{ padding: "3px 9px", borderRadius: 6, border: `1px solid ${coachMode === key ? COLORS.border2 : COLORS.border}`, background: coachMode === key ? COLORS.surface3 : "transparent", color: coachMode === key ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
             >
               {cfg.label}
-            </button>
+            </ToolbarBtn>
           ))}
         </div>
       </div>

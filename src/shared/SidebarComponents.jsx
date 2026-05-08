@@ -43,6 +43,49 @@ SidebarBtn.propTypes = {
   primary:  PropTypes.bool,
 };
 
+// Toolbar toggle button — transparent idle, surface3 on hover;
+// active variant uses inbox accent with darker hover.
+function ToolbarBtn({ children, onClick, active, color, disabled, title, style }) {
+  const [hover, setHover] = useState(false);
+  const resolvedColor = color || (active ? COLORS.inbox : COLORS.text2);
+  const borderColor   = color ? `${color}55` : (active ? COLORS.inbox : COLORS.border);
+  const bg = active
+    ? (hover && !disabled ? '#363830' : COLORS.surface3)
+    : (hover && !disabled ? COLORS.surface3 : 'transparent');
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        padding: '5px 10px', borderRadius: 7,
+        border: `1px solid ${borderColor}`,
+        background: bg,
+        color: resolvedColor,
+        fontFamily: 'inherit', fontSize: 11,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        flexShrink: 0,
+        opacity: disabled ? 0.5 : 1,
+        transition: 'all 0.1s',
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+ToolbarBtn.propTypes = {
+  children:  PropTypes.node.isRequired,
+  onClick:   PropTypes.func.isRequired,
+  active:    PropTypes.bool,
+  color:     PropTypes.string,
+  disabled:  PropTypes.bool,
+  title:     PropTypes.string,
+  style:     PropTypes.object,
+};
+
 // Generic surface button used in toolbar and action areas.
 function Btn({ children, onClick, style }) {
   const [hover, setHover] = useState(false);
@@ -63,4 +106,4 @@ Btn.propTypes = {
   style:    PropTypes.object,
 };
 
-export { BucketItem, SidebarBtn, Btn };
+export { BucketItem, SidebarBtn, Btn, ToolbarBtn };

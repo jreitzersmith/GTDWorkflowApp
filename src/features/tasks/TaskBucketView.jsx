@@ -1,7 +1,6 @@
-import { useState } from "react";
 import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../../constants.jsx";
-import { Btn } from "../../shared/SidebarComponents.jsx";
+import { Btn, ToolbarBtn } from "../../shared/SidebarComponents.jsx";
 import { TaskRow } from "./TaskRow.jsx";
 import { CompletedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListHelpers.jsx";
 import { InboxBulkBar } from "./InboxBars.jsx";
@@ -11,48 +10,6 @@ const ADD_ROW_STYLE = { display: "flex", gap: 6, padding: "8px 16px", borderBott
 const PANEL_HEADER_STYLE = { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 };
 const TASK_LIST_STYLE = { flex: 1, overflowY: "auto", padding: "4px 0" };
 const INPUT_STYLE = { flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" };
-// Toolbar and groupBy buttons: transparent idle, surface3 on hover;
-// active variant shows surface3 idle / darker on hover with inbox accent.
-function ToolbarBtn({ children, onClick, active, color, disabled, title, style }) {
-  const [hover, setHover] = useState(false);
-  const resolvedColor = color || (active ? COLORS.inbox : COLORS.text2);
-  const borderColor   = color ? `${color}55` : (active ? COLORS.inbox : COLORS.border);
-  const bg = active
-    ? (hover && !disabled ? '#363830' : COLORS.surface3)
-    : (hover && !disabled ? COLORS.surface3 : 'transparent');
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        padding: '5px 10px', borderRadius: 7,
-        border: `1px solid ${borderColor}`,
-        background: bg,
-        color: resolvedColor,
-        fontFamily: 'inherit', fontSize: 11,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        flexShrink: 0,
-        opacity: disabled ? 0.5 : 1,
-        transition: 'all 0.1s',
-        ...style,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-ToolbarBtn.propTypes = {
-  children:  PropTypes.node.isRequired,
-  onClick:   PropTypes.func.isRequired,
-  active:    PropTypes.bool,
-  color:     PropTypes.string,
-  disabled:  PropTypes.bool,
-  title:     PropTypes.string,
-  style:     PropTypes.object,
-};
 
 const GROUP_OPTS = [
   { key: "none",     label: "None" },
