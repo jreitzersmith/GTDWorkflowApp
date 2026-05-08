@@ -2397,3 +2397,20 @@
     Three static or append-only index-key sites left unchanged intentionally.
   </td>
 </tr>
+
+<tr>
+  <td><code>85cf009</code></td>
+  <td>refactor</td>
+  <td>feature-based file structure (item 4)</td>
+  <td>
+    Reorganised all <code>src/</code> files from type-based folders
+    (<code>/components</code>, <code>/hooks</code>, <code>/utils</code>,
+    <code>/api</code>) into feature folders: <code>features/tasks</code>,
+    <code>features/email</code>, <code>features/calendar</code>,
+    <code>features/settings</code>, <code>features/coach</code>, and
+    <code>shared/</code> for shell components. <code>api/gmailTools.js</code>
+    split: Tavily web search &rarr; <code>features/coach/webSearch.js</code>;
+    Gmail helpers &rarr; <code>features/email/gmailTools.js</code>. All import
+    paths updated; build verified clean.
+  </td>
+</tr>

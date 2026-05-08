@@ -5625,3 +5625,30 @@ days.map((d, i) => (
 criteriaChips.map((ch, i) => (
   &lt;span key={ch.label}&gt;</code></pre>
 </section>
+
+<section id="snippet-feature-structure">
+  <h2>Feature-based directory structure</h2>
+  <p>Commit <code>85cf009</code> &mdash; Item 4</p>
+  <pre><code class="language-text">src/
+├── App.jsx            (coordinator)
+├── constants.jsx      (shared tokens)
+├── contexts.js        (shared context)
+├── api/
+│   └── supabase.js
+├── hooks/             (cross-cutting infrastructure)
+│   ├── useSupabaseAuth.js
+│   ├── useGoogleAuth.js
+│   └── useSupabaseSync.js
+├── shared/            (shell / layout)
+│   ├── AppSidebar.jsx
+│   ├── AuthGate.jsx
+│   ├── ErrorBoundary.jsx
+│   ├── ResizeHandle.jsx
+│   └── SidebarComponents.jsx
+└── features/
+    ├── tasks/         (TaskRow, TaskDetailPanel, taskUtils, ...)
+    ├── email/         (EmailInboxPanel, gmailTools, ...)
+    ├── calendar/      (CalendarManagementView, calendarApi, ...)
+    ├── settings/      (SettingsPanel, useSettings, ...)
+    └── coach/         (AICoach, useCallAI, webSearch, ...)</code></pre>
+</section>

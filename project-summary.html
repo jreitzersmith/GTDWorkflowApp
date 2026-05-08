@@ -3142,3 +3142,51 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
     <code>String.split()</code> fragment list (ephemeral, no DOM state).
   </p>
 </section>
+
+<section id="feature-based-structure">
+  <h2>Code quality: feature-based file structure (item 4)</h2>
+  <p>Commit <code>85cf009</code> &mdash; 2026-05-08</p>
+  <p>
+    The original project organised files by type: <code>/components</code>,
+    <code>/hooks</code>, <code>/utils</code>, <code>/api</code>. This is a common
+    starting layout but it scales poorly — as the codebase grows, the folders fill
+    up with unrelated files and it becomes hard to see which pieces belong together.
+    The industry-standard alternative is <em>feature-based organisation</em>:
+    each self-contained domain gets its own folder, and every file that belongs to
+    that domain (component, hook, utility, API helper) lives inside it.
+  </p>
+  <p>The new <code>src/</code> layout:</p>
+  <ul>
+    <li><strong>features/tasks/</strong> &mdash; TaskRow, TaskDetailPanel,
+      TaskBucketView, TaskListHelpers, InboxBars, taskUtils, and all task-specific
+      hooks (useTaskCrud, useDragDrop, useInboxProcessing, useTaskRowState,
+      useTaskDetailDrafts, useTaskUIState)</li>
+    <li><strong>features/email/</strong> &mdash; email tab container, all three
+      email panel components, emailUtils, gmailTools API helpers, useGmailState</li>
+    <li><strong>features/calendar/</strong> &mdash; all four calendar components,
+      calendarApi (moved from <code>api/</code>), useCalendarState</li>
+    <li><strong>features/settings/</strong> &mdash; SettingsPanel and its three
+      sub-components, UsagePanel, useSettings, useAppSettings, useAIUsageTracking</li>
+    <li><strong>features/coach/</strong> &mdash; AICoach, CoachPanel, useCallAI,
+      useAICoachState, useProjectReview, and a new <code>webSearch.js</code> split
+      from the old gmailTools file (Tavily search belongs to the coach feature,
+      not the email feature)</li>
+    <li><strong>shared/</strong> &mdash; shell/layout components with no single
+      feature owner: ErrorBoundary, ResizeHandle, AppSidebar, AuthGate,
+      SidebarComponents</li>
+    <li><strong>hooks/</strong> &mdash; three truly cross-cutting infrastructure
+      hooks that serve multiple features: useSupabaseAuth, useGoogleAuth,
+      useSupabaseSync</li>
+    <li><strong>api/</strong> &mdash; now contains only <code>supabase.js</code>;
+      feature-specific API files moved into their feature folders</li>
+  </ul>
+  <p>
+    <code>api/gmailTools.js</code> was split into two files as part of this move:
+    the Tavily web-search function and its tool definition went to
+    <code>features/coach/webSearch.js</code> (it is exclusively consumed by the AI
+    coach), while the Gmail API helpers went to
+    <code>features/email/gmailTools.js</code>. This also fixed a long-standing
+    oddity where Gmail and web-search code were bundled in the same file with no
+    logical connection.
+  </p>
+</section>
