@@ -487,7 +487,7 @@ function useCallAI({
     await callAI(text, coachMode, chatHistory);
   }, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages]);
 
-  return { callAI, sendChat };
+  return { callAI, sendChat, fetchModels };
 }
 
-export { useCallAI };
+export { useCallAI }

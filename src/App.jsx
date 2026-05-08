@@ -188,7 +188,7 @@ export default function GTDManager() {
     return `Today's date: ${today}\n\n${sections.join("\n\n")}${calSection}`;
   }, [tasks, calendarEnabled, calendarEvents]);
 
-  const { callAI, sendChat } = useCallAI({
+  const { callAI, sendChat, fetchModels } = useCallAI({
     tasks, efforts, calibrationOverrides,
     provider, localModel,
     googleToken, googleScope, calendarEnabled,
