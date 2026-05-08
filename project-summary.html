@@ -224,7 +224,7 @@
   <a href="project-summary.html" class="active">📄 Feature Summary</a>
   <a href="project-snippets.html">🔬 Code Snippets</a>
   <a href="project-commits.html">📜 Commit Log</a>
-  <span class="updated">Last updated: May 5, 2026</span>
+  <span class="updated">Last updated: May 7, 2026</span>
 </nav>
 
 <div class="layout">
@@ -337,7 +337,17 @@
   <ul>
     <li><a href="#refactor-calendar-split">Calendar Split (2a)</a></li>
     <li><a href="#refactor-settings-split">Settings Split (2b)</a></li>
-      <li><a href="#refactor-taskdetail-split">TaskDetailPanel Split (2d)</a></li>
+    <li><a href="#refactor-taskdetail-split">TaskDetailPanel Split (2d)</a></li>
+    <li><a href="#refactor-taskrow-split">TaskRow Split (2e)</a></li>
+    <li><a href="#refactor-gtdmanager-component-split">GTDManager Split (2f)</a></li>
+    <li><a href="#refactor-2g-phase1">Hook Extraction Phase 1 (2g): useDragDrop &amp; useSupabaseSync</a></li>
+    <li><a href="#phase2g2">Hook Extraction Phase 2 (2g): useCallAI</a></li>
+    <li><a href="#phase2g3">Hook Extraction Phase 3 (2g): useInboxProcessing</a></li>
+  </ul>
+
+  <div class="section-label">May 7 &#8212; Fixes</div>
+  <ul>
+    <li><a href="#fix-inbox-processing">Inbox Processing Fixes (8a)</a></li>
   </ul>
 
 </aside>
@@ -2726,3 +2736,185 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
       <a class="link-chip chip-commit" href="project-commits.html#commit-f7c23b3">&#x1F4DC; f7c23b3 &mdash; TaskRow split</a>
     </div>
   </section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-gtdmanager-component-split">
+    <div class="feat-header">
+      <span class="feat-icon">&#x1F9E9;</span>
+      <span class="feat-title">Code Quality 2f &mdash; GTDManager Component Split</span>
+      <span class="feat-badge badge-refactor">Refactor &mdash; May 7</span>
+    </div>
+    <div class="feat-desc">
+      <p><code>GTDManager</code>'s <code>return</code> block was 582 lines of deeply nested JSX, mixing six distinct rendering concerns in a single function. Any reader trying to understand auth gating, the sidebar, the task panel, or the AI coach had to scroll through the whole blob to find what they needed.</p>
+      <p>Six purpose-built component files were extracted:</p>
+      <ul>
+        <li><strong>ErrorBoundary.jsx</strong> (43 lines) &mdash; Class component that catches render errors and shows a crash UI with a &#8220;Try again&#8221; button. Previously inlined in App.jsx. The <code>children</code> prop is optional (not <code>.isRequired</code>) because the boundary wraps conditionally-rendered content that can resolve to <code>null</code>.</li>
+        <li><strong>ResizeHandle.jsx</strong> (32 lines) &mdash; Drag handle for horizontal and vertical panel resizing with hover state. Also previously inlined.</li>
+        <li><strong>AuthGate.jsx</strong> (65 lines) &mdash; Wraps <code>children</code>; renders a loading spinner if auth is in progress, a magic-link sign-in form if no user is logged in, and the children otherwise. Replaces two early-return blocks at the top of the old <code>return</code>.</li>
+        <li><strong>AppSidebar.jsx</strong> (113 lines) &mdash; Full left sidebar: GTD bucket list, Tools section (Email / Calendar), action buttons (Process Inbox / Weekly Review / Brain Dump), Settings and Usage toggles, sync status indicator. 17 props; <code>onSelectBucket</code> is curried (<code>key =&gt; () =&gt; handler(key)</code>) so each bucket button needs no closure of its own.</li>
+        <li><strong>TaskBucketView.jsx</strong> (324 lines) &mdash; Panel header (bucket title + toolbar), add-task row, and full task-list rendering for all eight bucket modes: <code>ProjectTree</code>, <code>CompletedTree</code>, waterfall-filtered Next Actions with groupBy, deferred list, inbox bulk select, and <code>EffortAccuracyBar</code> for the Completed view. 27 props.</li>
+        <li><strong>CoachPanel.jsx</strong> (236 lines) &mdash; AI Coach section: header with mode tabs and <code>ProviderSelector</code>, message list with all review / calendar / group-suggestion bars, resizable chat input, send button, and usage-stats footer. 50 props.</li>
+      </ul>
+      <p><strong>Net result:</strong> App.jsx shrank from 2,580 &rarr; 2,140 lines (&minus;440). The <code>GTDManager</code> return block went from 582 lines to 220 lines. The <code>s</code> inline-style object was trimmed from 20 keys to 6 &mdash; only those still referenced in the new compact return. Every import that moved into a child component was removed from App.jsx.</p>
+      <p>A small UX fix was folded in at the same time: switching to any Tools view (Email, Calendar) now also closes the Task Detail panel. The <code>onSelectEmail</code> and <code>onSelectCalendar</code> callbacks both call <code>setSelectedTaskId(null)</code> before switching the view.</p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: Presentational Decomposition</h4>
+      <p>When a component's <code>return</code> block becomes a scroll, it signals that the component is doing too many jobs. The fix is not to add section comments and dividers &mdash; it is to cut each rendering concern into a purpose-named component so that the parent's return reads like a table of contents. After the split, reading <code>GTDManager</code>'s return takes one screen. A developer can understand the entire layout structure without knowing anything about how the sidebar or the coach are rendered internally. The details are one file jump away.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>A 582-line return block is like a shell script where <code>main()</code> does everything: parses args, queries the database, formats the report, emails it, and cleans up &mdash; all inline with no functions. It runs, but understanding or changing any one piece means reading the whole script. Extracting components is the equivalent of splitting <code>main()</code> into named functions. The high-level flow is immediately readable; the implementation is one function call away.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-24c17bd">&#x1F4DC; 24c17bd &mdash; GTDManager component split</a>
+      <a class="link-chip chip-snippet" href="project-snippets.html#snip-gtdmanager-component-split">&#x1F50D; Import changes</a>
+    </div>
+  </section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="fix-inbox-processing">
+    <div class="feat-header">
+      <span class="feat-icon">&#x1F4E5;</span>
+      <span class="feat-title">Inbox Processing Fixes &amp; Add &amp; Ask AI Scope (item 8a)</span>
+      <span class="feat-badge badge-fix">Fix &mdash; May 7</span>
+    </div>
+    <div class="feat-desc">
+      <p>Three interrelated bugs in the inbox processing flow were fixed, and a user-requested Delete action was added to the suggestion bar.</p>
+      <ul>
+        <li><strong>Add &amp; Ask AI single-task scope.</strong> The &#8220;+ Add &amp; Ask AI&#8221; button adds a task to Inbox and immediately asks the AI to process it. Previously, after the user confirmed the suggested bucket, the coach auto-chained to the <em>next</em> inbox item — processing tasks the user hadn't asked about. A <code>singleTaskMode</code> ref (set to <code>true</code> by <code>askAIAboutTask</code>, <code>false</code> by <code>startProcessInbox</code>) now gates the auto-chain branch in both <code>handleConfirmMove</code> and <code>handleSkipPendingAction</code>. Single-task runs end with &#8220;✅ Done!&#8221;; full-inbox runs still chain as before.</li>
+        <li><strong>Skip stall.</strong> Clicking Skip in Process Inbox mode previously just called <code>setPendingAction(null)</code> — it cleared the suggestion UI but left the current task untouched and never advanced to the next item, stalling the flow. <code>handleSkipPendingAction</code> now shows a &#8220;⏭ Skipping&#8221; message and advances to the next inbox item.</li>
+        <li><strong>Skip loop.</strong> After skipping a task and confirming the next one, the flow looped back to the skipped task because <code>handleConfirmMove</code> had no memory of which tasks were already skipped. A <code>skippedInSessionIds</code> ref (a <code>Set</code> reset at the start of each <code>startProcessInbox</code> call) tracks skipped IDs. Both <code>handleConfirmMove</code> and <code>handleSkipPendingAction</code> exclude skipped IDs when selecting the next item.</li>
+        <li><strong>Confirm task targeting.</strong> <code>handleConfirmMove</code> previously resolved the &#8220;current&#8221; task as <code>inboxItems[0]</code> — always the first item in inbox. After a skip this was wrong: the skipped task remained at position 0, so confirming the <em>next</em> task would archive the wrong one. A <code>processingTaskId</code> ref (set by <code>processNextInboxItem</code> on entry) now identifies the task being processed precisely.</li>
+        <li><strong>Delete button.</strong> The <code>PendingActionBar</code> now shows a muted-red &#8220;🗑 Delete&#8221; button alongside Confirm and Skip. Clicking it archives the current inbox item to Inbox History (no new task created) and advances to the next unskipped item, respecting <code>singleTaskMode</code>.</li>
+      </ul>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: useRef for Session State</h4>
+      <p><code>useState</code> triggers a re-render every time it changes. For flags and IDs that affect <em>logic</em> but not <em>rendering</em>, <code>useRef</code> is the right tool: the value lives on <code>.current</code>, persists across renders, and changing it never causes a re-render. All three new refs here (<code>singleTaskMode</code>, <code>processingTaskId</code>, <code>skippedInSessionIds</code>) fit this pattern — they coordinate behaviour between callbacks without the overhead or timing issues of state updates.</p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>The skip loop is the same bug as a shell <code>for</code> loop that re-reads a list file on every iteration. If a line isn&#39;t deleted from the file when processed, the loop visits it again next time round. The fix — tracking which items have been &#8220;seen&#8221; in a Set — is the in-memory equivalent of writing a PID file or a processed-IDs log so the loop knows not to re-visit completed work.</p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-8d2bdf5">&#x1F4DC; 8d2bdf5 &mdash; Inbox processing fixes</a>
+    </div>
+  </section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="feat" id="refactor-2g-phase1">
+    <div class="feat-header">
+      <span class="feat-icon">&#x1F9F0;</span>
+      <span class="feat-title">Code Quality 2g Phase 1 &mdash; Custom Hook Extraction: useDragDrop &amp; useSupabaseSync</span>
+      <span class="feat-badge badge-refactor">Refactor &mdash; May 8</span>
+    </div>
+    <div class="feat-desc">
+      <p>
+        Phase 1 of item 2g pulls two large blocks of non-rendering logic out of <code>GTDManager</code>
+        into dedicated custom hooks, reducing <code>App.jsx</code> from 2,188 to 1,916 lines.
+      </p>
+      <ul>
+        <li>
+          <strong><code>useDragDrop.js</code> (56 lines).</strong>
+          Owns <code>dragId</code> and <code>dropTarget</code> state (previously in <code>useTaskUIState</code>)
+          and the four project-tree event handlers that were inline <code>useCallback</code>s in
+          <code>GTDManager</code>. Accepts <code>{ setTasks }</code> so it can call
+          <code>moveTaskInTree</code> on drop. Returns <code>setDropTarget</code> alongside the
+          handlers because <code>TaskBucketView</code> needs it to clear the drop target on drag-leave.
+        </li>
+        <li>
+          <strong><code>useSupabaseSync.js</code> (293 lines).</strong>
+          Consolidates all nine Supabase and localStorage <code>useEffect</code>s: localStorage task
+          write, Supabase task read + migration, Supabase settings read + migration, task write-diff
+          (upsert/delete), debounced settings upsert (1500 ms), four localStorage fallbacks for
+          calendar state, offline-flush, realtime subscription, and gmail_queue load. Owns
+          <code>supabaseReady</code>, <code>syncStatus</code>, and the three coordination refs.
+          Returns only <code>{ syncStatus, supabaseReady }</code> to the caller.
+        </li>
+      </ul>
+      <p>
+        Three small UI effects were intentionally left in <code>GTDManager</code>: Gmail unread count,
+        bucket-change resets for <code>projectParentId</code> and <code>selectedTaskId</code>, and
+        the one-time deferred-task auto-surface on mount.
+      </p>
+    </div>
+    <div class="box box-concept">
+      <h4>React Concept: Custom Hooks as Extraction Units</h4>
+      <p>
+        A custom hook is just a function whose name starts with <code>use</code> and which can call
+        other hooks. That one rule lets you move an entire cluster of <code>useState</code>,
+        <code>useRef</code>, and <code>useEffect</code> calls out of a component into its own file.
+        The component gets a clean call site and a tidy return value, while the hook is independently
+        readable and testable.
+      </p>
+    </div>
+    <div class="box box-sysadmin">
+      <h4>Sysadmin Analogy</h4>
+      <p>
+        Extracting <code>useSupabaseSync</code> is the same as pulling a 300-line bash script&#39;s
+        database-sync block into its own <code>sync_db.sh</code> sourced file. The main script gets
+        a single <code>source sync_db.sh</code>; the sync logic lives where it can be read, tested,
+        and owned separately.
+      </p>
+    </div>
+    <div class="link-row">
+      <a class="link-chip chip-commit" href="project-commits.html#commit-814ac63">&#x1F4DC; 814ac63 &mdash; Hook extraction phase 1</a>
+    </div>
+  </section>
+<section id="phase2g3">
+  <h2>2g-3 &mdash; Extract <code>useInboxProcessing</code> Hook</h2>
+  <p><strong>Commit:</strong> <code>e7d8b78</code> &mdash; <em>refactor: extract useInboxProcessing hook (2g phase 3)</em></p>
+  <p>App.jsx: <strong>1,485 &rarr; 1,395 lines</strong></p>
+
+  <h3>What changed</h3>
+  <p>
+    Six inbox-processing callbacks were extracted from <code>GTDManager</code> into a new
+    <code>src/hooks/useInboxProcessing.js</code> hook:
+    <code>processNextInboxItem</code>, <code>handleConfirmMove</code>,
+    <code>handleSkipPendingAction</code>, <code>handleDeleteInboxItem</code>,
+    <code>startProcessInbox</code>, and <code>askAIAboutTask</code>.
+    These six functions work together as a unit — each of the four action handlers
+    calls <code>processNextInboxItem</code> to auto-chain to the next inbox item —
+    so they belong in a single focused hook.
+  </p>
+
+  <h3>Design decisions</h3>
+  <details><summary>Why does <code>switchCoachMode</code> stay in App.jsx?</summary>
+  <p>
+    <code>switchCoachMode</code> is used by three separate concerns: inbox processing,
+    the weekly review, and the project review. Putting it inside
+    <code>useInboxProcessing</code> would give the hook knowledge of unrelated flows.
+    Instead it stays in <code>GTDManager</code> and is passed as a plain parameter to
+    the hook, keeping the hook&rsquo;s interface explicit and the dependency graph clean.
+  </p>
+  </details>
+  <details><summary>Why are the three session-coordination refs defined in App.jsx rather than the hook?</summary>
+  <p>
+    <code>singleTaskMode</code>, <code>processingTaskId</code>, and
+    <code>skippedInSessionIds</code> are <code>useRef</code> objects whose
+    <code>.current</code> values are read or written by several callbacks across
+    multiple hooks. Owning them in <code>GTDManager</code> and passing them as
+    mutable ref objects lets any hook that receives them read and write
+    <code>.current</code> without triggering re-renders, and without any hook
+    needing to own state that logically belongs to the component.
+  </p>
+  </details>
+
+  <h3>Hook signature</h3>
+  <pre><code class="language-js">const {
+  processNextInboxItem,
+  handleConfirmMove,
+  handleSkipPendingAction,
+  handleDeleteInboxItem,
+  startProcessInbox,
+  askAIAboutTask,
+} = useInboxProcessing({
+  tasks, pendingAction,
+  singleTaskMode, processingTaskId, skippedInSessionIds,
+  setTasks, setCurrentBucket,
+  setMessages, setChatHistory,
+  setPendingAction,
+  callAI, switchCoachMode,
+});</code></pre>
+</section>

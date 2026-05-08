@@ -2268,3 +2268,61 @@
   <div class="commit-lesson"><strong>Wrong file is a silent lie.</strong> A component named <code>BucketItem</code> that renders the sidebar navigation has nothing to do with how individual tasks are displayed. Leaving it in <code>TaskRow.jsx</code> told every future reader a false story about where sidebar components live. Moving it to <code>SidebarComponents.jsx</code> makes the codebase self-documenting: the filename is the answer to &ldquo;where do I find the sidebar?&rdquo;</div>
   <div class="commit-back"><a href="project-summary.html#refactor-taskrow-split">&#8593; Refactor: TaskRow Split</a></div>
 </div>
+
+<!-- 24c17bd -->
+<div class="commit-entry" id="commit-24c17bd">
+  <div class="commit-top">
+    <span class="commit-hash">24c17bd</span>
+    <span class="commit-date">2026-05-07</span>
+    <span class="commit-type type-refactor">refactor</span>
+  </div>
+  <div class="commit-msg">refactor: extract GTDManager rendering into six purpose-built components (item 2f)</div>
+  <div class="commit-body">
+    Six new files: <strong>ErrorBoundary.jsx</strong> (43 lines), <strong>ResizeHandle.jsx</strong> (32 lines), <strong>AuthGate.jsx</strong> (65 lines), <strong>AppSidebar.jsx</strong> (113 lines), <strong>TaskBucketView.jsx</strong> (324 lines), <strong>CoachPanel.jsx</strong> (236 lines). App.jsx: 2,580 &rarr; 2,140 lines (&minus;440). <code>GTDManager</code> return block: 582 &rarr; 220 lines. <code>s</code> style object trimmed from 20 keys to 6. Also folded in: task detail panel closes when switching to any Tools view (Email, Calendar).
+  </div>
+  <div class="commit-lesson"><strong>The return block is a table of contents.</strong> When <code>GTDManager</code>'s return was 582 lines it was simultaneously the table of contents <em>and</em> every chapter. A reader looking for the sidebar had to scroll past hundreds of lines of coach-panel JSX. After the split the return is 220 lines of named component wiring &mdash; reading it shows the full layout structure without revealing any rendering detail. Details are one file hop away.</div>
+  <div class="commit-back"><a href="project-summary.html#refactor-gtdmanager-component-split">&#8593; Refactor: GTDManager Component Split</a></div>
+</div>
+
+<!-- 8d2bdf5 -->
+<div class="commit-entry" id="commit-8d2bdf5">
+  <div class="commit-top">
+    <span class="commit-hash">8d2bdf5</span>
+    <span class="commit-date">2026-05-07</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: inbox processing — single-task scope, skip loop, delete option (item 8a)</div>
+  <div class="commit-body">
+    Five changes across <strong>App.jsx</strong>, <strong>CoachPanel.jsx</strong>, <strong>AICoach.jsx</strong>:
+    (1) <code>singleTaskMode</code> ref stops &#8220;Add &amp; Ask AI&#8221; from chaining to the next inbox item after confirm.
+    (2) <code>processingTaskId</code> ref makes <code>handleConfirmMove</code> target the task actually being reviewed, not blindly <code>inboxItems[0]</code>.
+    (3) <code>skippedInSessionIds</code> ref (a <code>Set</code>) records skips so <code>handleConfirmMove</code> doesn&#39;t loop back to already-skipped tasks.
+    (4) <code>handleSkipPendingAction</code> replaces the bare <code>setPendingAction(null)</code> dismiss — it records the skip, shows a message, and advances.
+    (5) Delete button added to <code>PendingActionBar</code>: archives to Inbox History and advances.
+  </div>
+  <div class="commit-lesson"><strong>Bugs cluster around implicit assumptions about order.</strong> Three of the four bugs here shared the same root: code assumed the inbox array would always be ordered the same way relative to what was being processed. Making the current task explicit via a ref — rather than inferring it from array position — eliminated all three at once. When you find yourself reading <code>array[0]</code> to mean &#8220;the thing I&#39;m working on&#8221;, that&#39;s a signal to make the reference explicit.</div>
+  <div class="commit-back"><a href="project-summary.html#fix-inbox-processing">&#8593; Inbox Processing Fixes</a></div>
+</div>
+
+  <tr>
+    <td><code>814ac63</code></td>
+    <td>refactor</td>
+    <td>Extract useDragDrop and useSupabaseSync hooks (2g phase 1)</td>
+    <td>
+      New <code>src/hooks/useDragDrop.js</code> (56 lines) owns drag state + 4 handlers.
+      New <code>src/hooks/useSupabaseSync.js</code> (293 lines) owns all 9 Supabase/localStorage effects,
+      supabaseReady, syncStatus, and 3 coordination refs.
+      App.jsx: 2,188 → 1,916 lines.
+    </td>
+  </tr>
+
+<tr>
+  <td><code>e7d8b78</code></td>
+  <td>refactor</td>
+  <td>extract useInboxProcessing hook (2g phase 3)</td>
+  <td>
+    New <code>src/hooks/useInboxProcessing.js</code> owns all six inbox-processing
+    callbacks. Session-coordination refs and <code>switchCoachMode</code> stay in
+    App.jsx and are threaded in as parameters. App.jsx: 1,485 &rarr; 1,395 lines.
+  </td>
+</tr>

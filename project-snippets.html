@@ -4512,6 +4512,94 @@ import { TaskDetailPanel } from "./components/TaskDetailPanel.jsx";
 </div>
 
 
+
+<!-- 2g Phase 1 snippets -->
+<section id="snippets-2g-phase1">
+  <h2>2g Phase 1 — <code>useDragDrop</code> &amp; <code>useSupabaseSync</code></h2>
+
+  <details>
+    <summary><code>useDragDrop.js</code> — full hook</summary>
+    <pre><code class="language-js">function useDragDrop({ setTasks }) {
+  const [dragId, setDragId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+
+  const handleProjectDragStart = useCallback((id) => {
+    setDragId(id);
+    setDropTarget(null);
+  }, []);
+
+  const handleProjectDragOver = useCallback((e, taskId) => {
+    if (taskId === dragId) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientY - rect.top) / rect.height;
+    const position = ratio &lt; 0.33 ? 'before' : ratio &gt; 0.67 ? 'after' : 'inside';
+    setDropTarget(prev =&gt;
+      prev?.id === taskId &amp;&amp; prev?.position === position ? prev : { id: taskId, position }
+    );
+  }, [dragId]);
+
+  const handleProjectDragEnd = useCallback(() => {
+    setDragId(null);
+    setDropTarget(null);
+  }, []);
+
+  const handleProjectDrop = useCallback((targetId) => {
+    setDropTarget(prev =&gt; {
+      if (prev &amp;&amp; dragId) {
+        setTasks(all =&gt; moveTaskInTree(all, dragId, targetId, prev.position));
+      }
+      return null;
+    });
+    setDragId(null);
+  }, [dragId, setTasks]);
+
+  return { dragId, dropTarget, setDropTarget,
+    handleProjectDragStart, handleProjectDragOver,
+    handleProjectDragEnd, handleProjectDrop };
+}</code></pre>
+  </details>
+
+  <details>
+    <summary><code>useSupabaseSync.js</code> — hook signature and return</summary>
+    <pre><code class="language-js">function useSupabaseSync({
+  authUser,
+  tasks, setTasks,
+  locations, efforts, calibrationOverrides,
+  skippedCalendarIds, seenCalendarEventIds,
+  recurringAcknowledgedMap, recurringReviewDays,
+  setLocations, setEfforts, setCalibrationOverrides,
+  setSkippedCalendarIds, setSeenCalendarEventIds,
+  setRecurringAcknowledgedMap, setRecurringReviewDays,
+  setGmailQueue,
+}) {
+  const [supabaseReady, setSupabaseReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('synced');
+  const prevTasksRef = useRef(null);
+  const settingsReadyRef = useRef(false);
+  const settingsDebounceRef = useRef(null);
+
+  // ... 9 useEffect blocks ...
+
+  return { syncStatus, supabaseReady };
+}</code></pre>
+  </details>
+
+  <details>
+    <summary>App.jsx — how the hooks are called</summary>
+    <pre><code class="language-jsx">const { syncStatus, supabaseReady } = useSupabaseSync({
+  authUser, tasks, setTasks,
+  locations, efforts, calibrationOverrides,
+  skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
+  setLocations, setEfforts, setCalibrationOverrides,
+  setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
+  setGmailQueue,
+});
+
+const { dragId, dropTarget, setDropTarget,
+        handleProjectDragStart, handleProjectDragOver,
+        handleProjectDragEnd, handleProjectDrop } = useDragDrop({ setTasks });</code></pre>
+  </details>
+</section>
 </body>
 </html>
 
@@ -5163,6 +5251,94 @@ function useAICoachState() {
   <div class="annotation"><strong>No effects means pure UI state.</strong> Every piece of state here is driven solely by user interaction — none of it needs to be persisted or synced. That absence of effects is itself a signal: this hook is a clean namespace for ephemeral state, and it will reset to defaults on every page reload.</div>
   <div class="snip-back"><a href="project-summary.html#refactor-coach-ui-hooks">&#8593; Refactor: Coach/UI Hook Extraction</a></div>
 </div>
+
+<!-- 2g Phase 1 snippets -->
+<section id="snippets-2g-phase1">
+  <h2>2g Phase 1 — <code>useDragDrop</code> &amp; <code>useSupabaseSync</code></h2>
+
+  <details>
+    <summary><code>useDragDrop.js</code> — full hook</summary>
+    <pre><code class="language-js">function useDragDrop({ setTasks }) {
+  const [dragId, setDragId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+
+  const handleProjectDragStart = useCallback((id) => {
+    setDragId(id);
+    setDropTarget(null);
+  }, []);
+
+  const handleProjectDragOver = useCallback((e, taskId) => {
+    if (taskId === dragId) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientY - rect.top) / rect.height;
+    const position = ratio &lt; 0.33 ? 'before' : ratio &gt; 0.67 ? 'after' : 'inside';
+    setDropTarget(prev =&gt;
+      prev?.id === taskId &amp;&amp; prev?.position === position ? prev : { id: taskId, position }
+    );
+  }, [dragId]);
+
+  const handleProjectDragEnd = useCallback(() => {
+    setDragId(null);
+    setDropTarget(null);
+  }, []);
+
+  const handleProjectDrop = useCallback((targetId) => {
+    setDropTarget(prev =&gt; {
+      if (prev &amp;&amp; dragId) {
+        setTasks(all =&gt; moveTaskInTree(all, dragId, targetId, prev.position));
+      }
+      return null;
+    });
+    setDragId(null);
+  }, [dragId, setTasks]);
+
+  return { dragId, dropTarget, setDropTarget,
+    handleProjectDragStart, handleProjectDragOver,
+    handleProjectDragEnd, handleProjectDrop };
+}</code></pre>
+  </details>
+
+  <details>
+    <summary><code>useSupabaseSync.js</code> — hook signature and return</summary>
+    <pre><code class="language-js">function useSupabaseSync({
+  authUser,
+  tasks, setTasks,
+  locations, efforts, calibrationOverrides,
+  skippedCalendarIds, seenCalendarEventIds,
+  recurringAcknowledgedMap, recurringReviewDays,
+  setLocations, setEfforts, setCalibrationOverrides,
+  setSkippedCalendarIds, setSeenCalendarEventIds,
+  setRecurringAcknowledgedMap, setRecurringReviewDays,
+  setGmailQueue,
+}) {
+  const [supabaseReady, setSupabaseReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('synced');
+  const prevTasksRef = useRef(null);
+  const settingsReadyRef = useRef(false);
+  const settingsDebounceRef = useRef(null);
+
+  // ... 9 useEffect blocks ...
+
+  return { syncStatus, supabaseReady };
+}</code></pre>
+  </details>
+
+  <details>
+    <summary>App.jsx — how the hooks are called</summary>
+    <pre><code class="language-jsx">const { syncStatus, supabaseReady } = useSupabaseSync({
+  authUser, tasks, setTasks,
+  locations, efforts, calibrationOverrides,
+  skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
+  setLocations, setEfforts, setCalibrationOverrides,
+  setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
+  setGmailQueue,
+});
+
+const { dragId, dropTarget, setDropTarget,
+        handleProjectDragStart, handleProjectDragOver,
+        handleProjectDragEnd, handleProjectDrop } = useDragDrop({ setTasks });</code></pre>
+  </details>
+</section>
 </body>
 <div class="snip-entry" id="snip-task-shape">
   <div class="snip-header">
@@ -5236,3 +5412,106 @@ import { PRIORITIES, TaskRow } from "./components/TaskRow.jsx";
   <div class="annotation"><strong>The filename is the documentation.</strong> A reader looking for sidebar components now has an obvious destination. The import line itself answers "where does this come from?" without needing to grep or open a barrel file.</div>
   <div class="snip-back"><a href="project-summary.html#refactor-taskrow-split">&#8593; Refactor: TaskRow Split</a></div>
 </div>
+
+<div class="snip-card" id="snip-gtdmanager-component-split">
+  <div class="snip-header">
+    <span class="snip-title">GTDManager component split &mdash; import changes (item 2f)</span>
+    <span class="snip-file">src/App.jsx &mdash; import block</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Before: every primitive rendered by GTDManager's return was imported in App.jsx
+import { Component } from "react";   // for inline ErrorBoundary class
+import { BucketItem, SidebarBtn, Btn } from "./components/SidebarComponents.jsx";
+import { PRIORITIES, TaskRow } from "./components/TaskRow.jsx";
+import {
+  ActionBtn, ChatBubble, TypingIndicator, PendingActionBar,
+  ReviewModeBar, MetadataReviewBar, ProjectReviewBar, ProviderSelector,
+} from "./components/AICoach.jsx";
+import { CompletedTree, ProjectTree,
+         GroupDivider, EmptyState } from "./components/TaskListHelpers.jsx";
+import { CalendarSuggestionsBar } from "./components/CalendarSuggestionsBar.jsx";
+import { ProjectGroupSuggestionBar, InboxBulkBar } from "./components/InboxBars.jsx";
+import { fmtTokens, fmtCost } from "./hooks/useAIUsageTracking.js";
+
+// After: six purpose-built components absorb all of the above
+import { ErrorBoundary }  from "./components/ErrorBoundary.jsx";
+import { ResizeHandle }   from "./components/ResizeHandle.jsx";
+import { AuthGate }       from "./components/AuthGate.jsx";
+import { AppSidebar }     from "./components/AppSidebar.jsx";
+import { TaskBucketView } from "./components/TaskBucketView.jsx";
+import { CoachPanel }     from "./components/CoachPanel.jsx";
+// All primitives above now live in the component files that render them.</code></pre></div>
+  <div class="annotation"><strong>Imports as a complexity meter.</strong> Before the split, every new widget added to the coach panel or task list forced a new import line in App.jsx. Each line was a signal that the return block was growing beyond its remit. After the split, App.jsx imports only six component seams. Adding a new bar to <code>CoachPanel</code> no longer touches App.jsx&rsquo;s import list at all &mdash; the dependency is contained within the component that owns it.</div>
+  <div class="snip-back"><a href="project-summary.html#refactor-gtdmanager-component-split">&#8593; Refactor: GTDManager Component Split</a></div>
+</div>
+
+<div class="snip-card" id="snip-inbox-processing-refs">
+  <div class="snip-header">
+    <span class="snip-title">Inbox processing — three coordination refs (item 8a)</span>
+    <span class="snip-file">src/App.jsx</span>
+  </div>
+  <div class="snip-code"><pre><code class="language-javascript">// Three useRef values coordinate the inbox processing flow without causing re-renders.
+
+const singleTaskMode    = useRef(false); // true when triggered by "Add & Ask AI"
+const processingTaskId  = useRef(null);  // id of the task currently under review
+const skippedInSessionIds = useRef(new Set()); // ids skipped this session
+
+// processNextInboxItem stamps the ref so confirm/skip always know the right target
+const processNextInboxItem = useCallback(async (task) => {
+  processingTaskId.current = task.id;
+  // ...call AI...
+}, [callAI]);
+
+// handleConfirmMove resolves current by id, not by array position
+const current  = tasks.find(t => t.id === processingTaskId.current)
+               ?? tasks.filter(t => t.bucket === "inbox")[0];
+const nextItem = tasks.filter(t =>
+  t.bucket === "inbox" &&
+  t.id !== current?.id &&
+  !skippedInSessionIds.current.has(t.id)   // skip the already-skipped
+)[0];
+
+// handleSkipPendingAction records the skip before advancing
+skippedInSessionIds.current.add(processingTaskId.current);
+
+// startProcessInbox resets session state for a fresh run
+singleTaskMode.current    = false;
+skippedInSessionIds.current = new Set();</code></pre></div>
+  <div class="annotation"><strong>Logic refs vs state.</strong> None of these three values need to cause a re-render when they change — they only affect what happens inside callbacks. Using <code>useRef</code> instead of <code>useState</code> avoids stale-closure issues (the ref object is stable; only <code>.current</code> changes) and eliminates unnecessary renders during what can be a rapid confirm/skip/advance sequence.</div>
+  <div class="snip-back"><a href="project-summary.html#fix-inbox-processing">&#8593; Inbox Processing Fixes</a></div>
+</div>
+
+<section id="snippet-useInboxProcessing">
+  <h2>useInboxProcessing hook — inbox action callbacks</h2>
+  <p>Commit <code>e7d8b78</code> &mdash; Phase 2g-3</p>
+  <pre><code class="language-js">// src/hooks/useInboxProcessing.js
+import { useCallback } from 'react';
+import { genId } from '../api/calendarApi.js';
+
+function useInboxProcessing({
+  tasks, pendingAction,
+  singleTaskMode, processingTaskId, skippedInSessionIds,
+  setTasks, setCurrentBucket,
+  setMessages, setChatHistory,
+  setPendingAction,
+  callAI, switchCoachMode,
+}) {
+  const processNextInboxItem = useCallback(async (task) => {
+    processingTaskId.current = task.id;
+    setPendingAction(null);
+    setChatHistory([]);
+    const prompt = `Process this GTD inbox item: "${task.text}"`;
+    setMessages(prev => [...prev, { role: 'user', text: `Processing: **"${task.text}"**` }]);
+    await callAI(prompt, 'process', []);
+  }, [callAI, processingTaskId, setPendingAction, setChatHistory, setMessages]);
+
+  // handleConfirmMove, handleSkipPendingAction, handleDeleteInboxItem,
+  // startProcessInbox, askAIAboutTask follow the same pattern …
+
+  return {
+    processNextInboxItem, handleConfirmMove, handleSkipPendingAction,
+    handleDeleteInboxItem, startProcessInbox, askAIAboutTask,
+  };
+}
+
+export { useInboxProcessing };</code></pre>
+</section>
