@@ -105,4 +105,4 @@ Check your output against this list:
 [ ] No console.logs left in the code
 [ ] New pure functions and hooks have test candidates identified and proposed in Step 2
 [ ] Approved tests are written, passing, and co-located in the feature folder
-[ ] If this resolves a tracked issue or feature request (#), it will be logged in Prompts/Resolved_Issues_And_Requests.md after commit
+[ ] If this resolves a tracked issue or feature request (#), it will be logged in Claude_Prompts/Resolved_Issues_And_Requests.md after commit

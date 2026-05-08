@@ -21,19 +21,19 @@ A personal GTD (Getting Things Done) task manager built as a React app. It combi
 - Vite for local dev
 
 ## Coding standards
-See `Prompts/Senior_Code_Engineer.md` — read this file whenever writing or reviewing any code.
+See `Claude_Prompts/Senior_Code_Engineer.md` — read this file whenever writing or reviewing any code.
 
 ## Pairing workflow
-See `Prompts/AI_Pair_Programming.md` — read this file at the start of any development session and follow it for every change.
+See `Claude_Prompts/AI_Pair_Programming.md` — read this file at the start of any development session and follow it for every change.
 
 ## Known issues & roadmap
-See `Prompts/Known_Issues_And_Requests.md` — read this when planning new features or triaging bugs.
+See `Claude_Prompts/Known_Issues_And_Requests.md` — read this when planning new features or triaging bugs.
 
 ## Resolved issues & requests
-See `Prompts/Resolved_Issues_And_Requests.md` — add an entry after every commit that closes a known issue or completes a feature request.
+See `Claude_Prompts/Resolved_Issues_And_Requests.md` — add an entry after every commit that closes a known issue or completes a feature request.
 
 ## Project documentation
-See `Prompts/Project_Summary.md` — read this when updating the HTML summary docs in `Product_Summary/` (`project-summary.html`, `project-snippets.html`, `project-commits.html`).
+See `Claude_Prompts/Project_Summary.md` — read this when updating the HTML summary docs in `Product_Summary/` (`project-summary.html`, `project-snippets.html`, `project-commits.html`).
 
 ## File structure
 ```
@@ -44,7 +44,7 @@ GTDWorkflowApp/
 │   ├── project-commits.html         ← commit history view
 │   ├── project-snippets.html        ← code snippet reference
 │   └── GTDWorkflowApp_ProjectSummary.html
-├── Prompts/                         ← Claude workflow docs (NOT app prompts)
+├── Claude_Prompts/                  ← Claude workflow docs (NOT app prompts)
 │   ├── AI_Pair_Programming.md
 │   ├── Senior_Code_Engineer.md
 │   ├── Known_Issues_And_Requests.md

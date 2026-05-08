@@ -59,16 +59,16 @@ feat: short description
 Use `fix:` for bug fixes, `docs:` for documentation-only commits.
 
 After committing, if the change resolves a tracked known issue or completes a feature request:
-1. Append a row to `Prompts/Resolved_Issues_And_Requests.md` — date, type, #, name, commit hash
-2. Mark the item done (~~strikethrough~~) in `Prompts/Known_Issues_And_Requests.md`
-3. Confirm the last-used number at the top of `Prompts/Known_Issues_And_Requests.md` is current
+1. Append a row to `Claude_Prompts/Resolved_Issues_And_Requests.md` — date, type, #, name, commit hash
+2. Mark the item done (~~strikethrough~~) in `Claude_Prompts/Known_Issues_And_Requests.md`
+3. Confirm the last-used number at the top of `Claude_Prompts/Known_Issues_And_Requests.md` is current
 
 ### Step 8 — Documentation (append only)
 After the commit, update all three project doc files — **but only if John has already confirmed the feature works in Step 6.** If for any reason he hasn't confirmed yet, explicitly say docs will be updated once he does. Do not update docs speculatively.
 
 When ready: read the tail of each HTML file in `Product_Summary/` to find the last documented state, then append new content (TOC entry, feature section, snippets, commit entry). Never rewrite existing sections. Update all three files in one Python pass.
 
-Authoring rules (from `Prompts/Project_Summary.md`):
+Authoring rules (from `Claude_Prompts/Project_Summary.md`):
 - Audience: total beginner to React/Node.js, but experienced sysadmin (Linux/macOS/Windows/AWS)
 - Each feature: plain-English description, design decision, React concepts explained from scratch
 - Cross-link all three files via named anchors; use highlight.js from CDN for syntax highlighting
@@ -78,7 +78,7 @@ Authoring rules (from `Prompts/Project_Summary.md`):
 
 ## Backlog management
 
-When John provides a new Known Issue or Feature Request to add to `Prompts/Known_Issues_And_Requests.md`, categorise it first before placing it:
+When John provides a new Known Issue or Feature Request to add to `Claude_Prompts/Known_Issues_And_Requests.md`, categorise it first before placing it:
 
 | Category | Number format | Use when |
 |---|---|---|
