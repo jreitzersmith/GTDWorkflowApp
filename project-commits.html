@@ -2382,3 +2382,18 @@
     <code>[ ]</code> from titles and trailing <code>]</code> from field values.
   </td>
 </tr>
+
+<tr>
+  <td><code>b8bdf8e</code></td>
+  <td>fix</td>
+  <td>replace array-index keys with stable keys in dynamic lists (item 5)</td>
+  <td>
+    Six <code>key={"{i}"}</code>/<code>key={"{idx}"}</code> instances replaced
+    across four files: suggestion checkboxes in <code>AICoach.jsx</code> and
+    <code>CalendarSuggestionsBar.jsx</code> now use <code>key={"{s.text}"}</code>;
+    day cells in <code>CalendarEventDisplay.jsx</code> use
+    <code>key={"{d.toISOString()}"}</code>; chip spans in
+    <code>EmailRulesPanel.jsx</code> use <code>key={"{ch.label}"}</code>.
+    Three static or append-only index-key sites left unchanged intentionally.
+  </td>
+</tr>

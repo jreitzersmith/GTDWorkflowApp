@@ -5601,3 +5601,27 @@ const val = pair.slice(colon + 1).trim().replace(/\]$/, '');
 // extractUpdateAction — title field strip
 if (key === 'title') changes.text = val.replace(/[\[\]]/g, '');</code></pre>
 </section>
+
+<section id="snippet-stable-keys">
+  <h2>Stable key props replacing array-index keys</h2>
+  <p>Commit <code>b8bdf8e</code> &mdash; Item 5</p>
+  <pre><code class="language-jsx">// AICoach.jsx — project-review suggestion checkboxes
+// before: key={idx}
+suggestions.map((s, idx) => (
+  &lt;label key={s.text}&gt;
+
+// CalendarSuggestionsBar.jsx — calendar suggestion checkboxes
+// before: key={idx}
+suggestions.map((s, idx) => (
+  &lt;label key={s.text}&gt;
+
+// CalendarEventDisplay.jsx — month and week day cells
+// before: key={i}
+days.map((d, i) => (
+  &lt;div key={d.toISOString()}&gt;
+
+// EmailRulesPanel.jsx — criteria chips and action chips
+// before: key={i}
+criteriaChips.map((ch, i) => (
+  &lt;span key={ch.label}&gt;</code></pre>
+</section>

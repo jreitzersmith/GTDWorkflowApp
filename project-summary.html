@@ -3111,3 +3111,34 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
     defensive guard against any residual malformed output.
   </p>
 </section>
+
+<section id="fix-index-keys">
+  <h2>Code quality: replace array-index keys with stable keys (item 5)</h2>
+  <p>Commit <code>b8bdf8e</code> &mdash; 2026-05-08</p>
+  <p>
+    React uses the <code>key</code> prop to track which list item corresponds to
+    which DOM node across renders. When you use the array index as a key on a
+    <em>dynamic</em> list (one that can be reordered, filtered, or have items
+    inserted in the middle), React can reuse the wrong DOM node, causing visual
+    glitches or stale input state. Six instances of <code>key={"{i}"}</code> or
+    <code>key={"{idx}"}</code> across four component files were replaced with
+    stable, unique keys derived from the item&#8217;s own data:
+  </p>
+  <ul>
+    <li><strong>AICoach.jsx</strong> &mdash; project-review suggestion checkboxes:
+      <code>key={"{idx}"}</code> &rarr; <code>key={"{s.text}"}</code></li>
+    <li><strong>CalendarSuggestionsBar.jsx</strong> &mdash; calendar suggestion
+      checkboxes: <code>key={"{idx}"}</code> &rarr; <code>key={"{s.text}"}</code></li>
+    <li><strong>CalendarEventDisplay.jsx</strong> &mdash; month-view day cells and
+      week-view day columns: <code>key={"{i}"}</code> &rarr;
+      <code>key={"{d.toISOString()}"}</code></li>
+    <li><strong>EmailRulesPanel.jsx</strong> &mdash; criteria chips and action chips:
+      <code>key={"{i}"}</code> &rarr; <code>key={"{ch.label}"}</code></li>
+  </ul>
+  <p>
+    Three other index-key sites were intentionally left unchanged: a static
+    three-dot typing indicator (array is always length 3, never reordered), the
+    append-only chat message list (order never changes once rendered), and a
+    <code>String.split()</code> fragment list (ephemeral, no DOM state).
+  </p>
+</section>
