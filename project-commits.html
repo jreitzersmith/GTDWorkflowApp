@@ -2414,3 +2414,18 @@
     paths updated; build verified clean.
   </td>
 </tr>
+
+<tr>
+  <td><code>c3fb23e</code></td>
+  <td>fix</td>
+  <td>cache Gmail labels/filters to eliminate Rules tab re-fetch</td>
+  <td>
+    <code>gmailLabels</code> and <code>gmailFilters</code> state lifted from
+    <code>EmailRulesPanel</code> into <code>EmailManagementView</code>
+    (<code>email.jsx</code>), which persists across tab switches. Both arrays
+    passed as props; the existing empty-array guard in the
+    <code>useEffect</code> already prevents re-fetching when data is present.
+    Result: Rules tab loads instantly on every visit after the first; first-load
+    behaviour unchanged (fetches from Gmail API on mount).
+  </td>
+</tr>

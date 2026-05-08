@@ -58,6 +58,11 @@ feat: short description
 
 Use `fix:` for bug fixes, `docs:` for documentation-only commits.
 
+After committing, if the change resolves a tracked known issue or completes a feature request:
+1. Append a row to `Prompts/Resolved_Issues_And_Requests.md` — date, type, #, name, commit hash
+2. Mark the item done (~~strikethrough~~) in `Prompts/Known_Issues_And_Requests.md`
+3. Confirm the last-used number at the top of `Prompts/Known_Issues_And_Requests.md` is current
+
 ### Step 8 — Documentation (append only)
 After the commit, update all three project doc files — **but only if John has already confirmed the feature works in Step 6.** If for any reason he hasn't confirmed yet, explicitly say docs will be updated once he does. Do not update docs speculatively.
 
@@ -68,6 +73,25 @@ Authoring rules (from `Prompts/Project_Summary.md`):
 - Each feature: plain-English description, design decision, React concepts explained from scratch
 - Cross-link all three files via named anchors; use highlight.js from CDN for syntax highlighting
 - Collapsible sections where possible; consistent fonts, colors, and nav header across all three files
+
+---
+
+## Backlog management
+
+When John provides a new Known Issue or Feature Request to add to `Prompts/Known_Issues_And_Requests.md`, categorise it first before placing it:
+
+| Category | Number format | Use when |
+|---|---|---|
+| Known Issues | `Issue#x` | A bug or broken behaviour in the current app |
+| Code quality | `CQ#x` | Code standards gaps: component size, test coverage, architecture |
+| UI polish / quick wins | `FR#x` | Low-effort visible improvements (styling, interactions) |
+| Daily workflow / GTD core | `FR#x` | Core GTD loop, daily planning, coach modes |
+| Inbox / processing improvements | `FR#x` | Inbox flow, processing, AI suggestions |
+| Integrations / data | `FR#x` | External services (Gmail, Calendar, Supabase, Todoist, etc.) |
+| Data model expansions | `FR#x` | New fields, buckets, or task properties |
+| Platform / reach | `FR#x` | Mobile layout, export, third-party sync |
+
+After placing the entry, update the **Last used numbers** line at the top of the file.
 
 ---
 

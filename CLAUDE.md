@@ -27,7 +27,10 @@ See `Prompts/Senior_Code_Engineer.md` — read this file whenever writing or rev
 See `Prompts/AI_Pair_Programming.md` — read this file at the start of any development session and follow it for every change.
 
 ## Known issues & roadmap
-See `Prompts/Known_Issues_And_Additions.md` — read this when planning new features or triaging bugs.
+See `Prompts/Known_Issues_And_Requests.md` — read this when planning new features or triaging bugs.
+
+## Resolved issues & requests
+See `Prompts/Resolved_Issues_And_Requests.md` — add an entry after every commit that closes a known issue or completes a feature request.
 
 ## File structure
 ```

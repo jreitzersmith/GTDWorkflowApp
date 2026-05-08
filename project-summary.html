@@ -349,6 +349,7 @@
   <div class="section-label">May 7 &#8212; Fixes</div>
   <ul>
     <li><a href="#fix-inbox-processing">Inbox Processing Fixes (8a)</a></li>
+    <li><a href="#fix-rules-tab-cache">Email Rules Tab &mdash; Instant Re-open</a></li>
   </ul>
 
 </aside>
@@ -3189,4 +3190,43 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
     oddity where Gmail and web-search code were bundled in the same file with no
     logical connection.
   </p>
+</section>
+
+<section id="fix-rules-tab-cache">
+  <h2>Email Rules tab — eliminate re-fetch on every visit</h2>
+  <p>Commit <code>c3fb23e</code></p>
+  <p>
+    The Email &gt; Rules tab displays all Gmail filters and labels fetched live
+    from the Gmail API. The fetch takes roughly 10 seconds. Originally, every
+    time the user switched to the Rules tab — even switching away and straight
+    back — the full 10-second fetch repeated from scratch.
+  </p>
+  <p>
+    <strong>Why it happened.</strong> The tab bar in <code>email.jsx</code> uses
+    a conditional render: <code>{"{emailTab === 'rules' && <EmailRulesPanel .../>}"}</code>.
+    Each time the tab became active, React mounted a brand-new
+    <code>EmailRulesPanel</code> instance, resetting its internal
+    <code>gmailLabels</code> and <code>gmailFilters</code> state to empty arrays,
+    which triggered the fetch guard and kicked off another API call.
+  </p>
+  <p>
+    <strong>The fix — lift state above the mount/unmount boundary.</strong> The
+    two data arrays were moved from <code>EmailRulesPanel</code>'s local state
+    into <code>EmailManagementView</code> (the parent in <code>email.jsx</code>),
+    which stays mounted for the entire time the Email section is open. They are
+    passed down as props. The existing fetch guard —
+    <code>if (googleToken &amp;&amp; !rulesLoading &amp;&amp; gmailLabels.length === 0) loadRules()</code>
+    — already does the right thing: it only fetches when the arrays are empty.
+    With state living in the parent, the arrays are populated after the first
+    fetch and remain populated across tab switches, so the guard skips every
+    subsequent visit.
+  </p>
+  <div class="commit-lesson"><strong>React concept — component lifetime and state scope:</strong>
+    State declared inside a component lives only as long as that component is
+    mounted. Conditionally rendering a component (<code>{"{show &amp;&amp; <Panel/>}"}</code>)
+    destroys and recreates its state every time <code>show</code> flips. When you
+    need data to survive across those toggles, lift the state to a parent that
+    stays mounted — the same principle as keeping a variable in the outer scope
+    of a shell function so it survives repeated calls to an inner function.
+  </div>
 </section>

@@ -5652,3 +5652,42 @@ criteriaChips.map((ch, i) => (
     ├── settings/      (SettingsPanel, useSettings, ...)
     └── coach/         (AICoach, useCallAI, webSearch, ...)</code></pre>
 </section>
+
+<section id="snip-rules-tab-cache">
+  <h2>Email Rules tab — lift state to survive tab switch</h2>
+  <p>Commit <code>c3fb23e</code> &mdash; cache Gmail labels/filters above the mount boundary</p>
+  <pre><code class="language-jsx">// email.jsx — state lives here so it survives tab switches
+function EmailManagementView({ ..., emailTab }) {
+  const [gmailLabels,  setGmailLabels]  = useState([]);
+  const [gmailFilters, setGmailFilters] = useState([]);
+
+  // ...tab bar...
+
+  {emailTab === 'rules' && (
+    &lt;EmailRulesPanel
+      googleToken={googleToken}
+      googleScope={googleScope}
+      gmailLabels={gmailLabels}
+      setGmailLabels={setGmailLabels}
+      gmailFilters={gmailFilters}
+      setGmailFilters={setGmailFilters}
+    /&gt;
+  )}
+}
+
+// EmailRulesPanel.jsx — data comes in as props; fetch guard unchanged
+function EmailRulesPanel({
+  googleToken, googleScope,
+  gmailLabels, setGmailLabels,
+  gmailFilters, setGmailFilters,
+}) {
+  const [rulesLoading, setRulesLoading] = useState(false);
+  // ...
+
+  useEffect(() => {
+    // gmailLabels.length === 0 only on first mount; populated arrays
+    // survive tab switches in the parent so this guard skips re-fetches
+    if (googleToken && !rulesLoading && gmailLabels.length === 0) loadRules();
+  }, [googleToken]);
+}</code></pre>
+</section>
