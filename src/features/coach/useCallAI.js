@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SYSTEM_PROMPTS, OPENWEBUI_URL } from '../../constants.jsx';
 import { TOOLS, doWebSearch } from './webSearch.js';
 import { GMAIL_SEARCH_TOOL, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL,
@@ -14,6 +14,15 @@ import { buildCalibrationContext, extractAction, extractUpdateAction, extractAdd
   extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction,
   extractCalendarDeleteAction } from '../tasks/taskUtils.jsx';
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
+
+// Buckets to include in the task context for each coach mode.
+// Modes not listed here receive all buckets (null = no filter).
+const MODE_CONTEXT_BUCKETS = {
+  process:         ['inbox', 'project'],
+  projectReview:   ['project'],
+  projectMetadata: ['project'],
+  calendarEvent:   ['next', 'project'],
+};
 
 /**
  * Owns the AI fetch loop, all tool-dispatch branches, action-line parsing,
@@ -58,12 +67,15 @@ function useCallAI({
     if (provider === 'local') fetchModels();
   }, [provider, fetchModels]);
 
+  const [lastInputLog, setLastInputLog] = useState(null);
+
   const callAI = useCallback(async (userMsg, mode, history) => {
     // Inject calibration context only for modes that suggest effort estimates
     const calibCtx = (mode === 'process' || mode === 'projectMetadata')
       ? buildCalibrationContext(tasks, efforts, calibrationOverrides)
       : '';
-    const systemPrompt = SYSTEM_PROMPTS[mode] + calibCtx + '\n\n[Current Task List]\n' + getTaskContext();
+    const systemPrompt = SYSTEM_PROMPTS[mode] + calibCtx + '\n\n[Current Task List]\n' + getTaskContext(MODE_CONTEXT_BUCKETS[mode] ?? null);
+    let inputLogSet = false;
     const newHistory = [...history, { role: 'user', content: userMsg }];
 
     setLoading(true);
@@ -133,7 +145,13 @@ function useCallAI({
           if (!res.ok || data.error) {
             throw new Error(`Anthropic error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
           }
-          if (data.usage) recordUsage(data.usage.input_tokens || 0, data.usage.output_tokens || 0, Date.now() - reqStart, mode, 'claude');
+          if (data.usage) {
+            recordUsage(data.usage.input_tokens || 0, data.usage.output_tokens || 0, Date.now() - reqStart, mode, 'claude');
+            if (!inputLogSet) {
+              setLastInputLog({ systemPrompt, userMsg, mode, inputTokens: data.usage.input_tokens || 0, ts: new Date().toISOString() });
+              inputLogSet = true;
+            }
+          }
           if (data.stop_reason === 'tool_use') {
             const toolUseBlocks = data.content.filter(b => b.type === 'tool_use');
             const toolResults = [];
@@ -292,7 +310,13 @@ function useCallAI({
         if (!res.ok || data.error) {
           throw new Error(`Open WebUI error ${res.status}: ${data.error?.message || JSON.stringify(data)}`);
         }
-        if (data.usage) recordUsage(data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0, Date.now() - ollamaStart, mode, 'ollama');
+        if (data.usage) {
+          recordUsage(data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0, Date.now() - ollamaStart, mode, 'ollama');
+          if (!inputLogSet) {
+            setLastInputLog({ systemPrompt, userMsg, mode, inputTokens: data.usage.prompt_tokens || 0, ts: new Date().toISOString() });
+            inputLogSet = true;
+          }
+        }
         reply = data.choices?.[0]?.message?.content || 'Sorry, something went wrong.';
       }
 
@@ -478,7 +502,7 @@ function useCallAI({
     }
   }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel,
       googleToken, googleScope, calendarEnabled, setCalendarEvents,
-      recordUsage, setTasks, setGmailQueue, setMessages, setChatHistory,
+      recordUsage, setLastInputLog, setTasks, setGmailQueue, setMessages, setChatHistory,
       setLoading, setPendingAction, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendChat = useCallback(async () => {
@@ -489,7 +513,7 @@ function useCallAI({
     await callAI(text, coachMode, chatHistory);
   }, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages]);
 
-  return { callAI, sendChat, fetchModels };
+  return { callAI, sendChat, fetchModels, lastInputLog };
 }
 
 export { useCallAI }

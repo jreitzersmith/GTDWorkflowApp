@@ -7,7 +7,7 @@ const MODE_LABELS = {
   brainDump: 'Brain Dump', projectReview: 'Project Review', projectMetadata: 'Project Metadata',
 };
 
-function UsagePanel({ stats, onClear, onClose }) {
+function UsagePanel({ stats, lastInputLog, onClear, onClose }) {
   const s = stats || createEmptyUsageStats();
   const totalCost = (s.byProvider?.claude?.costUsd || 0);
   const totalSaved = (s.byProvider?.ollama?.savedUsd || 0);
@@ -113,6 +113,41 @@ function UsagePanel({ stats, onClear, onClose }) {
           </tbody>
         </table>
 
+        {/* Last Call */}
+        {lastInputLog && (() => {
+          const fmtTs = new Date(lastInputLog.ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+          const charCount = lastInputLog.systemPrompt.length;
+          return (
+            <div style={{ marginTop: 24 }}>
+              <div style={sectionHd}>Last Call</div>
+              <div style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 14px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', flexWrap: 'wrap', gap: '10px 20px', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: COLORS.text }}>{MODE_LABELS[lastInputLog.mode] || lastInputLog.mode}</span>
+                  <span style={{ fontSize: 11, color: COLORS.muted }}>{fmtTs}</span>
+                  <span style={{ fontSize: 11, color: COLORS.text2 }}>{fmtTokens(lastInputLog.inputTokens)} input tokens <span style={{ color: COLORS.muted }}>({lastInputLog.inputTokens.toLocaleString()})</span></span>
+                  <span style={{ fontSize: 11, color: COLORS.muted }}>{charCount.toLocaleString()} chars</span>
+                </div>
+                <details style={{ padding: '0' }}>
+                  <summary style={{ padding: '8px 14px', fontSize: 11, color: COLORS.text2, cursor: 'pointer', userSelect: 'none', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>System prompt</span>
+                    <button
+                      onClick={e => { e.preventDefault(); navigator.clipboard.writeText(lastInputLog.systemPrompt); }}
+                      style={{ padding: '2px 8px', borderRadius: 4, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 10, cursor: 'pointer' }}
+                    >Copy</button>
+                  </summary>
+                  <pre style={{ margin: 0, padding: '10px 14px', fontSize: 10, lineHeight: 1.5, color: COLORS.text2, background: COLORS.surface, overflowY: 'auto', maxHeight: 220, whiteSpace: 'pre-wrap', wordBreak: 'break-word', borderTop: `1px solid ${COLORS.border}` }}>{lastInputLog.systemPrompt}</pre>
+                </details>
+                <details style={{ borderTop: `1px solid ${COLORS.border}` }}>
+                  <summary style={{ padding: '8px 14px', fontSize: 11, color: COLORS.text2, cursor: 'pointer', userSelect: 'none', listStyle: 'none' }}>
+                    User message
+                  </summary>
+                  <pre style={{ margin: 0, padding: '10px 14px', fontSize: 10, lineHeight: 1.5, color: COLORS.text2, background: COLORS.surface, overflowY: 'auto', maxHeight: 120, whiteSpace: 'pre-wrap', wordBreak: 'break-word', borderTop: `1px solid ${COLORS.border}` }}>{lastInputLog.userMsg}</pre>
+                </details>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Clear */}
         <div style={{ marginTop: 28, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
           <button
@@ -126,9 +161,10 @@ function UsagePanel({ stats, onClear, onClose }) {
 }
 
 UsagePanel.propTypes = {
-  stats:   PropTypes.object,
-  onClear: PropTypes.func.isRequired,
-  onClose: PropTypes.func.isRequired,
+  stats:        PropTypes.object,
+  lastInputLog: PropTypes.object,
+  onClear:      PropTypes.func.isRequired,
+  onClose:      PropTypes.func.isRequired,
 };
 
 export { MODE_LABELS, UsagePanel };

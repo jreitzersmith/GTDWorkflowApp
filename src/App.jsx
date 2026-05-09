@@ -127,10 +127,10 @@ export default function GTDManager() {
     });
   }, []); // run once on mount
 
-  const getTaskContext = useCallback(() => {
+  const getTaskContext = useCallback((allowedBuckets = null) => {
     const today = todayStr();
     const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe" };
-    const sections = Object.entries(bucketNames).map(([k, label]) => {
+    const sections = Object.entries(bucketNames).filter(([k]) => !allowedBuckets || allowedBuckets.includes(k)).map(([k, label]) => {
       const items = tasks.filter(t => t.bucket === k && !t.done);
       if (!items.length) return `${label}: empty`;
       const lines = items.map(t => {
@@ -191,7 +191,7 @@ export default function GTDManager() {
     return `Today's date: ${today}\n\n${sections.join("\n\n")}${calSection}`;
   }, [tasks, calendarEnabled, calendarEvents]);
 
-  const { callAI, sendChat, fetchModels } = useCallAI({
+  const { callAI, sendChat, fetchModels, lastInputLog } = useCallAI({
     tasks, efforts, calibrationOverrides,
     provider, localModel,
     googleToken, googleScope, calendarEnabled,
@@ -803,6 +803,7 @@ export default function GTDManager() {
                       ) : showUsage ? (
                         <UsagePanel
                           stats={aiUsageStats}
+                          lastInputLog={lastInputLog}
                           onClear={() => setAiUsageStats(createEmptyUsageStats())}
                           onClose={() => setShowUsage(false)}
                         />
