@@ -37,9 +37,9 @@
 4. ~~CQ#4 — Feature-based file structure~~ — **done** (85cf009): all files migrated to /features/tasks, /features/email, /features/calendar, /features/settings, /features/coach, /shared; gmailTools.js split into webSearch.js + gmailTools.js
 5. ~~CQ#5 — Array index as key~~ — **done** (b8bdf8e): replaced index keys in AICoach, CalendarSuggestionsBar, CalendarEventDisplay, EmailRulesPanel with stable keys
 6. ~~CQ#6 — Task detail panel dropdown dark text~~ — **done** (34acae2, 59968bb): `color: undefined` in Actual Effort and Category selects was overriding `fieldInput`'s `COLORS.text`, letting the browser fall back to the OS dark text; fixed to `COLORS.text` for empty state; added `colorScheme: 'dark'` to both selects
-10. CQ#10 — Task detail panel location button color — inactive location buttons should be slightly lighter than their current color, but still darker than the field label color defined in CQ#9 (three-tier: field labels > inactive locations > current muted)
-9. CQ#9 — Task detail panel field label color — field headers should use the same color as inactive bucket labels in the left navigation bar (currently inconsistent)
-8. CQ#8 — Task detail panel field order (cont.) — move the "Based on" dropdown to just below the Orig. Due field
+10. ~~CQ#10 — Task detail panel location button color~~ — **done** (98f94f5): inactive location buttons changed from COLORS.muted to #81807a (midpoint between text2 and muted)
+9. ~~CQ#9 — Task detail panel field label color~~ — **done** (98f94f5): all width-64 row labels changed from COLORS.muted to COLORS.text2, matching inactive sidebar bucket labels
+8. ~~CQ#8 — Task detail panel field order (cont.) — move the "Based on" dropdown~~ — **done** (98f94f5): moved to first sub-field inside RecurrenceEditor, just below Repeat toggle
 7. ~~CQ#7 — Task detail panel field order~~ — **done** (13873e1, c1316aa): Move to relocated below Bucket; Orig Due moved above Due; Defer moved directly below Due; Category moved above Location
 
 ### Feature requests

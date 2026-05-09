@@ -40,3 +40,6 @@ One row per item: date · type · # · name · commit hash(es).
 | 2026-05-09 | Bug Fix      | Issue#7 | extractAction positional capture bug — due date + recurrence lost for non-project types | 5b6f0bc |
 | 2026-05-09 | Bug Fix      | Issue#8 | Calendar month view header/cell column misalignment (unified grid) | 8bdb90e          |
 | 2026-05-09 | Feature      | FR#36   | Calendar month view equal column widths + event chip 3-line clamp | 8bdb90e          |
+| 2026-05-09 | Code Quality | CQ#8    | Task detail panel: "Base on" moved to first sub-field below Repeat toggle | 98f94f5 |
+| 2026-05-09 | Code Quality | CQ#9    | Task detail panel field label color → COLORS.text2 (matches inactive sidebar buckets) | 98f94f5 |
+| 2026-05-09 | Code Quality | CQ#10   | Task detail panel inactive location button color → #81807a (mid-tier between labels and muted) | 98f94f5 |
