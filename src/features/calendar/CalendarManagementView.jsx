@@ -108,12 +108,17 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
   const pendingTasks = useMemo(() => {
     const horizon = new Date(today);
     horizon.setDate(horizon.getDate() + 60);
-    return tasks.filter(t =>
-      t.dueDate && !t.done && !t.calendarEventId &&
-      t.bucket !== 'inboxHistory' &&
-      new Date(t.dueDate + 'T00:00:00') >= today &&
-      new Date(t.dueDate + 'T00:00:00') <= horizon
-    ).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const getEffectiveDate = t => t.recurrence?.weekDays?.length
+      ? firstOccurrenceDate(t.recurrence)
+      : t.dueDate;
+    return tasks
+      .filter(t => {
+        const d = getEffectiveDate(t);
+        return d && !t.done && !t.calendarEventId &&
+          t.bucket !== 'inboxHistory' && t.bucket !== 'done' &&
+          new Date(d + 'T00:00:00') <= horizon;
+      })
+      .sort((a, b) => getEffectiveDate(a).localeCompare(getEffectiveDate(b)));
   }, [tasks, today]);
 
   const handleDeleteEvent = async (ev) => {
@@ -153,14 +158,22 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
     setAddStatus(prev => ({ ...prev, [task.id]: 'loading' }));
     try {
       const rrule = buildRRULE(task.recurrence, task.recurrence?.until || null);
-      const startDate = task.recurrence ? firstOccurrenceDate(task.recurrence) : task.dueDate;
+      const startDate = task.recurrence?.weekDays?.length
+        ? firstOccurrenceDate(task.recurrence)
+        : (task.dueDate || new Date().toISOString().slice(0, 10));
       const ev = await doCalendarCreateEvent(googleToken, {
         summary: task.text, description: `GTD task added from your task manager.`,
         date: startDate,
         ...(rrule ? { recurrence: [rrule] } : {}),
       });
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, calendarEventId: ev.id } : t));
-      setCalendarEvents(prev => [...prev, ev]);
+      // Recurring events: refetch so the calendar shows all expanded instances.
+      // Non-recurring: optimistic local add is sufficient.
+      if (rrule) {
+        await fetchEvents(navDate);
+      } else {
+        setCalendarEvents(prev => [...prev, ev]);
+      }
       setAddStatus(prev => ({ ...prev, [task.id]: 'done' }));
       setAddConfirmId(null);
     } catch (e) {
