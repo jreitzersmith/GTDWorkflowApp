@@ -6,6 +6,7 @@ import {
   getOrderedChildren,
   waterfallFilter,
   moveTaskInTree,
+  extractAction,
   extractCreateAction,
   extractUpdateAction,
   extractAddAction,
@@ -157,6 +158,43 @@ describe('waterfallFilter', () => {
 
   it('returns an empty array for an empty input', () => {
     expect(waterfallFilter([], [])).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractAction
+// ---------------------------------------------------------------------------
+describe('extractAction', () => {
+  it('parses a plain next action with no fields', () => {
+    const result = extractAction('→ACTION:next|Buy rat poison');
+    expect(result).toMatchObject({ type: 'next', title: 'Buy rat poison', dueDate: null, deferUntil: null, recurrence: null });
+  });
+
+  it('parses due date in third positional segment (next type)', () => {
+    // Regression: AI emits →ACTION:next|title|due:DATE|recur:...
+    // Before fix, due:DATE was captured in m[3] and missed by extras search.
+    const result = extractAction('→ACTION:next|Place rat poison under the house|due:2026-05-09|recur:monthly:1');
+    expect(result.dueDate).toBe('2026-05-09');
+    expect(result.recurrence).toEqual({ raw: 'monthly:1' });
+  });
+
+  it('parses defer in third positional segment (next type)', () => {
+    const result = extractAction('→ACTION:next|Call dentist|defer:2026-06-01');
+    expect(result.deferUntil).toBe('2026-06-01');
+  });
+
+  it('parses project type — nextAction in third segment, not treated as a field', () => {
+    const result = extractAction('→ACTION:project|Website Redesign|Draft wireframes|due:2026-07-01');
+    expect(result).toMatchObject({
+      type: 'project',
+      title: 'Website Redesign',
+      nextAction: 'Draft wireframes',
+      dueDate: '2026-07-01',
+    });
+  });
+
+  it('returns null for non-matching text', () => {
+    expect(extractAction('nothing here')).toBeNull();
   });
 });
 

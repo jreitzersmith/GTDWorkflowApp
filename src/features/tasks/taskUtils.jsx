@@ -61,15 +61,24 @@ function formatBubble(text) {
 function extractAction(text) {
   const m = text.match(/→ACTION:(next|project|someday|waiting|delete)\|?([^|\n]*)?\|?([^|\n]*)?((?:\|[^\n]*)*)?/);
   if (!m) return null;
-  const extras = m[4] || "";
-  const dueMatch = extras.match(/\|due:(\d{4}-\d{2}-\d{2})/);
+  // For 'project' type m[3] is the first next action; for all other types the
+  // third positional segment may be a due/defer/recur field captured before the
+  // extras group — fold it back into extras so field searches always work.
+  const isProjectType = m[1] === 'project';
+  const seg3 = (m[3] || "").trim();
+  const extras = isProjectType
+    ? (m[4] || "")
+    : (seg3 ? '|' + seg3 : '') + (m[4] || "");
+  const dueMatch   = extras.match(/\|due:(\d{4}-\d{2}-\d{2})/);
   const deferMatch = extras.match(/\|defer:(\d{4}-\d{2}-\d{2})/);
+  const recurMatch = extras.match(/\|recur:([^|]+)/);
   return {
     type: m[1],
     title: (m[2] || "").trim(),
-    nextAction: (m[3] || "").trim(),
-    dueDate: dueMatch ? dueMatch[1] : null,
-    deferUntil: deferMatch ? deferMatch[1] : null,
+    nextAction: isProjectType ? seg3 : '',
+    dueDate:    dueMatch   ? dueMatch[1]                                : null,
+    deferUntil: deferMatch ? deferMatch[1]                              : null,
+    recurrence: recurMatch ? parseRecurrenceValue(recurMatch[1].trim()) : null,
   };
 }
 
