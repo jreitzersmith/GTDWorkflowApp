@@ -11,12 +11,12 @@
 - [ ] Issue#3 [GH#2] — Weekly Review doesn't check off steps as completed
 - ~~Issue#4 [GH#3] — No export or sync with Todoist~~ — **moved to FR#9**
 - [ ] Issue#5 — Emails pulled from Gmail are cut short (body text truncated before end of message)
-- [x] ~~Issue#8 — Calendar month view: day-header columns don't align with the day-cell columns below them~~ — **fixed** (8bdb90e): merged header and day-cell grids into a single unified grid (header and grid are separate grid containers; a scrollbar or border width difference causes them to drift out of sync)
-- [x] ~~Issue#7 — Add & Ask AI: AI correctly parses due date and recurrence from the task text but the created task has neither field set~~ — **fixed** (5b6f0bc): extractAction positional capture bug; handleConfirmMove now applies recurrence; process prompt documents recurrence field (confirmed: AI identified next recurrence date correctly but the task was saved without dueDate or recurrence)
-- [ ] Issue#11 — Calendar event creation uses today's date instead of the task's due date (task detail panel shows correct due date, but the created calendar event is pinned to the current date)
-- [ ] Issue#10 — Add & Ask AI: when AI identifies a duplicate and the user confirms delete, the original inbox item is archived but a new task is still created (the confirmed action should be delete-only, not create)
-- [ ] Issue#9 — Tasks with a due date do not appear in the Calendar view "tasks with due date, but no calendar event" section — not shown on first visit, nor after soft or hard refresh; root cause unknown (may be a filter, sort, or data-mapping bug in CalendarManagementView/calendarApi)
-- [x] ~~Issue#6 — `calendarEventId` is never persisted to Supabase~~ — **fixed** (4c78c0b): added to taskToDb/dbToTask mappers and ALTER TABLE migration: missing from `taskToDb`, `dbToTask`, and the `tasks` table schema. After any Supabase sync the field is lost, so calendar-linked events immediately re-appear as unlinked in the "Calendar events without tasks" section
+- [x] ~~Issue#8 [GH#26] — Calendar month view: day-header columns don't align with the day-cell columns below them~~ — **fixed** (8bdb90e): merged header and day-cell grids into a single unified grid (header and grid are separate grid containers; a scrollbar or border width difference causes them to drift out of sync)
+- [x] ~~Issue#7 [GH#25] — Add & Ask AI: AI correctly parses due date and recurrence from the task text but the created task has neither field set~~ — **fixed** (5b6f0bc): extractAction positional capture bug; handleConfirmMove now applies recurrence; process prompt documents recurrence field (confirmed: AI identified next recurrence date correctly but the task was saved without dueDate or recurrence)
+- [ ] Issue#11 [GH#22] — Calendar event creation uses today's date instead of the task's due date (task detail panel shows correct due date, but the created calendar event is pinned to the current date)
+- [ ] Issue#10 [GH#21] — Add & Ask AI: when AI identifies a duplicate and the user confirms delete, the original inbox item is archived but a new task is still created (the confirmed action should be delete-only, not create)
+- [ ] Issue#9 [GH#20] — Tasks with a due date do not appear in the Calendar view "tasks with due date, but no calendar event" section — not shown on first visit, nor after soft or hard refresh; root cause unknown (may be a filter, sort, or data-mapping bug in CalendarManagementView/calendarApi)
+- [x] ~~Issue#6 [GH#24] — `calendarEventId` is never persisted to Supabase~~ — **fixed** (4c78c0b): added to taskToDb/dbToTask mappers and ALTER TABLE migration: missing from `taskToDb`, `dbToTask`, and the `tasks` table schema. After any Supabase sync the field is lost, so calendar-linked events immediately re-appear as unlinked in the "Calendar events without tasks" section
 
 ---
 
@@ -37,9 +37,9 @@
 4. ~~CQ#4 — Feature-based file structure~~ — **done** (85cf009): all files migrated to /features/tasks, /features/email, /features/calendar, /features/settings, /features/coach, /shared; gmailTools.js split into webSearch.js + gmailTools.js
 5. ~~CQ#5 — Array index as key~~ — **done** (b8bdf8e): replaced index keys in AICoach, CalendarSuggestionsBar, CalendarEventDisplay, EmailRulesPanel with stable keys
 6. ~~CQ#6 — Task detail panel dropdown dark text~~ — **done** (34acae2, 59968bb): `color: undefined` in Actual Effort and Category selects was overriding `fieldInput`'s `COLORS.text`, letting the browser fall back to the OS dark text; fixed to `COLORS.text` for empty state; added `colorScheme: 'dark'` to both selects
-10. ~~CQ#10 — Task detail panel location button color~~ — **done** (98f94f5): inactive location buttons changed from COLORS.muted to #81807a (midpoint between text2 and muted)
-9. ~~CQ#9 — Task detail panel field label color~~ — **done** (98f94f5): all width-64 row labels changed from COLORS.muted to COLORS.text2, matching inactive sidebar bucket labels
-8. ~~CQ#8 — Task detail panel field order (cont.) — move the "Based on" dropdown~~ — **done** (98f94f5): moved to first sub-field inside RecurrenceEditor, just below Repeat toggle
+10. ~~CQ#10 [GH#30] — Task detail panel location button color~~ — **done** (98f94f5): inactive location buttons changed from COLORS.muted to #81807a (midpoint between text2 and muted)
+9. ~~CQ#9 [GH#29] — Task detail panel field label color~~ — **done** (98f94f5): all width-64 row labels changed from COLORS.muted to COLORS.text2, matching inactive sidebar bucket labels
+8. ~~CQ#8 [GH#28] — Task detail panel field order (cont.) — move the "Based on" dropdown~~ — **done** (98f94f5): moved to first sub-field inside RecurrenceEditor, just below Repeat toggle
 7. ~~CQ#7 — Task detail panel field order~~ — **done** (13873e1, c1316aa): Move to relocated below Bucket; Orig Due moved above Due; Defer moved directly below Due; Category moved above Location
 
 ### Feature requests
@@ -71,8 +71,8 @@
 - ~~FR#25 [GH#11] — Email rules persistence (Supabase + localStorage optimistic cache; well-scoped)~~ — **done** (a2bb532): `useGmailRulesCache` hook; labels + filters cached in localStorage; instant load on reload
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
 - ~~FR#18 [GH#13] — Gmail rate limiting / backoff~~ — **done** (51062a9): `fetchWithBackoff` + `batchedAll`; inbox/search now fire 10 requests per chunk with 429 retry
-- ~~FR#36 — Calendar month view: day column min/max width + event title wrapping~~ — **done** (8bdb90e): minmax(135px, 1fr) grid columns; EventChip 3-line clamp with word-boundary ellipsis and maxWidth:180 — columns without events are narrower than those with events (fix: equal column widths via minmax); event tiles should have a minimum display width (~"Vet - Teeth Cleaning") and a maximum (~"Resume study of database class"); titles exceeding max wrap to new lines (max 3 lines, no mid-word splits, ellipsis after last complete word on line 3)
-- FR#35 — Calendar sync: when a task has a parent, show only the child task in the "tasks with due date, no calendar event" list (suppress the parent to avoid adding both parent and child as separate events)
+- ~~FR#36 [GH#27] — Calendar month view: day column min/max width + event title wrapping~~ — **done** (8bdb90e): minmax(135px, 1fr) grid columns; EventChip 3-line clamp with word-boundary ellipsis and maxWidth:180 — columns without events are narrower than those with events (fix: equal column widths via minmax); event tiles should have a minimum display width (~"Vet - Teeth Cleaning") and a maximum (~"Resume study of database class"); titles exceeding max wrap to new lines (max 3 lines, no mid-word splits, ellipsis after last complete word on line 3)
+- FR#35 [GH#23] — Calendar sync: when a task has a parent, show only the child task in the "tasks with due date, no calendar event" list (suppress the parent to avoid adding both parent and child as separate events)
 - ~~FR#22 [GH#14] — Show linked tasks in Calendar event detail~~ — **done** (4c78c0b): LinkedTasksSection in EventDetailPanel; getLinkedTasks() in calendarApi.js; onOpenTask opens Task Detail Panel in-place
 - FR#26 — Connect Google Drive (browse, search, and attach Drive files to tasks or coach context)
 - FR#27 — Connect Google Sheets and Docs (read/write Sheets for data capture; read Docs for coach context)
