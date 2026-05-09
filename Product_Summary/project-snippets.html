@@ -107,7 +107,7 @@
     <span class="current">📝 Code Snippets</span>
     <a href="project-commits.html">📦 Commit Log</a>
   </div>
-  <span class="updated">Last updated: May 3, 2026</span>
+  <span class="updated">Last updated: May 9, 2026</span>
 </header>
 
 <div class="shell">
@@ -5793,4 +5793,151 @@ to categorise it using the table above. If the category is ambiguous,
 ask one clarifying question before recording. Once the category is
 confirmed, add the entry to `Known_Issues_And_Requests.md` with the
 next available number and update the Last used numbers line.</code></pre>
+</section>
+<section id="snip-gmail-rules-cache">
+  <h2>useGmailRulesCache — localStorage cache hook</h2>
+  <p>Commit <code>a2bb532</code> &mdash; <code>src/features/email/useGmailRulesCache.js</code></p>
+  <pre><code class="language-javascript">// Lazy initialiser reads from localStorage once on mount
+const [gmailLabels, setGmailLabelsState] = useState(
+  () => readJson(LS_LABELS_KEY) || []
+);
+
+// useEffect persists every update back to localStorage
+useEffect(() => {
+  localStorage.setItem(LS_LABELS_KEY, JSON.stringify(gmailLabels));
+}, [gmailLabels]);
+
+// setGmailFilters also stamps a fetchedAt timestamp
+const setGmailFilters = (filtersOrUpdater) => {
+  setGmailFiltersState(filtersOrUpdater);
+  const now = new Date().toISOString();
+  setFetchedAt(now);
+  localStorage.setItem(LS_FETCHED_AT_KEY, now);
+};</code></pre>
+</section>
+<section id="snip-gmail-rate-limiting">
+  <h2>fetchWithBackoff and batchedAll — Gmail rate limiting helpers</h2>
+  <p>Commit <code>51062a9</code> &mdash; <code>src/features/email/gmailTools.js</code></p>
+  <pre><code class="language-javascript">// Retry on 429/500/503 with Retry-After header support
+async function fetchWithBackoff(url, options = {}, maxRetries = 3) {
+  let attempt = 0;
+  while (true) {
+    const res = await fetch(url, options);
+    if (res.ok) return res;
+    const retryable = res.status === 429 || res.status === 500 || res.status === 503;
+    if (!retryable || attempt >= maxRetries) return res;
+    const retryAfter = res.headers.get('Retry-After');
+    const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : (2 ** attempt) * 1000;
+    await sleep(waitMs);
+    attempt++;
+  }
+}
+
+// Chunked Promise.all — fires at most batchSize requests concurrently
+async function batchedAll(items, asyncFn, batchSize = 10, delayMs = 150) {
+  const results = [];
+  for (let i = 0; i &lt; items.length; i += batchSize) {
+    const chunk = items.slice(i, i + batchSize);
+    const chunkResults = await Promise.all(chunk.map(asyncFn));
+    results.push(...chunkResults);
+    if (i + batchSize &lt; items.length) await sleep(delayMs);
+  }
+  return results;
+}</code></pre>
+</section>
+<section id="snip-category-manager">
+  <h2>CategoryManager — CRUD for user-defined categories</h2>
+  <p>Commit <code>681a46d</code> &mdash; <code>src/features/settings/SettingsManagerComponents.jsx</code></p>
+  <p><a href="project-summary.html#feat-categories">&#8617; Back to Project Categories</a></p>
+  <pre><code class="language-javascript">// addCategory is called when the user presses Enter or clicks Add.
+// The hook deduplicates and keeps the list alphabetically sorted.
+const addCategory = useCallback((name) => {
+  const trimmed = name.trim();
+  if (!trimmed || categories.includes(trimmed)) return;
+  setCategories(prev => [...prev, trimmed].sort((a, b) => a.localeCompare(b)));
+}, [categories, setCategories]);
+
+// renameCategory updates BOTH the category list AND every task that
+// holds the old name — a single atomic state update.
+const renameCategory = useCallback((oldName, newName) => {
+  const trimmed = newName.trim();
+  if (!trimmed || trimmed === oldName) return;
+  setCategories(prev =>
+    prev.map(c => c === oldName ? trimmed : c)
+        .sort((a, b) => a.localeCompare(b))
+  );
+  // Walk every task and swap the old name for the new one.
+  setTasks(prev =>
+    prev.map(t => ({ ...t, category: t.category === oldName ? trimmed : t.category }))
+  );
+}, [setCategories, setTasks]);
+
+// removeCategory optionally replaces the removed name with another one.
+// Passing no replacement clears the field (sets it to null).
+const removeCategory = useCallback((name, replaceName) => {
+  setCategories(prev => prev.filter(c => c !== name));
+  setTasks(prev =>
+    prev.map(t =>
+      t.category !== name ? t : { ...t, category: replaceName || null }
+    )
+  );
+}, [setCategories, setTasks]);</code></pre>
+</section>
+
+<section id="snip-category-filter">
+  <h2>ProjectTree — category filter applied at the root level</h2>
+  <p>Commit <code>192683e</code> &mdash; <code>src/features/tasks/TaskListHelpers.jsx</code></p>
+  <p><a href="project-summary.html#feat-categories">&#8617; Back to Project Categories</a></p>
+  <pre><code class="language-javascript">function ProjectTree({ parentId, depth, dragId, dropTarget,
+                        onDragStart, onDragOver, onDragEnd, onDrop }) {
+  // Read the filter value out of context — no prop drilling required.
+  const { allTasks, collapsedNodes, projectCategoryFilter } = useContext(TaskRowContext);
+
+  if (depth &gt; 5) return null;
+
+  // getOrderedChildren returns the direct children of parentId,
+  // sorted by their saved sort_order.
+  let children = getOrderedChildren(parentId, allTasks);
+
+  // Only filter at the root level (depth === 0).
+  // Children at deeper levels are always shown — you want to see
+  // every task inside a matching project, not just the root card.
+  if (depth === 0 &amp;&amp; projectCategoryFilter) {
+    children = children.filter(t =&gt; t.category === projectCategoryFilter);
+  }
+
+  if (!children.length) return null;
+  // … render loop continues unchanged
+}</code></pre>
+</section>
+
+<section id="snip-category-chip">
+  <h2>Category chip in TaskRow</h2>
+  <p>Commit <code>0bef2c8</code> &mdash; <code>src/features/tasks/TaskRow.jsx</code></p>
+  <p><a href="project-summary.html#feat-categories">&#8617; Back to Project Categories</a></p>
+  <pre><code class="language-javascript">// categories comes from TaskRowContext — the same array managed in Settings.
+const { ..., categories } = useContext(TaskRowContext);
+
+// hasMetadata controls whether the detail panel opens on title click.
+// Adding category here ensures the panel opens for tasks that only have
+// a category set and no other metadata.
+const hasMetadata = task.dueDate || task.effort || task.location?.length
+  || task.notes || task.priority?.length || !!task.category;
+
+// Amber chip — shown in both "below" and "inline" tag display modes.
+// The translucent background (#d4a84422) keeps it visually distinct
+// from the blue location chips and the grey effort chip.
+{task.category &amp;&amp; (
+  &lt;span style={{
+    fontSize: 10,
+    padding: "1px 6px",
+    borderRadius: 10,
+    background: "#d4a84422",
+    color: "#d4a844",
+    border: "1px solid #d4a84444",
+    whiteSpace: "nowrap",   // added in inline mode so chip never wraps
+  }}&gt;
+    &#9670; {task.category}
+  &lt;/span&gt;
+)}</code></pre>
 </section>

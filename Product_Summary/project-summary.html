@@ -224,7 +224,7 @@
   <a href="project-summary.html" class="active">📄 Feature Summary</a>
   <a href="project-snippets.html">🔬 Code Snippets</a>
   <a href="project-commits.html">📜 Commit Log</a>
-  <span class="updated">Last updated: May 7, 2026</span>
+  <span class="updated">Last updated: May 9, 2026</span>
 </nav>
 
 <div class="layout">
@@ -350,6 +350,18 @@
   <ul>
     <li><a href="#fix-inbox-processing">Inbox Processing Fixes (8a)</a></li>
     <li><a href="#fix-rules-tab-cache">Email Rules Tab &mdash; Instant Re-open</a></li>
+  </ul>
+
+  <div class="section-label">May 8 &#8212; New</div>
+  <ul>
+    <li><a href="#feat-dark-checkboxes">Dark-theme Checkboxes</a></li>
+    <li><a href="#feat-gmail-rules-cache">Email Rules Cache (FR#25)</a></li>
+    <li><a href="#feat-gmail-rate-limiting">Gmail Rate Limiting (FR#18)</a></li>
+  </ul>
+
+  <div class="section-label">May 9 &#8212; New</div>
+  <ul>
+    <li><a href="#feat-categories">Project Categories (FR#23)</a></li>
   </ul>
 
 </aside>
@@ -3398,4 +3410,207 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
     This removes the manual step of separately asking Claude to log a report
     after discussing it.
   </p>
+</section>
+<section id="feat-gmail-rules-cache">
+  <h2>Gmail rules localStorage cache (FR#25)</h2>
+  <p>Commit <code>a2bb532</code></p>
+  <p>
+    The Email → Rules tab fetches two things from Gmail on first visit: all user
+    labels and all filters. Before this change those results lived in plain React
+    state inside <code>EmailManagementView</code> — they survived tab-switches
+    within a session but were thrown away on every page reload, forcing another
+    API round-trip before the tab could render.
+  </p>
+  <p>
+    <strong>The fix.</strong> A new custom hook —
+    <code>useGmailRulesCache</code> in
+    <code>src/features/email/useGmailRulesCache.js</code> — replaces the two
+    bare <code>useState([])</code> calls. On mount it reads
+    <code>gtd_gmail_labels</code> and <code>gtd_gmail_filters</code> from
+    <code>localStorage</code>, so the Rules tab populates instantly with no
+    loading spinner. Each setter writes back to <code>localStorage</code> via
+    <code>useEffect</code> whenever Gmail returns fresh data. A third key,
+    <code>gtd_gmail_rules_fetched_at</code>, records an ISO timestamp every
+    time filters are refreshed — available for future staleness logic without
+    any code change required.
+  </p>
+  <p>
+    <code>EmailManagementView</code> (email.jsx) was updated to import
+    <code>useGmailRulesCache</code> in place of the raw state; the props
+    passed down to <code>EmailRulesPanel</code> are unchanged, so that
+    component needed no modification.
+  </p>
+  <p>
+    The hook ships with a 13-test suite co-located in
+    <code>useGmailRulesCache.test.js</code>, covering: initialisation from a
+    warm cache, graceful fallback for missing or invalid JSON, persistence on
+    every setter call, and timestamp recording.
+  </p>
+  <div class="commit-lesson"><strong>React concept — lazy state initialisation:</strong>
+    Passing a function to <code>useState</code> (e.g.
+    <code>useState(() => readJson(key) || [])</code>) means the initialiser
+    runs exactly once — on the first render — rather than on every re-render.
+    This is the correct pattern for reading from <code>localStorage</code>
+    inside a hook: cheap on subsequent renders, correct on the first one.
+  </div>
+</section>
+<section id="feat-gmail-rate-limiting">
+  <h2>Gmail rate limiting — backoff retry and batched fetches (FR#18)</h2>
+  <p>Commit <code>51062a9</code></p>
+  <p>
+    The Email inbox and AI coach search both work by first asking Gmail for a
+    list of message IDs, then fetching the details of each message individually.
+    Previously both used <code>Promise.all</code> to fire all detail requests
+    simultaneously — up to 50 at once. Gmail's API budget is roughly 250 quota
+    units per user per second, and each <code>messages.get</code> call costs
+    5 units, so a 50-message burst sits right at the ceiling and reliably
+    triggers 429 "Too Many Requests" errors.
+  </p>
+  <p>
+    <strong>Two helpers</strong> were added to
+    <code>src/features/email/gmailTools.js</code>:
+  </p>
+  <p>
+    <code>fetchWithBackoff(url, options, maxRetries = 3)</code> wraps
+    <code>fetch</code> with automatic retry on 429, 500, and 503 responses.
+    On a 429 it reads Gmail's <code>Retry-After</code> header and waits exactly
+    that many seconds; when the header is absent it falls back to exponential
+    backoff (1 s, 2 s, 4 s). After <code>maxRetries</code> attempts it returns
+    the failing response for the caller to handle normally.
+  </p>
+  <p>
+    <code>batchedAll(items, asyncFn, batchSize = 10, delayMs = 150)</code>
+    is a drop-in replacement for <code>Promise.all(items.map(asyncFn))</code>
+    that processes items in chunks of <code>batchSize</code>, waiting
+    <code>delayMs</code> milliseconds between chunks. Results are returned in
+    the original order. At 10 concurrent requests the burst is 50 quota units —
+    well within the per-second budget even if other app calls are in flight.
+  </p>
+  <p>
+    Both helpers were applied to <code>doGmailFetchInbox</code> and
+    <code>doGmailSearch</code>. <code>doGmailBatchLabel</code> (used when
+    archiving checked emails) had its inner <code>fetch</code> swapped for
+    <code>fetchWithBackoff</code> for resilience, though its batches are
+    typically small enough not to hit the limit.
+  </p>
+  <div class="commit-lesson"><strong>React / JS concept — concurrency control:</strong>
+    <code>Promise.all</code> fires every promise immediately with no upper
+    bound on concurrency. When talking to a rate-limited API this is almost
+    always wrong. The pattern of chunking with a delay — implemented here as
+    <code>batchedAll</code> — is the standard fix: it keeps throughput high
+    while keeping the instantaneous request rate predictable and within quota.
+  </div>
+</section>
+<section id="feat-categories">
+  <h2>Project Categories (FR#23)</h2>
+  <p>Commits <a href="project-commits.html#commit-681a46d"><code>681a46d</code></a>,
+    <a href="project-commits.html#commit-0bef2c8"><code>0bef2c8</code></a>,
+    <a href="project-commits.html#commit-192683e"><code>192683e</code></a></p>
+  <p>
+    As the project list grows it becomes hard to see where your attention should
+    go across different areas of life or work. Project Categories let you assign
+    a user-defined label — like "Work", "Home", or "Health" — to any task, then
+    filter and group the interface by that label.
+  </p>
+
+  <h3>Phase 1 — data layer and settings UI</h3>
+  <p>
+    Categories are stored in two places. Each task gets an optional
+    <code>category</code> text field in Supabase (added with an
+    <code>ALTER TABLE … ADD COLUMN IF NOT EXISTS category TEXT</code> migration).
+    The full list of available category names lives in the
+    <code>user_settings</code> table as a <code>JSONB</code> array, and is also
+    cached in <code>localStorage</code> under <code>gtd_categories</code> so the
+    UI is instant on reload.
+  </p>
+  <p>
+    <strong>Settings UI.</strong> A new <code>CategoryManager</code> component
+    (styled with the amber accent colour <code>#d4a844</code> to distinguish it
+    visually) lets you add, rename, and remove categories. Renaming a category
+    updates every task that holds the old name in a single pass. Removing a
+    category asks for an optional replacement name; tasks with no replacement get
+    their <code>category</code> field cleared. The component is wired into
+    <code>SettingsPanel</code> exactly like <code>LocationManager</code>.
+  </p>
+  <p>
+    <strong>Sync.</strong> <code>useSupabaseSync</code> reads and writes the
+    <code>categories</code> array alongside the existing settings fields, so
+    categories survive sign-out and appear on other devices immediately.
+  </p>
+  <p>
+    <strong>Import / Export.</strong> The backup JSON now includes a
+    <code>categories</code> array. On import both Replace and Merge modes handle
+    it: Replace overwrites the list, Merge unions the two sets alphabetically.
+  </p>
+
+  <h3>Phase 2 — UI surface</h3>
+  <p>
+    Two visible changes land once at least one category exists. First, the
+    <strong>Task Detail Panel</strong> grows a "Category" row between Location
+    and the notes area — a <code>&lt;select&gt;</code> that shows all defined
+    category names plus a "—" option to clear. The row is hidden entirely when no
+    categories have been defined, so the panel stays clean for users who don't use
+    the feature.
+  </p>
+  <p>
+    Second, every <strong>Task Row</strong> gains an amber ◆ chip in the tag
+    area when the task has a category assigned, in both the below-title and
+    inline display modes. The chip uses a translucent amber background
+    (<code>#d4a84422</code>) with an amber border so it visually stands apart from
+    the blue location chips and grey effort chips.
+  </p>
+
+  <h3>Phase 3 — grouping, filtering, AI context, and inheritance</h3>
+  <p>
+    <strong>Next Actions group-by.</strong> "Category" is added to the
+    <code>GROUP_OPTS</code> toolbar in the Next Actions view alongside Project,
+    Location, Due Date, Priority, and Effort. Tasks with no category fall into a
+    "No Category" group at the bottom.
+  </p>
+  <p>
+    <strong>Projects filter.</strong> When categories exist, an amber
+    <code>&lt;select&gt;</code> ("All categories" / per-category options) appears
+    in the Projects toolbar. Selecting a category filters the tree to show only
+    root projects that carry that category — their full subtree (all child tasks)
+    remains visible beneath them. The filter is held in
+    <code>projectCategoryFilter</code> state in <code>App.jsx</code>, flows into
+    <code>TaskRowContext</code>, and is applied inside <code>ProjectTree</code>
+    only at <code>depth === 0</code> so nested children are never clipped.
+  </p>
+  <p>
+    <strong>AI coach context.</strong> <code>getTaskContext()</code> now includes
+    <code>category:X</code> in each task's metadata block when set, so the coach
+    can reason about categories when giving advice or planning the day.
+  </p>
+  <p>
+    <strong>Child task inheritance.</strong> When you add a subtask to a project
+    that already has a category, the new task automatically inherits that category.
+    This applies in three places: the Projects add-row (<code>addProjectTask</code>),
+    the AI coach <code>→ACTION:add</code> handler, and the inbox-processing
+    "convert to project" flow.
+  </p>
+
+  <h4>Code snippets</h4>
+  <ul>
+    <li><a href="project-snippets.html#snip-category-manager">CategoryManager component</a></li>
+    <li><a href="project-snippets.html#snip-category-filter">ProjectTree category filter</a></li>
+    <li><a href="project-snippets.html#snip-category-chip">Category chip in TaskRow</a></li>
+  </ul>
+
+  <div class="commit-lesson"><strong>React concept — lifting state up:</strong>
+    The <code>projectCategoryFilter</code> value lives in <code>App.jsx</code>
+    (the common ancestor) and is shared downward via <code>TaskRowContext</code>.
+    This is the standard React pattern when two distant components — the toolbar
+    dropdown that sets the filter and the <code>ProjectTree</code> that reads it
+    — need to share the same piece of state. Neither component owns the state;
+    the nearest common ancestor does.
+  </div>
+  <div class="commit-lesson"><strong>React concept — context as a dependency injection system:</strong>
+    <code>TaskRowContext</code> acts like a bag that every row component can
+    reach into without props being threaded through every level. Adding
+    <code>projectCategoryFilter</code> and <code>setProjectCategoryFilter</code>
+    to the context object meant <code>ProjectTree</code> could read the filter
+    with a single <code>useContext</code> call — no new props required at any
+    intermediate component.
+  </div>
 </section>

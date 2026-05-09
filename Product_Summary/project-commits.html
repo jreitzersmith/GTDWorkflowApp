@@ -110,7 +110,7 @@
     <a href="project-snippets.html">📝 Code Snippets</a>
     <span class="current">📦 Commit Log</span>
   </div>
-  <span class="updated">Last updated: May 3, 2026</span>
+  <span class="updated">Last updated: May 9, 2026</span>
 </header>
 
 <div class="shell">
@@ -245,6 +245,13 @@
   <a href="#commit-de6e25ea">de6e25ea · refactor: email.jsx split (2c)</a>
   <a href="#commit-f8772d59">f8772d59 · refactor: TaskDetailPanel.jsx split (2d)</a>
   <a href="#commit-f7c23b3">f7c23b3 · refactor: extract SidebarComponents from TaskRow (2e)</a>
+  <div class="date-group">May 9</div>
+  <a href="#commit-681a46d">681a46d &middot; FR#23 Phase 1</a>
+  <a href="#commit-47dbe29">47dbe29 &middot; docs FR#23 Phase 1</a>
+  <a href="#commit-0bef2c8">0bef2c8 &middot; FR#23 Phase 2</a>
+  <a href="#commit-a399175">a399175 &middot; docs FR#23 Phase 2</a>
+  <a href="#commit-192683e">192683e &middot; FR#23 Phase 3</a>
+  <a href="#commit-1cb4ae8">1cb4ae8 &middot; docs FR#23 Phase 3</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -2541,4 +2548,105 @@
     Working instructions.
   </td>
 </tr>
-
+<tr>
+  <td><code>a2bb532</code></td>
+  <td>feat</td>
+  <td>cache Gmail labels and filters in localStorage (FR#25)</td>
+  <td>
+    New <code>useGmailRulesCache</code> hook reads <code>gtd_gmail_labels</code>
+    and <code>gtd_gmail_filters</code> from <code>localStorage</code> on mount —
+    Rules tab loads instantly on page reload. Setters persist via
+    <code>useEffect</code>; <code>gtd_gmail_rules_fetched_at</code> timestamp
+    recorded on every filter refresh. <code>EmailManagementView</code> updated
+    to use the hook in place of bare <code>useState</code>. 13 co-located tests.
+  </td>
+</tr>
+<tr>
+  <td><code>51062a9</code></td>
+  <td>feat</td>
+  <td>Gmail rate limiting — fetchWithBackoff + batchedAll (FR#18)</td>
+  <td>
+    <code>fetchWithBackoff</code>: retries 429/500/503 up to 3 times, reads
+    <code>Retry-After</code> header, falls back to exponential backoff.
+    <code>batchedAll</code>: chunked <code>Promise.all</code> replacement
+    (10 concurrent, 150 ms between chunks). Applied to
+    <code>doGmailFetchInbox</code> and <code>doGmailSearch</code>;
+    <code>fetchWithBackoff</code> also applied to <code>doGmailBatchLabel</code>.
+    10 co-located tests.
+  </td>
+</tr>
+<tr id="commit-681a46d">
+  <td><code>681a46d</code></td>
+  <td>feat</td>
+  <td>FR#23 Phase 1 — project categories data layer + settings UI</td>
+  <td>
+    Added <code>category TEXT</code> column to the <code>tasks</code> Supabase
+    table and a <code>categories JSONB</code> column to <code>user_settings</code>
+    via SQL migrations. Updated <code>taskToDb</code> / <code>dbToTask</code>
+    field mappers in <code>supabase.js</code>. Added <code>categories</code>
+    state + CRUD handlers (<code>addCategory</code>, <code>renameCategory</code>,
+    <code>removeCategory</code>) to <code>useAppSettings</code> and
+    <code>useSettings</code>. Created the <code>CategoryManager</code> component
+    (amber <code>#d4a844</code> accent) in <code>SettingsManagerComponents.jsx</code>.
+    Wired into <code>SettingsPanel</code> and <code>useSupabaseSync</code>;
+    import/export backup JSON updated to include the categories array.
+  </td>
+</tr>
+<tr id="commit-47dbe29">
+  <td><code>47dbe29</code></td>
+  <td>docs</td>
+  <td>docs: mark FR#23 Phase 1 done; add Phase 2/3 roadmap; update resolved log</td>
+  <td>
+    Updated <code>Known_Issues_And_Requests.md</code> to mark Phase 1 complete
+    and document the Phase 2 and Phase 3 roadmap. Added FR#23 Phase 1 entry to
+    <code>Resolved_Issues_And_Requests.md</code>.
+  </td>
+</tr>
+<tr id="commit-0bef2c8">
+  <td><code>0bef2c8</code></td>
+  <td>feat</td>
+  <td>FR#23 Phase 2 — category dropdown in TaskDetailPanel + chip in TaskRow</td>
+  <td>
+    <code>TaskDetailPanel</code>: new "Category" select row (hidden until at least
+    one category exists) between Location and notes. <code>TaskRow</code>: amber
+    ◆ chip rendered in both below-title and inline tag-display modes when
+    <code>task.category</code> is set; <code>hasMetadata</code> guard updated to
+    include category so the detail panel opens correctly. <code>categories</code>
+    array added to <code>TaskRowContext</code> value in <code>App.jsx</code>.
+  </td>
+</tr>
+<tr id="commit-a399175">
+  <td><code>a399175</code></td>
+  <td>docs</td>
+  <td>docs: mark FR#23 Phase 2 done; update resolved log</td>
+  <td>
+    Updated backlog and resolved log to reflect Phase 2 completion.
+  </td>
+</tr>
+<tr id="commit-192683e">
+  <td><code>192683e</code></td>
+  <td>feat</td>
+  <td>FR#23 Phase 3 — category grouping, Projects filter, AI context, child inheritance</td>
+  <td>
+    <strong>getTaskContext</strong>: adds <code>category:X</code> to each task's
+    metadata line when set, so the AI coach can reason about categories.
+    <strong>groupByField</strong>: new <code>category</code> case + "No Category"
+    ungrouped label; <strong>GROUP_OPTS</strong> in <code>TaskBucketView</code>
+    gets a Category button for Next Actions. <strong>Projects filter</strong>:
+    <code>projectCategoryFilter</code> state in <code>App.jsx</code>; amber
+    select in the Projects toolbar; <code>ProjectTree</code> applies the filter
+    at <code>depth === 0</code> via <code>TaskRowContext</code>.
+    <strong>Child inheritance</strong>: subtasks created via <code>addProjectTask</code>,
+    the AI coach <code>→ACTION:add</code>, and inbox processing all inherit the
+    parent's category automatically.
+  </td>
+</tr>
+<tr id="commit-1cb4ae8">
+  <td><code>1cb4ae8</code></td>
+  <td>docs</td>
+  <td>docs: mark FR#23 Phase 3 complete in Known_Issues and Resolved_Issues</td>
+  <td>
+    Updated <code>Known_Issues_And_Requests.md</code> to mark all three FR#23
+    phases complete. Added Phase 3 entry to <code>Resolved_Issues_And_Requests.md</code>.
+  </td>
+</tr>
