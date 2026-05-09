@@ -288,6 +288,18 @@ function parseRecurrenceValue(val) {
   return rec;
 }
 
+// Returns all tasks linked to a given calendar event via calendarEventId.
+// Matches on both the event's own id and its master recurring event id.
+function getLinkedTasks(tasks, ev) {
+  if (!ev || !tasks) return [];
+  return tasks.filter(t =>
+    t.calendarEventId && (
+      t.calendarEventId === ev.id ||
+      (ev.recurringEventId && t.calendarEventId === ev.recurringEventId)
+    )
+  );
+}
+
 // Throws a descriptive error for non-ok API responses; otherwise returns parsed JSON.
 // Use as: const data = await parseApiResponse(res, 'Gmail API');
 async function parseApiResponse(res, label) {
@@ -304,4 +316,4 @@ async function parseApiResponse(res, label) {
 }
 
 
-export { CALENDAR_SCOPE, doCalendarFetchEvents, buildRRULE, firstOccurrenceDate, parseRRULE, doCalendarCreateEvent, doCalendarDeleteEvent, doCalendarUpdateEvent, calEventStart, calEventEnd, isAllDayEvent, fmtCalTime, eventsForDay, isSameDay, getMondayOfWeek, genId, DAY_MAP, parseRecurrenceValue, parseApiResponse };
+export { CALENDAR_SCOPE, doCalendarFetchEvents, buildRRULE, firstOccurrenceDate, parseRRULE, doCalendarCreateEvent, doCalendarDeleteEvent, doCalendarUpdateEvent, calEventStart, calEventEnd, isAllDayEvent, fmtCalTime, eventsForDay, isSameDay, getMondayOfWeek, genId, DAY_MAP, parseRecurrenceValue, parseApiResponse, getLinkedTasks };

@@ -85,3 +85,6 @@ ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS due_time TEXT;
 
 -- Added with project categories feature (FR#23, 2026-05-09): user-defined task categories
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS category TEXT;
+
+-- Added with Issue#6 fix (2026-05-09): persists the linked Google Calendar event ID per task
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS calendar_event_id TEXT;

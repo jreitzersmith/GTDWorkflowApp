@@ -8,6 +8,17 @@ import {
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAY_NAMES_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
+const BUCKET_LABELS = {
+  inbox: 'Inbox',
+  next: 'Next Actions',
+  project: 'Projects',
+  waiting: 'Waiting For',
+  someday: 'Someday/Maybe',
+  deferred: 'Deferred',
+  done: 'Completed',
+  inboxHistory: 'Inbox History',
+};
+
 function buildMonthGrid(year, month) {
   const firstDay = new Date(year, month, 1);
   const startDow = firstDay.getDay(); // 0=Sun
@@ -19,6 +30,42 @@ function buildMonthGrid(year, month) {
     grid.push(d);
   }
   return grid;
+}
+
+function LinkedTasksSection({ linkedTasks, onOpenTask }) {
+  if (!linkedTasks || linkedTasks.length === 0) return null;
+  return (
+    <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 8 }}>
+      <div style={{ fontSize: 10, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>
+        Linked Tasks
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {linkedTasks.map(task => (
+          <div
+            key={task.id}
+            onClick={() => onOpenTask && onOpenTask(task.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '5px 8px', borderRadius: 5,
+              background: COLORS.surface2, border: `1px solid ${COLORS.border}`,
+              cursor: onOpenTask ? 'pointer' : 'default',
+            }}
+          >
+            <span style={{
+              fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              color: task.done ? COLORS.muted : COLORS.text,
+              textDecoration: task.done ? 'line-through' : 'none',
+            }}>
+              {task.text}
+            </span>
+            <span style={{ fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>
+              {BUCKET_LABELS[task.bucket] || task.bucket}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function EventChip({ ev, isSelected, onClick }) {
@@ -33,8 +80,10 @@ function EventChip({ ev, isSelected, onClick }) {
         background: isSelected ? COLORS.calendar : COLORS.calendar + '33',
         color: isSelected ? '#fff' : COLORS.calendar,
         border: `1px solid ${COLORS.calendar}55`,
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         cursor: 'pointer', lineHeight: 1.5, marginBottom: 1,
+        maxWidth: 180,
+        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+        overflow: 'hidden', overflowWrap: 'break-word', wordBreak: 'normal',
       }}
     >
       {timeStr}{ev.summary || '(No title)'}
@@ -42,7 +91,7 @@ function EventChip({ ev, isSelected, onClick }) {
   );
 }
 
-function EventDetailPanel({ ev, onProcessWithAI, onClose, onDelete, onReschedule }) {
+function EventDetailPanel({ ev, onProcessWithAI, onClose, onDelete, onReschedule, linkedTasks, onOpenTask }) {
   const allDay = isAllDayEvent(ev);
   const start = calEventStart(ev);
   const end = calEventEnd(ev);
@@ -84,6 +133,8 @@ function EventDetailPanel({ ev, onProcessWithAI, onClose, onDelete, onReschedule
       <div style={{ fontSize: 12, color: COLORS.text2 }}>🕐 {startStr}{endStr}</div>
       {ev.location && <div style={{ fontSize: 12, color: COLORS.text2 }}>📍 {ev.location}</div>}
       {desc && <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.5, maxHeight: 80, overflowY: 'auto' }}>{desc}</div>}
+
+      <LinkedTasksSection linkedTasks={linkedTasks} onOpenTask={onOpenTask} />
 
       {rescheduleMode && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0 4px', borderTop: `1px solid ${COLORS.border}` }}>
@@ -151,7 +202,7 @@ function EventDetailPanel({ ev, onProcessWithAI, onClose, onDelete, onReschedule
   );
 }
 
-function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, selectedEvent, onProcessWithAI, onDelete, onReschedule }) {
+function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, selectedEvent, onProcessWithAI, onDelete, onReschedule, linkedTasks, onOpenTask }) {
   const year = navDate.getFullYear();
   const month = navDate.getMonth();
   const grid = buildMonthGrid(year, month);
@@ -159,16 +210,13 @@ function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, s
   return (
     <div style={{ padding: '8px 0' }}>
       {selectedEvent && (
-        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} onDelete={onDelete} onReschedule={onReschedule} />
+        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} onDelete={onDelete} onReschedule={onReschedule} linkedTasks={linkedTasks} onOpenTask={onOpenTask} />
       )}
-      {/* Day headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: `1px solid ${COLORS.border}` }}>
+      {/* Unified grid: header row + day cells share one set of column tracks */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(135px, 1fr))' }}>
         {DAY_NAMES_SHORT.map(d => (
-          <div key={d} style={{ padding: '4px 6px', fontSize: 10, color: COLORS.muted, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{d}</div>
+          <div key={d} style={{ padding: '4px 6px', fontSize: 10, color: COLORS.muted, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${COLORS.border}` }}>{d}</div>
         ))}
-      </div>
-      {/* Day grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
         {grid.map((d, i) => {
           const isThisMonth = d.getMonth() === month;
           const isToday = isSameDay(d, today);
@@ -180,7 +228,8 @@ function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, s
               key={d.toISOString()}
               onClick={() => onDayClick(new Date(d))}
               style={{
-                minHeight: 80, padding: '4px 4px 2px', borderRight: (i + 1) % 7 !== 0 ? `1px solid ${COLORS.border}` : 'none',
+                minHeight: 80, padding: '4px 4px 2px',
+                borderRight: (i + 1) % 7 !== 0 ? `1px solid ${COLORS.border}` : 'none',
                 borderBottom: `1px solid ${COLORS.border}`, cursor: 'pointer',
                 background: isToday ? COLORS.calendarBg : 'transparent',
                 transition: 'background 0.1s',
@@ -203,16 +252,16 @@ function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, s
   );
 }
 
-function CalendarWeekView({ navDate, events, today, onDayClick, onEventClick, selectedEvent, onProcessWithAI, onDelete, onReschedule }) {
+function CalendarWeekView({ navDate, events, today, onDayClick, onEventClick, selectedEvent, onProcessWithAI, onDelete, onReschedule, linkedTasks, onOpenTask }) {
   const monday = getMondayOfWeek(navDate);
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
 
   return (
     <div style={{ padding: '8px 0' }}>
       {selectedEvent && (
-        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} onDelete={onDelete} onReschedule={onReschedule} />
+        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} onDelete={onDelete} onReschedule={onReschedule} linkedTasks={linkedTasks} onOpenTask={onOpenTask} />
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(135px, 1fr))' }}>
         {days.map((d, i) => {
           const isToday = isSameDay(d, today);
           const dayEvents = eventsForDay(events, d.getFullYear(), d.getMonth(), d.getDate());
@@ -239,7 +288,7 @@ function CalendarWeekView({ navDate, events, today, onDayClick, onEventClick, se
   );
 }
 
-function CalendarDayView({ navDate, events, today, onEventClick, selectedEvent, onProcessWithAI, onDelete, onReschedule }) {
+function CalendarDayView({ navDate, events, today, onEventClick, selectedEvent, onProcessWithAI, onDelete, onReschedule, linkedTasks, onOpenTask }) {
   const isToday = isSameDay(navDate, today);
   const dayEvents = eventsForDay(events, navDate.getFullYear(), navDate.getMonth(), navDate.getDate())
     .sort((a, b) => {
@@ -259,7 +308,7 @@ function CalendarDayView({ navDate, events, today, onEventClick, selectedEvent, 
       </div>
 
       {selectedEvent && (
-        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} onDelete={onDelete} onReschedule={onReschedule} />
+        <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} onDelete={onDelete} onReschedule={onReschedule} linkedTasks={linkedTasks} onOpenTask={onOpenTask} />
       )}
 
       {allDayEvs.length > 0 && (

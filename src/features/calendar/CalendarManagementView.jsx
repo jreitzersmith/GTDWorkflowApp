@@ -5,6 +5,7 @@ import {
   doCalendarFetchEvents, doCalendarCreateEvent,
   doCalendarUpdateEvent, doCalendarDeleteEvent,
   calEventStart, buildRRULE, firstOccurrenceDate, getMondayOfWeek,
+  getLinkedTasks,
 } from "./calendarApi.js";
 import { CalendarNewEventsSection, CalendarPendingTasksSection } from "./CalendarManagementSections.jsx";
 import { CalendarMonthView, CalendarWeekView, CalendarDayView, MONTH_NAMES } from "./CalendarEventDisplay.jsx";
@@ -42,6 +43,9 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
   }, [handleMarkEventSeen, processCalendarEventWithAI]);
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
+
+  // Tasks whose calendarEventId matches the currently selected event (or its recurring master).
+  const linkedTasks = useMemo(() => getLinkedTasks(tasks, selectedEvent), [tasks, selectedEvent]);
 
   // Detect calendar events that have no linked task and haven't been reviewed/skipped yet.
   // Deduplicated by master recurring event ID so a recurring series appears only once.
@@ -290,6 +294,8 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
             onProcessWithAI={processCalendarEventWithAI}
             onDelete={handleDeleteEvent}
             onReschedule={handleRescheduleEvent}
+            linkedTasks={linkedTasks}
+            onOpenTask={onOpenDetail}
           />
         )}
         {calendarTab === 'week' && (
@@ -303,6 +309,8 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
             onProcessWithAI={processCalendarEventWithAI}
             onDelete={handleDeleteEvent}
             onReschedule={handleRescheduleEvent}
+            linkedTasks={linkedTasks}
+            onOpenTask={onOpenDetail}
           />
         )}
         {calendarTab === 'day' && (
@@ -315,6 +323,8 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
             onProcessWithAI={processCalendarEventWithAI}
             onDelete={handleDeleteEvent}
             onReschedule={handleRescheduleEvent}
+            linkedTasks={linkedTasks}
+            onOpenTask={onOpenDetail}
           />
         )}
       </div>
