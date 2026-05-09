@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#11** · Code Quality — **CQ#10** · Feature Requests — **FR#37**
+> **Last used numbers:** Known Issues — **Issue#13** · Code Quality — **CQ#10** · Feature Requests — **FR#37**
 
 ---
 
@@ -9,9 +9,9 @@
 - [ ] Issue#2 [GH#1] — Brain Dump doesn't auto-add items to inbox — user has to copy manually (Chat mode can create tasks via `→ACTION:create`, but Brain Dump mode is not wired up)
 - [ ] Issue#3 [GH#2] — Weekly Review doesn't check off steps as completed
 - [ ] Issue#5 — Emails pulled from Gmail are cut short (body text truncated before end of message)
-- [ ] Issue#9 [GH#20] — Tasks with a due date do not appear in the Calendar view "tasks with due date, but no calendar event" section — not shown on first visit, nor after soft or hard refresh; root cause unknown (may be a filter, sort, or data-mapping bug in CalendarManagementView/calendarApi)
 - [ ] Issue#10 [GH#21] — Add & Ask AI: when AI identifies a duplicate and the user confirms delete, the original inbox item is archived but a new task is still created (the confirmed action should be delete-only, not create)
-- [ ] Issue#11 [GH#22] — Calendar event creation uses today's date instead of the task's due date (task detail panel shows correct due date, but the created calendar event is pinned to the current date)
+- [ ] Issue#12 [GH#32] (2026-05-09) — Process mode: AI does not assign due date when user corrects a deferral assumption mid-conversation (task filed without dueDate after user overrides AI's proposed defer date)
+- [ ] Issue#13 [GH#33] (2026-05-09) — AI sets incorrect deferUntil on weekday-recurring tasks (defers to day after first calendar occurrence instead of next recurrence date)
 
 ---
 
