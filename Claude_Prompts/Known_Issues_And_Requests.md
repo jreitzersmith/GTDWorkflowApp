@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#11** · Code Quality — **CQ#10** · Feature Requests — **FR#36**
+> **Last used numbers:** Known Issues — **Issue#11** · Code Quality — **CQ#10** · Feature Requests — **FR#37**
 
 ---
 
@@ -73,6 +73,7 @@
 - ~~FR#18 [GH#13] — Gmail rate limiting / backoff~~ — **done** (51062a9): `fetchWithBackoff` + `batchedAll`; inbox/search now fire 10 requests per chunk with 429 retry
 - ~~FR#36 [GH#27] — Calendar month view: day column min/max width + event title wrapping~~ — **done** (8bdb90e): minmax(135px, 1fr) grid columns; EventChip 3-line clamp with word-boundary ellipsis and maxWidth:180 — columns without events are narrower than those with events (fix: equal column widths via minmax); event tiles should have a minimum display width (~"Vet - Teeth Cleaning") and a maximum (~"Resume study of database class"); titles exceeding max wrap to new lines (max 3 lines, no mid-word splits, ellipsis after last complete word on line 3)
 - FR#35 [GH#23] — Calendar sync: when a task has a parent, show only the child task in the "tasks with due date, no calendar event" list (suppress the parent to avoid adding both parent and child as separate events)
+- FR#37 [GH#31] (2026-05-09) — Calendar event creation: set default notification(s) on created events (simplest: pass `useDefault: true` to Google Calendar API; stretch: configurable reminder interval in Settings)
 - ~~FR#22 [GH#14] — Show linked tasks in Calendar event detail~~ — **done** (4c78c0b): LinkedTasksSection in EventDetailPanel; getLinkedTasks() in calendarApi.js; onOpenTask opens Task Detail Panel in-place
 - FR#26 — Connect Google Drive (browse, search, and attach Drive files to tasks or coach context)
 - FR#27 — Connect Google Sheets and Docs (read/write Sheets for data capture; read Docs for coach context)
