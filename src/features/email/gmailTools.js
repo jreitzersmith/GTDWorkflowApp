@@ -4,6 +4,37 @@ import { parseApiResponse } from "../calendar/calendarApi.js";
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Wraps fetch with automatic retry on 429 / 500 / 503.
+// Respects the Retry-After header Gmail sends on 429; falls back to
+// exponential backoff (1 s → 2 s → 4 s) when the header is absent.
+async function fetchWithBackoff(url, options = {}, maxRetries = 3) {
+  let attempt = 0;
+  while (true) {
+    const res = await fetch(url, options);
+    if (res.ok) return res;
+    const retryable = res.status === 429 || res.status === 500 || res.status === 503;
+    if (!retryable || attempt >= maxRetries) return res; // caller handles non-OK
+    const retryAfter = res.headers.get('Retry-After');
+    const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : (2 ** attempt) * 1000;
+    await sleep(waitMs);
+    attempt++;
+  }
+}
+
+// Like Promise.all but processes items in chunks to avoid Gmail rate limits.
+// Fires at most batchSize requests concurrently, then waits delayMs before
+// the next chunk. Results are returned in the original order.
+async function batchedAll(items, asyncFn, batchSize = 10, delayMs = 150) {
+  const results = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const chunk = items.slice(i, i + batchSize);
+    const chunkResults = await Promise.all(chunk.map(asyncFn));
+    results.push(...chunkResults);
+    if (i + batchSize < items.length) await sleep(delayMs);
+  }
+  return results;
+}
+
 // ── Gmail tool (Anthropic tool use) ──────────────────────────────────────────
 const GMAIL_SEARCH_TOOL = {
   name: "gmail_search",
@@ -41,10 +72,11 @@ async function doGmailSearch(query, token, maxResults = 10) {
   const listData = await parseApiResponse(listRes, 'Gmail API');
   const messages = listData.messages || [];
   if (!messages.length) return "No emails found matching that query.";
-  const details = (await Promise.all(
-    messages.map(async ({ id }) => {
+  const details = (await batchedAll(
+    messages,
+    async ({ id }) => {
       try {
-        const msgRes = await fetch(
+        const msgRes = await fetchWithBackoff(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata`
           + `&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -55,7 +87,7 @@ async function doGmailSearch(query, token, maxResults = 10) {
         const get = (name) => hdrs.find(h => h.name === name)?.value || '';
         return `Gmail-ID: ${id}\nFrom: ${get('From')}\nDate: ${get('Date')}\nSubject: ${get('Subject')}\nSnippet: ${msg.snippet || ''}`;
       } catch { return null; }
-    })
+    }
   )).filter(Boolean);
   if (!details.length) return "No emails found matching that query.";
   return `Found ${messages.length} email(s). Top ${details.length} result(s):\n\n${details.join('\n\n---\n\n')}`;
@@ -263,7 +295,7 @@ async function doGmailBatchLabel(messageIds, addLabelIds, removeLabelIds, token)
   const body = { addLabelIds: addLabelIds || [], removeLabelIds: removeLabelIds || [] };
   const results = await Promise.allSettled(
     messageIds.map(id =>
-      fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}/modify`, {
+      fetchWithBackoff(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}/modify`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -455,25 +487,28 @@ async function doGmailFetchInbox(token, pageToken = null) {
   const data = await parseApiResponse(res, 'Gmail API');
   const messages = data.messages || [];
   if (!messages.length) return { emails: [], nextPageToken: null };
-  const details = await Promise.all(messages.map(async ({ id }) => {
-    try {
-      const msgRes = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata` +
-        `&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!msgRes.ok) return null;
-      const msg = await msgRes.json();
-      const hdrs = msg.payload?.headers || [];
-      const get = name => hdrs.find(h => h.name === name)?.value || '';
-      const fromRaw = get('From');
-      const nameMatch = fromRaw.match(/^"?(.+?)"?\s*<.+>$/);
-      const fromName = nameMatch ? nameMatch[1] : fromRaw.replace(/<.*>/, '').trim() || fromRaw;
-      const fromEmail = (fromRaw.match(/<(.+?)>/) || [])[1] || fromRaw;
-      const isUnread = (msg.labelIds || []).includes('UNREAD');
-      return { id, from: fromRaw, fromName, fromEmail, date: get('Date'), subject: get('Subject'), snippet: msg.snippet || '', isUnread, labelIds: msg.labelIds || [] };
-    } catch { return null; }
-  }));
+  const details = await batchedAll(
+    messages,
+    async ({ id }) => {
+      try {
+        const msgRes = await fetchWithBackoff(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata` +
+          `&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!msgRes.ok) return null;
+        const msg = await msgRes.json();
+        const hdrs = msg.payload?.headers || [];
+        const get = name => hdrs.find(h => h.name === name)?.value || '';
+        const fromRaw = get('From');
+        const nameMatch = fromRaw.match(/^"?(.+?)"?\s*<.+>$/);
+        const fromName = nameMatch ? nameMatch[1] : fromRaw.replace(/<.*>/, '').trim() || fromRaw;
+        const fromEmail = (fromRaw.match(/<(.+?)>/) || [])[1] || fromRaw;
+        const isUnread = (msg.labelIds || []).includes('UNREAD');
+        return { id, from: fromRaw, fromName, fromEmail, date: get('Date'), subject: get('Subject'), snippet: msg.snippet || '', isUnread, labelIds: msg.labelIds || [] };
+      } catch { return null; }
+    }
+  );
   return { emails: details.filter(Boolean), nextPageToken: data.nextPageToken || null };
 }
 
@@ -505,4 +540,4 @@ async function doGmailFetchFilters(token) {
 }
 
 
-export { GMAIL_SEARCH_TOOL, generateCodeVerifier, generateCodeChallenge, doGmailSearch, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL, GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL, GMAIL_LIST_FILTERS_TOOL, GMAIL_CREATE_FILTER_TOOL, GMAIL_DELETE_FILTER_TOOL, GMAIL_BULK_ACTION_TOOL, GMAIL_QUEUE_ADD_TOOL, GMAIL_SCOPE_OPTS, GMAIL_SCOPE_DISPLAY, doGmailListLabels, doGmailFetchLabelsRaw, doGmailLabel, doGmailBatchLabel, buildRawMessage, doGmailCompose, doGmailSend, doGmailCreateLabel, doGmailListFilters, doGmailCreateFilter, doGmailDeleteFilter, doGmailBulkAction, extractGmailPlainText, doGmailFetchInbox, doGmailGetMessageBody, doGmailFetchFilters };
+export { GMAIL_SEARCH_TOOL, generateCodeVerifier, generateCodeChallenge, fetchWithBackoff, batchedAll, doGmailSearch, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL, GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL, GMAIL_LIST_FILTERS_TOOL, GMAIL_CREATE_FILTER_TOOL, GMAIL_DELETE_FILTER_TOOL, GMAIL_BULK_ACTION_TOOL, GMAIL_QUEUE_ADD_TOOL, GMAIL_SCOPE_OPTS, GMAIL_SCOPE_DISPLAY, doGmailListLabels, doGmailFetchLabelsRaw, doGmailLabel, doGmailBatchLabel, buildRawMessage, doGmailCompose, doGmailSend, doGmailCreateLabel, doGmailListFilters, doGmailCreateFilter, doGmailDeleteFilter, doGmailBulkAction, extractGmailPlainText, doGmailFetchInbox, doGmailGetMessageBody, doGmailFetchFilters };
