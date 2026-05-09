@@ -2731,3 +2731,66 @@
     of 180 px prevents chips from stretching excessively on wide monitors.
   </td>
 </tr>
+
+<tr id="commit-df6a17d">
+  <td><code>df6a17d</code></td>
+  <td>fix</td>
+  <td>Issue#9 + Issue#11 — calendar pending tasks filter and recurring event push</td>
+  <td>
+    <strong>Issue#9</strong> — Tasks with a due date were invisible in the
+    "Add to Calendar" section because the <code>pendingTasks</code> filter
+    required <code>dueDate &gt;= today</code>, silently dropping every overdue
+    task. Fix: remove the lower-bound date check so past-due tasks appear too
+    (the 60-day upper horizon is kept). A <code>bucket !== 'done'</code> guard
+    was also added alongside the existing <code>!t.done</code> flag as a
+    belt-and-suspenders defence against data inconsistencies.<br><br>
+    A second gap was discovered during testing: weekday-recurring tasks with
+    no explicit <code>dueDate</code> were also invisible, because filtering
+    and sorting only looked at <code>t.dueDate</code>. Fix: introduce a
+    <code>getEffectiveDate(t)</code> helper that returns
+    <code>firstOccurrenceDate(t.recurrence)</code> for weekday-recurring tasks
+    and <code>t.dueDate</code> for everything else — matching the same logic
+    already used in <code>handleConfirmAdd</code>.<br><br>
+    <strong>Issue#11</strong> — When pushing a recurring task to Google
+    Calendar, <code>handleConfirmAdd</code> called
+    <code>firstOccurrenceDate(task.recurrence)</code> unconditionally whenever
+    <code>task.recurrence</code> was truthy. For non-weekday recurrences
+    (e.g. monthly), <code>firstOccurrenceDate</code> returns today as a
+    fallback, so the calendar event landed on today instead of the task's
+    actual due date. Fix: only call <code>firstOccurrenceDate</code> when
+    <code>task.recurrence.weekDays</code> is populated; otherwise use
+    <code>task.dueDate</code>.<br><br>
+    <strong>Recurring event display fix</strong> — After pushing a recurring
+    task to Google Calendar, the app added the raw master event object to
+    local state with <code>setCalendarEvents(prev =&gt; [...prev, ev])</code>.
+    Because the calendar was fetched with <code>singleEvents: true</code>, the
+    local state held expanded instances — not master events — so only the first
+    occurrence ever appeared in the calendar view. Fix: for recurring events
+    (when <code>rrule</code> is non-null), call <code>fetchEvents(navDate)</code>
+    after creation so all expanded instances are pulled back from Google and
+    appear in the view; non-recurring events continue to use the faster
+    optimistic local add.
+  </td>
+</tr>
+
+<tr id="commit-4c54153">
+  <td><code>4c54153</code></td>
+  <td>chore</td>
+  <td>Close Issue#9 + Issue#11; log Issue#12 + Issue#13</td>
+  <td>
+    Housekeeping commit. Removed Issue#9 (GH#20) and Issue#11 (GH#22) from
+    <code>Known_Issues_And_Requests.md</code> and appended them to
+    <code>Resolved_Issues_And_Requests.md</code> with commit hash
+    <code>df6a17d</code>. Added two newly discovered issues observed during
+    testing: <strong>Issue#12</strong> (GH#32) — process mode AI drops the
+    due date when the user overrides a deferral assumption mid-conversation;
+    <strong>Issue#13</strong> (GH#33) — AI sets an incorrect
+    <code>deferUntil</code> on weekday-recurring tasks (the day after the
+    first calendar occurrence rather than the next recurrence date).
+    Both are deferred for investigation in a future cycle.
+    Updated last-used issue number to Issue#13.
+  </td>
+</tr>
+</table>
+</body>
+</html>

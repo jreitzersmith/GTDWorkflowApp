@@ -3763,3 +3763,60 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
   </div>
   <p>Commits: <a href="project-commits.html#commit-8bdb90e">8bdb90e</a></p>
 </section>
+
+<section id="issue9-issue11-calendar-filter">
+  <h2>Issue#9 + Issue#11 — Calendar: Pending Task Filter and Recurring Event Push</h2>
+  <p>
+    Two related bugs in the Calendar Management view that prevented tasks from
+    appearing in the "Add to Calendar" section and caused calendar events to land
+    on the wrong date.
+  </p>
+  <h3>Issue#9 — past-due and weekday-recurring tasks invisible</h3>
+  <p>
+    The <code>pendingTasks</code> memo filtered with
+    <code>dueDate &gt;= today</code>, silently dropping every task whose due
+    date had already passed. Users who accumulated overdue tasks saw an empty
+    section even though those tasks still needed calendar events. Fix: remove the
+    lower-bound check. The 60-day upper horizon is kept to prevent an unbounded
+    list. A <code>bucket !== 'done'</code> guard was also added alongside the
+    existing <code>!t.done</code> flag.
+  </p>
+  <p>
+    A second gap: weekday-recurring tasks with no explicit <code>dueDate</code>
+    were also invisible, because the filter required <code>t.dueDate</code>.
+    Fix: a <code>getEffectiveDate(t)</code> helper returns
+    <code>firstOccurrenceDate(t.recurrence)</code> for weekday-recurring tasks
+    and <code>t.dueDate</code> otherwise. Both filtering and sorting use this
+    helper so recurring tasks appear with the correct next-occurrence date.
+  </p>
+  <h3>Issue#11 — wrong start date for recurring calendar events</h3>
+  <p>
+    <code>handleConfirmAdd</code> called <code>firstOccurrenceDate()</code>
+    whenever <code>task.recurrence</code> was truthy. For non-weekday
+    recurrences (e.g. monthly), that function returns today as a fallback, so
+    monthly tasks always landed on today's date instead of their due date. Fix:
+    only call <code>firstOccurrenceDate</code> when
+    <code>task.recurrence.weekDays</code> is populated.
+  </p>
+  <h3>Recurring event display fix</h3>
+  <p>
+    After pushing a recurring task to Google Calendar, the app added the raw
+    master event object directly to local state. The calendar was fetched with
+    <code>singleEvents: true</code>, which expands recurring series into
+    individual instances — so adding the unexpanded master event meant only the
+    first occurrence ever appeared in the calendar view. Fix: for recurring
+    events, call <code>fetchEvents(navDate)</code> after creation so Google
+    returns the full set of expanded instances. Non-recurring events continue to
+    use the faster optimistic local add.
+  </p>
+  <div class="commit-lesson"><strong>Optimistic updates vs. server round-trips</strong>:
+    for simple single events, adding the returned object directly to local state
+    is fast and correct — the server response matches what the UI needs.
+    For recurring events the returned object is a master "template" event, not
+    the expanded list the UI displays. In that case, an extra GET (refetch) is
+    worth the round-trip to get the data in the right shape.
+  </div>
+  <p>Commits: <a href="project-commits.html#commit-df6a17d">df6a17d</a></p>
+</section>
+</body>
+</html>
