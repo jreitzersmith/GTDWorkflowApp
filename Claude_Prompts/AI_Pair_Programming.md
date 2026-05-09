@@ -59,9 +59,9 @@ feat: short description
 Use `fix:` for bug fixes, `docs:` for documentation-only commits.
 
 After committing, if the change resolves a tracked known issue or completes a feature request:
-1. Append a row to `Claude_Prompts/Resolved_Issues_And_Requests.md` — date, type, #, name, commit hash
-2. Mark the item done (~~strikethrough~~) in `Claude_Prompts/Known_Issues_And_Requests.md`
-3. Confirm the last-used number at the top of `Claude_Prompts/Known_Issues_And_Requests.md` is current
+1. **Move** the item out of `Claude_Prompts/Known_Issues_And_Requests.md` entirely (delete the line).
+2. **Append a row** to `Claude_Prompts/Resolved_Issues_And_Requests.md` — date, type, #, GH#, name, commit hash. Close the corresponding GitHub issue via the GitHub MCP (`state: closed`).
+3. Confirm the last-used number at the top of `Claude_Prompts/Known_Issues_And_Requests.md` is current.
 
 ### Step 8 — Documentation (append only)
 After the commit, update all three project doc files — **but only if John has already confirmed the feature works in Step 6.** If for any reason he hasn't confirmed yet, explicitly say docs will be updated once he does. Do not update docs speculatively.
@@ -92,6 +92,12 @@ When John provides a new Known Issue or Feature Request to add to `Claude_Prompt
 | Platform / reach | `FR#x` | Mobile layout, export, third-party sync |
 
 After placing the entry, update the **Last used numbers** line at the top of the file.
+
+**GitHub issue on creation.** Every new Issue / CQ / FR entry must also be filed as a GitHub issue immediately using the GitHub MCP (`mcp__github__create_issue`). Use the appropriate label(s) from the repo's existing set (`Issue`, `Feature_Request`, `FR: UI_Polish`, `FR: Daily_Workflow`, `FR: Inbox_Processing`, `FR: Integrations`, `FR: Data_Model`, `FR: Platform`). The entry in `Known_Issues_And_Requests.md` must include the assigned GH# and the creation date:
+
+```
+- [ ] Issue#12 [GH#31] (2026-05-09) — description of the issue
+```
 
 **Triage on report.** When John says something like "there's an issue", "something isn't behaving correctly", or "I need X", immediately attempt to categorise it using the table above. If the category is ambiguous, ask one clarifying question before recording. Once the category is confirmed, add the entry to `Known_Issues_And_Requests.md` with the next available number and update the Last used numbers line.
 
