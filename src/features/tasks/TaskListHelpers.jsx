@@ -49,9 +49,12 @@ CompletedTree.propTypes = {
 
 // Drag-and-drop reorderable tree of project children.
 function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop }) {
-  const { allTasks, collapsedNodes } = useContext(TaskRowContext);
+  const { allTasks, collapsedNodes, projectCategoryFilter } = useContext(TaskRowContext);
   if (depth > 5) return null;
-  const children = getOrderedChildren(parentId, allTasks);
+  let children = getOrderedChildren(parentId, allTasks);
+  if (depth === 0 && projectCategoryFilter) {
+    children = children.filter(t => t.category === projectCategoryFilter);
+  }
   if (!children.length) return null;
 
   return (

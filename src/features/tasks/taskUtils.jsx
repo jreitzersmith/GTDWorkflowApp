@@ -227,7 +227,7 @@ function waterfallFilter(nextTasks, allTasks) {
 // "project" walks up the parent chain to find the root project name.
 // Tasks with no value for the field go into a field-specific fallback bucket.
 function groupByField(taskList, field, allTasks = []) {
-  const ungroupedLabel = field === "project" ? "No Project" : field === "effort" ? "No Effort" : "Ungrouped";
+  const ungroupedLabel = field === "project" ? "No Project" : field === "effort" ? "No Effort" : field === "category" ? "No Category" : "Ungrouped";
   const groups = {};
   const ungrouped = [];
   taskList.forEach(task => {
@@ -240,6 +240,8 @@ function groupByField(taskList, field, allTasks = []) {
       keys = task.dueDate ? [task.dueDate] : [];
     } else if (field === "effort") {
       keys = task.effort ? [task.effort] : [];
+    } else if (field === "category") {
+      keys = task.category ? [task.category] : [];
     } else if (field === "project") {
       // Walk up the parent chain to find the root project.
       if (task.parentId) {

@@ -18,6 +18,7 @@ const GROUP_OPTS = [
   { key: "dueDate",  label: "Due Date" },
   { key: "priority", label: "Priority" },
   { key: "effort",   label: "Effort" },
+  { key: "category", label: "Category" },
 ];
 
 function EffortAccuracyBar({ bucketTasks }) {
@@ -80,6 +81,9 @@ function TaskBucketView({
   loading,
   onStartProjectReview,
   onBulkAssign,
+  categories,
+  projectCategoryFilter,
+  setProjectCategoryFilter,
 }) {
   const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
 
@@ -120,6 +124,16 @@ function TaskBucketView({
             >
               ⊕ Expand All
             </ToolbarBtn>
+            {categories && categories.length > 0 && (
+              <select
+                value={projectCategoryFilter || ''}
+                onChange={e => setProjectCategoryFilter(e.target.value || null)}
+                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: projectCategoryFilter ? '#d4a844' : COLORS.text2, colorScheme: 'dark', cursor: 'pointer', outline: 'none' }}
+              >
+                <option value=''>All categories</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
             <ToolbarBtn
               onClick={onStartProjectReview}
               disabled={loading}

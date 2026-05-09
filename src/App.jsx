@@ -66,6 +66,7 @@ export default function GTDManager() {
           refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
   const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
+  const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
 
   // ── Auth ───────────────────────────────────────────────────────────────
   const { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink } = useSupabaseAuth();
@@ -143,6 +144,7 @@ export default function GTDManager() {
         if (t.location?.length) meta.push(`location:${t.location.join(",")}`);
         if (t.priority?.length) meta.push(`priority:${t.priority.join(",")}`);
         if (t.notes)            meta.push(`has-notes`);
+        if (t.category)         meta.push(`category:${t.category}`);
         if (t.recurrence) {
           const r = t.recurrence;
           const days = r.weekDays?.length
@@ -723,6 +725,8 @@ export default function GTDManager() {
     efforts,
     tagDisplay,
     categories,
+    projectCategoryFilter,
+    setProjectCategoryFilter,
   };
 
   return (
@@ -865,6 +869,9 @@ export default function GTDManager() {
                           loading={loading}
                           onStartProjectReview={startProjectReview}
                           onBulkAssign={bulkAssignToProject}
+                          categories={categories}
+                          projectCategoryFilter={projectCategoryFilter}
+                          setProjectCategoryFilter={setProjectCategoryFilter}
                         />
                       )}
                     </div>

@@ -64,8 +64,8 @@ function useInboxProcessing({
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null },
-        { id: actionId, text: nextAction || title, bucket: 'next', done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null },
+        { id: projectId, text: title || current.text, bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null, category: null },
+        { id: actionId, text: nextAction || title, bucket: 'next', done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, notes: null, category: null },
         ...prev,
       ]);
     } else if (type === 'someday') {

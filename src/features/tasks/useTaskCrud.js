@@ -63,14 +63,17 @@ function useTaskCrud({
       ]);
     } else {
       const childId = genId();
-      setTasks(prev => [
-        ...prev.map(t =>
-          t.id === projectParentId
-            ? { ...t, childIds: [...(t.childIds || []), childId] }
-            : t
-        ),
-        { id: childId, text, bucket: 'next', done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null },
-      ]);
+      setTasks(prev => {
+        const parent = prev.find(t => t.id === projectParentId);
+        return [
+          ...prev.map(t =>
+            t.id === projectParentId
+              ? { ...t, childIds: [...(t.childIds || []), childId] }
+              : t
+          ),
+          { id: childId, text, bucket: 'next', done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null, category: parent?.category ?? null },
+        ];
+      });
     }
     setAddText('');
   }, [addText, projectParentId, setTasks, setAddText]);

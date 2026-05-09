@@ -347,6 +347,7 @@ function useCallAI({
                   id: newId, text: title, bucket, done: false, created: Date.now(),
                   parentId: parent.id, priority: [], location, dueDate, effort,
                   actualEffort: null, deferUntil, notes: null, recurrence,
+                  category: parent.category ?? null,
                 };
                 workingTasks = [
                   ...workingTasks.map(t => t.id === parent.id
