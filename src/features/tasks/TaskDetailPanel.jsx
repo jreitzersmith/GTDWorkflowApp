@@ -298,6 +298,20 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
 
+          {/* Move to bucket */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Move to</span>
+            <select
+              value={task.bucket}
+              onChange={e => onUpdate(task.id, { bucket: e.target.value })}
+              style={{ ...fieldInput, flex: 1, fontSize: 12, colorScheme: 'dark' }}
+            >
+              {Object.entries(BUCKETS).filter(([k]) => k !== 'inboxHistory').map(([key, cfg]) => (
+                <option key={key} value={key}>{cfg.label}</option>
+              ))}
+            </select>
+          </div>
+
           <ProjectSelector
             taskId={task.id}
             parentId={task.parentId}
@@ -431,19 +445,6 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
           )}
         </div>
 
-        {/* Move to bucket */}
-        <div>
-          <div style={fieldLabel}>Move to</div>
-          <select
-            value={task.bucket}
-            onChange={e => onUpdate(task.id, { bucket: e.target.value })}
-            style={{ ...fieldInput, fontSize: 12 }}
-          >
-            {Object.entries(BUCKETS).filter(([k]) => k !== 'inboxHistory').map(([key, cfg]) => (
-              <option key={key} value={key}>{cfg.label}</option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* Footer actions */}
