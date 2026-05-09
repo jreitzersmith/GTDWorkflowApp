@@ -14,7 +14,7 @@ const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
 function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelected }) {
   const { onComplete, onDelete, onMove, onAskAI, onUpdateTask, onAssignToProject, onSkipRecurrence, onNavigate, onOpenDetail, onToggleCollapse, onToggleCollapseLevel } = useContext(TaskActionsContext);
-  const { currentBucket, allTasks, moveMenu, setMoveMenu, pendingAction, collapsedNodes, selectedTaskId, locations, efforts, tagDisplay } = useContext(TaskRowContext);
+  const { currentBucket, allTasks, moveMenu, setMoveMenu, pendingAction, collapsedNodes, selectedTaskId, locations, efforts, tagDisplay, categories } = useContext(TaskRowContext);
   const {
     hover, setHover,
     expanded, setExpanded,
@@ -118,7 +118,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
     setAssignTarget("__new__");
   };
 
-  const hasMetadata = taskPriority.length > 0 || taskLocation.length > 0 || taskDueDate || !!taskEffort || !!task.deferUntil;
+  const hasMetadata = taskPriority.length > 0 || taskLocation.length > 0 || taskDueDate || !!taskEffort || !!task.deferUntil || !!task.category;
 
   return (
     <div
@@ -208,6 +208,9 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
               {task.deferUntil && (
                 <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44` }}>⏰ {task.deferUntil}</span>
               )}
+              {task.category && (
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: "#d4a84422", color: "#d4a844", border: "1px solid #d4a84444" }}>◆ {task.category}</span>
+              )}
             </div>
           )}
           {/* Parent project link for Next Actions */}
@@ -242,6 +245,9 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
             ) : null}
             {task.deferUntil && (
               <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44`, whiteSpace: "nowrap" }}>⏰ {task.deferUntil}</span>
+            )}
+            {task.category && (
+              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: "#d4a84422", color: "#d4a844", border: "1px solid #d4a84444", whiteSpace: "nowrap" }}>◆ {task.category}</span>
             )}
           </div>
         )}

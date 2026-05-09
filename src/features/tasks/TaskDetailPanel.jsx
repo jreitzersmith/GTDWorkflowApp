@@ -233,7 +233,7 @@ RecurrenceEditor.propTypes = {
 
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
-function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
   const {
     titleDraft, setTitleDraft, saveTitle,
     notesDraft, setNotesDraft, saveNotes,
@@ -414,6 +414,21 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, onUpdate, onCompl
               })}
             </div>
           </div>
+
+          {/* Category */}
+          {(categories || []).length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Category</span>
+              <select
+                value={task.category || ''}
+                onChange={e => onUpdate(task.id, { category: e.target.value || null })}
+                style={{ ...fieldInput, width: 'auto', fontSize: 12, padding: '3px 6px', color: task.category ? '#d4a844' : undefined }}
+              >
+                <option value=''>—</option>
+                {(categories || []).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Move to bucket */}
@@ -458,6 +473,7 @@ TaskDetailPanel.propTypes = {
   allTasks:          PropTypes.arrayOf(taskShape).isRequired,
   locations:         PropTypes.arrayOf(PropTypes.string).isRequired,
   efforts:           PropTypes.arrayOf(PropTypes.string).isRequired,
+  categories:        PropTypes.arrayOf(PropTypes.string),
   onUpdate:          PropTypes.func.isRequired,
   onComplete:        PropTypes.func.isRequired,
   onDelete:          PropTypes.func.isRequired,

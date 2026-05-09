@@ -722,6 +722,7 @@ export default function GTDManager() {
     locations,
     efforts,
     tagDisplay,
+    categories,
   };
 
   return (
@@ -955,6 +956,7 @@ export default function GTDManager() {
                     allTasks={tasks}
                     locations={locations}
                     efforts={efforts}
+                    categories={categories}
                     onUpdate={updateTask}
                     onComplete={(id) => { completeTask(id); setSelectedTaskId(null); }}
                     onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
