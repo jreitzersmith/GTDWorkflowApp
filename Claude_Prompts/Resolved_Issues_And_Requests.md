@@ -29,3 +29,4 @@ One row per item: date · type · # · name · commit hash(es).
 | 2026-05-08 | Feature      | FR#18   | Gmail rate limiting — fetchWithBackoff + batchedAll               | 51062a9           |
 | 2026-05-09 | Feature      | FR#23   | Project categories Phase 1 — data layer + settings UI             | 681a46d           |
 | 2026-05-09 | Feature      | FR#23   | Project categories Phase 2 — detail panel dropdown + row chip     | 0bef2c8           |
+| 2026-05-09 | Feature      | FR#23   | Project categories Phase 3 — groupBy, Projects filter, AI context, child inheritance | 192683e |

@@ -67,10 +67,10 @@
 
 #### Data model expansions
 
-- FR#23 [GH#15] — Project categories (user-defined; filtering/grouping across buckets; Settings UI) — note: natural integration point with FR#28 in Project Review mode; category could scope the AI context to only that category's projects + children, significantly reducing token usage
+- ~~FR#23 [GH#15] — Project categories~~ — **done** (681a46d, 0bef2c8, 192683e):
   - ~~Phase 1 — data layer + settings UI~~ — **done** (681a46d): SQL migrations, supabase.js mappers, useAppSettings/useSettings category CRUD, CategoryManager component, Settings panel section, Supabase sync
   - ~~Phase 2 — TaskDetailPanel category dropdown + TaskRow category chip~~ — **done** (0bef2c8): category select in detail panel (hidden until categories exist); amber ◆ chip in both below/inline tag modes
-  - Phase 3 — Projects filter, Next Actions groupBy, AI context inclusion, child task inheritance
+  - ~~Phase 3 — Projects filter, Next Actions groupBy, AI context inclusion, child task inheritance~~ — **done** (192683e): getTaskContext adds category:X; groupByField + GROUP_OPTS get Category option; Projects toolbar gets amber filter select; ProjectTree filters at depth=0 via context; child tasks inherit parent category in useCallAI/useTaskCrud/useInboxProcessing
 - FR#10 [GH#16] — Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
 - FR#16 [GH#17] — Shopping list manager (new bucket/sidebar section)
 
