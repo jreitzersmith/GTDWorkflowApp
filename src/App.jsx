@@ -129,12 +129,50 @@ export default function GTDManager() {
 
   const getTaskContext = useCallback((allowedBuckets = null) => {
     const today = todayStr();
+    const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0);
+    const cutoff14 = new Date(todayDate); cutoff14.setDate(cutoff14.getDate() + 14);
+    const BUCKET_CAPS = { next: 75, someday: 40 };
     const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe" };
     const sections = Object.entries(bucketNames).filter(([k]) => !allowedBuckets || allowedBuckets.includes(k)).map(([k, label]) => {
       const items = tasks.filter(t => t.bucket === k && !t.done);
       if (!items.length) return `${label}: empty`;
-      const lines = items.map(t => {
+      const cap = BUCKET_CAPS[k];
+      let displayItems;
+      if (k === 'next') {
+        const dueSoon = items
+          .filter(t => t.dueDate && new Date(t.dueDate) <= cutoff14)
+          .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+        const dueSoonIds = new Set(dueSoon.map(t => t.id));
+        const rest = items
+          .filter(t => !dueSoonIds.has(t.id))
+          .sort((a, b) => b.created - a.created);
+        displayItems = [...dueSoon, ...rest.slice(0, Math.max(0, cap - dueSoon.length))];
+      } else {
+        displayItems = cap && items.length > cap
+          ? items.slice().sort((a, b) => b.created - a.created).slice(0, cap)
+          : items;
+      }
+      const omitted = items.length - displayItems.length;
+      // For Projects: reorder into depth-first tree order matching the sidebar; track depth for indentation
+      let orderedItems = displayItems;
+      const depthMap = new Map();
+      if (k === 'project') {
+        const byId = new Map(items.map(t => [t.id, t]));
+        const roots = displayItems.filter(t => !t.parentId || !byId.get(t.parentId));
+        const ordered = [];
+        const visit = (task, depth) => {
+          ordered.push(task);
+          depthMap.set(task.id, depth);
+          (task.childIds || []).forEach(cid => { const c = byId.get(cid); if (c && !c.done) visit(c, depth + 1); });
+        };
+        roots.forEach(t => visit(t, 0));
+        const seen = new Set(ordered.map(t => t.id));
+        displayItems.filter(t => !seen.has(t.id)).forEach(t => ordered.push(t));
+        orderedItems = ordered;
+      }
+      const lines = orderedItems.map(t => {
         const meta = [];
+        if (t.parentId)         meta.push(`parent:${t.parentId}`);
         if (t.dueDate)          meta.push(`due:${t.dueDate}${t.dueTime ? ' ' + t.dueTime : ''}`);
         if (t.originalDueDate)  meta.push(`original-due:${t.originalDueDate}`);
         if (t.completedDate)    meta.push(`completed:${t.completedDate}`);
@@ -153,18 +191,16 @@ export default function GTDManager() {
           const until = r.until ? `:${r.until}` : "";
           meta.push(`recur:${r.frequency}:${r.interval || 1}${days}${until}`);
         }
+        const indent = depthMap.has(t.id) ? '  '.repeat(depthMap.get(t.id)) : '';
         const idTag = `[id:${t.id}] `;
-        return meta.length ? `- ${idTag}${t.text} [${meta.join("] [")}]` : `- ${idTag}${t.text}`;
+        return meta.length ? `${indent}- ${idTag}${t.text} [${meta.join("] [")}]` : `${indent}- ${idTag}${t.text}`;
       });
-      return `${label} (${items.length}):\n${lines.join("\n")}`;
+      return `${label} (${items.length}):\n${lines.join("\n")}${omitted ? `\n[… ${omitted} older items omitted]` : ''}`;
     });
     // Append upcoming calendar events (next 14 days) when calendar is connected
     let calSection = '';
     if (calendarEnabled && calendarEvents.length > 0) {
-      const todayDate = new Date();
-      todayDate.setHours(0, 0, 0, 0);
-      const horizon = new Date(todayDate);
-      horizon.setDate(horizon.getDate() + 14);
+      const horizon = cutoff14;
       const upcoming = calendarEvents
         .filter(ev => {
           const s = calEventStart(ev);
