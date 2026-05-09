@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#5** · Code Quality — **CQ#7** · Feature Requests — **FR#30**
+> **Last used numbers:** Known Issues — **Issue#5** · Code Quality — **CQ#7** · Feature Requests — **FR#31**
 
 ---
 
@@ -63,9 +63,10 @@
 - FR#22 [GH#14] — Show linked tasks in Calendar event detail
 - FR#26 — Connect Google Drive (browse, search, and attach Drive files to tasks or coach context)
 - FR#27 — Connect Google Sheets and Docs (read/write Sheets for data capture; read Docs for coach context)
-- FR#28 — Mode-aware task context filtering — pass only relevant buckets per coach mode (e.g. process mode gets Inbox + Projects only; projectReview gets Projects only; chat gets everything)
+- ~~FR#28 — Mode-aware task context filtering~~ — **done** (5e91b81): MODE_CONTEXT_BUCKETS map in useCallAI; process→inbox+project, projectReview/projectMetadata→project only, calendarEvent→next+project; getTaskContext accepts allowedBuckets param; chat/review/dump unchanged (all buckets)
 - FR#29 — Per-bucket task context caps — limit high-accumulation buckets (Someday/Maybe, Next Actions) to e.g. 50 most-recent items in the AI context, with a note on how many were omitted
 - FR#30 — Lazy task context — omit task list from system prompt by default; expose it as a tool the AI can call when it needs it, eliminating per-call token cost for simple interactions
+- ~~FR#31 — Last-call inspector in Usage panel~~ — **done** (5e91b81): lastInputLog state in useCallAI captures system prompt text, user message, input token count, mode, and timestamp on each call; collapsible "Last Call" section in UsagePanel shows all fields with expandable panes and a copy button
 
 #### Data model expansions
 

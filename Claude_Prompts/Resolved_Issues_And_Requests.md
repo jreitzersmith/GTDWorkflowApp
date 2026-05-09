@@ -32,3 +32,5 @@ One row per item: date · type · # · name · commit hash(es).
 | 2026-05-09 | Feature      | FR#23   | Project categories Phase 3 — groupBy, Projects filter, AI context, child inheritance | 192683e |
 | 2026-05-09 | Code Quality | CQ#6    | Task detail panel dropdown dark text (color: undefined override + colorScheme: dark)  | 34acae2, 59968bb |
 | 2026-05-09 | Code Quality | CQ#7    | Task detail panel field order (Move to, Orig Due, Defer, Category positions)          | 13873e1, c1316aa |
+| 2026-05-09 | Feature      | FR#28   | Mode-aware task context filtering (MODE_CONTEXT_BUCKETS; allowedBuckets param)        | 5e91b81           |
+| 2026-05-09 | Feature      | FR#31   | Last-call inspector in Usage panel (lastInputLog; system prompt + tokens)             | 5e91b81           |
