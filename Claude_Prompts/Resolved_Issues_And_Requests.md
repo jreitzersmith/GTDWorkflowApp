@@ -35,3 +35,8 @@ One row per item: date · type · # · name · commit hash(es).
 | 2026-05-09 | Feature      | FR#28   | Mode-aware task context filtering (MODE_CONTEXT_BUCKETS; allowedBuckets param)        | 5e91b81           |
 | 2026-05-09 | Feature      | FR#31   | Last-call inspector in Usage panel (lastInputLog; system prompt + tokens)             | 5e91b81           |
 | 2026-05-09 | Feature      | FR#29   | Per-bucket AI context caps + parentId + hierarchical project order                    | e8df369           |
+| 2026-05-09 | Feature      | FR#22   | Linked tasks panel in Calendar event detail                       | 4c78c0b           |
+| 2026-05-09 | Bug Fix      | Issue#6 | calendarEventId persisted to Supabase (taskToDb/dbToTask + ALTER TABLE) | 4c78c0b     |
+| 2026-05-09 | Bug Fix      | Issue#7 | extractAction positional capture bug — due date + recurrence lost for non-project types | 5b6f0bc |
+| 2026-05-09 | Bug Fix      | Issue#8 | Calendar month view header/cell column misalignment (unified grid) | 8bdb90e          |
+| 2026-05-09 | Feature      | FR#36   | Calendar month view equal column widths + event chip 3-line clamp | 8bdb90e          |

@@ -5941,3 +5941,107 @@ const hasMetadata = task.dueDate || task.effort || task.location?.length
   &lt;/span&gt;
 )}</code></pre>
 </section>
+
+<section id="snippet-getLinkedTasks">
+  <h2>getLinkedTasks — calendarApi.js</h2>
+  <p><a href="project-summary.html#fr22-linked-tasks">← Back to FR#22</a></p>
+  <pre><code class="language-javascript">
+// Returns every task whose calendarEventId matches the given calendar event.
+// Also checks ev.recurringEventId so recurring instances share linked tasks
+// with their parent series.
+function getLinkedTasks(tasks, ev) {
+  if (!ev || !tasks) return [];
+  return tasks.filter(t =>
+    t.calendarEventId && (
+      t.calendarEventId === ev.id ||
+      // Recurring events: the instance has its own id but also carries the
+      // series parent id in recurringEventId — match on either.
+      (ev.recurringEventId && t.calendarEventId === ev.recurringEventId)
+    )
+  );
+}
+  </code></pre>
+</section>
+
+<section id="snippet-extractAction-fix">
+  <h2>extractAction fix — taskUtils.jsx (Issue#7)</h2>
+  <p><a href="project-summary.html#issue7-extractAction">← Back to Issue#7</a></p>
+  <pre><code class="language-javascript">
+function extractAction(text) {
+  // The regex splits the action line into positional groups:
+  //   m[1] = type (next/project/someday/waiting/delete)
+  //   m[2] = first segment after type (title for most types; project name for 'project')
+  //   m[3] = second segment (may be a field like "due:2026-05-09" for non-project types,
+  //           or the first next action for 'project' type)
+  //   m[4] = all remaining pipe-separated segments
+  const m = text.match(
+    /→ACTION:(next|project|someday|waiting|delete)\|?([^|
+]*)?\|?([^|
+]*)?((?:\|[^
+]*)*)?/
+  );
+  if (!m) return null;
+
+  const isProjectType = m[1] === 'project';
+  const seg3 = (m[3] || "").trim();
+
+  // For 'project': seg3 is the first next action — leave it alone.
+  // For all other types: seg3 may be a field (due/defer/recur) that landed
+  // in the wrong positional slot. Fold it back into extras so field searches work.
+  const extras = isProjectType
+    ? (m[4] || "")
+    : (seg3 ? '|' + seg3 : '') + (m[4] || "");
+
+  const dueMatch   = extras.match(/\|due:(\d{4}-\d{2}-\d{2})/);
+  const deferMatch = extras.match(/\|defer:(\d{4}-\d{2}-\d{2})/);
+  const recurMatch = extras.match(/\|recur:([^|]+)/);
+
+  return {
+    type:       m[1],
+    title:      (m[2] || "").trim(),
+    nextAction: isProjectType ? seg3 : '',      // only meaningful for 'project'
+    dueDate:    dueMatch   ? dueMatch[1]   : null,
+    deferUntil: deferMatch ? deferMatch[1] : null,
+    recurrence: recurMatch ? parseRecurrenceValue(recurMatch[1].trim()) : null,
+  };
+}
+  </code></pre>
+</section>
+
+<section id="snippet-eventchip-lineclamp">
+  <h2>EventChip line-clamp — CalendarEventDisplay.jsx (FR#36)</h2>
+  <p><a href="project-summary.html#issue8-fr36-calendar-month">← Back to Issue#8 / FR#36</a></p>
+  <pre><code class="language-javascript">
+function EventChip({ ev, isSelected, onClick }) {
+  const allDay = isAllDayEvent(ev);
+  const timeStr = allDay ? '' : fmtCalTime(ev) + ' ';
+  return (
+    &lt;div
+      onClick={e => { e.stopPropagation(); onClick(ev); }}
+      title={ev.summary || '(No title)'}   // tooltip still shows the full title
+      style={{
+        fontSize: 10, padding: '1px 5px', borderRadius: 3,
+        background: isSelected ? COLORS.calendar : COLORS.calendar + '33',
+        color: isSelected ? '#fff' : COLORS.calendar,
+        border: `1px solid ${COLORS.calendar}55`,
+        cursor: 'pointer', lineHeight: 1.5, marginBottom: 1,
+
+        // Cap width so chips don't stretch across very wide columns
+        maxWidth: 180,
+
+        // Multi-line ellipsis: wrap text, show at most 3 lines,
+        // then add "…" at the last complete word on line 3.
+        display: '-webkit-box',
+        WebkitLineClamp: 3,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        overflowWrap: 'break-word',
+        wordBreak: 'normal',  // never split a word in the middle
+      }}
+    &gt;
+      {timeStr}{ev.summary || '(No title)'}
+    &lt;/div&gt;
+  );
+}
+  </code></pre>
+</section>

@@ -3614,3 +3614,152 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
     intermediate component.
   </div>
 </section>
+
+<section id="fr22-linked-tasks">
+  <h2>FR#22 — Linked Tasks in Calendar Event Detail</h2>
+  <p>
+    When you click a Google Calendar event in the Calendar view, the detail panel
+    now shows a "Linked Tasks" section listing every GTD task that has been
+    associated with that event. Clicking any task in the list opens the Task Detail
+    Panel in-place — you stay in the Calendar view the whole time.
+  </p>
+  <h3>Design decision</h3>
+  <p>
+    The link is stored as a <code>calendarEventId</code> field on each task.
+    Matching is done by a pure helper function (<code>getLinkedTasks</code>) that
+    also checks the event's <code>recurringEventId</code> so recurring-event
+    instances share the same linked tasks as their parent series.
+    The matched tasks are computed once with <code>useMemo</code> in
+    <code>CalendarManagementView</code> and threaded down as props.
+  </p>
+  <h3>React concepts demonstrated</h3>
+  <div class="commit-lesson"><strong>useMemo — cached derived data</strong>:
+    <code>useMemo</code> runs a function only when its dependencies change. Here
+    it recomputes the list of linked tasks only when <code>tasks</code> or
+    <code>selectedEvent</code> changes — not on every render. Think of it as
+    a computed property that caches its result.
+  </div>
+  <div class="commit-lesson"><strong>Prop drilling</strong>:
+    Data flows from parent to child through props. <code>linkedTasks</code> and
+    <code>onOpenTask</code> had to be passed through
+    <code>CalendarManagementView → CalendarMonthView → EventDetailPanel</code>.
+    Each intermediate component receives and forwards the props it doesn't use
+    itself — this is called prop drilling and is fine for shallow trees.
+  </div>
+  <p>Commits: <a href="project-commits.html#commit-4c78c0b">4c78c0b</a></p>
+</section>
+
+<section id="issue6-calendarEventId">
+  <h2>Issue#6 — calendarEventId Persisted to Supabase</h2>
+  <p>
+    After a task was linked to a Google Calendar event, the link was lost on the
+    next page reload. The calendar sync section would re-show the task as
+    "unlinked" even though it had just been connected.
+  </p>
+  <h3>Root cause</h3>
+  <p>
+    The <code>calendarEventId</code> field existed only in React's in-memory
+    state. The two mapper functions that translate between the app's camelCase
+    objects and Supabase's snake_case columns — <code>taskToDb</code> and
+    <code>dbToTask</code> — both omitted it. The Supabase table also lacked
+    the column entirely. After a real-time sync the field was simply gone.
+  </p>
+  <h3>Fix</h3>
+  <p>
+    Added <code>calendar_event_id</code> to both mappers and ran an
+    <code>ALTER TABLE … ADD COLUMN IF NOT EXISTS calendar_event_id TEXT</code>
+    migration directly in the Supabase SQL Editor.
+  </p>
+  <div class="commit-lesson"><strong>Data mapper pattern</strong>:
+    Supabase uses snake_case column names; JavaScript conventionally uses
+    camelCase. Rather than scatter the translation everywhere, two mapper
+    functions (<code>taskToDb</code> / <code>dbToTask</code>) act as a
+    translation layer at the API boundary. Adding a new field means updating
+    both mappers — and the database schema.
+  </div>
+  <p>Commits: <a href="project-commits.html#commit-4c78c0b">4c78c0b</a></p>
+</section>
+
+<section id="issue7-extractAction">
+  <h2>Issue#7 — Add &amp; Ask AI: Due Date and Recurrence Not Saved</h2>
+  <p>
+    When a task was created via "Add &amp; Ask AI" and the AI correctly identified
+    a due date or recurrence from the task text, the created task was saved
+    without either field.
+  </p>
+  <h3>Root cause — three layers</h3>
+  <p>
+    The AI's reply ends with an action line like
+    <code>→ACTION:next|Buy milk|due:2026-05-09|recur:monthly:1</code>.
+    A regex in <code>extractAction</code> parsed this into positional capture
+    groups. For non-project action types the due/defer/recur fields landed in
+    capture group <code>m[3]</code>, but the code only searched the later
+    <code>m[4]</code> (extras) group — so those fields were silently dropped.
+    Even if parsing had worked, <code>handleConfirmMove</code> never read the
+    <code>recurrence</code> field from the parsed result. And the process-mode
+    system prompt didn't document that recurrence should appear in the action
+    line at all, so the AI rarely included it.
+  </p>
+  <h3>Fix</h3>
+  <p>
+    For non-project action types, <code>m[3]</code> is now folded back into the
+    extras string before field extraction. <code>handleConfirmMove</code>
+    destructures and applies <code>recurrence</code>. The system prompt now
+    documents the <code>|recur:FREQ:N[:DAYS]</code> field. Five regression tests
+    were added.
+  </p>
+  <div class="commit-lesson"><strong>Regex capture groups</strong>:
+    A regex like <code>/(a)(b)(c)/</code> stores what each pair of parentheses
+    matched into numbered slots (<code>m[1]</code>, <code>m[2]</code>,
+    <code>m[3]</code>). When the format can vary — optional fields, different
+    numbers of pipe-separated segments — positional capture groups become
+    fragile. The fix treats everything after the title as a single string and
+    searches it with targeted sub-patterns.
+  </div>
+  <p>Commits: <a href="project-commits.html#commit-5b6f0bc">5b6f0bc</a></p>
+</section>
+
+<section id="issue8-fr36-calendar-month">
+  <h2>Issue#8 + FR#36 — Calendar Month View: Column Alignment and Equal Widths</h2>
+  <p>
+    Two related visual bugs in the month view: the day-name headers (Sun–Sat)
+    were misaligned with the day columns beneath them, and days without events
+    appeared narrower than days with long event titles.
+  </p>
+  <h3>Issue#8 — header/cell misalignment</h3>
+  <p>
+    The header row and the day-cell grid were two <em>separate</em> CSS grid
+    containers. Each had its own column-sizing context, so a long event title
+    in one column expanded only the lower grid. The fix merged them into one
+    unified grid so all rows share the same column tracks.
+  </p>
+  <h3>FR#36 — equal column widths + event chip line-clamp</h3>
+  <p>
+    CSS <code>1fr</code> is shorthand for <code>minmax(auto, 1fr)</code>. The
+    <code>auto</code> minimum means a column can't shrink below its content's
+    natural size — a column with a long event title grows wider than an empty
+    one. Switching to <code>minmax(135px, 1fr)</code> forces a hard minimum and
+    equal distribution.
+  </p>
+  <p>
+    Event chips now wrap across up to three lines using CSS
+    <code>-webkit-line-clamp: 3</code>. The browser automatically appends
+    <code>…</code> at the last complete word boundary on line three — no
+    mid-word splits. A <code>maxWidth</code> of 180 px prevents chips from
+    becoming excessively wide on large monitors.
+  </p>
+  <div class="commit-lesson"><strong>CSS Grid track sizing — minmax()</strong>:
+    <code>minmax(min, max)</code> sets the lower and upper bounds for a grid
+    column's width. <code>1fr</code> (one "fraction unit") divides the available
+    space equally — but only after each column's minimum is satisfied. Using
+    <code>0</code> as the minimum removes any content-driven floor;
+    using a pixel value (like <code>135px</code>) sets an explicit floor.
+  </div>
+  <div class="commit-lesson"><strong>CSS line-clamp</strong>:
+    <code>-webkit-line-clamp: N</code> combined with
+    <code>display: -webkit-box</code> and <code>overflow: hidden</code> truncates
+    multi-line text to N lines and appends an ellipsis. The browser respects word
+    boundaries automatically — it never cuts a word in half.
+  </div>
+  <p>Commits: <a href="project-commits.html#commit-8bdb90e">8bdb90e</a></p>
+</section>

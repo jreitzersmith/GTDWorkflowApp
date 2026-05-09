@@ -2650,3 +2650,84 @@
     phases complete. Added Phase 3 entry to <code>Resolved_Issues_And_Requests.md</code>.
   </td>
 </tr>
+
+<tr id="commit-f73b097">
+  <td><code>f73b097</code></td>
+  <td>docs</td>
+  <td>docs: defer mid-testing issues rule in AI_Pair_Programming.md</td>
+  <td>
+    Added a "Defer during active testing" rule to the Backlog management section
+    of <code>AI_Pair_Programming.md</code>. New issues raised while Steps 5–6 are
+    in progress are logged immediately but not investigated; after the current work
+    is committed and documented Claude surfaces those items and asks how to proceed.
+  </td>
+</tr>
+<tr id="commit-4c78c0b">
+  <td><code>4c78c0b</code></td>
+  <td>feat/fix</td>
+  <td>FR#22 linked tasks in event detail + Issue#6 calendarEventId persistence</td>
+  <td>
+    <strong>FR#22</strong> — Clicking a Google Calendar event in the Calendar view
+    now shows a "Linked Tasks" section listing every GTD task whose
+    <code>calendarEventId</code> matches that event. Clicking any listed task opens
+    the Task Detail Panel in-place without leaving the Calendar view.<br><br>
+    Implementation: <code>getLinkedTasks(tasks, ev)</code> added to
+    <code>calendarApi.js</code> (also matches recurring event parent IDs);
+    <code>LinkedTasksSection</code> component added to
+    <code>CalendarEventDisplay.jsx</code>; <code>linkedTasks</code> and
+    <code>onOpenTask</code> props threaded from <code>CalendarManagementView</code>
+    through all three view components into <code>EventDetailPanel</code>. An
+    8-test suite was added to <code>calendarApi.test.js</code>.<br><br>
+    <strong>Issue#6</strong> — <code>calendarEventId</code> was never written to
+    or read from Supabase, so every page reload wiped the link between a task and
+    its calendar event. Fixed by adding <code>calendar_event_id</code> to
+    <code>taskToDb</code> and <code>dbToTask</code> in <code>supabase.js</code>,
+    and adding the column via <code>ALTER TABLE</code> migration in
+    <code>tasks_schema.sql</code>.
+  </td>
+</tr>
+<tr id="commit-5b6f0bc">
+  <td><code>5b6f0bc</code></td>
+  <td>fix</td>
+  <td>Issue#7 extractAction fails to parse due date and recurrence (non-project types)</td>
+  <td>
+    When the AI processed an inbox item via "Add &amp; Ask AI" and included a due
+    date or recurrence in its action line (e.g.
+    <code>→ACTION:next|Buy milk|due:2026-05-09|recur:monthly:1</code>), the created
+    task was saved without those fields.<br><br>
+    <strong>Root cause</strong>: the regex in <code>extractAction</code> captured
+    pipe-delimited segments positionally into <code>m[2]</code>, <code>m[3]</code>,
+    and <code>m[4]</code>. For non-project action types, the due/defer/recur fields
+    land in <code>m[3]</code> but the code only searched <code>m[4]</code>
+    (extras). Fix: detect whether the action type is <code>project</code>; for all
+    other types fold <code>m[3]</code> back into extras so all fields are found
+    regardless of position. Three-layer fix: (1) <code>extractAction</code> in
+    <code>taskUtils.jsx</code>, (2) <code>handleConfirmMove</code> in
+    <code>useInboxProcessing.js</code> now passes recurrence to created tasks,
+    (3) the process-mode system prompt now documents the recurrence field.
+    Five new tests added to <code>taskUtils.test.js</code> including a direct
+    regression case.
+  </td>
+</tr>
+<tr id="commit-8bdb90e">
+  <td><code>8bdb90e</code></td>
+  <td>fix/feat</td>
+  <td>Issue#8 month view alignment + FR#36 equal column widths and event chip line-clamp</td>
+  <td>
+    <strong>Issue#8</strong> — The day-name header row (Sun–Sat) was a separate
+    CSS grid from the day-cell grid below it. Each had its own column-sizing
+    context, so a long event title in one column would widen only the lower grid,
+    causing the headers to drift out of sync. Fix: merged both grids into one
+    unified grid so headers and cells share the same column tracks.<br><br>
+    <strong>FR#36</strong> — Two further month-view improvements:
+    <em>Equal column widths</em> — CSS <code>1fr</code> is actually
+    <code>minmax(auto, 1fr)</code>, meaning a column expands to its content's
+    minimum size. Days with long event titles were wider than empty days. Fixed
+    by switching to <code>minmax(135px, 1fr)</code>, which sets a hard minimum
+    per column and forces equal distribution.
+    <em>Event chip line-clamp</em> — Event titles are now allowed to wrap across
+    up to three lines. After line three the browser appends <code>…</code> at
+    the last complete word boundary (no mid-word splits). A <code>maxWidth</code>
+    of 180 px prevents chips from stretching excessively on wide monitors.
+  </td>
+</tr>
