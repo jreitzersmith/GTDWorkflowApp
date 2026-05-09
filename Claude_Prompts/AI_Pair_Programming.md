@@ -95,6 +95,12 @@ After placing the entry, update the **Last used numbers** line at the top of the
 
 **Triage on report.** When John says something like "there's an issue", "something isn't behaving correctly", or "I need X", immediately attempt to categorise it using the table above. If the category is ambiguous, ask one clarifying question before recording. Once the category is confirmed, add the entry to `Known_Issues_And_Requests.md` with the next available number and update the Last used numbers line.
 
+**Defer during active testing.** If a new Issue / CQ / FR arrives while testing is already in progress (Steps 5–6 of an open feature), evaluate whether it is directly related to what is being tested:
+- **Directly related** (e.g. the bug surfaces because of the change under test): address it immediately as part of the current cycle.
+- **Not directly related**: log it in `Known_Issues_And_Requests.md` as normal, but do not investigate or propose changes. Acknowledge the log to John and resume the current testing cycle.
+
+Once the in-progress work has been confirmed, committed, and documented (Steps 6–8 complete), surface any issues logged that session and ask John whether to tackle those first or review the full outstanding backlog before picking the next item.
+
 ---
 
 ## File edit rules for App.jsx
