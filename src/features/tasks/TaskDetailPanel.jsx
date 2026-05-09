@@ -319,6 +319,12 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
             onReassignProject={onReassignProject}
           />
 
+          <OriginalDueDateField
+            taskId={task.id}
+            originalDueDate={task.originalDueDate}
+            onUpdate={onUpdate}
+          />
+
           {/* Due date */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
             <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Due</span>
@@ -330,11 +336,16 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
             />
           </div>
 
-          <OriginalDueDateField
-            taskId={task.id}
-            originalDueDate={task.originalDueDate}
-            onUpdate={onUpdate}
-          />
+          {/* Defer until */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Defer</span>
+            <input
+              type="date"
+              value={task.deferUntil || ""}
+              onChange={e => onUpdate(task.id, { deferUntil: e.target.value || null })}
+              style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
+            />
+          </div>
 
           {/* Completed date — read-only */}
           {task.completedDate && (
@@ -360,17 +371,6 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
           })()}
 
           <RecurrenceEditor rec={task.recurrence || null} taskId={task.id} onUpdate={onUpdate} />
-
-          {/* Defer until */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Defer</span>
-            <input
-              type="date"
-              value={task.deferUntil || ""}
-              onChange={e => onUpdate(task.id, { deferUntil: e.target.value || null })}
-              style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
-            />
-          </div>
 
           {/* Effort (estimated) */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
@@ -409,6 +409,21 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
             })()}
           </div>
 
+          {/* Category */}
+          {(categories || []).length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Category</span>
+              <select
+                value={task.category || ''}
+                onChange={e => onUpdate(task.id, { category: e.target.value || null })}
+                style={{ ...fieldInput, width: 'auto', fontSize: 12, padding: '3px 6px', colorScheme: 'dark', color: task.category ? '#d4a844' : COLORS.text }}
+              >
+                <option value=''>—</option>
+                {(categories || []).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          )}
+
           {/* Location tags */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12 }}>
             <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, paddingTop: 2 }}>Location</span>
@@ -428,21 +443,6 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
               })}
             </div>
           </div>
-
-          {/* Category */}
-          {(categories || []).length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Category</span>
-              <select
-                value={task.category || ''}
-                onChange={e => onUpdate(task.id, { category: e.target.value || null })}
-                style={{ ...fieldInput, width: 'auto', fontSize: 12, padding: '3px 6px', colorScheme: 'dark', color: task.category ? '#d4a844' : COLORS.text }}
-              >
-                <option value=''>—</option>
-                {(categories || []).map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          )}
         </div>
 
       </div>
