@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#4** · Code Quality — **CQ#5** · Feature Requests — **FR#25**
+> **Last used numbers:** Known Issues — **Issue#5** · Code Quality — **CQ#5** · Feature Requests — **FR#30**
 
 ---
 
@@ -9,7 +9,8 @@
 - [x] ~~Issue#1 — Email Rules tab re-fetches on every visit~~ — **fixed** (c3fb23e): lifted `gmailLabels`/`gmailFilters` state into `EmailManagementView`; tab opens instantly after first load
 - [ ] Issue#2 [GH#1] — Brain Dump doesn't auto-add items to inbox — user has to copy manually (Chat mode can create tasks via `→ACTION:create`, but Brain Dump mode is not wired up)
 - [ ] Issue#3 [GH#2] — Weekly Review doesn't check off steps as completed
-- [ ] Issue#4 [GH#3] — No export or sync with Todoist
+- ~~Issue#4 [GH#3] — No export or sync with Todoist~~ — **moved to FR#9**
+- [ ] Issue#5 — Emails pulled from Gmail are cut short (body text truncated before end of message)
 
 ---
 
@@ -54,19 +55,27 @@
 
 #### Integrations / data
 
-- FR#25 [GH#11] — Email rules persistence (Supabase + localStorage optimistic cache; well-scoped)
+- ~~FR#25 [GH#11] — Email rules persistence (Supabase + localStorage optimistic cache; well-scoped)~~ — **done** (a2bb532): `useGmailRulesCache` hook; labels + filters cached in localStorage; instant load on reload
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
-- FR#18 [GH#13] — Gmail rate limiting / backoff
+- ~~FR#18 [GH#13] — Gmail rate limiting / backoff~~ — **done** (51062a9): `fetchWithBackoff` + `batchedAll`; inbox/search now fire 10 requests per chunk with 429 retry
 - FR#22 [GH#14] — Show linked tasks in Calendar event detail
+- FR#26 — Connect Google Drive (browse, search, and attach Drive files to tasks or coach context)
+- FR#27 — Connect Google Sheets and Docs (read/write Sheets for data capture; read Docs for coach context)
+- FR#28 — Mode-aware task context filtering — pass only relevant buckets per coach mode (e.g. process mode gets Inbox + Projects only; projectReview gets Projects only; chat gets everything)
+- FR#29 — Per-bucket task context caps — limit high-accumulation buckets (Someday/Maybe, Next Actions) to e.g. 50 most-recent items in the AI context, with a note on how many were omitted
+- FR#30 — Lazy task context — omit task list from system prompt by default; expose it as a tool the AI can call when it needs it, eliminating per-call token cost for simple interactions
 
 #### Data model expansions
 
-- FR#23 [GH#15] — Project categories (user-defined; filtering/grouping across buckets; Settings UI)
+- FR#23 [GH#15] — Project categories (user-defined; filtering/grouping across buckets; Settings UI) — note: natural integration point with FR#28 in Project Review mode; category could scope the AI context to only that category's projects + children, significantly reducing token usage
+  - ~~Phase 1 — data layer + settings UI~~ — **done** (681a46d): SQL migrations, supabase.js mappers, useAppSettings/useSettings category CRUD, CategoryManager component, Settings panel section, Supabase sync
+  - Phase 2 — TaskDetailPanel category dropdown + TaskRow category chip
+  - Phase 3 — Projects filter, Next Actions groupBy, AI context inclusion, child task inheritance
 - FR#10 [GH#16] — Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
 - FR#16 [GH#17] — Shopping list manager (new bucket/sidebar section)
 
 #### Platform / reach
 
-- FR#9 [GH#18] — Todoist export / two-way sync
+- FR#9 [GH#18] — Todoist export / two-way sync (previously Issue#4 / GH#3)
 - ~~FR#11 — Multi-device sync~~ — **done (Supabase)**
 - FR#20 [GH#19] — Mobile layout (significant; requires media queries throughout)
