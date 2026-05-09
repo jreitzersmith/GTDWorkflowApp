@@ -61,6 +61,7 @@ function taskToDb(task, userId) {
     parent_id:     task.parentId      ?? null,
     child_ids:     task.childIds      ?? [],
     sort_order:    task.sortOrder     ?? 0,
+    category:      task.category      ?? null,
     updated_at:    new Date().toISOString(),
   };
 }
@@ -83,6 +84,7 @@ function dbToTask(row) {
     recurrence:   row.recurrence    ?? null,
     childIds:     row.child_ids     ?? [],
     sortOrder:    row.sort_order    ?? 0,
+    category:     row.category      ?? null,
   };
   if (row.parent_id) t.parentId = row.parent_id;
   return t;

@@ -11,10 +11,10 @@ import { DEFAULT_EFFORTS } from '../features/settings/useAppSettings.js';
  * @param {{
  *   authUser: object|null,
  *   tasks: Array, setTasks: Function,
- *   locations: Array, efforts: Array, calibrationOverrides: object,
+ *   locations: Array, efforts: Array, calibrationOverrides: object, categories: Array,
  *   skippedCalendarIds: Set, seenCalendarEventIds: Set,
  *   recurringAcknowledgedMap: Map, recurringReviewDays: number,
- *   setLocations: Function, setEfforts: Function, setCalibrationOverrides: Function,
+ *   setLocations: Function, setEfforts: Function, setCalibrationOverrides: Function, setCategories: Function,
  *   setSkippedCalendarIds: Function, setSeenCalendarEventIds: Function,
  *   setRecurringAcknowledgedMap: Function, setRecurringReviewDays: Function,
  *   setGmailQueue: Function,
@@ -24,9 +24,9 @@ import { DEFAULT_EFFORTS } from '../features/settings/useAppSettings.js';
 function useSupabaseSync({
   authUser,
   tasks, setTasks,
-  locations, efforts, calibrationOverrides,
+  locations, efforts, calibrationOverrides, categories,
   skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
-  setLocations, setEfforts, setCalibrationOverrides,
+  setLocations, setEfforts, setCalibrationOverrides, setCategories,
   setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
   setGmailQueue,
 }) {
@@ -100,6 +100,7 @@ function useSupabaseSync({
           // Server wins — overwrite local state
           if (Array.isArray(data.locations)) setLocations([...data.locations].sort((a, b) => a.localeCompare(b)));
           if (Array.isArray(data.efforts)) setEfforts(data.efforts);
+          if (Array.isArray(data.categories)) setCategories([...data.categories].sort((a, b) => a.localeCompare(b)));
           if (data.calibration_overrides && typeof data.calibration_overrides === 'object')
             setCalibrationOverrides(data.calibration_overrides);
           if (Array.isArray(data.cal_skipped_tasks)) setSkippedCalendarIds(new Set(data.cal_skipped_tasks));
@@ -113,11 +114,13 @@ function useSupabaseSync({
           const localEfforts   = (() => { try { return JSON.parse(localStorage.getItem('gtd_efforts')   || 'null') || DEFAULT_EFFORTS; } catch { return DEFAULT_EFFORTS; } })();
           const localCalib     = (() => { try { return JSON.parse(localStorage.getItem('gtd_effort_calibration') || 'null') || {}; } catch { return {}; } })();
           const localSkipped   = (() => { try { return JSON.parse(localStorage.getItem('gtd_cal_skipped') || '[]'); } catch { return []; } })();
+          const localCategories = (() => { try { return JSON.parse(localStorage.getItem('gtd_categories') || 'null') || []; } catch { return []; } })();
           supabase.from('user_settings').insert({
             user_id: authUser.id,
             locations: localLocations,
             efforts: localEfforts,
             calibration_overrides: localCalib,
+            categories: localCategories,
             cal_skipped_tasks: localSkipped,
             cal_seen_events: [],
           }).then(({ error: e2 }) => {
@@ -184,6 +187,7 @@ function useSupabaseSync({
           locations,
           efforts,
           calibration_overrides: calibrationOverrides,
+          categories,
           cal_skipped_tasks: [...skippedCalendarIds],
           cal_seen_events:   [...seenCalendarEventIds],
           cal_recurring_acknowledged: [...recurringAcknowledgedMap.entries()],
@@ -196,7 +200,7 @@ function useSupabaseSync({
         });
     }, 1500);
     return () => clearTimeout(settingsDebounceRef.current);
-  }, [locations, efforts, calibrationOverrides, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fallback: keep localStorage in sync for unauthenticated sessions
   useEffect(() => {

@@ -82,3 +82,6 @@ CREATE INDEX IF NOT EXISTS tasks_parent_idx  ON public.tasks(parent_id);
 
 -- Added with Google Calendar feature (2026-05-04): stores HH:MM time for calendar events
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS due_time TEXT;
+
+-- Added with project categories feature (FR#23, 2026-05-09): user-defined task categories
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS category TEXT;

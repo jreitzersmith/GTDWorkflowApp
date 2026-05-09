@@ -17,6 +17,7 @@ function useSettings({
   locations, setLocations,
   efforts, setEfforts,
   setCalibrationOverrides,
+  categories, setCategories,
 }) {
   // ── Locations ────────────────────────────────────────────────────────────
 
@@ -78,6 +79,32 @@ function useSettings({
     })));
   }, [setEfforts, setTasks]);
 
+  // ── Categories ───────────────────────────────────────────────────────────
+
+  const addCategory = useCallback((name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setCategories(prev => prev.includes(trimmed) ? prev : [...prev, trimmed].sort((a, b) => a.localeCompare(b)));
+  }, [setCategories]);
+
+  const renameCategory = useCallback((oldName, newName) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    setCategories(prev => prev.map(c => c === oldName ? trimmed : c).sort((a, b) => a.localeCompare(b)));
+    setTasks(prev => prev.map(t => ({
+      ...t,
+      category: t.category === oldName ? trimmed : t.category,
+    })));
+  }, [setCategories, setTasks]);
+
+  const removeCategory = useCallback((name, replaceName) => {
+    setCategories(prev => prev.filter(c => c !== name));
+    setTasks(prev => prev.map(t => {
+      if (t.category !== name) return t;
+      return { ...t, category: replaceName || null };
+    }));
+  }, [setCategories, setTasks]);
+
   // ── Calibration overrides ────────────────────────────────────────────────
 
   const setCalibrationOverride = useCallback((label, overrideLabel) => {
@@ -95,7 +122,7 @@ function useSettings({
   // ── Data I/O ─────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(() => {
-    const data = { version: 1, exportedAt: new Date().toISOString(), tasks, locations, efforts };
+    const data = { version: 1, exportedAt: new Date().toISOString(), tasks, locations, efforts, categories };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -103,7 +130,7 @@ function useSettings({
     a.download = `gtd-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [tasks, locations, efforts]);
+  }, [tasks, locations, efforts, categories]);
 
   const handleImport = useCallback((data, mode = 'replace') => {
     if (!data || !Array.isArray(data.tasks)) {
@@ -115,6 +142,7 @@ function useSettings({
       setTasks(data.tasks);
       if (Array.isArray(data.locations)) setLocations([...data.locations].sort((a, b) => a.localeCompare(b)));
       if (Array.isArray(data.efforts)) setEfforts(data.efforts);
+      if (Array.isArray(data.categories)) setCategories([...data.categories].sort((a, b) => a.localeCompare(b)));
     } else {
       const existingIds = new Set(tasks.map(t => t.id));
       const incoming = data.tasks.filter(t => !existingIds.has(t.id));
@@ -127,13 +155,16 @@ function useSettings({
         setLocations(prev => [...new Set([...prev, ...data.locations])].sort((a, b) => a.localeCompare(b)));
       if (Array.isArray(data.efforts))
         setEfforts(prev => { const s = new Set(prev); return [...prev, ...data.efforts.filter(e => !s.has(e))]; });
+      if (Array.isArray(data.categories))
+        setCategories(prev => [...new Set([...prev, ...data.categories])].sort((a, b) => a.localeCompare(b)));
       alert(`Merged ${incoming.length} new task${incoming.length !== 1 ? 's' : ''}.`);
     }
-  }, [tasks, setTasks, setLocations, setEfforts]);
+  }, [tasks, setTasks, setLocations, setEfforts, setCategories, categories]);
 
   return {
     addLocation, renameLocation, removeLocation,
     addEffort, renameEffort, removeEffort,
+    addCategory, renameCategory, removeCategory,
     setCalibrationOverride, clearCalibrationOverride,
     handleExport, handleImport,
   };

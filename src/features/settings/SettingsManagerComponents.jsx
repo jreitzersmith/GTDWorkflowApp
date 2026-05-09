@@ -189,6 +189,159 @@ LocationManager.propTypes = {
   onRemove:  PropTypes.func.isRequired,
 };
 
+// ── CategoryManager ───────────────────────────────────────────────────────────
+// Full CRUD for user-defined project categories with cascade rename/remove.
+const CATEGORY_COLOR = "#d4a844";
+function CategoryManager({ categories, tasks, onAdd, onRename, onRemove }) {
+  const [newCatText, setNewCatText] = useState("");
+  const [editingIdx, setEditingIdx] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [removingName, setRemovingName] = useState(null);
+  const [replaceWith, setReplaceWith] = useState("");
+
+  const usedByCount = (name) => tasks.filter(t => t.category === name).length;
+
+  const handleAdd = () => {
+    const trimmed = newCatText.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setNewCatText("");
+  };
+
+  const startEdit = (idx) => {
+    setEditingIdx(idx);
+    setEditText(categories[idx]);
+    setRemovingName(null);
+  };
+
+  const confirmEdit = () => {
+    if (editingIdx !== null) {
+      onRename(categories[editingIdx], editText);
+      setEditingIdx(null);
+      setEditText("");
+    }
+  };
+
+  const startRemove = (name) => {
+    setRemovingName(name);
+    setReplaceWith("");
+    setEditingIdx(null);
+  };
+
+  const confirmRemove = () => {
+    onRemove(removingName, replaceWith || null);
+    setRemovingName(null);
+    setReplaceWith("");
+  };
+
+  const inUse = removingName ? usedByCount(removingName) : 0;
+
+  return (
+    <div style={{ maxWidth: 480 }}>
+      <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 16, lineHeight: 1.5 }}>
+        Categories group tasks and projects across buckets. Changes cascade to all existing tasks.
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+        {categories.map((cat, idx) => {
+          const count = usedByCount(cat);
+          const isEditing = editingIdx === idx;
+          const isRemoving = removingName === cat;
+
+          return (
+            <div key={cat} style={{ background: COLORS.surface2, border: `1px solid ${isRemoving ? "#d45a5a55" : COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px" }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: CATEGORY_COLOR, flexShrink: 0 }} />
+                {isEditing ? (
+                  <input
+                    autoFocus
+                    value={editText}
+                    onChange={e => setEditText(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditingIdx(null); }}
+                    style={{ flex: 1, background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 5, padding: "3px 7px", color: COLORS.text, fontFamily: "inherit", fontSize: 13, outline: "none" }}
+                  />
+                ) : (
+                  <span style={{ flex: 1, fontSize: 13, color: COLORS.text }}>{cat}</span>
+                )}
+                <span style={{ fontSize: 11, color: COLORS.muted, flexShrink: 0 }}>{count} task{count !== 1 ? "s" : ""}</span>
+                {isEditing ? (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={confirmEdit} style={{ padding: "3px 9px", borderRadius: 5, border: `1px solid ${COLORS.next}55`, background: "transparent", color: COLORS.next, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>Save</button>
+                    <button onClick={() => setEditingIdx(null)} style={{ padding: "3px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => startEdit(idx)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
+                    <button onClick={() => startRemove(cat)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid #d45a5a44`, background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
+                  </div>
+                )}
+              </div>
+
+              {isRemoving && (
+                <div style={{ padding: "8px 12px 10px", borderTop: `1px solid ${COLORS.border}`, background: COLORS.surface3 }}>
+                  {inUse > 0 ? (
+                    <>
+                      <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 8 }}>
+                        <strong style={{ color: "#d45a5a" }}>{inUse} task{inUse !== 1 ? "s" : ""}</strong> use this category. Replace with:
+                      </div>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <select
+                          value={replaceWith}
+                          onChange={e => setReplaceWith(e.target.value)}
+                          style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none" }}
+                        >
+                          <option value="">— remove category only —</option>
+                          {categories.filter(c => c !== cat).map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <button onClick={confirmRemove} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d45a5a", background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Confirm</button>
+                        <button onClick={() => setRemovingName(null)} style={{ padding: "5px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <span style={{ flex: 1, fontSize: 12, color: COLORS.text2 }}>Remove <strong>{cat}</strong>? No tasks use it.</span>
+                      <button onClick={confirmRemove} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d45a5a", background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>
+                      <button onClick={() => setRemovingName(null)} style={{ padding: "4px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {categories.length === 0 && (
+          <div style={{ fontSize: 12, color: COLORS.muted, fontStyle: "italic", padding: "6px 2px" }}>
+            No categories yet. Add one below to start grouping your tasks.
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 6 }}>
+        <input
+          value={newCatText}
+          onChange={e => setNewCatText(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleAdd()}
+          placeholder="New category… (e.g. Work, Health, Finance)"
+          style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" }}
+        />
+        <button
+          onClick={handleAdd}
+          disabled={!newCatText.trim()}
+          style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${CATEGORY_COLOR}`, background: "transparent", color: CATEGORY_COLOR, fontFamily: "inherit", fontSize: 12, cursor: newCatText.trim() ? "pointer" : "not-allowed", opacity: newCatText.trim() ? 1 : 0.4 }}
+        >+ Add</button>
+      </div>
+    </div>
+  );
+}
+
+CategoryManager.propTypes = {
+  categories: PropTypes.arrayOf(PropTypes.string).isRequired,
+  tasks:      PropTypes.arrayOf(taskShape).isRequired,
+  onAdd:      PropTypes.func.isRequired,
+  onRename:   PropTypes.func.isRequired,
+  onRemove:   PropTypes.func.isRequired,
+};
+
 // ── EffortManager ─────────────────────────────────────────────────────────────
 // CRUD for effort level labels with cascade rename/remove across all tasks.
 function EffortManager({ efforts, tasks, onAdd, onRename, onRemove }) {
@@ -408,4 +561,4 @@ EffortCalibrationManager.propTypes = {
   onClearOverride:      PropTypes.func.isRequired,
 };
 
-export { TagDisplaySetting, LocationManager, EffortManager, EffortCalibrationManager };
+export { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager };

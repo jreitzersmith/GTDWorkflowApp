@@ -38,3 +38,9 @@ CREATE POLICY "Users can manage their own settings"
   FOR ALL
   USING  (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
+
+
+-- ── Section 3: Migrations (run manually in Supabase SQL editor) ───────────────
+
+-- Added with project categories feature (FR#23, 2026-05-09): user-defined category list
+ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS categories JSONB NOT NULL DEFAULT '[]'::jsonb;

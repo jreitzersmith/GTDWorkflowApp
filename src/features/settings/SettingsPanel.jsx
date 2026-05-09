@@ -4,9 +4,9 @@ import { COLORS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { GMAIL_SCOPE_OPTS, GMAIL_SCOPE_DISPLAY } from "../email/gmailTools.js";
 import { SettingsSection } from "./SettingsSection.jsx";
-import { TagDisplaySetting, LocationManager, EffortManager, EffortCalibrationManager } from "./SettingsManagerComponents.jsx";
+import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager } from "./SettingsManagerComponents.jsx";
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, googleScope, onConnectGmail, onDisconnectGmail, gmailError, calendarEnabled, onConnectCalendar, onDisconnectCalendar, recurringReviewDays, onSetRecurringReviewDays }) {
+function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, categories, onAddCategory, onRenameCategory, onRemoveCategory, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, googleScope, onConnectGmail, onDisconnectGmail, gmailError, calendarEnabled, onConnectCalendar, onDisconnectCalendar, recurringReviewDays, onSetRecurringReviewDays }) {
   const fileInputRef = useRef(null);
   const [importMode, setImportMode] = useState("replace");
   const [gmailPendingScope, setGmailPendingScope] = useState('readonly');
@@ -157,6 +157,9 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, efforts, o
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
           <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
         </SettingsSection>
+        <SettingsSection label="Categories" storageKey="gtd_settings_categories">
+          <CategoryManager categories={categories} tasks={tasks} onAdd={onAddCategory} onRename={onRenameCategory} onRemove={onRemoveCategory} />
+        </SettingsSection>
         <SettingsSection label="Locations" storageKey="gtd_settings_locations">
           <LocationManager locations={locations} tasks={tasks} onAdd={onAdd} onRename={onRename} onRemove={onRemove} />
         </SettingsSection>
@@ -205,6 +208,10 @@ SettingsPanel.propTypes = {
   onAdd:                      PropTypes.func.isRequired,
   onRename:                   PropTypes.func.isRequired,
   onRemove:                   PropTypes.func.isRequired,
+  categories:                 PropTypes.arrayOf(PropTypes.string).isRequired,
+  onAddCategory:              PropTypes.func.isRequired,
+  onRenameCategory:           PropTypes.func.isRequired,
+  onRemoveCategory:           PropTypes.func.isRequired,
   efforts:                    PropTypes.arrayOf(PropTypes.string).isRequired,
   onAddEffort:                PropTypes.func.isRequired,
   onRenameEffort:             PropTypes.func.isRequired,

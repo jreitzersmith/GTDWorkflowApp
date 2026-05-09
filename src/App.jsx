@@ -57,7 +57,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay } = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories } = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
@@ -79,9 +79,9 @@ export default function GTDManager() {
 
   const { syncStatus, supabaseReady } = useSupabaseSync({
     authUser, tasks, setTasks,
-    locations, efforts, calibrationOverrides,
+    locations, efforts, calibrationOverrides, categories,
     skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
-    setLocations, setEfforts, setCalibrationOverrides,
+    setLocations, setEfforts, setCalibrationOverrides, setCategories,
     setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
     setGmailQueue,
   });
@@ -658,6 +658,7 @@ export default function GTDManager() {
   const {
     addLocation, renameLocation, removeLocation,
     addEffort, renameEffort, removeEffort,
+    addCategory, renameCategory, removeCategory,
     setCalibrationOverride, clearCalibrationOverride,
     handleExport, handleImport,
   } = useSettings({
@@ -665,6 +666,7 @@ export default function GTDManager() {
     locations, setLocations,
     efforts, setEfforts,
     setCalibrationOverrides,
+    categories, setCategories,
   });
 
   // "deferred" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
@@ -775,6 +777,10 @@ export default function GTDManager() {
                           onClearCalibrationOverride={clearCalibrationOverride}
                           tagDisplay={tagDisplay}
                           onSetTagDisplay={setTagDisplay}
+                          categories={categories}
+                          onAddCategory={addCategory}
+                          onRenameCategory={renameCategory}
+                          onRemoveCategory={removeCategory}
                           onExport={handleExport}
                           onImport={handleImport}
                           onClose={() => setShowSettings(false)}
