@@ -16,7 +16,7 @@ function ProjectSelector({ taskId, parentId, eligibleProjects, onReassignProject
   const [newProjName, setNewProjName] = useState("");
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12 }}>
-      <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, marginTop: 5 }}>Project</span>
+      <span style={{ color: COLORS.text2, width: 64, flexShrink: 0, marginTop: 5 }}>Project</span>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
         {!newProjMode ? (
           <select
@@ -89,7 +89,7 @@ function OriginalDueDateField({ taskId, originalDueDate, onUpdate }) {
   const [confirming, setConfirming] = useState(false);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-      <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Orig. Due</span>
+      <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Orig. Due</span>
       {editing ? (
         confirming ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -137,7 +137,7 @@ function RecurrenceEditor({ rec, taskId, onUpdate }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, fontSize: 12 }}>Repeat</span>
+        <span style={{ color: COLORS.text2, width: 64, flexShrink: 0, fontSize: 12 }}>Repeat</span>
         <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 12 }}>
           <StyledCheckbox
             checked={!!rec}
@@ -152,7 +152,18 @@ function RecurrenceEditor({ rec, taskId, onUpdate }) {
       {rec && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Every</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Base on</span>
+            <select
+              value={rec.rescheduleFrom || "completion"}
+              onChange={e => onUpdate(taskId, { recurrence: { ...rec, rescheduleFrom: e.target.value } })}
+              style={{ ...fieldInput, flex: 1, fontSize: 12, padding: "3px 6px" }}
+            >
+              <option value="completion">Completion date</option>
+              <option value="dueDate">Original due date</option>
+            </select>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Every</span>
             <input
               type="number" min={1} max={99}
               value={rec.interval || 1}
@@ -172,7 +183,7 @@ function RecurrenceEditor({ rec, taskId, onUpdate }) {
           </div>
           {rec.frequency === "weekly" && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>On</span>
+              <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>On</span>
               <div style={{ display: "flex", gap: 3 }}>
                 {["Su","Mo","Tu","We","Th","Fr","Sa"].map((day, i) => {
                   const active = (rec.weekDays || []).includes(i);
@@ -190,7 +201,7 @@ function RecurrenceEditor({ rec, taskId, onUpdate }) {
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Until</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Until</span>
             <input
               type="date"
               value={rec.until || ""}
@@ -198,19 +209,8 @@ function RecurrenceEditor({ rec, taskId, onUpdate }) {
               style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
             />
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Base on</span>
-            <select
-              value={rec.rescheduleFrom || "completion"}
-              onChange={e => onUpdate(taskId, { recurrence: { ...rec, rescheduleFrom: e.target.value } })}
-              style={{ ...fieldInput, flex: 1, fontSize: 12, padding: "3px 6px" }}
-            >
-              <option value="completion">Completion date</option>
-              <option value="dueDate">Original due date</option>
-            </select>
-          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>On spawn</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>On spawn</span>
             <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
               <StyledCheckbox
                 checked={!!rec.sendToInbox}
@@ -294,13 +294,13 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
 
           {/* Bucket (read-only label) */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Bucket</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Bucket</span>
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
 
           {/* Move to bucket */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Move to</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Move to</span>
             <select
               value={task.bucket}
               onChange={e => onUpdate(task.id, { bucket: e.target.value })}
@@ -327,7 +327,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
 
           {/* Due date */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Due</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Due</span>
             <input
               type="date"
               value={task.dueDate || ""}
@@ -338,7 +338,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
 
           {/* Defer until */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Defer</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Defer</span>
             <input
               type="date"
               value={task.deferUntil || ""}
@@ -350,7 +350,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
           {/* Completed date — read-only */}
           {task.completedDate && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Completed</span>
+              <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Completed</span>
               <span>{task.completedDate}</span>
             </div>
           )}
@@ -364,7 +364,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
             const label = days === 0 ? "On time" : days < 0 ? `${Math.abs(days)}d early` : `${days}d late`;
             return (
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Variance</span>
+                <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Variance</span>
                 <span style={{ background: color + "22", color, border: `1px solid ${color}55`, borderRadius: 4, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}>{label}</span>
               </div>
             );
@@ -374,7 +374,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
 
           {/* Effort (estimated) */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Estimated</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Estimated</span>
             <select
               value={task.effort || ""}
               onChange={e => onUpdate(task.id, { effort: e.target.value || null })}
@@ -387,7 +387,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
 
           {/* Actual effort */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Actual</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Actual</span>
             <select
               value={task.actualEffort || ""}
               onChange={e => onUpdate(task.id, { actualEffort: e.target.value || null })}
@@ -412,7 +412,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
           {/* Category */}
           {(categories || []).length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-              <span style={{ color: COLORS.muted, width: 64, flexShrink: 0 }}>Category</span>
+              <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Category</span>
               <select
                 value={task.category || ''}
                 onChange={e => onUpdate(task.id, { category: e.target.value || null })}
@@ -426,7 +426,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
 
           {/* Location tags */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.muted, width: 64, flexShrink: 0, paddingTop: 2 }}>Location</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0, paddingTop: 2 }}>Location</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {(locations || []).map(loc => {
                 const active = (task.location || []).includes(loc);
@@ -437,7 +437,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
                       const cur = task.location || [];
                       onUpdate(task.id, { location: active ? cur.filter(l => l !== loc) : [...cur, loc] });
                     }}
-                    style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + '22' : 'transparent', color: active ? COLORS.project : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+                    style={{ padding: '2px 8px', borderRadius: 10, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + '22' : 'transparent', color: active ? COLORS.project : '#81807a', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
                   >{loc}</button>
                 );
               })}
