@@ -377,7 +377,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
             <select
               value={task.actualEffort || ""}
               onChange={e => onUpdate(task.id, { actualEffort: e.target.value || null })}
-              style={{ ...fieldInput, width: 'auto', fontSize: 12, padding: '3px 6px', colorScheme: 'dark', color: task.actualEffort ? effortAccuracyColor(effortToMinutes(task.effort), effortToMinutes(task.actualEffort)) : COLORS.muted }}
+              style={{ ...fieldInput, width: 'auto', fontSize: 12, padding: '3px 6px', colorScheme: 'dark', color: task.actualEffort ? effortAccuracyColor(effortToMinutes(task.effort), effortToMinutes(task.actualEffort)) : COLORS.text }}
             >
               <option value=''>—</option>
               {(efforts || []).map(e => <option key={e} value={e}>{e}</option>)}
@@ -422,7 +422,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
               <select
                 value={task.category || ''}
                 onChange={e => onUpdate(task.id, { category: e.target.value || null })}
-                style={{ ...fieldInput, width: 'auto', fontSize: 12, padding: '3px 6px', colorScheme: 'dark', color: task.category ? '#d4a844' : COLORS.muted }}
+                style={{ ...fieldInput, width: 'auto', fontSize: 12, padding: '3px 6px', colorScheme: 'dark', color: task.category ? '#d4a844' : COLORS.text }}
               >
                 <option value=''>—</option>
                 {(categories || []).map(c => <option key={c} value={c}>{c}</option>)}
