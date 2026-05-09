@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#5** · Code Quality — **CQ#5** · Feature Requests — **FR#30**
+> **Last used numbers:** Known Issues — **Issue#5** · Code Quality — **CQ#7** · Feature Requests — **FR#30**
 
 ---
 
@@ -30,6 +30,8 @@
 3. ~~CQ#3 — Presentational/container separation~~ — **done** (275f250): extracted useTaskRowState and useTaskDetailDrafts; collectDescendantIds moved to taskUtils
 4. ~~CQ#4 — Feature-based file structure~~ — **done** (85cf009): all files migrated to /features/tasks, /features/email, /features/calendar, /features/settings, /features/coach, /shared; gmailTools.js split into webSearch.js + gmailTools.js
 5. ~~CQ#5 — Array index as key~~ — **done** (b8bdf8e): replaced index keys in AICoach, CalendarSuggestionsBar, CalendarEventDisplay, EmailRulesPanel with stable keys
+6. ~~CQ#6 — Task detail panel dropdown dark text~~ — **done** (34acae2, 59968bb): `color: undefined` in Actual Effort and Category selects was overriding `fieldInput`'s `COLORS.text`, letting the browser fall back to the OS dark text; fixed to `COLORS.text` for empty state; added `colorScheme: 'dark'` to both selects
+7. ~~CQ#7 — Task detail panel field order~~ — **done** (13873e1, c1316aa): Move to relocated below Bucket; Orig Due moved above Due; Defer moved directly below Due; Category moved above Location
 
 ### Feature requests
 
