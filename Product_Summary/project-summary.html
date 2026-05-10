@@ -3818,5 +3818,75 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
   </div>
   <p>Commits: <a href="project-commits.html#commit-df6a17d">df6a17d</a></p>
 </section>
+
+<section id="fr33-fr34-fr30">
+  <h2>FR#33 + FR#34 + FR#30 — Search &amp; Lazy AI Context (2026-05-09)</h2>
+  <p>
+    Three related features that make finding tasks faster and AI chat cheaper.
+  </p>
+
+  <h3>FR#33 — In-bucket filter</h3>
+  <p>
+    A compact text input appears in the bucket header whenever a bucket has at least one task.
+    Typing narrows the visible list to tasks whose title or notes contain the query (case-insensitive).
+    A live "<em>N / total</em>" counter shows how many tasks matched.
+    Clearing the field restores the full view — including any grouping, project tree, or waterfall ordering.
+  </p>
+  <p><strong>React concept — controlled input with derived state:</strong>
+    <code>filterText</code> is a piece of React state. The displayed list is not stored separately —
+    it is computed on every render as a <code>.filter()</code> call over <code>bucketTasks</code>.
+    React calls this a "derived value": instead of synchronising two pieces of state, one is always
+    calculated from the other.
+  </p>
+  <p><strong>Design decision:</strong> rather than trying to filter through <code>ProjectTree</code>
+    and <code>CompletedTree</code> (which read from a context and walk their own recursive logic),
+    the filter branch renders a simple flat list, bypassing all grouping and tree rendering.
+    This keeps the filter path short and predictable.
+  </p>
+  <p>Commits: <a href="project-commits.html#commit-863847b">863847b</a></p>
+
+  <h3>FR#34 — Global search modal (Cmd+K)</h3>
+  <p>
+    Pressing <kbd>Cmd+K</kbd> (or <kbd>Ctrl+K</kbd> on Windows) opens a floating search modal
+    that searches across every non-archive, non-done bucket simultaneously.
+    Results appear as you type, with the matching text highlighted in each row
+    and a small badge showing which bucket the task lives in.
+    Use arrow keys to navigate, Enter to jump to the task, or Escape to close.
+    A Search button with a <kbd>⌘K</kbd> hint is also available in the sidebar Tools section.
+  </p>
+  <p><strong>React concept — portal-style overlay:</strong> the modal is rendered inside the
+    normal React tree but uses <code>position: fixed; inset: 0</code> to visually escape the
+    layout. Clicking the semi-transparent backdrop closes it; clicking inside the modal card stops
+    propagation so the click does not reach the backdrop.
+  </p>
+  <p><strong>React concept — global keyboard listener:</strong>
+    A <code>useEffect</code> in <code>App.jsx</code> calls
+    <code>window.addEventListener('keydown', handler)</code> and returns a cleanup function that
+    calls <code>removeEventListener</code>. React runs the cleanup whenever the component unmounts,
+    preventing memory leaks.
+  </p>
+  <p>Commits: <a href="project-commits.html#commit-35392d4">35392d4</a></p>
+
+  <h3>FR#30 — Lazy task context in chat mode</h3>
+  <p>
+    In previous versions the AI coach received the complete task list in every single message —
+    even for a simple "good morning" chat. This inflated token counts and cost money for every call.
+    Now, when using the Claude provider in Chat mode, the system prompt contains only a short summary
+    line such as <em>"Inbox: 4 · Next Actions: 12 · Projects: 3 — call get_task_context to retrieve
+    full task details when needed."</em>
+    If the AI needs the full list (e.g. to check for duplicates or evaluate workload) it calls the
+    <code>get_task_context</code> tool, which runs <code>getTaskContext()</code> in the browser and
+    returns the result. A "📋 Loading task list…" chip appears in the chat while it runs.
+    All other modes (Process, Weekly Review, etc.) continue to receive the full task list as before.
+  </p>
+  <p><strong>AI concept — tool use / function calling:</strong>
+    The Claude API supports "tools" — functions the AI can request to be called.
+    The app defines <code>GET_TASK_CONTEXT_TOOL</code> with a name, description, and input schema.
+    When Claude decides it needs the data, it replies with a <code>stop_reason: 'tool_use'</code>
+    response instead of text. The app runs the function, sends the result back, and Claude
+    continues its reply. This round-trip keeps expensive data out of the prompt until it is needed.
+  </p>
+  <p>Commits: <a href="project-commits.html#commit-0ce7e9b">0ce7e9b</a></p>
+</section>
 </body>
 </html>

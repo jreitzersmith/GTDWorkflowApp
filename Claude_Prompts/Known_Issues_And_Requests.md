@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#13** · Code Quality — **CQ#10** · Feature Requests — **FR#37**
+> **Last used numbers:** Known Issues — **Issue#13** · Code Quality — **CQ#10** · Feature Requests — **FR#38**
 
 ---
 
@@ -29,8 +29,6 @@
 - FR#7 [GH#6] — Daily focus view (pick 3 Most Important Tasks from Next Actions)
 - FR#15 [GH#7] — AI-assisted daily planning (new coach mode; evaluates calendar + tasks + travel time)
 - FR#6 [GH#8] — Brain Dump auto-capture (AI extracts items and adds them directly to Inbox)
-- FR#33 — Search within current bucket (filter bar that narrows visible tasks by text match on title/notes; scoped to whichever bucket is active)
-- FR#34 — Search across all tasks (global search spanning all buckets; results show task title, bucket, and key metadata; clicking a result opens the task detail panel)
 
 #### Inbox / processing improvements
 
@@ -44,8 +42,8 @@
 - FR#37 [GH#31] (2026-05-09) — Calendar event creation: set default notification(s) on created events (simplest: pass `useDefault: true` to Google Calendar API; stretch: configurable reminder interval in Settings)
 - FR#26 — Connect Google Drive (browse, search, and attach Drive files to tasks or coach context)
 - FR#27 — Connect Google Sheets and Docs (read/write Sheets for data capture; read Docs for coach context)
-- FR#30 — Lazy task context — omit task list from system prompt by default; expose it as a tool the AI can call when it needs it, eliminating per-call token cost for simple interactions
 - FR#32 — Include project child tasks in process-mode context — getTaskContext currently shows only the project title and metadata; child tasks (which live in the `next` bucket) are excluded by the bucket filter, so the AI can only match new inbox items against project names. Fix: when serialising a project task, inline its direct children as an indented sub-list so the AI can detect duplicates and better judge fit
+- FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
 
 #### Data model expansions
 

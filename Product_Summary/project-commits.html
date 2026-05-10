@@ -2791,6 +2791,61 @@
     Updated last-used issue number to Issue#13.
   </td>
 </tr>
+<tr id="commit-863847b">
+  <td><code>863847b</code></td>
+  <td>2026-05-09</td>
+  <td>FR#33 — In-bucket text filter</td>
+  <td>
+    Adds a live text filter to <code>TaskBucketView</code>. A compact input
+    in the panel header narrows the visible list to tasks whose title or notes
+    match the query. When the filter is active, all grouping, tree rendering
+    (ProjectTree, CompletedTree), waterfall filtering, and groupByField logic
+    are bypassed — the component renders a simple flat list instead.
+    A match count badge (<em>N / total</em>) is shown next to the input.
+    The filter state is local to the component and resets via a
+    <code>useEffect</code> whenever <code>currentBucket</code> changes.
+    <br><a href="project-summary.html#fr33-fr34-fr30">↑ Back to feature</a>
+  </td>
+</tr>
+<tr id="commit-35392d4">
+  <td><code>35392d4</code></td>
+  <td>2026-05-09</td>
+  <td>FR#34 — Global search modal (Cmd+K)</td>
+  <td>
+    New <code>src/shared/SearchModal.jsx</code>: a fixed-position overlay with
+    a search input, live results list, and keyboard navigation (↑↓ to move,
+    Enter to open, Escape to close). Searches across inbox, next, project,
+    waiting, someday, and deferred buckets; excludes done tasks. Highlights
+    the matching substring in each result row. A small bucket badge identifies
+    where each result lives.
+    <br><code>App.jsx</code>: adds a <code>useEffect</code> global keydown
+    listener for Cmd+K / Ctrl+K, <code>searchOpen</code> state, and an
+    <code>onSearchSelect</code> callback that switches bucket and opens the
+    task detail panel.
+    <br><code>AppSidebar.jsx</code>: Search button with <kbd>⌘K</kbd> hint in
+    the Tools section.
+    <br><a href="project-summary.html#fr33-fr34-fr30">↑ Back to feature</a>
+  </td>
+</tr>
+<tr id="commit-0ce7e9b">
+  <td><code>0ce7e9b</code></td>
+  <td>2026-05-09</td>
+  <td>FR#30 — Lazy task context in chat mode</td>
+  <td>
+    In <code>useCallAI.js</code>, the system prompt construction now branches
+    on <code>mode === 'chat' && provider === 'claude'</code>. In that branch
+    a compact per-bucket count summary replaces the full task list, and the
+    AI is instructed to call <code>get_task_context</code> when it needs
+    details. All other modes continue to receive the full serialised task list.
+    <br>Defines <code>GET_TASK_CONTEXT_TOOL</code> (name, description, and
+    input schema with an optional <code>buckets</code> array). Adds it as the
+    first entry in <code>availableTools</code> for chat mode. The dispatch
+    handler in the tool loop calls <code>getTaskContext(buckets)</code>, shows
+    a "📋 Loading task list…" chip while it runs, and returns the result as
+    a <code>tool_result</code> message.
+    <br><a href="project-summary.html#fr33-fr34-fr30">↑ Back to feature</a>
+  </td>
+</tr>
 </table>
 </body>
 </html>

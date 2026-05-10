@@ -48,3 +48,6 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-09 | Code Quality | CQ#10   | GH#30  | Task detail panel inactive location button color → #81807a (mid-tier between labels and muted) | 98f94f5 |
 | 2026-05-09 | Bug Fix      | Issue#9 | GH#20  | pendingTasks filter: show past-due + weekday-recurring tasks in Add to Calendar section | df6a17d |
 | 2026-05-09 | Bug Fix      | Issue#11| GH#22  | Calendar push: use dueDate (not today) for non-weekday recurrences; refetch after recurring event creation | df6a17d |
+| 2026-05-09 | Feature      | FR#33   | —      | In-bucket text filter — compact filter input in bucket header, flat filtered list bypassing tree/waterfall | 863847b |
+| 2026-05-09 | Feature      | FR#34   | —      | Global search modal (Cmd+K) — SearchModal with keyboard nav, bucket badge, highlight; sidebar button | 35392d4 |
+| 2026-05-09 | Feature      | FR#30   | —      | Lazy task context in chat mode — compact summary + get_task_context tool; full list for other modes | 0ce7e9b |
