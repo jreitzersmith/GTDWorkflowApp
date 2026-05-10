@@ -51,3 +51,4 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-09 | Feature      | FR#33   | —      | In-bucket text filter — compact filter input in bucket header, flat filtered list bypassing tree/waterfall | 863847b |
 | 2026-05-09 | Feature      | FR#34   | —      | Global search modal (Cmd+K) — SearchModal with keyboard nav, bucket badge, highlight; sidebar button | 35392d4 |
 | 2026-05-09 | Feature      | FR#30   | —      | Lazy task context in chat mode — compact summary + get_task_context tool; full list for other modes | 0ce7e9b |
+| 2026-05-09 | Feature      | FR#39   | GH#35  | Drive file picker for tasks — DriveAttachments component, Picker API, drive_attachments DB column | 15e1b81 |
