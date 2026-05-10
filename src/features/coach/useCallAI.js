@@ -15,6 +15,23 @@ import { buildCalibrationContext, extractAction, extractUpdateAction, extractAdd
   extractCalendarDeleteAction } from '../tasks/taskUtils.jsx';
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
 
+// Lazy task-retrieval tool — used in chat mode so the full task list isn't
+// sent on every message. The AI calls this when it needs task details.
+const GET_TASK_CONTEXT_TOOL = {
+  name: 'get_task_context',
+  description: 'Retrieve the full task list. Call this when you need to reference specific tasks, check for duplicates, evaluate workload, or answer questions about projects and actions.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      buckets: {
+        type: 'array',
+        items: { type: 'string', enum: ['inbox', 'next', 'project', 'waiting', 'someday'] },
+        description: 'Buckets to include. Omit or pass null for all buckets.',
+      },
+    },
+  },
+};
+
 // Buckets to include in the task context for each coach mode.
 // Modes not listed here receive all buckets (null = no filter).
 const MODE_CONTEXT_BUCKETS = {
@@ -74,7 +91,20 @@ function useCallAI({
     const calibCtx = (mode === 'process' || mode === 'projectMetadata')
       ? buildCalibrationContext(tasks, efforts, calibrationOverrides)
       : '';
-    const systemPrompt = SYSTEM_PROMPTS[mode] + calibCtx + '\n\n[Current Task List]\n' + getTaskContext(MODE_CONTEXT_BUCKETS[mode] ?? null);
+    // For chat mode with the Claude provider, send only a compact task summary.
+    // The AI can call get_task_context to retrieve the full list on demand,
+    // keeping per-message token cost low.
+    const isLazyMode = mode === 'chat' && provider === 'claude';
+    const taskContextPart = isLazyMode
+      ? (() => {
+          const BUCKET_LABELS = { inbox: 'Inbox', next: 'Next Actions', project: 'Projects', waiting: 'Waiting For', someday: 'Someday/Maybe' };
+          const counts = Object.entries(BUCKET_LABELS)
+            .map(([k, label]) => { const n = tasks.filter(t => t.bucket === k && !t.done).length; return n ? `${label}: ${n}` : null; })
+            .filter(Boolean).join(' · ');
+          return `\n\n[Task Overview — ${counts}]\nCall get_task_context to retrieve full task details when needed.`;
+        })()
+      : `\n\n[Current Task List]\n${getTaskContext(MODE_CONTEXT_BUCKETS[mode] ?? null)}`;
+    const systemPrompt = SYSTEM_PROMPTS[mode] + calibCtx + taskContextPart;
     let inputLogSet = false;
     const newHistory = [...history, { role: 'user', content: userMsg }];
 
@@ -94,7 +124,7 @@ function useCallAI({
             messages: apiMessages,
           };
           if (mode === 'chat') {
-            const availableTools = [];
+            const availableTools = [GET_TASK_CONTEXT_TOOL];
             if (import.meta.env.VITE_TAVILY_API_KEY) availableTools.push(...TOOLS);
             if (googleToken) {
               availableTools.push(GMAIL_SEARCH_TOOL);
@@ -156,7 +186,16 @@ function useCallAI({
             const toolUseBlocks = data.content.filter(b => b.type === 'tool_use');
             const toolResults = [];
             for (const toolUse of toolUseBlocks) {
-              if (toolUse.name === 'web_search') {
+              if (toolUse.name === 'get_task_context') {
+                setMessages(prev => [...prev, { role: 'assistant', text: '📋 Loading task list…', isSearchChip: true }]);
+                try {
+                  const buckets = Array.isArray(toolUse.input?.buckets) && toolUse.input.buckets.length
+                    ? toolUse.input.buckets
+                    : null;
+                  const result = getTaskContext(buckets);
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: result });
+                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === 'web_search') {
                 const query = toolUse.input.query;
                 setMessages(prev => [...prev, {
                   role: 'assistant', text: `🔍 Searching: "${query}"`, isSearchChip: true,
