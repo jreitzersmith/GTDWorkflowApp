@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — Google Services (Mockup)</title>
+<style>
+  /* ── Design tokens (matched to src/constants.jsx) ─────────────────── */
+  :root {
+    --bg:        #111210;
+    --surface:   #1a1c18;
+    --surface2:  #222420;
+    --surface3:  #2a2c28;
+    --border:    #333530;
+    --border2:   #404240;
+    --text:      #e8e4dc;
+    --text2:     #a8a49c;
+    --muted:     #5a5c58;
+    --next:      #5ab878;
+    --nextBg:    #182418;
+    --accent:    #5a8fd4;
+    --waiting:   #d4845a;
+    --someday:   #9a8ad4;
+    --inbox:     #e8c84a;
+    --deferred:  #c87ee0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 16px;
+    min-height: 100vh;
+  }
+
+  /* ── Panel shell ───────────────────────────────────────────────────── */
+  .panel {
+    width: 520px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-header {
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-header-title {
+    font-family: Georgia, serif;
+    font-size: 16px;
+    font-weight: 300;
+  }
+  .panel-header-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .btn-close {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .panel-body {
+    padding: 0 24px;
+    overflow-y: auto;
+    max-height: 82vh;
+  }
+
+  /* ── Stub sections (non-focus) ─────────────────────────────────────── */
+  .section-stub {
+    border-bottom: 1px solid var(--border);
+    padding: 12px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--text2);
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.45;
+    cursor: pointer;
+    user-select: none;
+  }
+  .section-stub span.arr { font-size: 12px; color: var(--muted); }
+
+  /* ── Google Services section ───────────────────────────────────────── */
+  .section {
+    border-bottom: 1px solid var(--border);
+  }
+  .section-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text);
+    font-family: inherit;
+  }
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .section-arrow { font-size: 12px; color: var(--muted); }
+
+  .section-body { padding-bottom: 20px; }
+
+  .section-desc {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── Service row ───────────────────────────────────────────────────── */
+  .service-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .service-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .service-icon {
+    font-size: 15px;
+    width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .service-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    width: 58px;
+    flex-shrink: 0;
+  }
+
+  .scope-group {
+    display: flex;
+    gap: 3px;
+    flex: 1;
+    flex-wrap: wrap;
+  }
+
+  /* Segmented scope buttons */
+  .scope-btn {
+    padding: 3px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text2);
+    font-family: inherit;
+    font-size: 10px;
+    cursor: pointer;
+    line-height: 1.4;
+    transition: none;
+  }
+  .scope-btn.active {
+    background: var(--surface3);
+    border-color: var(--accent);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .scope-btn.disabled-look {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  /* Calendar — no scope choice, just a toggle */
+  .toggle-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    color: var(--text2);
+  }
+  .toggle-track {
+    width: 28px;
+    height: 16px;
+    border-radius: 8px;
+    background: var(--next);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .toggle-track.off { background: var(--border2); }
+  .toggle-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: white;
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    transition: right 0.15s;
+  }
+  .toggle-track.off .toggle-thumb { right: auto; left: 2px; }
+
+  /* Status badge */
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--next);
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: 8px;
+  }
+  .status-badge.pending { color: var(--muted); }
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--next);
+    flex-shrink: 0;
+  }
+  .status-dot.pending { background: var(--muted); }
+
+  /* ── Scope change notice ───────────────────────────────────────────── */
+  .scope-notice {
+    font-size: 11px;
+    color: var(--inbox);
+    background: #2a2618;
+    border: 1px solid #3e3418;
+    border-radius: 6px;
+    padding: 7px 10px;
+    margin-bottom: 14px;
+    line-height: 1.4;
+  }
+
+  /* ── Bottom action row ─────────────────────────────────────────────── */
+  .action-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  .btn-reauth {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 7px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-disconnect-all {
+    padding: 8px 14px;
+    border-radius: 7px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .reauth-note {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: 1.4;
+  }
+
+  /* ── State toggle tabs (mockup controls) ───────────────────────────── */
+  .mockup-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    justify-content: center;
+  }
+  .ctrl-btn {
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text2);
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .ctrl-btn.active {
+    background: var(--surface3);
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .mockup-label {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .error-note {
+    font-size: 11px;
+    color: var(--waiting);
+    line-height: 1.4;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div style="width:560px">
+
+  <!-- Mockup state controls -->
+  <p class="mockup-label">UI Mockup — Google Services · Settings Panel</p>
+  <div class="mockup-controls">
+    <button class="ctrl-btn active" onclick="setState('connected')">All Connected</button>
+    <button class="ctrl-btn" onclick="setState('partial')">Partial (Gmail+Cal only)</button>
+    <button class="ctrl-btn" onclick="setState('disconnected')">Not Connected</button>
+  </div>
+
+  <!-- Panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-header-title">⚙ Settings</div>
+        <div class="panel-header-sub">Configure your GTD system</div>
+      </div>
+      <button class="btn-close">✕ Close</button>
+    </div>
+
+    <div class="panel-body">
+
+      <!-- Stub sections above (collapsed) -->
+      <div class="section-stub">Tag Display <span class="arr">▸</span></div>
+      <div class="section-stub">Categories <span class="arr">▸</span></div>
+      <div class="section-stub">Locations <span class="arr">▸</span></div>
+
+      <!-- ── GOOGLE SERVICES SECTION ─────────────────────────────────── -->
+      <div class="section">
+        <button class="section-toggle">
+          <span class="section-label">Google Services</span>
+          <span class="section-arrow">▾</span>
+        </button>
+
+        <div class="section-body">
+          <p class="section-desc">
+            Connect Google services to let the AI coach work with your email, calendar, documents,
+            and files. Select the access level for each service, then click <strong style="color:var(--text2)">Re-authorize Google</strong>
+            to apply all changes in a single sign-in step.
+          </p>
+
+          <!-- Pending-change notice (shown when scope was modified but not re-authed) -->
+          <div class="scope-notice" id="changeNotice" style="display:none">
+            ⚠ You've changed one or more scope settings. Click <strong>Re-authorize Google</strong> below to apply them.
+          </div>
+
+          <div class="service-rows" id="serviceRows">
+            <!-- Rows injected by JS -->
+          </div>
+
+          <!-- Bottom actions -->
+          <div class="action-row">
+            <button class="btn-reauth" id="reauthBtn">
+              <span style="font-size:14px">G</span>
+              <span id="reauthLabel">Re-authorize Google</span>
+            </button>
+            <button class="btn-disconnect-all" id="disconnectBtn">Disconnect All</button>
+          </div>
+          <div class="reauth-note" id="reauthNote">
+            Re-authorizing opens a single Google sign-in that grants all selected scopes at once.
+            Your existing tasks and settings are not affected.
+          </div>
+        </div>
+      </div>
+      <!-- ── END GOOGLE SERVICES ──────────────────────────────────────── -->
+
+      <!-- Stub sections below -->
+      <div class="section-stub">Weekly Review <span class="arr">▸</span></div>
+      <div class="section-stub">Effort Levels <span class="arr">▸</span></div>
+      <div class="section-stub">Backup &amp; Restore <span class="arr">▸</span></div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Service definitions ─────────────────────────────────────────────────────
+const SERVICES = [
+  {
+    id: 'gmail',
+    icon: '✉',
+    name: 'Gmail',
+    scopes: [
+      { key: 'readonly', label: 'Read Only',   desc: 'Read messages' },
+      { key: 'organize', label: 'Organize',    desc: 'Label & archive' },
+      { key: 'compose',  label: 'Compose',     desc: '+ Draft replies' },
+      { key: 'send',     label: 'Send',        desc: '+ Send messages' },
+    ],
+    defaultScope: 'organize',
+    hasToggle: false,
+  },
+  {
+    id: 'calendar',
+    icon: '📅',
+    name: 'Calendar',
+    scopes: null,           // no scope choice
+    defaultScope: null,
+    hasToggle: true,
+    toggleLabel: 'Full access',
+  },
+  {
+    id: 'drive',
+    icon: '💾',
+    name: 'Drive',
+    scopes: [
+      { key: 'standard', label: 'Standard', desc: 'Browse, attach & upload files' },
+      { key: 'full',     label: 'Full',     desc: '+ Manage all Drive content' },
+    ],
+    defaultScope: 'standard',
+    hasToggle: false,
+  },
+  {
+    id: 'docs',
+    icon: '📄',
+    name: 'Docs',
+    scopes: [
+      { key: 'readonly', label: 'Read Only', desc: 'Read docs for AI context' },
+      { key: 'full',     label: 'Full',      desc: '+ Create & edit docs' },
+    ],
+    defaultScope: 'full',
+    hasToggle: false,
+  },
+  {
+    id: 'sheets',
+    icon: '📊',
+    name: 'Sheets',
+    scopes: [
+      { key: 'readonly', label: 'Read Only', desc: 'Read spreadsheets' },
+      { key: 'full',     label: 'Full',      desc: '+ Create & edit sheets' },
+    ],
+    defaultScope: 'full',
+    hasToggle: false,
+  },
+  {
+    id: 'slides',
+    icon: '📽',
+    name: 'Slides',
+    scopes: [
+      { key: 'readonly', label: 'Read Only', desc: 'Read presentations' },
+      { key: 'full',     label: 'Full',      desc: '+ Create & edit slides' },
+    ],
+    defaultScope: 'full',
+    hasToggle: false,
+  },
+];
+
+// ── State ───────────────────────────────────────────────────────────────────
+let currentState = 'connected'; // 'connected' | 'partial' | 'disconnected'
+
+// Which services are authorized (connected) in each state
+const CONNECTED_MAP = {
+  connected:    { gmail: true, calendar: true, drive: true, docs: true, sheets: true, slides: true },
+  partial:      { gmail: true, calendar: true, drive: false, docs: false, sheets: false, slides: false },
+  disconnected: { gmail: false, calendar: false, drive: false, docs: false, sheets: false, slides: false },
+};
+
+// Current scope selection (always reflects what will be requested on next re-auth)
+const selectedScopes = {};
+SERVICES.forEach(s => { selectedScopes[s.id] = s.defaultScope; });
+
+// Track if user changed scope since last auth
+let hasUnsavedChanges = false;
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function render() {
+  const connected = CONNECTED_MAP[currentState];
+  const container = document.getElementById('serviceRows');
+
+  container.innerHTML = SERVICES.map(svc => {
+    const isConnected = connected[svc.id];
+    const badgeHtml = isConnected
+      ? `<div class="status-badge"><div class="status-dot"></div>Connected</div>`
+      : `<div class="status-badge pending"><div class="status-dot pending"></div>Not connected</div>`;
+
+    let controlHtml;
+    if (svc.hasToggle) {
+      // Calendar — simple on/off toggle, no scope choice
+      controlHtml = `
+        <div class="toggle-pill" style="flex:1">
+          <div class="toggle-track ${isConnected ? '' : 'off'}">
+            <div class="toggle-thumb"></div>
+          </div>
+          <span style="font-size:11px;color:var(--text2)">${svc.toggleLabel}</span>
+        </div>`;
+    } else {
+      // Service with scope options
+      const scopeBtns = svc.scopes.map(sc => {
+        const isActive = selectedScopes[svc.id] === sc.key;
+        return `<button class="scope-btn ${isActive ? 'active' : ''}"
+          title="${sc.desc}"
+          onclick="selectScope('${svc.id}', '${sc.key}')"
+        >${sc.label}</button>`;
+      }).join('');
+      controlHtml = `<div class="scope-group">${scopeBtns}</div>`;
+    }
+
+    return `
+      <div class="service-row">
+        <div class="service-icon">${svc.icon}</div>
+        <div class="service-name">${svc.name}</div>
+        ${controlHtml}
+        ${badgeHtml}
+      </div>`;
+  }).join('');
+
+  // Reauth button label
+  const anyConnected = Object.values(connected).some(Boolean);
+  document.getElementById('reauthLabel').textContent =
+    anyConnected ? 'Re-authorize Google' : 'Authorize Google';
+
+  // Change notice
+  document.getElementById('changeNotice').style.display =
+    hasUnsavedChanges && anyConnected ? 'block' : 'none';
+
+  // Disconnect all visibility
+  document.getElementById('disconnectBtn').style.display =
+    anyConnected ? 'inline-block' : 'none';
+}
+
+function selectScope(serviceId, scopeKey) {
+  selectedScopes[serviceId] = scopeKey;
+  const connected = CONNECTED_MAP[currentState];
+  if (connected[serviceId]) hasUnsavedChanges = true;
+  render();
+}
+
+function setState(state) {
+  currentState = state;
+  hasUnsavedChanges = false;
+  document.querySelectorAll('.ctrl-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase().includes(
+      state === 'connected' ? 'all' : state === 'partial' ? 'partial' : 'not'));
+  });
+  render();
+}
+
+// Init
+render();
+</script>
+</body>
+</html>

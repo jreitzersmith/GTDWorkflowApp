@@ -62,9 +62,10 @@ export default function GTDManager() {
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
-  const { googleToken, googleScope, calendarEnabled, gmailError,
-          signInWithGoogle, disconnectGmail, connectCalendar, disconnectCalendar,
-          refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
+  const { googleToken, googleScope, calendarEnabled, driveEnabled, docsEnabled,
+          sheetsEnabled, slidesEnabled, gmailError, scopePrefs,
+          setScopePref, reauthorizeGoogle, connectCalendar, disconnectCalendar,
+          disconnectAll, refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
   const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
@@ -856,13 +857,18 @@ export default function GTDManager() {
                           onImport={handleImport}
                           onClose={() => setShowSettings(false)}
                           googleToken={googleToken}
-                          googleScope={googleScope}
-                          onConnectGmail={signInWithGoogle}
-                          onDisconnectGmail={disconnectGmail}
+                          gmailScope={googleScope}
                           gmailError={gmailError}
                           calendarEnabled={calendarEnabled}
-                          onConnectCalendar={connectCalendar}
+                          driveEnabled={driveEnabled}
+                          docsEnabled={docsEnabled}
+                          sheetsEnabled={sheetsEnabled}
+                          slidesEnabled={slidesEnabled}
+                          scopePrefs={scopePrefs}
+                          onSetScopePref={setScopePref}
+                          onReauthorizeGoogle={reauthorizeGoogle}
                           onDisconnectCalendar={disconnectCalendar}
+                          onDisconnectAll={disconnectAll}
                           recurringReviewDays={recurringReviewDays}
                           onSetRecurringReviewDays={setRecurringReviewDays}
                         />

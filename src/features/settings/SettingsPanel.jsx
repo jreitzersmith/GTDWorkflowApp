@@ -2,15 +2,97 @@ import { useState, useRef } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
-import { GMAIL_SCOPE_OPTS, GMAIL_SCOPE_DISPLAY } from "../email/gmailTools.js";
 import { SettingsSection } from "./SettingsSection.jsx";
 import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager } from "./SettingsManagerComponents.jsx";
 
-function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, categories, onAddCategory, onRenameCategory, onRemoveCategory, efforts, onAddEffort, onRenameEffort, onRemoveEffort, calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride, tagDisplay, onSetTagDisplay, onExport, onImport, onClose, googleToken, googleScope, onConnectGmail, onDisconnectGmail, gmailError, calendarEnabled, onConnectCalendar, onDisconnectCalendar, recurringReviewDays, onSetRecurringReviewDays }) {
+// ── Google Services section config ────────────────────────────────────────────
+const GOOGLE_SERVICES = [
+  {
+    id: 'gmail', icon: '✉', name: 'Gmail',
+    scopes: [
+      { key: 'readonly', label: 'Read only',  desc: 'Search and read emails' },
+      { key: 'modify',   label: 'Organize',   desc: '+ label, archive, filter' },
+      { key: 'compose',  label: 'Compose',    desc: '+ draft replies' },
+      { key: 'send',     label: 'Send',       desc: '+ send messages' },
+    ],
+  },
+  { id: 'calendar', icon: '📅', name: 'Calendar', isToggle: true },
+  {
+    id: 'drive', icon: '💾', name: 'Drive',
+    scopes: [
+      { key: 'standard', label: 'Standard', desc: 'Browse, attach & upload files' },
+      { key: 'full',     label: 'Full',     desc: '+ manage all Drive content' },
+    ],
+  },
+  {
+    id: 'docs', icon: '📄', name: 'Docs',
+    scopes: [
+      { key: 'readonly', label: 'Read only', desc: 'Read docs for AI context' },
+      { key: 'full',     label: 'Full',      desc: '+ create & edit docs' },
+    ],
+  },
+  {
+    id: 'sheets', icon: '📊', name: 'Sheets',
+    scopes: [
+      { key: 'readonly', label: 'Read only', desc: 'Read spreadsheets' },
+      { key: 'full',     label: 'Full',      desc: '+ create & edit sheets' },
+    ],
+  },
+  {
+    id: 'slides', icon: '📽', name: 'Slides',
+    scopes: [
+      { key: 'readonly', label: 'Read only', desc: 'Read presentations' },
+      { key: 'full',     label: 'Full',      desc: '+ create & edit slides' },
+    ],
+  },
+];
+
+// Map service id → enabled prop
+function getEnabled(id, { googleToken, calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled }) {
+  if (id === 'gmail')    return !!googleToken;
+  if (id === 'calendar') return calendarEnabled;
+  if (id === 'drive')    return driveEnabled;
+  if (id === 'docs')     return docsEnabled;
+  if (id === 'sheets')   return sheetsEnabled;
+  if (id === 'slides')   return slidesEnabled;
+  return false;
+}
+
+// ── Inline style helpers ──────────────────────────────────────────────────────
+const scopeBtnStyle = (active) => ({
+  padding: '3px 8px',
+  borderRadius: 5,
+  border: `1px solid ${active ? COLORS.accent : COLORS.border2}`,
+  background: active ? COLORS.surface3 : 'transparent',
+  color: active ? COLORS.text : COLORS.text2,
+  fontFamily: 'inherit',
+  fontSize: 10,
+  fontWeight: active ? 600 : 400,
+  cursor: 'pointer',
+  lineHeight: 1.4,
+});
+
+function SettingsPanel({
+  locations, tasks, onAdd, onRename, onRemove,
+  categories, onAddCategory, onRenameCategory, onRemoveCategory,
+  efforts, onAddEffort, onRenameEffort, onRemoveEffort,
+  calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride,
+  tagDisplay, onSetTagDisplay,
+  onExport, onImport, onClose,
+  // Google props
+  googleToken, gmailScope, gmailError,
+  calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
+  scopePrefs, onSetScopePref,
+  onReauthorizeGoogle, onDisconnectCalendar, onDisconnectAll,
+  // Other
+  recurringReviewDays, onSetRecurringReviewDays,
+}) {
   const fileInputRef = useRef(null);
   const [importMode, setImportMode] = useState("replace");
-  const [gmailPendingScope, setGmailPendingScope] = useState('readonly');
-  const [gmailChangingScope, setGmailChangingScope] = useState(false);
+
+  // Tracks whether any scope pref has changed since the last re-auth.
+  // Reset to false on mount (fresh after OAuth redirect) and on Re-authorize click.
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -28,6 +110,35 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, categories
     e.target.value = "";
   };
 
+  const handleScopePref = (service, level) => {
+    onSetScopePref(service, level);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleCalendarToggle = () => {
+    if (calendarEnabled) {
+      // Disconnect immediately; also mark calendar pref as off
+      onDisconnectCalendar();
+      onSetScopePref('calendar', false);
+    } else {
+      // Not yet authorized — mark desired and prompt re-auth
+      onSetScopePref('calendar', true);
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleReauthorize = () => {
+    setHasUnsavedChanges(false);
+    onReauthorizeGoogle();
+  };
+
+  const anyConnected = !!googleToken;
+  const TOGGLE_ON  = { width: 28, height: 16, borderRadius: 8, background: COLORS.next, position: 'relative', cursor: 'pointer', flexShrink: 0, border: 'none' };
+  const TOGGLE_OFF = { ...TOGGLE_ON, background: COLORS.border2 };
+  const THUMB      = (on) => ({ width: 12, height: 12, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2, ...(on ? { right: 2 } : { left: 2 }) });
+
+  const enabledFlags = { googleToken, calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled };
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -40,105 +151,123 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, categories
           style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
         >✕ Close</button>
       </div>
+
       <div style={{ flex: 1, overflowY: "auto", padding: "0 24px" }}>
-        <SettingsSection label="Google / Gmail" storageKey="gtd_settings_gmail">
-          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
-            Connect Gmail to let the AI coach read and act on your inbox. Choose the access level below.
+
+        {/* ── Google Services ─────────────────────────────────────────────── */}
+        <SettingsSection label="Google Services" storageKey="gtd_settings_google_services">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12, lineHeight: 1.5 }}>
+            Connect Google services for email, calendar, documents, and files. Choose the access level
+            for each service, then click <strong style={{ color: COLORS.text2 }}>
+            {anyConnected ? 'Re-authorize Google' : 'Authorize Google'}</strong> to apply.
           </div>
-          {googleToken ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: COLORS.next }}>✓ Gmail connected — {GMAIL_SCOPE_DISPLAY[googleScope] || googleScope || 'read only'}</span>
-                {!gmailChangingScope && (<>
-                  <button onClick={() => { setGmailPendingScope(googleScope || 'readonly'); setGmailChangingScope(true); }}
-                    style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Change</button>
-                  <button onClick={onDisconnectGmail}
-                    style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Disconnect</button>
-                </>)}
-                {gmailChangingScope && (
-                  <button onClick={onDisconnectGmail}
-                    style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Disconnect</button>
-                )}
-              </div>
-              {gmailChangingScope && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {GMAIL_SCOPE_OPTS.map(opt => (
-                    <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
-                      borderRadius: 6, cursor: 'pointer',
-                      border: `1px solid ${gmailPendingScope === opt.key ? COLORS.accent : COLORS.border2}`,
-                      background: gmailPendingScope === opt.key ? COLORS.surface3 : 'transparent' }}>
-                      <input type="radio" name="gmail_scope_change" value={opt.key}
-                        checked={gmailPendingScope === opt.key}
-                        onChange={() => setGmailPendingScope(opt.key)}
-                        style={{ accentColor: COLORS.accent, cursor: 'pointer' }} />
-                      <span style={{ fontSize: 12, fontWeight: gmailPendingScope === opt.key ? 600 : 400, color: COLORS.text, minWidth: 68 }}>{opt.label}</span>
-                      <span style={{ fontSize: 11, color: COLORS.muted }}>{opt.desc}</span>
-                    </label>
-                  ))}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                    <button onClick={() => { setGmailChangingScope(false); onConnectGmail(gmailPendingScope); }}
-                      style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${COLORS.accent}`, background: COLORS.accent, color: '#fff', fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}>Reconnect</button>
-                    <button onClick={() => setGmailChangingScope(false)}
-                      style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+
+          {/* Change notice */}
+          {hasUnsavedChanges && (
+            <div style={{ fontSize: 11, color: COLORS.inbox, background: COLORS.inboxBg, border: `1px solid #3e3418`, borderRadius: 6, padding: '7px 10px', marginBottom: 12, lineHeight: 1.4 }}>
+              ⚠ Scope changes are pending — click <strong>
+              {anyConnected ? 'Re-authorize Google' : 'Authorize Google'}</strong> below to apply them.
+            </div>
+          )}
+
+          {/* Service rows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+            {GOOGLE_SERVICES.map(svc => {
+              const isConnected = getEnabled(svc.id, enabledFlags);
+              return (
+                <div key={svc.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8 }}>
+                  {/* Icon + name */}
+                  <span style={{ fontSize: 14, width: 20, textAlign: 'center', flexShrink: 0 }}>{svc.icon}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, width: 56, flexShrink: 0 }}>{svc.name}</span>
+
+                  {/* Scope controls */}
+                  {svc.isToggle ? (
+                    /* Calendar: toggle only */
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        onClick={handleCalendarToggle}
+                        style={isConnected ? TOGGLE_ON : TOGGLE_OFF}
+                        title={isConnected ? 'Disconnect Calendar' : 'Enable Calendar (requires Re-authorize)'}
+                      >
+                        <div style={THUMB(isConnected)} />
+                      </button>
+                      <span style={{ fontSize: 11, color: COLORS.text2 }}>
+                        {isConnected
+                          ? 'Full access'
+                          : scopePrefs.calendar && !isConnected
+                            ? <span style={{ color: COLORS.inbox }}>Pending re-authorize</span>
+                            : <span style={{ color: COLORS.muted }}>Off</span>
+                        }
+                      </span>
+                    </div>
+                  ) : (
+                    /* Other services: segmented scope selector */
+                    <div style={{ flex: 1, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                      {svc.scopes.map(sc => {
+                        const active = (scopePrefs[svc.id] || svc.scopes[0].key) === sc.key;
+                        return (
+                          <button
+                            key={sc.key}
+                            onClick={() => handleScopePref(svc.id, sc.key)}
+                            title={sc.desc}
+                            style={scopeBtnStyle(active)}
+                          >
+                            {sc.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Status badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 'auto', paddingLeft: 8 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: isConnected ? COLORS.next : COLORS.muted, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, color: isConnected ? COLORS.next : COLORS.muted }}>
+                      {isConnected ? 'Connected' : 'Not connected'}
+                    </span>
                   </div>
                 </div>
-              )}
-              {gmailError && <div style={{ fontSize: 11, color: '#d4845a', lineHeight: 1.4 }}>⚠ {gmailError}</div>}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 4 }}>
-                {GMAIL_SCOPE_OPTS.map(opt => (
-                  <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
-                    borderRadius: 6, cursor: 'pointer',
-                    border: `1px solid ${gmailPendingScope === opt.key ? COLORS.accent : COLORS.border2}`,
-                    background: gmailPendingScope === opt.key ? COLORS.surface3 : 'transparent' }}>
-                    <input type="radio" name="gmail_scope" value={opt.key}
-                      checked={gmailPendingScope === opt.key}
-                      onChange={() => setGmailPendingScope(opt.key)}
-                      style={{ accentColor: COLORS.accent, cursor: 'pointer' }} />
-                    <span style={{ fontSize: 12, fontWeight: gmailPendingScope === opt.key ? 600 : 400, color: COLORS.text, minWidth: 68 }}>{opt.label}</span>
-                    <span style={{ fontSize: 11, color: COLORS.muted }}>{opt.desc}</span>
-                  </label>
-                ))}
-              </div>
-              <button onClick={() => onConnectGmail(gmailPendingScope)}
-                style={{ padding: '7px 14px', borderRadius: 7, border: `1px solid ${COLORS.border2}`,
-                         background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit',
-                         fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                         alignSelf: 'flex-start' }}>
-                <span style={{ fontSize: 14 }}>G</span> Connect Gmail
-              </button>
-              {gmailError && <div style={{ fontSize: 11, color: '#d4845a', lineHeight: 1.4 }}>⚠ {gmailError}</div>}
-            </div>
-          )}
-        </SettingsSection>
-        <SettingsSection label="Google Calendar" storageKey="gtd_settings_calendar">
-          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
-            Connect Google Calendar to view events, add tasks as calendar events, and let the AI suggest tasks from your calendar.
+              );
+            })}
           </div>
-          {!calendarEnabled && <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 10, lineHeight: 1.4, padding: '7px 10px', background: COLORS.surface2, borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
-            ⚠ Before connecting, enable the <strong style={{ color: COLORS.text2 }}>Google Calendar API</strong> in your Google Cloud Console project and add the <code style={{ fontSize: 10, background: COLORS.surface3, padding: '1px 4px', borderRadius: 3 }}>calendar.events</code> scope to your OAuth consent screen.
-          </div>}
-          {calendarEnabled ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: COLORS.next }}>✓ Calendar connected</span>
-              <button onClick={onDisconnectCalendar}
-                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
-                Disconnect
-              </button>
-              <button onClick={onConnectCalendar}
-                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
-                Reconnect
-              </button>
+
+          {/* Gmail active scope display */}
+          {gmailScope && googleToken && (
+            <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 10 }}>
+              Gmail authorized at: <span style={{ color: COLORS.text2 }}>{gmailScope}</span>
             </div>
-          ) : (
-            <button onClick={onConnectCalendar}
-              style={{ padding: '7px 14px', borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}>
-              <span style={{ fontSize: 14 }}>📅</span> Connect Calendar
-            </button>
           )}
+
+          {/* Error */}
+          {gmailError && (
+            <div style={{ fontSize: 11, color: COLORS.waiting, lineHeight: 1.4, marginBottom: 10 }}>⚠ {gmailError}</div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              onClick={handleReauthorize}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 7, border: `1px solid ${COLORS.accent}`, background: COLORS.accent, color: '#fff', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <span style={{ fontSize: 13 }}>G</span>
+              {anyConnected ? 'Re-authorize Google' : 'Authorize Google'}
+            </button>
+            {anyConnected && (
+              <button
+                onClick={onDisconnectAll}
+                style={{ padding: '8px 14px', borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}
+              >
+                Disconnect All
+              </button>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: COLORS.muted, marginTop: 8, lineHeight: 1.4 }}>
+            Re-authorizing opens a single Google sign-in that grants all selected scopes at once.
+            Your tasks and settings are not affected.
+          </div>
         </SettingsSection>
+
+        {/* ── Weekly Review ────────────────────────────────────────────────── */}
         <SettingsSection label="Weekly Review" storageKey="gtd_settings_weekly_review">
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
             Recurring calendar events you've reviewed will resurface during your Weekly Review after this many days.
@@ -154,6 +283,7 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, categories
             <span style={{ fontSize: 12, color: COLORS.text2 }}>days</span>
           </div>
         </SettingsSection>
+
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
           <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
         </SettingsSection>
@@ -182,18 +312,9 @@ function SettingsPanel({ locations, tasks, onAdd, onRename, onRemove, categories
             <strong style={{ color: COLORS.text2 }}>Merge</strong> adds only tasks from the backup that don't already exist.
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button
-              onClick={onExport}
-              style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
-            >⬇ Export</button>
-            <button
-              onClick={() => { setImportMode("replace"); fileInputRef.current?.click(); }}
-              style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
-            >⬆ Import (Replace)</button>
-            <button
-              onClick={() => { setImportMode("merge"); fileInputRef.current?.click(); }}
-              style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
-            >⬆ Import (Merge)</button>
+            <button onClick={onExport} style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>⬇ Export</button>
+            <button onClick={() => { setImportMode("replace"); fileInputRef.current?.click(); }} style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>⬆ Import (Replace)</button>
+            <button onClick={() => { setImportMode("merge"); fileInputRef.current?.click(); }} style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>⬆ Import (Merge)</button>
             <input ref={fileInputRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={handleFileChange} />
           </div>
         </SettingsSection>
@@ -224,14 +345,21 @@ SettingsPanel.propTypes = {
   onExport:                   PropTypes.func.isRequired,
   onImport:                   PropTypes.func.isRequired,
   onClose:                    PropTypes.func.isRequired,
+  // Google
   googleToken:                PropTypes.string,
-  googleScope:                PropTypes.string,
-  onConnectGmail:             PropTypes.func.isRequired,
-  onDisconnectGmail:          PropTypes.func.isRequired,
+  gmailScope:                 PropTypes.string,
   gmailError:                 PropTypes.string,
   calendarEnabled:            PropTypes.bool.isRequired,
-  onConnectCalendar:          PropTypes.func.isRequired,
+  driveEnabled:               PropTypes.bool.isRequired,
+  docsEnabled:                PropTypes.bool.isRequired,
+  sheetsEnabled:              PropTypes.bool.isRequired,
+  slidesEnabled:              PropTypes.bool.isRequired,
+  scopePrefs:                 PropTypes.object.isRequired,
+  onSetScopePref:             PropTypes.func.isRequired,
+  onReauthorizeGoogle:        PropTypes.func.isRequired,
   onDisconnectCalendar:       PropTypes.func.isRequired,
+  onDisconnectAll:            PropTypes.func.isRequired,
+  // Other
   recurringReviewDays:        PropTypes.number.isRequired,
   onSetRecurringReviewDays:   PropTypes.func.isRequired,
 };
