@@ -11,6 +11,7 @@ import { ErrorBoundary } from "./shared/ErrorBoundary.jsx";
 import { ResizeHandle } from "./shared/ResizeHandle.jsx";
 import { AuthGate } from "./shared/AuthGate.jsx";
 import { AppSidebar } from "./shared/AppSidebar.jsx";
+import { SearchModal } from "./shared/SearchModal.jsx";
 import { TaskBucketView } from "./features/tasks/TaskBucketView.jsx";
 import { CoachPanel } from "./features/coach/CoachPanel.jsx";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth.js";
@@ -67,6 +68,7 @@ export default function GTDManager() {
   const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // ── Auth ───────────────────────────────────────────────────────────────
   const { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink } = useSupabaseAuth();
@@ -110,6 +112,18 @@ export default function GTDManager() {
   }, [googleToken]);
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
   useEffect(() => { setSelectedTaskId(null); }, [currentBucket]);
+
+  // Global search — Cmd+K / Ctrl+K
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(v => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // Auto-surface: on mount, move any standalone deferred tasks whose wake date has passed into Inbox.
   // Only moves tasks with no parentId (project subtasks stay in place; their deferUntil just stops hiding them).
@@ -307,6 +321,14 @@ export default function GTDManager() {
     setPendingAction(null);
     setMessages(msgs);
   };
+
+  const handleSearchSelect = useCallback((task) => {
+    setCurrentView("gtd");
+    setCurrentBucket(task.bucket);
+    setSelectedTaskId(task.id);
+    setShowSettings(false);
+    setShowUsage(false);
+  }, [setCurrentView, setCurrentBucket, setSelectedTaskId, setShowSettings, setShowUsage]);
 
   const startBrainDump = () => {
     switchCoachMode("dump", "Let's surface everything in your head and get it into your inbox.\n\n**Starting with work:** What professional tasks, deadlines, or commitments have been on your mind that aren't written down anywhere?");
@@ -792,7 +814,15 @@ export default function GTDManager() {
           onProcessInbox={startProcessInbox}
           onWeeklyReview={startWeeklyReview}
           onBrainDump={startBrainDump}
+          onOpenSearch={() => setSearchOpen(true)}
         />
+        {searchOpen && (
+          <SearchModal
+            tasks={tasks}
+            onSelect={handleSearchSelect}
+            onClose={() => setSearchOpen(false)}
+          />
+        )}
         <ResizeHandle onMouseDown={sidebarDragDown} direction="h" />
 
         <div style={s.main}>

@@ -19,6 +19,7 @@ function AppSidebar({
   onProcessInbox,
   onWeeklyReview,
   onBrainDump,
+  onOpenSearch,
 }) {
   return (
     <div style={{ width: sidebarWidth, background: COLORS.surface, display: "flex", flexDirection: "column", flexShrink: 0 }}>
@@ -75,6 +76,17 @@ function AppSidebar({
           <span style={{ flex: 1, fontSize: 13, color: currentView === "calendar" ? COLORS.text : COLORS.text2 }}>📅 Calendar</span>
           {calendarEnabled && <span style={{ fontSize: 9, background: COLORS.calendar + "33", color: COLORS.calendar, padding: "1px 5px", borderRadius: 8, fontWeight: 500 }}>✓</span>}
         </div>
+
+        <div
+          onClick={onOpenSearch}
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: "transparent", borderLeft: "3px solid transparent", transition: "background 0.1s" }}
+          onMouseEnter={e => e.currentTarget.style.background = COLORS.surface2}
+          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.text2, flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: COLORS.text2 }}>🔍 Search</span>
+          <kbd style={{ fontSize: 9, color: COLORS.muted, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "1px 4px" }}>⌘K</kbd>
+        </div>
       </div>
 
       <div style={{ padding: 10, borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -108,6 +120,7 @@ AppSidebar.propTypes = {
   onProcessInbox:  PropTypes.func.isRequired,
   onWeeklyReview:  PropTypes.func.isRequired,
   onBrainDump:     PropTypes.func.isRequired,
+  onOpenSearch:    PropTypes.func.isRequired,
 };
 
 export { AppSidebar };
