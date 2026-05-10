@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useTaskDetailDrafts } from "./useTaskDetailDrafts.js";
 import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../../constants.jsx";
@@ -231,9 +231,105 @@ RecurrenceEditor.propTypes = {
   onUpdate: PropTypes.func.isRequired,
 };
 
+// Drive file attachments section. Loads the Google Picker lazily on first use.
+// Shown only when driveEnabled is true.
+function DriveAttachments({ taskId, attachments, driveEnabled, googleToken, onUpdate }) {
+  const pickerLoading = useRef(false);
+
+  function ensureGapi(cb) {
+    if (window.gapi && window.gapi.load) { cb(); return; }
+    if (pickerLoading.current) return; // script already injected, wait
+    pickerLoading.current = true;
+    const script = document.createElement('script');
+    script.src = 'https://apis.google.com/js/api.js';
+    script.onload = () => { pickerLoading.current = false; cb(); };
+    document.head.appendChild(script);
+  }
+
+  function openPicker() {
+    const token = googleToken?.accessToken;
+    if (!token) return;
+    ensureGapi(() => {
+      window.gapi.load('picker', () => {
+        const devKey = import.meta.env.VITE_GOOGLE_BROWSER_API_KEY;
+        const picker = new window.google.picker.PickerBuilder()
+          .addView(
+            new window.google.picker.DocsView()
+              .setIncludeFolders(false)
+              .setSelectFolderEnabled(false)
+          )
+          .addView(new window.google.picker.DocsView(window.google.picker.ViewId.RECENTLY_PICKED))
+          .enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED)
+          .setOAuthToken(token)
+          .setDeveloperKey(devKey)
+          .setCallback((data) => {
+            if (data.action !== 'picked') return;
+            const picked = (data.docs || []).map(d => ({
+              id:       d.id,
+              name:     d.name,
+              mimeType: d.mimeType,
+              url:      d.url,
+            }));
+            const existing = attachments || [];
+            // Merge: skip duplicates
+            const merged = [...existing];
+            for (const att of picked) {
+              if (!merged.find(a => a.id === att.id)) merged.push(att);
+            }
+            onUpdate(taskId, { driveAttachments: merged });
+          })
+          .build();
+        picker.setVisible(true);
+      });
+    });
+  }
+
+  function removeAttachment(fileId) {
+    onUpdate(taskId, { driveAttachments: (attachments || []).filter(a => a.id !== fileId) });
+  }
+
+  if (!driveEnabled) return null;
+
+  const list = attachments || [];
+  return (
+    <div>
+      <div style={fieldLabel}>Drive Files</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {list.map(att => (
+          <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <a
+              href={att.url}
+              target="_blank"
+              rel="noreferrer"
+              style={{ flex: 1, fontSize: 12, color: COLORS.project, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              title={att.name}
+            >{att.name}</a>
+            <button
+              onClick={() => removeAttachment(att.id)}
+              title="Remove"
+              style={{ background: 'none', border: 'none', color: COLORS.muted, cursor: 'pointer', padding: '0 2px', fontSize: 15, lineHeight: 1, flexShrink: 0 }}
+            >×</button>
+          </div>
+        ))}
+        <button
+          onClick={openPicker}
+          style={{ alignSelf: 'flex-start', padding: '3px 10px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+        >+ Attach Drive file</button>
+      </div>
+    </div>
+  );
+}
+DriveAttachments.propTypes = {
+  taskId:       PropTypes.string.isRequired,
+  attachments:  PropTypes.array,
+  driveEnabled: PropTypes.bool,
+  googleToken:  PropTypes.object,
+  onUpdate:     PropTypes.func.isRequired,
+};
+
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
-function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, googleToken, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
   const {
     titleDraft, setTitleDraft, saveTitle,
     notesDraft, setNotesDraft, saveNotes,
@@ -287,6 +383,15 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, onUpd
             style={{ ...fieldInput, flex: 1, resize: "none", lineHeight: 1.5, minHeight: 120 }}
           />
         </div>
+
+        {/* Drive attachments */}
+        <DriveAttachments
+          taskId={task.id}
+          attachments={task.driveAttachments}
+          driveEnabled={driveEnabled}
+          googleToken={googleToken}
+          onUpdate={onUpdate}
+        />
 
         {/* Metadata */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -475,6 +580,8 @@ TaskDetailPanel.propTypes = {
   locations:         PropTypes.arrayOf(PropTypes.string).isRequired,
   efforts:           PropTypes.arrayOf(PropTypes.string).isRequired,
   categories:        PropTypes.arrayOf(PropTypes.string),
+  driveEnabled:      PropTypes.bool,
+  googleToken:       PropTypes.object,
   onUpdate:          PropTypes.func.isRequired,
   onComplete:        PropTypes.func.isRequired,
   onDelete:          PropTypes.func.isRequired,

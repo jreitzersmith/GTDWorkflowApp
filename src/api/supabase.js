@@ -63,6 +63,7 @@ function taskToDb(task, userId) {
     sort_order:         task.sortOrder      ?? 0,
     category:           task.category       ?? null,
     calendar_event_id:  task.calendarEventId ?? null,
+    drive_attachments:  task.driveAttachments ?? [],
     updated_at:         new Date().toISOString(),
   };
 }
@@ -84,9 +85,10 @@ function dbToTask(row) {
     notes:        row.notes         ?? null,
     recurrence:   row.recurrence    ?? null,
     childIds:     row.child_ids     ?? [],
-    sortOrder:       row.sort_order        ?? 0,
-    category:        row.category          ?? null,
-    calendarEventId: row.calendar_event_id ?? null,
+    sortOrder:         row.sort_order          ?? 0,
+    category:          row.category            ?? null,
+    calendarEventId:   row.calendar_event_id   ?? null,
+    driveAttachments:  row.drive_attachments   ?? [],
   };
   if (row.parent_id) t.parentId = row.parent_id;
   return t;
