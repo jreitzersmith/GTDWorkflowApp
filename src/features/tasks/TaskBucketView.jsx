@@ -1,4 +1,5 @@
 import PropTypes from "prop-types";
+import { useState, useEffect } from "react";
 import { COLORS, BUCKETS } from "../../constants.jsx";
 import { Btn, ToolbarBtn } from "../../shared/SidebarComponents.jsx";
 import { TaskRow } from "./TaskRow.jsx";
@@ -85,7 +86,21 @@ function TaskBucketView({
   projectCategoryFilter,
   setProjectCategoryFilter,
 }) {
+  const [filterText, setFilterText] = useState("");
+
+  // Reset filter when switching buckets
+  useEffect(() => { setFilterText(""); }, [currentBucket]);
+
   const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+
+  // Flat filtered list used when filterText is active (bypasses all grouping/tree logic)
+  const filterActive = filterText.trim().length > 0;
+  const filteredTasks = filterActive
+    ? bucketTasks.filter(t => {
+        const q = filterText.toLowerCase();
+        return (t.text || "").toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q);
+      })
+    : null;
 
   return (
     <>
@@ -95,6 +110,23 @@ function TaskBucketView({
           <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 300 }}>{BUCKETS[currentBucket].label}</div>
           <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{BUCKETS[currentBucket].desc}</div>
         </div>
+
+        {/* In-bucket search filter */}
+        {bucketTasks.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <input
+              value={filterText}
+              onChange={e => setFilterText(e.target.value)}
+              placeholder="Filter…"
+              style={{ width: filterActive ? 160 : 90, background: COLORS.surface2, border: `1px solid ${filterActive ? COLORS.inbox + "88" : COLORS.border}`, borderRadius: 6, padding: "4px 9px", fontFamily: "inherit", fontSize: 12, color: COLORS.text, outline: "none", transition: "width 0.15s, border-color 0.15s" }}
+            />
+            {filterActive && (
+              <span style={{ fontSize: 11, color: COLORS.muted, whiteSpace: "nowrap" }}>
+                {filteredTasks.length} / {bucketTasks.length}
+              </span>
+            )}
+          </div>
+        )}
 
         {currentBucket === "project" && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -219,7 +251,16 @@ function TaskBucketView({
 
       {/* Task list */}
       <div style={TASK_LIST_STYLE}>
-        {bucketTasks.length === 0 ? (
+        {filterActive ? (
+          filteredTasks.length === 0 ? (
+            <div style={{ padding: "28px 24px", textAlign: "center", color: COLORS.muted, fontSize: 12 }}>
+              <div style={{ fontSize: 22, opacity: 0.3, marginBottom: 8 }}>○</div>
+              No tasks match <em>"{filterText}"</em>
+            </div>
+          ) : (
+            filteredTasks.map(task => <TaskRow key={task.id} task={task} />)
+          )
+        ) : bucketTasks.length === 0 ? (
           <EmptyState bucket={currentBucket} />
         ) : currentBucket === "project" ? (
           <div onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropTarget(null); }}>
