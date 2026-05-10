@@ -1038,7 +1038,7 @@ export default function GTDManager() {
                     efforts={efforts}
                     categories={categories}
                     driveEnabled={driveEnabled}
-                    googleToken={googleToken}
+                    googleAccessToken={googleToken}
                     onUpdate={updateTask}
                     onComplete={(id) => { completeTask(id); setSelectedTaskId(null); }}
                     onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}

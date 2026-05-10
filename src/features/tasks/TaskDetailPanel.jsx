@@ -233,7 +233,7 @@ RecurrenceEditor.propTypes = {
 
 // Drive file attachments section. Loads the Google Picker lazily on first use.
 // Shown only when driveEnabled is true.
-function DriveAttachments({ taskId, attachments, driveEnabled, googleToken, onUpdate }) {
+function DriveAttachments({ taskId, attachments, driveEnabled, googleAccessToken, onUpdate }) {
   const pickerLoading = useRef(false);
 
   function ensureGapi(cb) {
@@ -247,7 +247,7 @@ function DriveAttachments({ taskId, attachments, driveEnabled, googleToken, onUp
   }
 
   function openPicker() {
-    const token = googleToken?.accessToken;
+    const token = googleAccessToken;
     if (!token) return;
     ensureGapi(() => {
       window.gapi.load('picker', () => {
@@ -320,16 +320,16 @@ function DriveAttachments({ taskId, attachments, driveEnabled, googleToken, onUp
   );
 }
 DriveAttachments.propTypes = {
-  taskId:       PropTypes.string.isRequired,
-  attachments:  PropTypes.array,
-  driveEnabled: PropTypes.bool,
-  googleToken:  PropTypes.object,
-  onUpdate:     PropTypes.func.isRequired,
+  taskId:            PropTypes.string.isRequired,
+  attachments:       PropTypes.array,
+  driveEnabled:      PropTypes.bool,
+  googleAccessToken: PropTypes.string,
+  onUpdate:          PropTypes.func.isRequired,
 };
 
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
-function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, googleToken, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, googleAccessToken, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
   const {
     titleDraft, setTitleDraft, saveTitle,
     notesDraft, setNotesDraft, saveNotes,
@@ -389,7 +389,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
           taskId={task.id}
           attachments={task.driveAttachments}
           driveEnabled={driveEnabled}
-          googleToken={googleToken}
+          googleAccessToken={googleAccessToken}
           onUpdate={onUpdate}
         />
 
@@ -581,7 +581,7 @@ TaskDetailPanel.propTypes = {
   efforts:           PropTypes.arrayOf(PropTypes.string).isRequired,
   categories:        PropTypes.arrayOf(PropTypes.string),
   driveEnabled:      PropTypes.bool,
-  googleToken:       PropTypes.object,
+  googleAccessToken: PropTypes.string,
   onUpdate:          PropTypes.func.isRequired,
   onComplete:        PropTypes.func.isRequired,
   onDelete:          PropTypes.func.isRequired,
