@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#58**
+> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#59**
 
 ---
 
@@ -46,6 +46,7 @@
 - FR#44 [GH#40] (2026-05-09) — Slides briefing from tasks — generate a Google Slides briefing deck from a selected project or set of Next Actions; one slide per task or milestone
 - FR#45 [GH#41] (2026-05-09) — Unified Drive/Docs/Sheets search — search bar in coach or task panel that queries Drive full-text and returns matching files as context or task attachments
 - FR#46 [GH#42] (2026-05-09) — Receipt-to-Sheets pipeline — forward a receipt email to the app; AI extracts vendor/amount/date and appends a row to a designated Google Sheet
+- FR#59 [GH#58] (2026-05-11) — AI coach Drive search tool — `search_drive` tool in useCallAI.js using Drive API `files.list` full-text search; coach can surface Drive files in conversation and offer to attach them to tasks; relates to FR#45 (UI search bar) but is AI tool-use access
 
 #### Data model expansions
 
