@@ -106,19 +106,15 @@ If an item in the work order hits a HALT condition, the worker logs it and skips
 
 After all changes for a cycle are complete, provide a specific manual testing checklist. Generic advice is not acceptable.
 
-Format requirements:
-- GitHub-flavored markdown checkboxes: `- [ ] item`
-- Each item: specific action + specific expected result
-- Group by feature area if multiple items were implemented
+**Format:** Always present the checklist as an interactive widget using `mcp__visualize__show_widget`. Each item must:
+- Cycle through unchecked → pass → fail → note on click
+- Pre-populate state if the user has already reported results in chat before the widget is rendered
+- Include a "Send results" button that calls `sendPrompt()` with a compact summary (e.g. `FR#XX test results — Item: pass · Item: fail`)
+- Use `note` state (amber) for items that partially passed or have a known caveat
 
-Example:
-```
-- [ ] Open Calendar view — confirm tasks with due dates appear in "tasks with due date, no calendar event" section on first load without refresh
-- [ ] Create a calendar event from a task with a due date — confirm the created event date matches the task's due date, not today
-- [ ] Check created event in Google Calendar — confirm a default notification is present
-```
+Each checklist item: specific action + specific expected result. Group by feature area if multiple items were implemented.
 
-John checks off completed items and pastes back specific failures. Do not ask for a general "did it work" — ask for the checklist result.
+John clicks items to mark state, then submits. Do not ask for a general "did it work" — wait for the widget submission. On receipt, treat pass = confirmed, fail = needs fix (diagnose), note = log as new FR if not already tracked.
 
 ---
 
@@ -286,4 +282,4 @@ If a new issue arrives during Phases 5–6: log it immediately in `Known_Issues_
 
 If a new issue is discovered during morning review: log it, add to the next work order. Do not patch it ad hoc during the review session unless it is a critical regression blocking use of the app.
 
-If the worker encountered unexpected scope (e.g., a dependent file changed and the replacement string was wrong): log in the work order report, add a revised item to the next planning session. Do not attempt to recover mid-batch.
+If the worker encountered unexpected scope (e.g., a dependent file changed and the replacement string was wrong): log in the work order report, add a revised item to the next planning session. Do not attempt

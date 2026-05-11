@@ -144,6 +144,9 @@ These preferences apply to all sessions and both workflow variants. They exist t
 - If the plan says "commit each item separately," commit — do not ask before each commit.
 - Ask for explicit go-ahead only when: scope has changed unexpectedly, a HALT condition was triggered, or a decision requires user judgment that wasn't anticipated in the plan.
 
+**Testing checklists**
+- Always present as an interactive widget (mcp__visualize__show_widget): click-to-cycle pass/fail/note, Send results button calling sendPrompt(). See Cycle_Programming_Workflow.md Phase 5 for full spec.
+
 **Clarifying questions**
 - Ask one clarifying question when category is ambiguous, not a list.
 - If you can proceed confidently with a reasonable assumption, state the assumption and proceed rather than asking.
@@ -205,4 +208,4 @@ Update the Last used numbers line at the top of the file.
 - No emoji in responses unless asked
 - Use `mcp__git__git_commit` for commits, not bash git (avoids HEAD.lock on Windows mount)
 - Use `git -C "path" push origin main` for push, not `cd && git push` (PowerShell `&&` is invalid)
-- Claude Desktop on this machine is MSIX-packaged; config is at `C:\Users\JRS\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`
+- Claude Desktop on this mac
