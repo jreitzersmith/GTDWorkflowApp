@@ -88,3 +88,15 @@ ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS category TEXT;
 
 -- Added with Issue#6 fix (2026-05-09): persists the linked Google Calendar event ID per task
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS calendar_event_id TEXT;
+
+-- One-time data migration (FR#49, 2026-05-11): promote intermediate project-hierarchy nodes
+-- from bucket='next' to bucket='project'. Prior to the 5-level hierarchy feature, any item
+-- added as a child via the project add bar (or dragged under a project) was stored as
+-- bucket='next' regardless of whether it acted as a project container with its own children.
+-- This corrects those rows so they appear in the ProjectTreePicker.
+-- Safe to re-run (WHERE bucket='next' prevents double-promotion).
+--
+-- UPDATE public.tasks
+--   SET bucket = 'project', updated_at = NOW()
+--   WHERE bucket = 'next'
+--   AND jsonb_array_length(child_ids) > 0;
