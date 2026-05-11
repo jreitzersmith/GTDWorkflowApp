@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useContext } from "r
 import { TaskActionsContext, TaskRowContext } from "./contexts.js";
 import { COLORS, BUCKETS } from "./constants.jsx";
 import { EmailManagementView } from "./features/email/email.jsx";
+import { TodaysFocusView } from "./features/tasks/TodaysFocusView.jsx";
 import { CalendarManagementView } from "./features/calendar/CalendarManagementView.jsx";
 import { DeferCheckPrompt, NoteRollupPrompt, ActualEffortPrompt } from "./features/coach/AICoach.jsx";
 import { SettingsPanel } from "./features/settings/SettingsPanel.jsx";
@@ -70,6 +71,17 @@ export default function GTDManager() {
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Compute Today's Focus count from localStorage for sidebar badge
+  const focusCount = (() => {
+    try {
+      const today8601 = new Date().toISOString().slice(0, 10);
+      const raw = localStorage.getItem(`gtd-todays-focus-${today8601}`);
+      if (!raw) return 0;
+      const { ids } = JSON.parse(raw);
+      return (ids || []).filter(id => tasks.find(t => t.id === id && !t.done)).length;
+    } catch { return 0; }
+  })();
+
   const [dailyReviewPhase, setDailyReviewPhase] = useState(() => {
     try {
       const raw = localStorage.getItem('gtd-daily-phase');
@@ -886,6 +898,8 @@ export default function GTDManager() {
           gmailUnreadCount={gmailUnreadCount}
           calendarEnabled={calendarEnabled}
           onSelectBucket={key => () => { setCurrentBucket(key); setCurrentView("gtd"); setShowSettings(false); }}
+          onSelectFocus={() => { setCurrentView("focus"); setShowSettings(false); setSelectedTaskId(null); }}
+          focusCount={focusCount}
           onSelectEmail={() => { setCurrentView("email"); setShowSettings(false); setSelectedTaskId(null); }}
           onSelectCalendar={() => { setCurrentView("calendar"); setShowSettings(false); setSelectedTaskId(null); }}
           onToggleSettings={() => { setShowSettings(v => !v); setShowUsage(false); }}
@@ -991,6 +1005,14 @@ export default function GTDManager() {
                           recurringAcknowledgedMap={recurringAcknowledgedMap}
                           recurringReviewDays={recurringReviewDays}
                           setRecurringAcknowledgedMap={setRecurringAcknowledgedMap}
+                        />
+                      ) : currentView === "focus" ? (
+                        <TodaysFocusView
+                          tasks={tasks}
+                          calendarEvents={calendarEvents}
+                          calendarEnabled={calendarEnabled}
+                          onDailyReview={startDailyReview}
+                          onOpenDetail={setSelectedTaskId}
                         />
                       ) : (
                         <TaskBucketView

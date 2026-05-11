@@ -12,6 +12,8 @@ function AppSidebar({
   gmailUnreadCount,
   calendarEnabled,
   onSelectBucket,
+  onSelectFocus,
+  focusCount,
   onSelectEmail,
   onSelectCalendar,
   onToggleSettings,
@@ -57,6 +59,19 @@ function AppSidebar({
 
         <div style={{ margin: "10px 14px 4px", borderTop: `1px solid ${COLORS.border}` }} />
         <div style={{ padding: "0 16px 4px", fontSize: 10, color: COLORS.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Tools</div>
+
+        <div
+          onClick={onSelectFocus}
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "focus" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "focus" ? "#f0c040" : "transparent"}`, transition: "background 0.1s" }}
+          onMouseEnter={e => { if (currentView !== "focus") { e.currentTarget.style.background = COLORS.surface2; } }}
+          onMouseLeave={e => { if (currentView !== "focus") { e.currentTarget.style.background = "transparent"; } }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#f0c040", flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "focus" ? COLORS.text : COLORS.text2 }}>📋 Today's Focus</span>
+          {focusCount > 0 && (
+            <span style={{ fontSize: 11, background: "#f0c04022", color: "#f0c040", padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{focusCount}</span>
+          )}
+        </div>
 
         <div
           onClick={onSelectEmail}
@@ -114,6 +129,8 @@ AppSidebar.propTypes = {
   gmailUnreadCount: PropTypes.number,
   calendarEnabled: PropTypes.bool.isRequired,
   onSelectBucket:  PropTypes.func.isRequired,
+  onSelectFocus:   PropTypes.func.isRequired,
+  focusCount:      PropTypes.number,
   onSelectEmail:   PropTypes.func.isRequired,
   onSelectCalendar: PropTypes.func.isRequired,
   onToggleSettings: PropTypes.func.isRequired,
