@@ -1,42 +1,83 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useTaskDetailDrafts } from "./useTaskDetailDrafts.js";
 import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { collectDescendantIds, effortAccuracyColor, effortToMinutes } from "./taskUtils.jsx";
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
+import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
 
 // Shared style tokens used across the sub-components below.
 const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
 const fieldInput = { width: "100%", background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", boxSizing: "border-box" };
 
-// Dropdown (and inline "new project" form) for assigning a task to a parent project.
+// Trigger button + floating tree dropdown for assigning a task to a parent
+// project. Sub-projects are collapsed by default and expand on hover.
+// Falls back to an inline text input when "New project…" is chosen.
 function ProjectSelector({ taskId, parentId, eligibleProjects, onReassignProject }) {
   const [newProjMode, setNewProjMode] = useState(false);
   const [newProjName, setNewProjName] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handleClickOutside = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [pickerOpen]);
+
+  const selectedProject = eligibleProjects.find(p => p.id === parentId);
+  const triggerLabel = selectedProject ? selectedProject.text : "— Standalone";
+
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12 }}>
       <span style={{ color: COLORS.text2, width: 64, flexShrink: 0, marginTop: 5 }}>Project</span>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
         {!newProjMode ? (
-          <select
-            value={parentId || ""}
-            onChange={e => {
-              if (e.target.value === "__new__") {
-                setNewProjMode(true);
-                setNewProjName("");
-              } else {
-                onReassignProject(taskId, e.target.value || null);
-              }
-            }}
-            style={{ ...fieldInput, fontSize: 12, color: parentId ? COLORS.project : COLORS.muted }}
-          >
-            <option value="">— Standalone</option>
-            {eligibleProjects.map(p => (
-              <option key={p.id} value={p.id}>{p.text}</option>
-            ))}
-            <option value="__new__">＋ New project…</option>
-          </select>
+          <div ref={pickerRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => setPickerOpen(o => !o)}
+              style={{
+                ...fieldInput, fontSize: 12, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 4,
+                color: parentId ? COLORS.project : COLORS.muted,
+              }}
+            >
+              <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {triggerLabel}
+              </span>
+              <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>▾</span>
+            </button>
+            {pickerOpen && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0,
+                background: COLORS.surface2, border: `1px solid ${COLORS.border2}`,
+                borderRadius: 6, padding: 4, zIndex: 50,
+                maxHeight: 240, overflowY: "auto",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+              }}>
+                <ProjectTreePicker
+                  eligibleProjects={eligibleProjects}
+                  selectedId={parentId}
+                  onSelect={(id) => {
+                    onReassignProject(taskId, id);
+                    setPickerOpen(false);
+                  }}
+                  onNewProject={() => {
+                    setPickerOpen(false);
+                    setNewProjMode(true);
+                    setNewProjName("");
+                  }}
+                  showStandalone
+                />
+              </div>
+            )}
+          </div>
         ) : (
           <div style={{ display: "flex", gap: 5 }}>
             <input
@@ -342,7 +383,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
   // to prevent circular references in the project hierarchy.
   const excludedIds = collectDescendantIds(task.id, allTasks);
   const eligibleProjects = allTasks.filter(
-    t => (t.bucket === "project" && !t.parentId || t.id === task.parentId) && !t.done && !excludedIds.has(t.id)
+    t => t.bucket === "project" && !t.done && !excludedIds.has(t.id)
   );
 
   return (

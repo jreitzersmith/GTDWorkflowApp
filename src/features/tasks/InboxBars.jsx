@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { COLORS } from "../../constants.jsx";
+import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
 
 const BUCKET_OPTS = [
   { key: 'inbox',   label: 'Inbox' },
@@ -16,7 +17,7 @@ function InboxBulkBar({ selectedCount, allTasks, onAssign, onClear }) {
   const [mode, setMode] = useState("pick"); // "pick" | "newName"
   const [newName, setNewName] = useState("");
   const [chosen, setChosen] = useState("");
-  const rootProjects = allTasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+  const eligibleProjects = allTasks.filter(t => t.bucket === "project" && !t.done);
 
   const handleConfirm = () => {
     if (mode === "newName") {
@@ -24,7 +25,6 @@ function InboxBulkBar({ selectedCount, allTasks, onAssign, onClear }) {
       onAssign(null, newName.trim());
     } else {
       if (!chosen) return;
-      if (chosen === "__new__") { setMode("newName"); return; }
       onAssign(chosen, null);
     }
     setOpen(false);
@@ -50,19 +50,18 @@ function InboxBulkBar({ selectedCount, allTasks, onAssign, onClear }) {
             {mode === "pick" ? (
               <>
                 <div style={{ fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Choose project</div>
-                <select
-                  value={chosen}
-                  onChange={e => setChosen(e.target.value)}
-                  autoFocus
-                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, padding: "5px 8px", fontFamily: "inherit", fontSize: 12, outline: "none" }}
-                >
-                  <option value="">— Select —</option>
-                  {rootProjects.map(p => <option key={p.id} value={p.id}>{p.text}</option>)}
-                  <option value="__new__">＋ New project…</option>
-                </select>
+                <div style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, padding: 4, maxHeight: 200, overflowY: "auto" }}>
+                  <ProjectTreePicker
+                    eligibleProjects={eligibleProjects}
+                    selectedId={chosen}
+                    onSelect={id => id && setChosen(id)}
+                    onNewProject={() => setMode("newName")}
+                    showStandalone={false}
+                  />
+                </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={handleConfirm} disabled={!chosen} style={{ flex: 1, padding: "5px 0", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: chosen ? COLORS.project + "22" : "transparent", color: chosen ? COLORS.project : COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: chosen ? "pointer" : "default", fontWeight: 600 }}>
-                    {chosen === "__new__" ? "Next →" : "Assign"}
+                    Assign
                   </button>
                   <button onClick={() => setOpen(false)} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                 </div>
@@ -102,7 +101,7 @@ function ProjectGroupSuggestionBar({ suggestion, taskCount, allTasks, onAccept, 
   const [overrideName, setOverrideName] = useState(suggestion.name || "");
   const [showAlt, setShowAlt] = useState(false);
   const [altChoice, setAltChoice] = useState("");
-  const rootProjects = allTasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+  const eligibleProjects = allTasks.filter(t => t.bucket === "project" && !t.done);
 
   const handleAccept = () => {
     if (suggestion.type === "existing") onAccept(suggestion.projectId, null);
@@ -142,16 +141,16 @@ function ProjectGroupSuggestionBar({ suggestion, taskCount, allTasks, onAccept, 
       )}
 
       {showAlt && (
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <select
-            value={altChoice}
-            onChange={e => setAltChoice(e.target.value)}
-            style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, padding: "4px 6px", fontFamily: "inherit", fontSize: 12, outline: "none" }}
-          >
-            <option value="">— Pick project —</option>
-            {rootProjects.map(p => <option key={p.id} value={p.id}>{p.text}</option>)}
-          </select>
-          <button onClick={handleAltConfirm} disabled={!altChoice} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: altChoice ? COLORS.project : COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: altChoice ? "pointer" : "default" }}>Assign</button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, padding: 4, maxHeight: 180, overflowY: "auto" }}>
+            <ProjectTreePicker
+              eligibleProjects={eligibleProjects}
+              selectedId={altChoice}
+              onSelect={id => id && setAltChoice(id)}
+              showStandalone={false}
+            />
+          </div>
+          <button onClick={handleAltConfirm} disabled={!altChoice} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: altChoice ? COLORS.project : COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: altChoice ? "pointer" : "default", alignSelf: "flex-start" }}>Assign</button>
         </div>
       )}
 
