@@ -60,3 +60,9 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-11 | Bug Fix      | Issue#15| GH#44  | Process mode: →ACTION:add type — place inbox item under existing project; full stack implementation | 3bd97ae |
 | 2026-05-11 | Feature      | FR#48   | GH#46  | Project picker dropdown: collapsible tree (ProjectTreePicker) replaces flat native select in TaskDetailPanel + InboxBars | 6eab4a4 |
 | 2026-05-11 | Bug Fix      | Issue#16| GH#47  | ProjectTreePicker: switch buildProjectTree from parentId to childIds to match project view structure | caafa98 |
+| 2026-05-11 | Feature      | FR#50   | GH#49  | Remove hover auto-expand from project picker dropdowns; chevron-click only                          | 8fb66a0 |
+| 2026-05-11 | Feature      | FR#51   | GH#50  | Fix Collapse All — recursively adds all descendants to collapsedNodes, not just L2                  | 8fb66a0 |
+| 2026-05-11 | Feature      | FR#52   | GH#51  | Rename "≡ Projects Only" toolbar button to "≡ Project Categories"                                  | 8fb66a0 |
+| 2026-05-11 | Feature      | FR#53   | GH#52  | Increase project tree depth guard to 6 levels in ProjectTree and CompletedTree                      | 8fb66a0 |
+| 2026-05-11 | Feature      | FR#56   | GH#55  | Remove Review Projects button + loading/onStartProjectReview props from TaskBucketView              | 8fb66a0 |
+| 2026-05-11 | Feature      | FR#58   | GH#57  | Project view: alpha sort L1 and L2 nodes                                                            | 8fb66a0 |
