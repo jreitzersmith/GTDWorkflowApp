@@ -28,10 +28,10 @@ A personal GTD (Getting Things Done) task manager built as a React SPA with an A
 - Vite for local dev
 
 ## Coding standards
-See `Claude_Prompts/Senior_Code_Engineer.md` — read this file whenever writing or reviewing any code.
+See `Claude_Prompts/Pair_Programming_Code_Standards.md` — read this file whenever writing or reviewing any code.
 
 ## Pairing workflow
-See `Claude_Prompts/AI_Pair_Programming.md` — read this file at the start of any development session and follow it for every change.
+See `Claude_Prompts/Pair_Programming_Workflow.md` — read this file at the start of any development session and follow it for every change.
 
 ## Known issues & roadmap
 See `Claude_Prompts/Known_Issues_And_Requests.md` — read this when planning new features or triaging bugs.
@@ -52,8 +52,9 @@ GTDWorkflowApp/
 │   ├── project-snippets.html        ← code snippet reference
 │   └── GTDWorkflowApp_ProjectSummary.html
 ├── Claude_Prompts/                  ← Claude workflow docs (NOT app prompts)
-│   ├── AI_Pair_Programming.md
-│   ├── Senior_Code_Engineer.md
+│   ├── Pair_Programming_CLAUDE.md   ← this file
+│   ├── Pair_Programming_Workflow.md
+│   ├── Pair_Programming_Code_Standards.md
 │   ├── Known_Issues_And_Requests.md
 │   ├── Resolved_Issues_And_Requests.md
 │   └── Project_Summary.md
