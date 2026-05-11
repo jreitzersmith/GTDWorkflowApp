@@ -22,6 +22,8 @@ const taskShape = PropTypes.shape({
   deferUntil:   PropTypes.string,
   notes:        PropTypes.string,
   recurrence:   PropTypes.object,
+  dueTime:      PropTypes.string,
+  processed:    PropTypes.bool,
   parentId:     PropTypes.string,
   childIds:     PropTypes.arrayOf(PropTypes.string),
 });

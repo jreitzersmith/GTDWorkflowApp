@@ -59,19 +59,19 @@ function useInboxProcessing({
 
     // Create new tasks based on action type, applying any AI-suggested dates
     if (type === 'next') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'next', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'next', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, processed: true }, ...prev]);
     } else if (type === 'project') {
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: null },
-        { id: actionId, text: nextAction || title, bucket: 'next', done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: null },
+        { id: projectId, text: title || current.text, bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: null, processed: true },
+        { id: actionId, text: nextAction || title, bucket: 'next', done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: null, processed: true },
         ...prev,
       ]);
     } else if (type === 'someday') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'someday', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'someday', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, processed: true }, ...prev]);
     } else if (type === 'waiting') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'waiting', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'waiting', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, processed: true }, ...prev]);
     } else if (type === 'add') {
       // Add as child of existing project (ID or title lookup)
       const parent = tasks.find(t => t.id === parentRef)
@@ -83,13 +83,13 @@ function useInboxProcessing({
           { id: childId, text: title || current.text, bucket: 'next', done: false, created: Date.now(),
             parentId: parent.id, priority: [], location: [], dueDate: aiDue || null, effort: null,
             actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null,
-            category: parent.category ?? null },
+            category: parent.category ?? null, processed: true },
         ]);
       } else {
         // Parent not found — fall back to standalone next action
         setTasks(prev => [{ id: childId, text: title || current.text, bucket: 'next', done: false,
           created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null,
-          actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null }, ...prev]);
+          actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, processed: true }, ...prev]);
       }
     }
     // type === 'delete': just archive, no new task
