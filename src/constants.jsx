@@ -117,6 +117,7 @@ After the user confirms a query and label in Phase 1, call gmail_queue_add to sa
   process: `You are a GTD inbox processor. For each inbox item given to you:
 
 1. Determine if it's actionable. If not actionable, end with: →ACTION:delete
+   - Also use →ACTION:delete if the item already exists in another bucket (Next Actions, Waiting For, etc.) — mention where it is already tracked.
 2. If actionable, decide: is this a SINGLE next action, or a multi-step PROJECT?
    - If you need clarification to decide, ask ONE specific question. Do NOT include an →ACTION tag until clarified.
 3. Reword the action as a concrete physical action starting with a strong verb (e.g. "Call", "Draft", "Research", "Buy").
@@ -198,7 +199,9 @@ If no preparation or follow-up tasks are needed, write:
 Be concise. Under 60 words before the suggestions block.`,
   dump: `You are a GTD brain dump coach. Surface open loops by asking about one life area at a time:
 Work tasks → Emails to send → People to follow up with → Projects falling behind → Personal errands → Home tasks → Health commitments → Finances → Learning goals → Anything nagging you
-For each response say "Got it — add that to your inbox." then immediately ask about the next area. Under 50 words each. After all areas, give a summary and encourage them to process their inbox.`,
+For each item the user mentions, acknowledge it and end your response with one →ACTION:create line per item captured:
+→ACTION:create|<exact item text>|bucket:inbox
+Then immediately ask about the next area. Under 60 words per response (before the action tags). After all areas, give a short summary and encourage them to process their inbox.`,
 };
 
 export const OPENWEBUI_URL = (import.meta.env.VITE_OPENWEBUI_URL || "http://192.168.0.102:3000").replace(/\/$/, "");

@@ -35,7 +35,7 @@ const GET_TASK_CONTEXT_TOOL = {
 // Buckets to include in the task context for each coach mode.
 // Modes not listed here receive all buckets (null = no filter).
 const MODE_CONTEXT_BUCKETS = {
-  process:         ['inbox', 'project'],
+  process:         ['inbox', 'next', 'project', 'waiting'],
   projectReview:   ['project'],
   projectMetadata: ['project'],
   calendarEvent:   ['next', 'project'],
@@ -362,10 +362,10 @@ function useCallAI({
       const updatedHistory = [...newHistory, { role: 'assistant', content: reply }];
       setChatHistory(updatedHistory);
 
-      // Apply →ACTION lines when in chat mode — supports multiple actions per response
+      // Apply →ACTION lines when in chat or dump mode — supports multiple actions per response
       let updateChip = null;
       let actionError = null;
-      if (mode === 'chat') {
+      if (mode === 'chat' || mode === 'dump') {
         const taskActionLines = reply.split('\n')
           .map(l => l.trim())
           .filter(l => /^→ACTION:(update|add|create)\|/.test(l));
