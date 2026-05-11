@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#68**
+> **Last used numbers:** Known Issues — **Issue#17** · Code Quality — **CQ#10** · Feature Requests — **FR#69**
 
 ---
 
@@ -24,12 +24,13 @@
 
 #### Inbox / processing improvements
 
+- FR#69 [GH#69] (2026-05-11) — Process mode: AI auto-infers category from sibling tasks when adding to existing project
 - FR#8 [GH#9] — Inbox Process mode — AI identifies co-related tasks during inbox processing and suggests grouping them into an existing project or a new one (similar to the calendar-event grouping flow)
 - FR#19 [GH#10] — Inbox History / AI exposure rethink (decide policy on what the AI sees; small code change once decided)
 
 #### Integrations / data
 
-- FR#68 [GH#67] (2026-05-11) — →ACTION:set-focus ACTION line in daily mode (implemented as part of FR#64/GH#63; GH#67 can be closed)
+
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
 - FR#35 [GH#23] — Calendar sync: when a task has a parent, show only the child task in the "tasks with due date, no calendar event" list (suppress the parent to avoid adding both parent and child as separate events)
 - FR#37 [GH#31] (2026-05-09) — Calendar event creation: set default notification(s) on created events (simplest: pass `useDefault: true` to Google Calendar API; stretch: configurable reminder interval in Settings)

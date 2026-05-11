@@ -59,3 +59,4 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-11 | Feature      | FR#65   | GH#64  | Today's Focus sidebar view                                                                           | 7be7535           |
 | 2026-05-11 | Feature      | FR#66   | GH#65  | Calendar-aware tasks in Today's Focus (no-calendar-event tier)                                       | 7be7535           |
 | 2026-05-11 | Feature      | FR#67   | GH#66  | dueTime field on tasks with UI time input in TaskDetailPanel                                         | 368d0a4           |
+| 2026-05-11 | Issue        | Issue#17| GH#68  | Process mode: effort and category silently dropped from ACTION lines                                  | 4408b89           |
