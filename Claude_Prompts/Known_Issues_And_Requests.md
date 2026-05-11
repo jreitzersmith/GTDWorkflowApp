@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#15** · Code Quality — **CQ#10** · Feature Requests — **FR#46**
+> **Last used numbers:** Known Issues — **Issue#15** · Code Quality — **CQ#10** · Feature Requests — **FR#47**
 
 ---
 
@@ -20,6 +20,7 @@
 #### UI polish / quick wins
 
 - FR#13 [GH#4] — Remove "Process with AI" button from the left sidebar navigation panel
+- FR#47 [GH#45] (2026-05-11) — Project view: toggle to show/hide completed subtasks
 
 #### Daily workflow / GTD core
 
