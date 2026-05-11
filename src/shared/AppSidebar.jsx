@@ -16,7 +16,8 @@ function AppSidebar({
   onSelectCalendar,
   onToggleSettings,
   onToggleUsage,
-  onProcessInbox,
+  onDailyReview,
+  dailyReviewPhase,
   onWeeklyReview,
   onBrainDump,
   onOpenSearch,
@@ -90,7 +91,7 @@ function AppSidebar({
       </div>
 
       <div style={{ padding: 10, borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
-        <SidebarBtn primary onClick={onProcessInbox}>🤖 Process Inbox with AI</SidebarBtn>
+        <SidebarBtn primary onClick={onDailyReview}>{dailyReviewPhase === 'end' ? '🌇 End Day' : '🌅 Start Day'}</SidebarBtn>
         <SidebarBtn onClick={onWeeklyReview}>📋 Weekly Review</SidebarBtn>
         <SidebarBtn onClick={onBrainDump}>🧠 Brain Dump</SidebarBtn>
       </div>
@@ -117,7 +118,8 @@ AppSidebar.propTypes = {
   onSelectCalendar: PropTypes.func.isRequired,
   onToggleSettings: PropTypes.func.isRequired,
   onToggleUsage:   PropTypes.func.isRequired,
-  onProcessInbox:  PropTypes.func.isRequired,
+  onDailyReview:   PropTypes.func.isRequired,
+  dailyReviewPhase: PropTypes.string.isRequired,
   onWeeklyReview:  PropTypes.func.isRequired,
   onBrainDump:     PropTypes.func.isRequired,
   onOpenSearch:    PropTypes.func.isRequired,

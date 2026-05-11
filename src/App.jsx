@@ -66,10 +66,18 @@ export default function GTDManager() {
           sheetsEnabled, slidesEnabled, gmailError, scopePrefs,
           setScopePref, reauthorizeGoogle, connectCalendar, disconnectCalendar,
           disconnectAll, refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
-  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion } = useTaskUIState();
+  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [dailyReviewPhase, setDailyReviewPhase] = useState(() => {
+    try {
+      const raw = localStorage.getItem('gtd-daily-phase');
+      if (!raw) return 'start';
+      const { phase, date } = JSON.parse(raw);
+      return date === new Date().toDateString() ? phase : 'start';
+    } catch { return 'start'; }
+  });
 
   // ── Auth ───────────────────────────────────────────────────────────────
   const { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink } = useSupabaseAuth();
@@ -341,6 +349,27 @@ export default function GTDManager() {
 
   const startBrainDump = () => {
     switchCoachMode("dump", "Let's surface everything in your head and get it into your inbox.\n\n**Starting with work:** What professional tasks, deadlines, or commitments have been on your mind that aren't written down anywhere?");
+  };
+
+  // FR#14: Daily Review — toggles between Start Day and End Day each click, persists via localStorage.
+  const startDailyReview = () => {
+    const today = new Date().toDateString();
+    if (dailyReviewPhase === 'start') {
+      const total = tasks.filter(t => !t.done && t.bucket !== 'done').length;
+      const today8601 = new Date().toISOString().slice(0, 10);
+      const overdue = tasks.filter(t => !t.done && t.dueDate && t.dueDate < today8601).length;
+      const overdueNote = overdue > 0 ? `, including **${overdue} overdue**` : '';
+      switchCoachMode('daily', `Good morning! Let's start your day.\n\nYou have **${total} active task${total !== 1 ? 's' : ''}** in your system${overdueNote}.\n\nWhat are the **1-3 things** that, if completed, would make today a success?`);
+      const newPhase = 'end';
+      setDailyReviewPhase(newPhase);
+      localStorage.setItem('gtd-daily-phase', JSON.stringify({ phase: newPhase, date: today }));
+    } else {
+      const inboxCount = tasks.filter(t => t.bucket === 'inbox' && !t.done).length;
+      switchCoachMode('daily', `Let's close out your day.\n\nYou have **${inboxCount} item${inboxCount !== 1 ? 's' : ''}** in your inbox.\n\nWhat loose ends, new commitments, or ideas came up today that you haven't captured yet?`);
+      const newPhase = 'start';
+      setDailyReviewPhase(newPhase);
+      localStorage.setItem('gtd-daily-phase', JSON.stringify({ phase: newPhase, date: today }));
+    }
   };
 
   // Prefill the coach chat with email content so the user can process it into tasks
@@ -794,6 +823,7 @@ export default function GTDManager() {
     categories,
     projectCategoryFilter,
     setProjectCategoryFilter,
+    showCompletedInProjects,
   };
 
   return (
@@ -820,7 +850,8 @@ export default function GTDManager() {
           onSelectCalendar={() => { setCurrentView("calendar"); setShowSettings(false); setSelectedTaskId(null); }}
           onToggleSettings={() => { setShowSettings(v => !v); setShowUsage(false); }}
           onToggleUsage={() => { setShowUsage(v => !v); setShowSettings(false); }}
-          onProcessInbox={startProcessInbox}
+          onDailyReview={startDailyReview}
+          dailyReviewPhase={dailyReviewPhase}
           onWeeklyReview={startWeeklyReview}
           onBrainDump={startBrainDump}
           onOpenSearch={() => setSearchOpen(true)}
@@ -953,6 +984,8 @@ export default function GTDManager() {
                           categories={categories}
                           projectCategoryFilter={projectCategoryFilter}
                           setProjectCategoryFilter={setProjectCategoryFilter}
+                          showCompletedInProjects={showCompletedInProjects}
+                          setShowCompletedInProjects={setShowCompletedInProjects}
                         />
                       )}
                     </div>
@@ -1042,6 +1075,7 @@ export default function GTDManager() {
                   <TaskDetailPanel
                     task={selTask}
                     allTasks={tasks}
+                    currentBucket={currentBucket}
                     locations={locations}
                     efforts={efforts}
                     categories={categories}
