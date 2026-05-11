@@ -100,3 +100,6 @@ ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS calendar_event_id TEXT;
 --   SET bucket = 'project', updated_at = NOW()
 --   WHERE bucket = 'next'
 --   AND jsonb_array_length(child_ids) > 0;
+
+-- Added with FR#54 (2026-05-11): ID of the auto-created "Standalone" catch-all project task
+ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS standalone_project_id TEXT;

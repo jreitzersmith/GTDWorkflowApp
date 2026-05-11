@@ -282,6 +282,65 @@ function groupByField(taskList, field, allTasks = []) {
   return sorted;
 }
 
+// Two-level project grouping for Next Actions.
+// Returns [{ l1Key, l1Label, subgroups: [{ l2Key, l2Label, items[] }] }]
+// — L1 = root project-bucket ancestor; L2 = second-level project-bucket ancestor.
+// — Tasks with no project ancestor appear in a trailing "Standalone" L1 group.
+// — Within each L1, subgroups are sorted alphabetically. L1 groups are sorted alphabetically.
+// — If an L1 group's tasks are direct children of L1 (no L2 ancestor) the l2 field is null
+//   and the subgroup is keyed `l1Id + "__direct"`.
+function groupByTwoLevelProject(taskList, allTasks) {
+  // Walk up parentId chain, collecting project-bucket ancestors in root-first order.
+  const getProjectAncestors = (task) => {
+    const ancestors = [];
+    let cur = task;
+    while (cur.parentId) {
+      const parent = allTasks.find(t => t.id === cur.parentId);
+      if (!parent) break;
+      if (parent.bucket === "project") ancestors.unshift(parent);
+      cur = parent;
+    }
+    return ancestors;
+  };
+
+  const l1Map = new Map(); // l1Id -> { l1, l2Map: Map<l2Key, { l2, l2Label, items[] }> }
+  const standaloneItems = [];
+
+  taskList.forEach(task => {
+    const ancestors = getProjectAncestors(task);
+    const l1 = ancestors[0] || null;
+    const l2 = ancestors[1] || null;
+
+    if (!l1) { standaloneItems.push(task); return; }
+
+    if (!l1Map.has(l1.id)) l1Map.set(l1.id, { l1, l2Map: new Map() });
+    const l1Entry = l1Map.get(l1.id);
+
+    const l2Key    = l2 ? l2.id : l1.id + "__direct";
+    const l2Label  = l2 ? l2.text : l1.text;
+    if (!l1Entry.l2Map.has(l2Key)) l1Entry.l2Map.set(l2Key, { l2, l2Label, items: [] });
+    l1Entry.l2Map.get(l2Key).items.push(task);
+  });
+
+  const result = [...l1Map.entries()]
+    .sort(([, a], [, b]) => a.l1.text.localeCompare(b.l1.text))
+    .map(([, { l1, l2Map }]) => ({
+      l1Key: l1.id,
+      l1Label: l1.text,
+      subgroups: [...l2Map.values()].sort((a, b) => a.l2Label.localeCompare(b.l2Label)),
+    }));
+
+  if (standaloneItems.length) {
+    result.push({
+      l1Key: '__standalone__',
+      l1Label: 'Standalone',
+      subgroups: [{ l2: null, l2Label: 'Standalone', items: standaloneItems }],
+    });
+  }
+
+  return result;
+}
+
 // Converts a human effort string (e.g. "2 hours", "3 days", "30m", "1h") to minutes.
 // Handles both long-form ("30 min", "2 hours") and compact abbreviations ("30m", "2h", "1d", "1w", "1mo").
 // Uses calendar time: 1 day = 24 h, 1 week = 7 d, 1 month = 30 d.
@@ -578,4 +637,4 @@ function useResizer(storageKey, defaultSize, { min, max, direction = 'h', sign =
 }
 
 
-export { todayStr, isDeferred, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, collectDescendantIds, moveTaskInTree, useResizer };
+export { todayStr, isDeferred, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, collectDescendantIds, moveTaskInTree, useResizer };

@@ -6,7 +6,7 @@ import { TaskRow } from "./TaskRow.jsx";
 import { CompletedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListHelpers.jsx";
 import { InboxBulkBar } from "./InboxBars.jsx";
 import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
-import { waterfallFilter, groupByField, effortToMinutes, minutesToEffortLabel, effortAccuracyColor, isDeferred } from "./taskUtils.jsx";
+import { waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, minutesToEffortLabel, effortAccuracyColor, isDeferred } from "./taskUtils.jsx";
 
 const ADD_ROW_STYLE = { display: "flex", gap: 6, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}` };
 const PANEL_HEADER_STYLE = { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 };
@@ -84,6 +84,7 @@ function TaskBucketView({
   categories,
   projectCategoryFilter,
   setProjectCategoryFilter,
+  standaloneProjectId,
 }) {
   const [filterText, setFilterText] = useState("");
   const [projPickerOpen, setProjPickerOpen] = useState(false);
@@ -322,6 +323,32 @@ function TaskBucketView({
           if (nextGroupBy === "none") {
             return visible.map(task => <TaskRow key={task.id} task={task} />);
           }
+          if (nextGroupBy === "project") {
+            return groupByTwoLevelProject(visible, tasks).map(({ l1Key, l1Label, subgroups }) => {
+              const l1Total = subgroups.reduce((s, sg) => s + sg.items.length, 0);
+              const l1IsStandalone = l1Key === "__standalone__";
+              return (
+                <div key={l1Key}>
+                  <GroupDivider label={l1Label} count={l1Total} isUngrouped={l1IsStandalone} />
+                  {subgroups.map(({ l2Key, l2Label, l2, items }) => {
+                    const groupMin = items.reduce((sum, t) => sum + effortToMinutes(t.effort), 0);
+                    const groupEffortLabel = minutesToEffortLabel(groupMin) || "0m";
+                    // Skip the L2 sub-header when it would just echo the L1 label
+                    // (direct children of L1 with no L2 ancestor, or the Standalone group)
+                    const skipSubHeader = l1IsStandalone || l2 === null;
+                    return (
+                      <div key={l2Key || l2Label}>
+                        {!skipSubHeader && (
+                          <GroupDivider label={l2Label} count={items.length} effortTotal={groupEffortLabel} isUngrouped />
+                        )}
+                        {items.map(task => <TaskRow key={task.id} task={task} />)}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            });
+          }
           return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => {
             const groupMin = items.reduce((sum, t) => sum + effortToMinutes(t.effort), 0);
             const groupEffortLabel = minutesToEffortLabel(groupMin) || "0m";
@@ -403,6 +430,7 @@ TaskBucketView.propTypes = {
   deferredDupeWarning: PropTypes.object,
   onViewDeferred:    PropTypes.func.isRequired,
   onBulkAssign:      PropTypes.func.isRequired,
+  standaloneProjectId: PropTypes.string,
 };
 
 export { TaskBucketView };
