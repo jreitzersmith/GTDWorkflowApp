@@ -17,18 +17,10 @@
 
 #### UI polish / quick wins
 
-- FR#62 [GH#61] (2026-05-11) — Projects view: re-clicking selected task row should toggle detail panel closed (set selectedTaskId to null)
-
-- FR#13 [GH#4] — Remove "Process with AI" button from the left sidebar navigation panel
-- FR#47 [GH#45] (2026-05-11) — Project view: toggle to show/hide completed subtasks
-- FR#60 [GH#59] (2026-05-11) — Task detail panel: subproject/task bucket toggle (visible in Projects view only); warn/block demotion of nodes with project-bucket children
-
 #### Daily workflow / GTD core
 
-- FR#14 [GH#5] — Daily Review button (replaces FR#13; context-aware: shows "Start Day" in the morning or if start-of-day review hasn't run yet; shows "End Day" in the afternoon/evening or after start-of-day completes; localStorage persistence; must handle incomplete/interrupted reviews gracefully)
 - FR#7 [GH#6] — Daily focus view (pick 3 Most Important Tasks from Next Actions)
 - FR#15 [GH#7] — AI-assisted daily planning (new coach mode; evaluates calendar + tasks + travel time)
-- FR#6 [GH#8] — Brain Dump auto-capture (AI extracts items and adds them directly to Inbox)
 
 #### Inbox / processing improvements
 

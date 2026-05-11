@@ -48,3 +48,9 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-09 | Code Quality | CQ#10   | GH#30  | Task detail panel inactive location button color → #81807a (mid-tier between labels and muted) | 98f94f5 |
 | 2026-05-11 | Feature      | FR#49   | GH#48  | 5-level project hierarchy — implemented via FR#48, FR#53, FR#54, FR#57                              | —                 |
 | 2026-05-11 | Feature      | FR#61   | GH#60  | Project view add bar: auto-select selected project-bucket item as parent                            | 40731df           |
+| 2026-05-11 | Feature      | FR#6    | GH#8   | Brain Dump auto-capture (already implemented via →ACTION:create lines)                              | —                 |
+| 2026-05-11 | Feature      | FR#13   | GH#4   | Remove "Process with AI" sidebar button (folded into FR#14)                                         | —                 |
+| 2026-05-11 | Feature      | FR#62   | GH#61  | Projects view: re-click selected task row to deselect / close detail panel                          | 263b3bd           |
+| 2026-05-11 | Feature      | FR#47   | GH#45  | Project view: show/hide completed subtasks toggle                                                   | 788cc78           |
+| 2026-05-11 | Feature      | FR#60   | GH#59  | Task detail panel: project/task type toggle with demotion guard                                     | d2af3fd           |
+| 2026-05-11 | Feature      | FR#14   | GH#5   | Daily Review button (Start Day / End Day) replacing Process Inbox                                   | 5ab7681           |
