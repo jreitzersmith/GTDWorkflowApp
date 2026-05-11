@@ -46,6 +46,9 @@ See `Claude_Prompts/Project_Summary.md` before updating HTML docs in `Product_Su
 ```
 GTDWorkflowApp/
 ├── CLAUDE.md
+├── Graphics/                  ← app icons and image assets
+│   ├── getting-things-done.ico
+│   └── getting-things-done.png
 ├── Product_Summary/
 │   ├── project-summary.html
 │   ├── project-commits.html
