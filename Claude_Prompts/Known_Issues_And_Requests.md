@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#59**
+> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#61**
 
 ---
 
@@ -19,6 +19,8 @@
 
 - FR#13 [GH#4] — Remove "Process with AI" button from the left sidebar navigation panel
 - FR#47 [GH#45] (2026-05-11) — Project view: toggle to show/hide completed subtasks
+- FR#60 [GH#59] (2026-05-11) — Task detail panel: subproject/task bucket toggle (visible in Projects view only); warn/block demotion of nodes with project-bucket children
+- FR#61 [GH#60] (2026-05-11) — Project view add bar: auto-select the currently selected project-bucket item as default parent in ProjectTreePicker; revert to __new__ when selection is cleared or is bucket:next
 
 #### Daily workflow / GTD core
 
