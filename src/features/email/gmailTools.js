@@ -459,7 +459,10 @@ async function doGmailBulkAction(query, addLabelIds, removeLabelIds, token) {
 
 // ── Email Management helper functions ────────────────────────────────────────
 
-// Recursively extract the first plain-text part from a Gmail message payload
+// Recursively extract all plain-text parts from a Gmail message payload.
+// Concatenates across parts so split/chunked bodies are fully captured.
+// For multipart/alternative the html part returns '' (mimeType check fails),
+// so concatenation is safe — no duplicate content.
 function extractGmailPlainText(payload) {
   if (!payload) return '';
   if (payload.mimeType === 'text/plain' && payload.body?.data) {
@@ -468,10 +471,7 @@ function extractGmailPlainText(payload) {
     } catch { return ''; }
   }
   if (payload.parts) {
-    for (const part of payload.parts) {
-      const text = extractGmailPlainText(part);
-      if (text) return text;
-    }
+    return payload.parts.map(p => extractGmailPlainText(p)).join('');
   }
   return '';
 }

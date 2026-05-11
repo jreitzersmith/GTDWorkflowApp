@@ -52,4 +52,5 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-09 | Feature      | FR#34   | —      | Global search modal (Cmd+K) — SearchModal with keyboard nav, bucket badge, highlight; sidebar button | 35392d4 |
 | 2026-05-09 | Feature      | FR#30   | —      | Lazy task context in chat mode — compact summary + get_task_context tool; full list for other modes | 0ce7e9b |
 | 2026-05-11 | Bug Fix      | Issue#3 | GH#2   | Weekly Review step tracking — closed as no longer reproducible                                      | —       |
+| 2026-05-11 | Bug Fix      | Issue#5 | —      | Email body truncated — extractGmailPlainText early-return replaced with full-part concatenation     | HEAD    |
 | 2026-05-09 | Feature      | FR#39   | GH#35  | Drive file picker for tasks — DriveAttachments component, Picker API, drive_attachments DB column | 15e1b81 |

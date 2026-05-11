@@ -7,7 +7,6 @@
 ## Known issues / remaining work
 
 - [ ] Issue#2 [GH#1] — Brain Dump doesn't auto-add items to inbox — user has to copy manually (Chat mode can create tasks via `→ACTION:create`, but Brain Dump mode is not wired up)
-- [ ] Issue#5 — Emails pulled from Gmail are cut short (body text truncated before end of message)
 - [ ] Issue#10 [GH#21] — Add & Ask AI: when AI identifies a duplicate and the user confirms delete, the original inbox item is archived but a new task is still created (the confirmed action should be delete-only, not create)
 - [ ] Issue#12 [GH#32] (2026-05-09) — Process mode: AI does not assign due date when user corrects a deferral assumption mid-conversation (task filed without dueDate after user overrides AI's proposed defer date)
 - [ ] Issue#13 [GH#33] (2026-05-09) — AI sets incorrect deferUntil on weekday-recurring tasks (defers to day after first calendar occurrence instead of next recurrence date)
