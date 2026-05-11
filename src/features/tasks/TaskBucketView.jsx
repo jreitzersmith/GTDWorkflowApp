@@ -85,6 +85,8 @@ function TaskBucketView({
   projectCategoryFilter,
   setProjectCategoryFilter,
   standaloneProjectId,
+  showCompletedInProjects,
+  setShowCompletedInProjects,
 }) {
   const [filterText, setFilterText] = useState("");
   const [projPickerOpen, setProjPickerOpen] = useState(false);
@@ -173,6 +175,13 @@ function TaskBucketView({
               title="Expand all projects fully"
             >
               ⊕ Expand All
+            </ToolbarBtn>
+            <ToolbarBtn
+              onClick={() => setShowCompletedInProjects(v => !v)}
+              active={showCompletedInProjects}
+              title={showCompletedInProjects ? 'Hide completed subtasks' : 'Show completed subtasks'}
+            >
+              ✓ Done
             </ToolbarBtn>
             {categories && categories.length > 0 && (
               <select
@@ -431,6 +440,8 @@ TaskBucketView.propTypes = {
   onViewDeferred:    PropTypes.func.isRequired,
   onBulkAssign:      PropTypes.func.isRequired,
   standaloneProjectId: PropTypes.string,
+  showCompletedInProjects: PropTypes.bool,
+  setShowCompletedInProjects: PropTypes.func,
 };
 
 export { TaskBucketView };

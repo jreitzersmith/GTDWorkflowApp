@@ -14,6 +14,7 @@ function useTaskUIState() {
   const [pendingDeferCheck, setPendingDeferCheck] = useState(null);
   const [inboxSelectedIds, setInboxSelectedIds] = useState(new Set());
   const [pendingGroupSuggestion, setPendingGroupSuggestion] = useState(null);
+  const [showCompletedInProjects, setShowCompletedInProjects] = useState(false);
 
   const toggleCollapse = useCallback((id) => {
     setCollapsedNodes(prev => {
@@ -52,6 +53,7 @@ function useTaskUIState() {
     pendingDeferCheck, setPendingDeferCheck,
     inboxSelectedIds, setInboxSelectedIds,
     pendingGroupSuggestion, setPendingGroupSuggestion,
+    showCompletedInProjects, setShowCompletedInProjects,
   };
 }
 
