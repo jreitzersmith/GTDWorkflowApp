@@ -600,7 +600,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Processed</span>
             <StyledCheckbox
               checked={task.processed ?? false}
-              onChange={checked => onUpdate(task.id, { processed: checked })}
+              onChange={e => onUpdate(task.id, { processed: e.target.checked })}
               label="Metadata complete"
               labelStyle={{ color: COLORS.text2, fontSize: 11 }}
             />
