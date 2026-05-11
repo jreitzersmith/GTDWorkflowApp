@@ -1,10 +1,11 @@
 import PropTypes from "prop-types";
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { COLORS, BUCKETS } from "../../constants.jsx";
 import { Btn, ToolbarBtn } from "../../shared/SidebarComponents.jsx";
 import { TaskRow } from "./TaskRow.jsx";
 import { CompletedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListHelpers.jsx";
 import { InboxBulkBar } from "./InboxBars.jsx";
+import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
 import { waterfallFilter, groupByField, effortToMinutes, minutesToEffortLabel, effortAccuracyColor, isDeferred } from "./taskUtils.jsx";
 
 const ADD_ROW_STYLE = { display: "flex", gap: 6, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}` };
@@ -87,11 +88,25 @@ function TaskBucketView({
   setProjectCategoryFilter,
 }) {
   const [filterText, setFilterText] = useState("");
+  const [projPickerOpen, setProjPickerOpen] = useState(false);
+  const projPickerRef = useRef(null);
 
   // Reset filter when switching buckets
   useEffect(() => { setFilterText(""); }, [currentBucket]);
 
+  // Close project picker on outside click
+  useEffect(() => {
+    if (!projPickerOpen) return;
+    const handler = e => {
+      if (projPickerRef.current && !projPickerRef.current.contains(e.target)) setProjPickerOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [projPickerOpen]);
+
   const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+  const allProjectTasks = tasks.filter(t => t.bucket === "project" && !t.done);
+  const selectedProjectNode = allProjectTasks.find(t => t.id === projectParentId);
 
   // Flat filtered list used when filterText is active (bypasses all grouping/tree logic)
   const filterActive = filterText.trim().length > 0;
@@ -196,36 +211,60 @@ function TaskBucketView({
 
       {/* Add row */}
       {currentBucket !== "deferred" && (
-        currentBucket === "project" ? (() => {
-          const selectedProject = rootProjects.find(t => t.id === projectParentId);
-          const placeholder = projectParentId === "__new__"
-            ? "New project name… (Enter to add)"
-            : `Subtask for "${selectedProject?.text ?? ""}"…`;
-          return (
-            <div style={ADD_ROW_STYLE}>
-              <input
-                value={addText}
-                onChange={e => setAddText(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && addProjectTask()}
-                placeholder={placeholder}
-                style={INPUT_STYLE}
-              />
-              <select
-                value={projectParentId}
-                onChange={e => setProjectParentId(e.target.value)}
-                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", fontFamily: "inherit", fontSize: 12, color: projectParentId === "__new__" ? COLORS.text2 : COLORS.project, outline: "none", cursor: "pointer", maxWidth: 180, colorScheme: "dark" }}
+        currentBucket === "project" ? (
+          <div style={ADD_ROW_STYLE}>
+            <input
+              value={addText}
+              onChange={e => setAddText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  if (projectParentId === "__new__") addProjectTask("project");
+                  else addProjectTask("next");
+                }
+              }}
+              placeholder={projectParentId === "__new__"
+                ? "New project name… (Enter to add)"
+                : `Under "${selectedProjectNode?.text ?? ""}"…`}
+              style={INPUT_STYLE}
+            />
+            <div ref={projPickerRef} style={{ position: "relative" }}>
+              <button
+                onClick={() => setProjPickerOpen(o => !o)}
+                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 10px", fontFamily: "inherit", fontSize: 12, color: projectParentId === "__new__" ? COLORS.text2 : COLORS.project, outline: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, maxWidth: 200 }}
               >
-                <option value="__new__">+ New project</option>
-                {rootProjects.map(p => (
-                  <option key={p.id} value={p.id}>{p.text.length > 30 ? p.text.slice(0, 28) + "…" : p.text}</option>
-                ))}
-              </select>
-              <Btn onClick={addProjectTask} style={{ fontSize: 12, borderColor: projectParentId === "__new__" ? COLORS.border : COLORS.project, color: projectParentId === "__new__" ? COLORS.text2 : COLORS.project }}>
-                {projectParentId === "__new__" ? "+ Add Project" : "+ Add Task"}
-              </Btn>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
+                  {projectParentId === "__new__" ? "＋ New project" : (selectedProjectNode?.text || "Select…")}
+                </span>
+                <span style={{ fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>▾</span>
+              </button>
+              {projPickerOpen && (
+                <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 50, minWidth: 220, maxHeight: 240, overflowY: "auto", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}>
+                  <ProjectTreePicker
+                    eligibleProjects={allProjectTasks}
+                    selectedId={projectParentId === "__new__" ? null : projectParentId}
+                    onSelect={id => { setProjectParentId(id || "__new__"); setProjPickerOpen(false); }}
+                    onNewProject={() => { setProjectParentId("__new__"); setProjPickerOpen(false); }}
+                    showStandalone={false}
+                  />
+                </div>
+              )}
             </div>
-          );
-        })() : (
+            {projectParentId === "__new__" ? (
+              <Btn onClick={() => addProjectTask("project")} style={{ fontSize: 12, borderColor: COLORS.border, color: COLORS.text2 }}>
+                + Add Project
+              </Btn>
+            ) : (
+              <>
+                <Btn onClick={() => addProjectTask("project")} style={{ fontSize: 12, borderColor: COLORS.project, color: COLORS.project }}>
+                  + Sub-project
+                </Btn>
+                <Btn onClick={() => addProjectTask("next")} style={{ fontSize: 12, borderColor: COLORS.project, color: COLORS.project }}>
+                  + Add Task
+                </Btn>
+              </>
+            )}
+          </div>
+        ) : (
           <>
             <div style={ADD_ROW_STYLE}>
               <input

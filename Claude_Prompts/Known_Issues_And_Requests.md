@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#48**
+> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#49**
 
 ---
 
@@ -51,6 +51,7 @@
 
 #### Data model expansions
 
+- FR#49 [GH#48] (2026-05-11) — 5-level project hierarchy: general categories (L1, bucket:project) → project categories (L2, bucket:project) → projects (L3, bucket:project) → tasks (L4, bucket:next) → subtasks (L5, bucket:next); requires moveTaskInTree bucket preservation, addProjectTask childBucket param, Projects add bar tree picker, groupByField nearest-project walk
 - FR#10 [GH#16] — Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
 - FR#16 [GH#17] — Shopping list manager (new bucket/sidebar section)
 

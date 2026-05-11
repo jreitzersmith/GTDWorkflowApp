@@ -53,7 +53,8 @@ function useTaskCrud({
     askAIAboutTask(task);
   }, [addText, setTasks, setAddText, setCurrentBucket, askAIAboutTask]);
 
-  const addProjectTask = useCallback(() => {
+  // childBucket: 'project' creates a sub-project; 'next' (default) creates a task.
+  const addProjectTask = useCallback((childBucket = 'next') => {
     const text = addText.trim();
     if (!text) return;
     if (projectParentId === '__new__') {
@@ -65,13 +66,20 @@ function useTaskCrud({
       const childId = genId();
       setTasks(prev => {
         const parent = prev.find(t => t.id === projectParentId);
+        const newChild = {
+          id: childId, text, bucket: childBucket, done: false, created: Date.now(),
+          parentId: projectParentId, priority: [], location: [], dueDate: null,
+          effort: null, actualEffort: null, deferUntil: null, notes: null,
+          category: parent?.category ?? null,
+          ...(childBucket === 'project' ? { childIds: [] } : {}),
+        };
         return [
           ...prev.map(t =>
             t.id === projectParentId
               ? { ...t, childIds: [...(t.childIds || []), childId] }
               : t
           ),
-          { id: childId, text, bucket: 'next', done: false, created: Date.now(), parentId: projectParentId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null, category: parent?.category ?? null },
+          newChild,
         ];
       });
     }

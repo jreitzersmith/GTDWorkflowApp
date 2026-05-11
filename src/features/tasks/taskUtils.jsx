@@ -254,15 +254,17 @@ function groupByField(taskList, field, allTasks = []) {
     } else if (field === "category") {
       keys = task.category ? [task.category] : [];
     } else if (field === "project") {
-      // Walk up the parent chain to find the root project.
+      // Walk up the parent chain to find the nearest project-bucket ancestor.
+      // In the 5-level model this is L3 (the actual Project), not the L1 root.
+      // In the legacy 2-level model the result is identical to walking to root.
       if (task.parentId) {
         let cur = task;
         while (cur.parentId) {
           const parent = allTasks.find(t => t.id === cur.parentId);
           if (!parent) break;
+          if (parent.bucket === "project") { keys = [parent.text]; break; }
           cur = parent;
         }
-        if (cur.id !== task.id) keys = [cur.text];
       }
     }
     if (!keys.length) { ungrouped.push(task); return; }
@@ -491,7 +493,13 @@ function moveTaskInTree(allTasks, dragId, targetId, position) {
   if (isAncestorOf(dragId, targetId)) return allTasks;
 
   const newParentId = position === "inside" ? targetId : (target.parentId || null);
-  const newBucket   = newParentId ? "next" : "project";
+  // Root items are always "project". When reparenting under a "next" item the
+  // dragged item becomes "next"; under a "project" item, preserve its own bucket
+  // so sub-projects stay "project" and tasks stay "next" across reorders.
+  const newParent = newParentId ? allTasks.find(t => t.id === newParentId) : null;
+  const newBucket = !newParentId ? "project"
+    : newParent?.bucket === "next" ? "next"
+    : dragged.bucket;
 
   // 1. Remove dragged from its current parent's childIds.
   let result = allTasks.map(t =>
