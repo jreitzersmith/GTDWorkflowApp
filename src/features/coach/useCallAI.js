@@ -10,7 +10,7 @@ import { GMAIL_SEARCH_TOOL, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL,
   doGmailBulkAction, doGmailLabel, doGmailCompose, doGmailSend } from '../email/gmailTools.js';
 import { doCalendarCreateEvent, doCalendarUpdateEvent, doCalendarDeleteEvent,
   genId } from '../calendar/calendarApi.js';
-import { buildCalibrationContext, extractAction, extractUpdateAction, extractAddAction,
+import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateAction, extractAddAction,
   extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction,
   extractCalendarDeleteAction } from '../tasks/taskUtils.jsx';
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
@@ -408,7 +408,7 @@ function useCallAI({
                 const newId = genId();
                 const newTask = {
                   id: newId, text: title, bucket, done: false, created: Date.now(),
-                  parentId: parent.id, priority: [], location, dueDate, effort,
+                  parentId: parent.id, priority: [], location, dueDate, effort: normalizeEffort(effort, efforts),
                   actualEffort: null, deferUntil, notes: null, recurrence,
                   category: category || parent.category || null,
                 };
@@ -433,7 +433,7 @@ function useCallAI({
               const newId = genId();
               const newTask = {
                 id: newId, text: title, bucket, done: false, created: Date.now(),
-                priority: [], location, dueDate, dueTime, effort, actualEffort: null,
+                priority: [], location, dueDate, dueTime, effort: normalizeEffort(effort, efforts), actualEffort: null,
                 deferUntil, notes: null, recurrence,
               };
               workingTasks = [newTask, ...workingTasks];

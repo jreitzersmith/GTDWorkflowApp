@@ -297,7 +297,7 @@ export default function GTDManager() {
     startProcessInbox,
     askAIAboutTask,
   } = useInboxProcessing({
-    tasks, pendingAction,
+    tasks, pendingAction, efforts,
     singleTaskMode, processingTaskId, skippedInSessionIds,
     setTasks, setCurrentBucket,
     setMessages, setChatHistory,

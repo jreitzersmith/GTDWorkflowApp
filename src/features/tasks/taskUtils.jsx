@@ -370,6 +370,25 @@ function effortToMinutes(str) {
   return 0;
 }
 
+// Snaps a raw effort string (from AI, any format) to the nearest label in the
+// user's configured effort list, matched by converted minutes.
+// Falls back to the raw string if no label list is provided or conversion fails.
+function normalizeEffort(raw, effortLabels) {
+  if (!raw) return null;
+  if (!effortLabels || !effortLabels.length) return raw;
+  if (effortLabels.includes(raw)) return raw;          // exact match
+  const rawMin = effortToMinutes(raw);
+  if (!rawMin) return raw;                              // unrecognised format — store as-is
+  let best = null, bestDiff = Infinity;
+  effortLabels.forEach(label => {
+    const m = effortToMinutes(label);
+    if (!m) return;
+    const diff = Math.abs(m - rawMin);
+    if (diff < bestDiff) { bestDiff = diff; best = label; }
+  });
+  return best || raw;
+}
+
 // Returns a color for effort accuracy comparison (actual vs estimated).
 // delta ≤ 0 → green (under/on time), ≤ 25% over → amber, > 25% → red.
 function effortAccuracyColor(estimatedMin, actualMin) {
@@ -396,7 +415,16 @@ function minutesToEffortLabel(minutes) {
 const MIN_CALIBRATION_SAMPLES = 3;
 function buildCalibrationContext(tasks, efforts, calibrationOverrides) {
   const completed = tasks.filter(t => t.done && t.effort && t.actualEffort);
-  if (!completed.length && !Object.values(calibrationOverrides || {}).some(Boolean)) return "";
+  const hasOverrides = Object.values(calibrationOverrides || {}).some(Boolean);
+  // Always emit the label list so the AI knows the exact strings to use.
+  const labelList = (efforts && efforts.length)
+    ? `
+
+## User's effort labels
+Available: ${efforts.map(e => `"${e}"`).join(', ')}
+Always use one of these exact strings — do not invent new labels.`
+    : '';
+  if (!completed.length && !hasOverrides) return labelList;
 
   // Per-label stats from completed tasks
   const stats = {};
@@ -642,4 +670,4 @@ function useResizer(storageKey, defaultSize, { min, max, direction = 'h', sign =
 }
 
 
-export { todayStr, isDeferred, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, collectDescendantIds, moveTaskInTree, useResizer };
+export { todayStr, isDeferred, normalizeEffort, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, collectDescendantIds, moveTaskInTree, useResizer };

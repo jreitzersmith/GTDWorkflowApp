@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { genId } from '../calendar/calendarApi.js';
+import { normalizeEffort } from './taskUtils.jsx';
 
 /**
  * Owns all inbox-processing logic: AI-driven item processing, confirm/skip/delete
@@ -26,7 +27,7 @@ import { genId } from '../calendar/calendarApi.js';
  * }}
  */
 function useInboxProcessing({
-  tasks, pendingAction,
+  tasks, pendingAction, efforts,
   singleTaskMode, processingTaskId, skippedInSessionIds,
   setTasks, setCurrentBucket,
   setMessages, setChatHistory,
@@ -59,19 +60,19 @@ function useInboxProcessing({
 
     // Create new tasks based on action type, applying any AI-suggested dates
     if (type === 'next') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'next', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: aiEffort || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'next', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
     } else if (type === 'project') {
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: aiEffort || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true },
+        { id: projectId, text: title || current.text, bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true },
         { id: actionId, text: nextAction || title, bucket: 'next', done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: null, processed: true },
         ...prev,
       ]);
     } else if (type === 'someday') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'someday', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: aiEffort || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'someday', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
     } else if (type === 'waiting') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'waiting', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: aiEffort || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'waiting', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
     } else if (type === 'add') {
       // Add as child of existing project (ID or title lookup)
       const parent = tasks.find(t => t.id === parentRef)
@@ -81,14 +82,14 @@ function useInboxProcessing({
         setTasks(prev => [
           ...prev.map(t => t.id === parent.id ? { ...t, childIds: [...(t.childIds || []), childId] } : t),
           { id: childId, text: title || current.text, bucket: 'next', done: false, created: Date.now(),
-            parentId: parent.id, priority: [], location: [], dueDate: aiDue || null, effort: aiEffort || null,
+            parentId: parent.id, priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null,
             actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null,
             category: aiCategory || parent.category || null, processed: true },
         ]);
       } else {
         // Parent not found — fall back to standalone next action
         setTasks(prev => [{ id: childId, text: title || current.text, bucket: 'next', done: false,
-          created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: aiEffort || null,
+          created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null,
           actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
       }
     }
