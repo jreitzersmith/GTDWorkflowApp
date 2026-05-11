@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A personal GTD task manager built as a React SPA with an AI coach powered by the Anthropic Claude API. Primary persistence via Supabase (tasks + user_settings tables); localStorage fallback for unauthenticated sessions. Real-time cross-device sync via Supabase subscription channel.
+A personal GTD task manager built as a React SPA with an AI coach powered by the Anthropic Claude API. Integrates with Google services (Gmail, Google Calendar, Drive, Docs, Sheets, Slides) for email management, calendar sync, and file attachments. Primary persistence via Supabase (tasks + user_settings + gmail_queue tables); localStorage fallback for unauthenticated sessions. Real-time cross-device sync via Supabase subscription channel.
 
 ## User context
 
@@ -14,7 +14,9 @@ Knowledge worker / desk job. Has tried GTD before but fades after ~1 week. Wants
 
 - React (functional components + hooks), inline styles only, shared tokens in `COLORS`, styles in `s`
 - Anthropic Claude API (`claude-sonnet-4-6`); local Ollama support for coach panel
-- Supabase: `tasks` + `user_settings` tables; `useSupabaseAuth.js`, `src/api/supabase.js` (field mappers: `taskToDb`/`dbToTask`, `queueEntryToRow`/`rowToQueueEntry`)
+- Supabase: `tasks` + `user_settings` + `gmail_queue` tables; `useSupabaseAuth.js`, `src/api/supabase.js` (field mappers: `taskToDb`/`dbToTask`, `queueEntryToRow`/`rowToQueueEntry`); tasks table includes `drive_attachments` JSONB column
+- Google OAuth 2.0 (PKCE flow) via `useGoogleAuth.js`; unified scope management for Gmail, Calendar, Drive, Docs, Sheets, Slides
+- Google API modules: `src/api/driveApi.js`, `docsApi.js`, `sheetsApi.js`, `slidesApi.js` (typed wrappers with 401 retry)
 - Vite for local dev
 
 ## Coding standards
@@ -97,15 +99,19 @@ File placement:
 
 ### Task management
 
-Add/edit/delete/move across buckets. Priority tags, location tags, due dates, effort estimates, defer-until. Task Detail Panel (360px side panel). Project hierarchy with drag-and-drop. Collapsible project tree. Descendant count badge. Cumulative effort totals. Waterfall filtering. Completed view hierarchy.
+Add/edit/delete/move across buckets. Priority tags, location tags, due dates, effort estimates, defer-until. Task Detail Panel (360px side panel). Project hierarchy with drag-and-drop. Collapsible project tree. Descendant count badge. Cumulative effort totals. Waterfall filtering. Completed view hierarchy. In-bucket text filter (bypasses tree/grouping; resets on bucket change). Global search modal (Cmd+K / Ctrl+K) across all non-archive buckets with keyboard nav and match highlighting. Drive file attachments on tasks via Google Picker (stored as `driveAttachments[]`).
 
 ### AI Coach (5 modes)
 
 Chat · Process · Weekly Review · Brain Dump · Project Review. Action lines: `→ACTION:update`, `→ACTION:add`, `→ACTION:create`.
 
+- **Chat** — lazy task context: compact bucket-count summary + `get_task_context` tool on demand; other modes receive full task list
+- **Process** — `→ACTION:add|<title>|parent:<id>` places tasks under existing projects; code-level question guard prevents auto-confirm when AI response contains a clarifying question; duplicate detection via expanded context (Next Actions + Waiting For visible to AI)
+- **Brain Dump** — each captured item auto-added to Inbox via `→ACTION:create|<text>|bucket:inbox`
+
 ### API
 
-`fetch` → `https://api.anthropic.com/v1/messages`. Full task list in system prompt. Claude + Ollama provider selector.
+`fetch` → `https://api.anthropic.com/v1/messages`. Chat mode uses lazy task context (compact summary + `get_task_context` tool); all other modes receive full task list. Claude + Ollama provider selector. Google Services settings panel: unified OAuth with per-service scope preferences.
 
 ---
 
@@ -178,6 +184,8 @@ These preferences apply to all sessions and both workflow variants. They exist t
 
 Update the Last used numbers line at the top of the file.
 
+**On root cause identified:** When the cause of an issue or the approach to a feature is determined — even before any code is written — update the corresponding GitHub issue with that reasoning. Include what the root cause is, what files/functions are involved, and the proposed fix. This keeps the issue self-documenting and avoids re-deriving the analysis if a session is interrupted.
+
 **On resolution:** Delete the line from `Known_Issues_And_Requests.md`. Append a row to `Resolved_Issues_And_Requests.md` (date · type · # · GH# · name · commit hash). Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
 
 **Triage on report:** Categorize immediately when John reports an issue or request. Ask one clarifying question if category is ambiguous. Do not begin investigation until the item is logged.
@@ -193,3 +201,4 @@ Update the Last used numbers line at the top of the file.
 - Use `mcp__git__git_commit` for commits, not bash git (avoids HEAD.lock on Windows mount)
 - Use `git -C "path" push origin main` for push, not `cd && git push` (PowerShell `&&` is invalid)
 - Claude Desktop on this machine is MSIX-packaged; config is at `C:\Users\JRS\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
