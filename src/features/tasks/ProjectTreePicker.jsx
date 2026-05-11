@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 
@@ -36,7 +36,7 @@ function buildProjectTree(flatProjects) {
 
 // Renders one row of the project tree. Recurses for expanded children.
 // Hover on a row with children triggers a timed expand via onHoverExpand.
-function ProjectTreeRow({ node, depth, selectedId, expanded, onSelect, onToggle, onHoverExpand }) {
+function ProjectTreeRow({ node, depth, selectedId, expanded, onSelect, onToggle }) {
   const hasChildren = node.children.length > 0;
   const isSelected = node.id === selectedId;
   const isExpanded = !!expanded[node.id];
@@ -44,7 +44,6 @@ function ProjectTreeRow({ node, depth, selectedId, expanded, onSelect, onToggle,
   return (
     <>
       <div
-        onMouseEnter={() => hasChildren && onHoverExpand(node.id)}
         onClick={() => onSelect(node.id)}
         style={{
           display: "flex", alignItems: "center", gap: 4,
@@ -81,7 +80,6 @@ function ProjectTreeRow({ node, depth, selectedId, expanded, onSelect, onToggle,
           expanded={expanded}
           onSelect={onSelect}
           onToggle={onToggle}
-          onHoverExpand={onHoverExpand}
         />
       ))}
     </>
@@ -95,7 +93,6 @@ ProjectTreeRow.propTypes = {
   expanded:      PropTypes.object.isRequired,
   onSelect:      PropTypes.func.isRequired,
   onToggle:      PropTypes.func.isRequired,
-  onHoverExpand: PropTypes.func.isRequired,
 };
 
 // Collapsible project tree picker. Shows all eligible projects as a nested
@@ -106,24 +103,11 @@ ProjectTreeRow.propTypes = {
 // showStandalone renders a "— Standalone" row at the top for TaskDetailPanel.
 function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProject, showStandalone }) {
   const [expanded, setExpanded] = useState({});
-  const hoverTimers = useRef({});
-
-  useEffect(() => {
-    const timers = hoverTimers.current;
-    return () => Object.values(timers).forEach(clearTimeout);
-  }, []);
 
   const tree = buildProjectTree(eligibleProjects);
 
   const handleToggle = (id) => {
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const handleHoverExpand = (id) => {
-    clearTimeout(hoverTimers.current[id]);
-    hoverTimers.current[id] = setTimeout(() => {
-      setExpanded(prev => ({ ...prev, [id]: true }));
-    }, 200);
   };
 
   return (
@@ -150,7 +134,6 @@ function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProjec
           expanded={expanded}
           onSelect={onSelect}
           onToggle={handleToggle}
-          onHoverExpand={handleHoverExpand}
         />
       ))}
       {onNewProject && (

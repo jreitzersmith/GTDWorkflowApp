@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#49**
+> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#58**
 
 ---
 
@@ -21,6 +21,11 @@
 
 - FR#13 [GH#4] — Remove "Process with AI" button from the left sidebar navigation panel
 - FR#47 [GH#45] (2026-05-11) — Project view: toggle to show/hide completed subtasks
+- FR#50 [GH#49] (2026-05-11) — Remove hover auto-expand from project picker dropdowns; expand on chevron click only
+- FR#51 [GH#50] (2026-05-11) — Fix "Collapse All": recursively add all descendants to collapsedNodes, not just immediate L2 children
+- FR#52 [GH#51] (2026-05-11) — Rename "≡ Projects Only" toolbar button to "≡ Project Categories"
+- FR#56 [GH#55] (2026-05-11) — Remove "🔍 Review Projects" button from Project view toolbar (redundant with coach panel)
+- FR#58 [GH#57] (2026-05-11) — Project view: alpha sort L1 and L2 nodes
 
 #### Daily workflow / GTD core
 
@@ -49,9 +54,16 @@
 - FR#45 [GH#41] (2026-05-09) — Unified Drive/Docs/Sheets search — search bar in coach or task panel that queries Drive full-text and returns matching files as context or task attachments
 - FR#46 [GH#42] (2026-05-09) — Receipt-to-Sheets pipeline — forward a receipt email to the app; AI extracts vendor/amount/date and appends a row to a designated Google Sheet
 
+#### Daily workflow / GTD core
+
+- FR#55 [GH#54] (2026-05-11) — Next Actions: show only lowest-level leaf items (L3–L6); exception for Standalone L2 items with no project parent. Blocked on FR#54
+- FR#57 [GH#56] (2026-05-11) — Next Actions groupBy=Project: two-level nesting — L1 header groups L2 sub-headers, each L2 lists its leaf tasks. Blocked on FR#54, FR#55
+
 #### Data model expansions
 
 - FR#49 [GH#48] (2026-05-11) — 5-level project hierarchy: general categories (L1, bucket:project) → project categories (L2, bucket:project) → projects (L3, bucket:project) → tasks (L4, bucket:next) → subtasks (L5, bucket:next); requires moveTaskInTree bucket preservation, addProjectTask childBucket param, Projects add bar tree picker, groupByField nearest-project walk
+- FR#53 [GH#52] (2026-05-11) — Increase project tree depth guard to 6 levels (depth > 6) in ProjectTree and CompletedTree
+- FR#54 [GH#53] (2026-05-11) — Add Standalone Project Category: catch-all for tasks with no project parent; needs design decision on identification (sentinel name vs user_settings ID vs virtual grouping)
 - FR#10 [GH#16] — Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
 - FR#16 [GH#17] — Shopping list manager (new bucket/sidebar section)
 

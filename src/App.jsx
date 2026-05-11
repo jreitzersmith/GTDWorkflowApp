@@ -939,8 +939,6 @@ export default function GTDManager() {
                           onDrop={handleProjectDrop}
                           deferredDupeWarning={deferredDupeWarning}
                           onViewDeferred={() => setCurrentBucket("deferred")}
-                          loading={loading}
-                          onStartProjectReview={startProjectReview}
                           onBulkAssign={bulkAssignToProject}
                           categories={categories}
                           projectCategoryFilter={projectCategoryFilter}

@@ -80,8 +80,6 @@ function TaskBucketView({
   onDrop,
   deferredDupeWarning,
   onViewDeferred,
-  loading,
-  onStartProjectReview,
   onBulkAssign,
   categories,
   projectCategoryFilter,
@@ -153,12 +151,16 @@ function TaskBucketView({
               }}
               title="Show project names only"
             >
-              ≡ Projects Only
+              ≡ Project Categories
             </ToolbarBtn>
             <ToolbarBtn
               onClick={() => {
                 const next = new Set();
-                rootProjects.forEach(p => (p.childIds || []).forEach(cid => next.add(cid)));
+                function addAllDescendants(id) {
+                  const task = tasks.find(t => t.id === id);
+                  (task?.childIds || []).forEach(cid => { next.add(cid); addAllDescendants(cid); });
+                }
+                rootProjects.forEach(p => addAllDescendants(p.id));
                 setCollapsedNodes(next);
               }}
               title="Collapse all projects to top-level tasks"
@@ -181,14 +183,6 @@ function TaskBucketView({
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             )}
-            <ToolbarBtn
-              onClick={onStartProjectReview}
-              disabled={loading}
-              color={COLORS.project}
-              style={{ fontSize: 12, padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 5 }}
-            >
-              🔍 Review Projects
-            </ToolbarBtn>
           </div>
         )}
 
@@ -408,8 +402,6 @@ TaskBucketView.propTypes = {
   onDrop:            PropTypes.func.isRequired,
   deferredDupeWarning: PropTypes.object,
   onViewDeferred:    PropTypes.func.isRequired,
-  loading:           PropTypes.bool.isRequired,
-  onStartProjectReview: PropTypes.func.isRequired,
   onBulkAssign:      PropTypes.func.isRequired,
 };
 

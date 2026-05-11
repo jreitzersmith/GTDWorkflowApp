@@ -17,7 +17,7 @@ function DropLine({ depth }) {
 // parentId !== null  -> done children of parentId, in childIds order.
 function CompletedTree({ parentId, depth }) {
   const { allTasks, collapsedNodes } = useContext(TaskRowContext);
-  if (depth > 5) return null;
+  if (depth > 6) return null;
 
   let children;
   if (parentId === null) {
@@ -50,10 +50,13 @@ CompletedTree.propTypes = {
 // Drag-and-drop reorderable tree of project children.
 function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop }) {
   const { allTasks, collapsedNodes, projectCategoryFilter } = useContext(TaskRowContext);
-  if (depth > 5) return null;
+  if (depth > 6) return null;
   let children = getOrderedChildren(parentId, allTasks);
   if (depth === 0 && projectCategoryFilter) {
     children = children.filter(t => t.category === projectCategoryFilter);
+  }
+  if (depth <= 1) {
+    children = [...children].sort((a, b) => a.text.localeCompare(b.text));
   }
   if (!children.length) return null;
 
