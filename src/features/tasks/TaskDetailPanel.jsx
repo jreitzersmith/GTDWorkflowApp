@@ -370,7 +370,7 @@ DriveAttachments.propTypes = {
 
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
-function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, googleAccessToken, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
   const {
     titleDraft, setTitleDraft, saveTitle,
     notesDraft, setNotesDraft, saveNotes,
@@ -385,6 +385,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
   const eligibleProjects = allTasks.filter(
     t => t.bucket === "project" && !t.done && !excludedIds.has(t.id)
   );
+  const hasProjectChildren = allTasks.some(t => t.parentId === task.id && t.bucket === 'project');
 
   return (
     <div style={{ ...style, background: COLORS.surface, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -443,6 +444,27 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Bucket</span>
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
+
+          {/* Type toggle — project/task switch, visible only in Projects view */}
+          {currentBucket === 'project' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Type</span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  onClick={() => onUpdate(task.id, { bucket: 'project' })}
+                  style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${task.bucket === 'project' ? COLORS.project : COLORS.border}`, background: task.bucket === 'project' ? COLORS.project + '22' : 'transparent', color: task.bucket === 'project' ? COLORS.project : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+                >&#128193; Project</button>
+                <button
+                  onClick={() => { if (!hasProjectChildren) onUpdate(task.id, { bucket: 'next' }); }}
+                  title={hasProjectChildren ? 'Cannot demote: this node has sub-projects' : 'Convert to a leaf task (Next Actions)'}
+                  style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${task.bucket === 'next' ? COLORS.next : COLORS.border}`, background: task.bucket === 'next' ? COLORS.next + '22' : 'transparent', color: task.bucket === 'next' ? COLORS.next : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: hasProjectChildren ? 'not-allowed' : 'pointer', opacity: hasProjectChildren ? 0.5 : 1 }}
+                >&#9889; Task</button>
+              </div>
+              {hasProjectChildren && (
+                <span style={{ fontSize: 10, color: COLORS.muted }}>has sub-projects</span>
+              )}
+            </div>
+          )}
 
           {/* Move to bucket */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
@@ -621,6 +643,7 @@ TaskDetailPanel.propTypes = {
   locations:         PropTypes.arrayOf(PropTypes.string).isRequired,
   efforts:           PropTypes.arrayOf(PropTypes.string).isRequired,
   categories:        PropTypes.arrayOf(PropTypes.string),
+  currentBucket:     PropTypes.string,
   driveEnabled:      PropTypes.bool,
   googleAccessToken: PropTypes.string,
   onUpdate:          PropTypes.func.isRequired,
