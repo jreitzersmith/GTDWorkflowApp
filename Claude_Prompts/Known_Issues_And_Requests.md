@@ -10,7 +10,6 @@
 - [ ] Issue#13 [GH#33] (2026-05-09) — AI sets incorrect deferUntil on weekday-recurring tasks (defers to day after first calendar occurrence instead of next recurrence date)
 - [ ] Issue#14 [GH#43] (2026-05-11) — Process mode: AI asks question and emits →ACTION tag in same response, bypassing clarification (needs code-level guard in useCallAI.js)
 - [ ] Issue#15 [GH#44] (2026-05-11) — Process mode: no →ACTION:add type — AI can't place a task under an existing project (falls back to standalone →ACTION:next)
-- [ ] Issue#16 [GH#47] (2026-05-11) — ProjectTreePicker chevrons missing: buildProjectTree uses parentId but project view uses childIds; switch to childIds to match project view structure
 
 ---
 
