@@ -21,7 +21,7 @@
 
 - FR#13 [GH#4] — Remove "Process with AI" button from the left sidebar navigation panel
 - FR#47 [GH#45] (2026-05-11) — Project view: toggle to show/hide completed subtasks
-- FR#48 [GH#46] (2026-05-11) — Project list: collapse all to top-level by default, expand subtasks on hover/click
+- FR#48 [GH#46] (2026-05-11) — Project picker dropdown (TaskDetailPanel + InboxBars): replace flat native select with collapsible tree; sub-projects hidden by default, expand on hover/click; enables selecting sub-projects as parent
 
 #### Daily workflow / GTD core
 
