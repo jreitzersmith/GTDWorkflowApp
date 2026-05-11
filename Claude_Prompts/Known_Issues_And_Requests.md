@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#62**
+> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#68**
 
 ---
 
@@ -21,6 +21,10 @@
 
 - FR#7 [GH#6] — Daily focus view (pick 3 Most Important Tasks from Next Actions)
 - FR#15 [GH#7] — AI-assisted daily planning (new coach mode; evaluates calendar + tasks + travel time)
+- FR#64 [GH#63] (2026-05-11) — SoD/EoD structured daily review: count summaries, MUST ACCOMPLISH checklist widget, brain dump capture, due-date update widget for incomplete items
+- FR#65 [GH#64] (2026-05-11) — Today's Focus sidebar view: AI-generated focus list persisted in localStorage, tiers by priority/due/overdue, click to open TaskDetailPanel
+- FR#66 [GH#65] (2026-05-11) — Calendar-aware tasks in Today's Focus: surface tasks with due date but no calendar event as a distinct tier
+- FR#67 [GH#66] (2026-05-11) — dueTime field on tasks: HH:MM string, SQL column + UI time input in TaskDetailPanel, sort within focus tiers by dueTime
 
 #### Inbox / processing improvements
 
@@ -29,6 +33,7 @@
 
 #### Integrations / data
 
+- FR#68 [GH#67] (2026-05-11) — →ACTION:set-focus ACTION line support in daily coach mode: emit set-focus with confirmed task IDs to write Today's Focus to localStorage
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
 - FR#35 [GH#23] — Calendar sync: when a task has a parent, show only the child task in the "tasks with due date, no calendar event" list (suppress the parent to avoid adding both parent and child as separate events)
 - FR#37 [GH#31] (2026-05-09) — Calendar event creation: set default notification(s) on created events (simplest: pass `useDefault: true` to Google Calendar API; stretch: configurable reminder interval in Settings)

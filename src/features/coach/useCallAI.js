@@ -365,7 +365,7 @@ function useCallAI({
       // Apply →ACTION lines when in chat or dump mode — supports multiple actions per response
       let updateChip = null;
       let actionError = null;
-      if (mode === 'chat' || mode === 'dump') {
+      if (mode === 'chat' || mode === 'dump' || mode === 'daily') {
         const taskActionLines = reply.split('\n')
           .map(l => l.trim())
           .filter(l => /^→ACTION:(update|add|create)\|/.test(l));
@@ -516,6 +516,19 @@ function useCallAI({
             }
             updateChip = { taskName: 'Calendar event', fields: ['deleted from Google Calendar'] };
           } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
+        }
+      }
+
+      // →ACTION:set-focus|<id1>,<id2>,... — daily mode focus selection
+      if (mode === 'daily') {
+        const focusLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('→ACTION:set-focus|'));
+        if (focusLine) {
+          const ids = focusLine.replace('→ACTION:set-focus|', '').split(',').map(id => id.trim()).filter(Boolean);
+          if (ids.length > 0) {
+            const today = new Date().toISOString().slice(0, 10);
+            localStorage.setItem(`gtd-todays-focus-${today}`, JSON.stringify({ ids, date: today }));
+            updateChip = { taskName: `${ids.length} task${ids.length !== 1 ? 's' : ''}`, fields: ["set as Today's Focus"] };
+          }
         }
       }
 

@@ -351,21 +351,61 @@ export default function GTDManager() {
     switchCoachMode("dump", "Let's surface everything in your head and get it into your inbox.\n\n**Starting with work:** What professional tasks, deadlines, or commitments have been on your mind that aren't written down anywhere?");
   };
 
-  // FR#14: Daily Review — toggles between Start Day and End Day each click, persists via localStorage.
+  // FR#14/FR#64: Daily Review — toggles between Start Day and End Day, persists via localStorage.
   const startDailyReview = () => {
     const today = new Date().toDateString();
+    const today8601 = new Date().toISOString().slice(0, 10);
+
+    // Compute a week boundary (next 7 days, exclusive of today)
+    const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekEnd8601 = weekEnd.toISOString().slice(0, 10);
+
+    // Calendar event IDs that tasks already have
+    const calEventIds = new Set(calendarEvents.map(e => e.id).filter(Boolean));
+
     if (dailyReviewPhase === 'start') {
-      const total = tasks.filter(t => !t.done && t.bucket !== 'done').length;
-      const today8601 = new Date().toISOString().slice(0, 10);
-      const overdue = tasks.filter(t => !t.done && t.dueDate && t.dueDate < today8601).length;
-      const overdueNote = overdue > 0 ? `, including **${overdue} overdue**` : '';
-      switchCoachMode('daily', `Good morning! Let's start your day.\n\nYou have **${total} active task${total !== 1 ? 's' : ''}** in your system${overdueNote}.\n\nWhat are the **1-3 things** that, if completed, would make today a success?`);
+      const active = tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
+      const overdue        = active.filter(t => t.dueDate && t.dueDate < today8601);
+      const dueToday       = active.filter(t => t.dueDate === today8601);
+      const dueThisWeek    = active.filter(t => t.dueDate && t.dueDate > today8601 && t.dueDate <= weekEnd8601 && effortToMinutes(t.effort) > 60);
+      const noCalEvent     = active.filter(t => t.dueDate && !t.calendarEventId && calendarEnabled);
+      const unprocessedInbox = tasks.filter(t => t.bucket === 'inbox' && !t.done).length;
+
+      const lines = [
+        `[SoD Summary]`,
+        `- Overdue: ${overdue.length}`,
+        `- Due today: ${dueToday.length}`,
+        `- Due this week (>1 hr effort): ${dueThisWeek.length}`,
+        calendarEnabled ? `- Have due date but no calendar event: ${noCalEvent.length}` : null,
+        `- Unprocessed inbox items: ${unprocessedInbox}`,
+        `[/SoD Summary]`,
+      ].filter(Boolean).join('\n');
+
+      const urgencyNote = overdue.length > 0 ? ` You have **${overdue.length} overdue item${overdue.length !== 1 ? 's' : ''}** that need attention.` : '';
+      switchCoachMode('daily', `Good morning! Let's start your day.${urgencyNote}\n\n${lines}`);
       const newPhase = 'end';
       setDailyReviewPhase(newPhase);
       localStorage.setItem('gtd-daily-phase', JSON.stringify({ phase: newPhase, date: today }));
     } else {
-      const inboxCount = tasks.filter(t => t.bucket === 'inbox' && !t.done).length;
-      switchCoachMode('daily', `Let's close out your day.\n\nYou have **${inboxCount} item${inboxCount !== 1 ? 's' : ''}** in your inbox.\n\nWhat loose ends, new commitments, or ideas came up today that you haven't captured yet?`);
+      const active = tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
+      const dueToday       = active.filter(t => t.dueDate === today8601);
+      const inboxCount     = tasks.filter(t => t.bucket === 'inbox' && !t.done).length;
+
+      // Check if a focus list was set today
+      const focusKey = `gtd-todays-focus-${today8601}`;
+      const focusData = (() => { try { return JSON.parse(localStorage.getItem(focusKey)); } catch { return null; } })();
+      const focusIds = focusData?.ids || [];
+      const focusDone = focusIds.filter(id => tasks.find(t => t.id === id && t.done)).length;
+
+      const lines = [
+        `[EoD Summary]`,
+        `- Focus tasks completed: ${focusDone} / ${focusIds.length}`,
+        `- Due today (not yet done): ${dueToday.filter(t => !t.done).length}`,
+        `- Unprocessed inbox items: ${inboxCount}`,
+        `[/EoD Summary]`,
+      ].join('\n');
+
+      switchCoachMode('daily', `Let's close out your day.\n\n${lines}`);
       const newPhase = 'start';
       setDailyReviewPhase(newPhase);
       localStorage.setItem('gtd-daily-phase', JSON.stringify({ phase: newPhase, date: today }));
