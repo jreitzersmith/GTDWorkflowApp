@@ -44,7 +44,7 @@ function useInboxProcessing({
 
   const handleConfirmMove = useCallback(() => {
     if (!pendingAction) return;
-    const { type, title, nextAction, dueDate: aiDue, deferUntil: aiDefer, recurrence: aiRecurrence } = pendingAction;
+    const { type, title, nextAction, parentRef, dueDate: aiDue, deferUntil: aiDefer, recurrence: aiRecurrence } = pendingAction;
 
     const current = tasks.find(t => t.id === processingTaskId.current)
       ?? tasks.filter(t => t.bucket === 'inbox')[0];
@@ -72,6 +72,25 @@ function useInboxProcessing({
       setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'someday', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null }, ...prev]);
     } else if (type === 'waiting') {
       setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'waiting', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null }, ...prev]);
+    } else if (type === 'add') {
+      // Add as child of existing project (ID or title lookup)
+      const parent = tasks.find(t => t.id === parentRef)
+                  || tasks.find(t => t.text.toLowerCase() === (parentRef || '').toLowerCase());
+      const childId = genId();
+      if (parent) {
+        setTasks(prev => [
+          ...prev.map(t => t.id === parent.id ? { ...t, childIds: [...(t.childIds || []), childId] } : t),
+          { id: childId, text: title || current.text, bucket: 'next', done: false, created: Date.now(),
+            parentId: parent.id, priority: [], location: [], dueDate: aiDue || null, effort: null,
+            actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null,
+            category: parent.category ?? null },
+        ]);
+      } else {
+        // Parent not found — fall back to standalone next action
+        setTasks(prev => [{ id: childId, text: title || current.text, bucket: 'next', done: false,
+          created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: null,
+          actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null }, ...prev]);
+      }
     }
     // type === 'delete': just archive, no new task
 

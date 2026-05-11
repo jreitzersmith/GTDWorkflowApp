@@ -59,7 +59,7 @@ function formatBubble(text) {
 }
 
 function extractAction(text) {
-  const m = text.match(/→ACTION:(next|project|someday|waiting|delete)\|?([^|\n]*)?\|?([^|\n]*)?((?:\|[^\n]*)*)?/);
+  const m = text.match(/→ACTION:(next|project|someday|waiting|delete|add)\|?([^|\n]*)?\|?([^|\n]*)?((?:\|[^\n]*)*)?/);
   if (!m) return null;
   // For 'project' type m[3] is the first next action; for all other types the
   // third positional segment may be a due/defer/recur field captured before the
@@ -69,13 +69,15 @@ function extractAction(text) {
   const extras = isProjectType
     ? (m[4] || "")
     : (seg3 ? '|' + seg3 : '') + (m[4] || "");
-  const dueMatch   = extras.match(/\|due:(\d{4}-\d{2}-\d{2})/);
-  const deferMatch = extras.match(/\|defer:(\d{4}-\d{2}-\d{2})/);
-  const recurMatch = extras.match(/\|recur:([^|]+)/);
+  const dueMatch    = extras.match(/\|due:(\d{4}-\d{2}-\d{2})/);
+  const deferMatch  = extras.match(/\|defer:(\d{4}-\d{2}-\d{2})/);
+  const recurMatch  = extras.match(/\|recur:([^|]+)/);
+  const parentMatch = extras.match(/\|parent:([^|]+)/);
   return {
-    type: m[1],
-    title: (m[2] || "").trim(),
+    type:      m[1],
+    title:     (m[2] || "").trim(),
     nextAction: isProjectType ? seg3 : '',
+    parentRef:  parentMatch ? parentMatch[1].trim() : null,
     dueDate:    dueMatch   ? dueMatch[1]                                : null,
     deferUntil: deferMatch ? deferMatch[1]                              : null,
     recurrence: recurMatch ? parseRecurrenceValue(recurMatch[1].trim()) : null,

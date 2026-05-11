@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#13** · Code Quality — **CQ#10** · Feature Requests — **FR#46**
+> **Last used numbers:** Known Issues — **Issue#15** · Code Quality — **CQ#10** · Feature Requests — **FR#46**
 
 ---
 
@@ -8,6 +8,8 @@
 
 - [ ] Issue#12 [GH#32] (2026-05-09) — Process mode: AI does not assign due date when user corrects a deferral assumption mid-conversation (task filed without dueDate after user overrides AI's proposed defer date)
 - [ ] Issue#13 [GH#33] (2026-05-09) — AI sets incorrect deferUntil on weekday-recurring tasks (defers to day after first calendar occurrence instead of next recurrence date)
+- [ ] Issue#14 [GH#43] (2026-05-11) — Process mode: AI asks question and emits →ACTION tag in same response, bypassing clarification (needs code-level guard in useCallAI.js)
+- [ ] Issue#15 [GH#44] (2026-05-11) — Process mode: no →ACTION:add type — AI can't place a task under an existing project (falls back to standalone →ACTION:next)
 
 ---
 

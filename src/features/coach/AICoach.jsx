@@ -92,7 +92,7 @@ function TypingIndicator() {
 
 function PendingActionBar({ action, onConfirm, onDismiss, onDelete }) {
   if (!action) return null;
-  const { type, title, nextAction } = action;
+  const { type, title, nextAction, parentName } = action;
 
   const configs = {
     next:    { color: COLORS.next,    label: "Next Actions", confirmText: "Create ✓" },
@@ -100,6 +100,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete }) {
     someday: { color: COLORS.someday, label: "Someday / Maybe", confirmText: "Move ✓" },
     waiting: { color: COLORS.waiting, label: "Waiting For", confirmText: "Move ✓" },
     delete:  { color: COLORS.muted,   label: "Archive (not actionable)", confirmText: "Archive ✓" },
+    add:     { color: COLORS.project, label: "Add to existing project", confirmText: "Add ✓" },
   };
   const cfg = configs[type] || configs.next;
 
@@ -110,6 +111,11 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete }) {
         <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
           <div><span style={{ color: COLORS.muted }}>Project: </span><strong style={{ color: COLORS.text }}>{title}</strong></div>
           <div><span style={{ color: COLORS.muted }}>Next action: </span><strong style={{ color: COLORS.next }}>{nextAction}</strong></div>
+        </div>
+      ) : type === "add" ? (
+        <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
+          <div><span style={{ color: COLORS.muted }}>Under: </span><strong style={{ color: COLORS.project }}>{parentName}</strong></div>
+          <div><span style={{ color: COLORS.muted }}>Action: </span><strong style={{ color: COLORS.next }}>{title}</strong></div>
         </div>
       ) : type !== "delete" ? (
         <div style={{ fontSize: 12, color: COLORS.text2 }}>
