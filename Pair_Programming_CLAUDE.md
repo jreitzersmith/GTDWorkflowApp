@@ -2,14 +2,14 @@
 
 ## Working instructions
 - Before each set of tool calls, briefly explain what you're looking for and why.
-- When John reports an issue or new request, triage and categorise it immediately — see the Backlog management section in `Claude_Prompts/Pair_Programming_Workflow.md`. Ask one clarifying question if the category is ambiguous before recording it.
+- When John reports an issue or new request, triage and categorise it immediately — see the Backlog management section below. Ask one clarifying question if the category is ambiguous before recording it.
 
 ## Ongoing maintenance
 - **Vite timestamp cleanup:** At the start of each session, check for `vite.config.js.timestamp-*.mjs` files in the project root. If 5 or more exist, delete them all with:
   `Remove-Item "C:\Programming_Projects\GTDWorkflowApp\vite.config.js.timestamp-*.mjs" -Force`
 
 ## What this project is
-A personal GTD (Getting Things Done) task manager built as a React app. It combines a full task list with an AI coach powered by the Anthropic Claude API.
+A personal GTD (Getting Things Done) task manager built as a React SPA with an AI coach powered by the Anthropic Claude API. Integrates with Google services (Gmail, Google Calendar, Drive, Docs, Sheets, Slides) for email management, calendar sync, and file attachments.
 
 ## User context
 - Knowledge worker / desk job
@@ -22,14 +22,16 @@ A personal GTD (Getting Things Done) task manager built as a React app. It combi
 - Anthropic Claude API (`claude-sonnet-4-6`) — also supports local LLMs via Ollama
 - **Supabase** for primary persistence (tasks + user_settings tables); real-time subscription channel for cross-device sync
 - localStorage as fallback for unauthenticated sessions and as one-time migration source when Supabase is empty on first auth
-- `useSupabaseAuth.js` — Supabase auth hook; `src/api/supabase.js` — client + field mappers (`taskToDb` / `dbToTask`, `queueEntryToRow` / `rowToQueueEntry`)
+- `useSupabaseAuth.js` — Supabase auth hook; `src/api/supabase.js` — client + field mappers (`taskToDb` / `dbToTask`, `queueEntryToRow` / `rowToQueueEntry`); tasks table includes `drive_attachments` JSONB column; `gmail_queue` table for email cleanup queue
+- Google OAuth 2.0 (PKCE flow) via `useGoogleAuth.js`; unified scope management for Gmail, Calendar, Drive, Docs, Sheets, Slides
+- Google API modules: `src/api/driveApi.js`, `docsApi.js`, `sheetsApi.js`, `slidesApi.js` (typed wrappers with 401 retry)
 - Vite for local dev
 
 ## Coding standards
-See `Claude_Prompts/Pair_Programming_Code_Standards.md` — read this file whenever writing or reviewing any code.
+See `Claude_Prompts/Senior_Code_Engineer.md` — read this file whenever writing or reviewing any code.
 
 ## Pairing workflow
-See `Claude_Prompts/Pair_Programming_Workflow.md` — read this file at the start of any development session and follow it for every change.
+See `Claude_Prompts/AI_Pair_Programming.md` — read this file at the start of any development session and follow it for every change.
 
 ## Known issues & roadmap
 See `Claude_Prompts/Known_Issues_And_Requests.md` — read this when planning new features or triaging bugs.
@@ -50,11 +52,10 @@ GTDWorkflowApp/
 │   ├── project-snippets.html        ← code snippet reference
 │   └── GTDWorkflowApp_ProjectSummary.html
 ├── Claude_Prompts/                  ← Claude workflow docs (NOT app prompts)
-│   ├── Pair_Programming_Workflow.md
-│   ├── Pair_Programming_Code_Standards.md
+│   ├── AI_Pair_Programming.md
+│   ├── Senior_Code_Engineer.md
 │   ├── Known_Issues_And_Requests.md
 │   ├── Resolved_Issues_And_Requests.md
-│   ├── Known_Issues_And_Requests.md
 │   └── Project_Summary.md
 ├── src/
 │   ├── App.jsx                      ← top-level layout + auth gate wiring
@@ -137,12 +138,46 @@ Every task object: `{ id, text, bucket, done, created, priority[], location[], d
   - `→ACTION:add` — create a child task under an existing parent (updates both `parentId` and parent's `childIds`)
   - `→ACTION:create` — create a standalone task in any bucket
   - Failed actions surface as a follow-up error bubble in the chat; success shown as an update chip
-- **Process** — walks inbox items one by one; recommends a bucket with one-click Move confirmation
+- **Process** — walks inbox items one by one; recommends a bucket with one-click Move confirmation. Supports `→ACTION:add|<title>|parent:<id>` to place tasks under existing projects. Code-level guard prevents auto-confirm when AI response contains a clarifying question. Duplicate detection: AI sees Next Actions + Waiting For context.
 - **Weekly Review** — guided 7-step review
-- **Brain Dump** — prompts across life areas to surface open loops
+- **Brain Dump** — prompts across life areas to surface open loops; each captured item auto-added to Inbox via `→ACTION:create|<text>|bucket:inbox`
 - **Project Review** — reviews projects one by one; two sub-modes: Tasks (next action suggestions) and Metadata (effort/due date/defer suggestions with accept/reject per task)
 
 ### API integration
 - `fetch` → `https://api.anthropic.com/v1/messages`
-- System prompt includes full task list context on every call
+- Chat mode: compact bucket-count summary + `get_task_context` tool on demand. All other modes receive the full task list.
 - Provider selector supports Claude (Anthropic API) and local Ollama models
+- **Google Services settings** — unified OAuth panel; per-service scope selector; single "Authorize Google" button; scope preferences persisted in localStorage
+
+---
+
+## Backlog management
+
+**Categories:**
+
+| Category | Number format | Use when |
+|---|---|---|
+| Known Issues | `Issue#x` | Bug or broken behaviour |
+| Code quality | `CQ#x` | Component size, test coverage, architecture |
+| UI polish / quick wins | `FR#x` | Low-effort visible improvements |
+| Daily workflow / GTD core | `FR#x` | Core GTD loop, planning, coach modes |
+| Inbox / processing improvements | `FR#x` | Inbox flow, AI suggestions |
+| Integrations / data | `FR#x` | Gmail, Calendar, Supabase, Todoist, etc. |
+| Data model expansions | `FR#x` | New fields, buckets, task properties |
+| Platform / reach | `FR#x` | Mobile, export, third-party sync |
+
+**On new entry:** File a GitHub issue immediately via `mcp__github__create_issue` using the repo's label set. Record the GH# and creation date in `Known_Issues_And_Requests.md`:
+
+```
+- [ ] Issue#12 [GH#31] (2026-05-09) — description
+```
+
+Update the Last used numbers line at the top of the file.
+
+**On root cause identified:** When the cause of an issue or the approach to a feature is determined — even before any code is written — update the corresponding GitHub issue with that reasoning. Include what the root cause is, what files/functions are involved, and the proposed fix. This keeps the issue self-documenting and avoids re-deriving the analysis if a session is interrupted.
+
+**On resolution:** Delete the line from `Known_Issues_And_Requests.md`. Append a row to `Resolved_Issues_And_Requests.md` (date · type · # · GH# · name · commit hash). Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
+
+**Triage on report:** Categorize immediately when John reports an issue or request. Ask one clarifying question if category is ambiguous. Do not begin investigation until the item is logged.
+
+**Defer during active testing:** If a new issue arrives during Phases 5–6 of an open workflow, log it and acknowledge it, but do not investigate or propose changes until the current cycle is confirmed and committed.

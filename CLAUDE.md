@@ -21,11 +21,11 @@ Knowledge worker / desk job. Has tried GTD before but fades after ~1 week. Wants
 
 ## Coding standards
 
-See `Claude_Prompts/Senior_Code_Engineer.md`. Read it before writing or reviewing any code.
+See `Claude_Prompts/Cycle_Programming_Code_Standards.md`. Read it before writing or reviewing any code.
 
 ## Pairing workflow
 
-See `Claude_Prompts/AI_Pair_Programming.md`. Read it at session start and follow it for every change.
+See `Claude_Prompts/Cycle_Programming_Workflow.md`. Read it at session start and follow it for every change.
 
 ## Known issues and roadmap
 
@@ -51,12 +51,13 @@ GTDWorkflowApp/
 │   ├── project-commits.html
 │   └── project-snippets.html
 ├── Claude_Prompts/
-│   ├── AI_Pair_Programming.md
-│   ├── Senior_Code_Engineer.md
+│   ├── Cycle_Programming_Claude.md   ← this file
+│   ├── Cycle_Programming_Workflow.md
+│   ├── Cycle_Programming_Code_Standards.md
+│   ├── Cycle_Programming_UserProcess.md
 │   ├── Known_Issues_And_Requests.md
 │   ├── Resolved_Issues_And_Requests.md
-│   ├── Project_Summary.md
-│   └── User_Instructions.md
+│   └── Project_Summary.md
 ├── src/
 │   ├── App.jsx
 │   ├── constants.jsx          ← COLORS, BUCKETS, COACH_MODES, SYSTEM_PROMPTS
@@ -76,6 +77,7 @@ GTDWorkflowApp/
 │   ├── prompts/               ← exported copies of all AI system prompts
 │   ├── shared/
 │   └── SQL/
+│   └── Visual_Mockups/		   ← exported copies of all mockups produced
 └── README.md
 ```
 
@@ -201,4 +203,3 @@ Update the Last used numbers line at the top of the file.
 - Use `mcp__git__git_commit` for commits, not bash git (avoids HEAD.lock on Windows mount)
 - Use `git -C "path" push origin main` for push, not `cd && git push` (PowerShell `&&` is invalid)
 - Claude Desktop on this machine is MSIX-packaged; config is at `C:\Users\JRS\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
