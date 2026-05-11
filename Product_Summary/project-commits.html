@@ -110,7 +110,7 @@
     <a href="project-snippets.html">📝 Code Snippets</a>
     <span class="current">📦 Commit Log</span>
   </div>
-  <span class="updated">Last updated: May 9, 2026</span>
+  <span class="updated">Last updated: May 11, 2026</span>
 </header>
 
 <div class="shell">
@@ -252,6 +252,19 @@
   <a href="#commit-a399175">a399175 &middot; docs FR#23 Phase 2</a>
   <a href="#commit-192683e">192683e &middot; FR#23 Phase 3</a>
   <a href="#commit-1cb4ae8">1cb4ae8 &middot; docs FR#23 Phase 3</a>
+  <div class="date-group">May 9–10 — Search &amp; Google Services</div>
+  <a href="#commit-863847b">863847b &middot; FR#33 in-bucket filter</a>
+  <a href="#commit-35392d4">35392d4 &middot; FR#34 global search ⌘K</a>
+  <a href="#commit-0ce7e9b">0ce7e9b &middot; FR#30 lazy task context</a>
+  <a href="#commit-121b819">121b819 &middot; FR#26/27 Google Services</a>
+  <a href="#commit-15e1b81">15e1b81 &middot; FR#39 Drive file picker</a>
+  <a href="#commit-32a8ea1">32a8ea1 &middot; fix googleToken type</a>
+  <div class="date-group">May 10–11 — Bug Fixes</div>
+  <a href="#commit-dd2891c">dd2891c &middot; Issue#5 email truncation</a>
+  <a href="#commit-4202163">4202163 &middot; Issue#10 duplicate detection</a>
+  <a href="#commit-13dd66a">13dd66a &middot; Issue#2 brain dump capture</a>
+  <a href="#commit-024e5b1">024e5b1 &middot; Issue#14 question guard</a>
+  <a href="#commit-3bd97ae">3bd97ae &middot; Issue#15 →ACTION:add type</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -2849,3 +2862,204 @@
 </table>
 </body>
 </html>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     NOTE: sidebar nav entries for May 9–10 commits were appended
+     via a sed patch below; new main-content entries follow here.
+═══════════════════════════════════════════════════════════════ -->
+
+<h2>May 9 (continued) — Search, Lazy Context &amp; Google Services</h2>
+
+<!-- 863847b -->
+<div class="commit-entry" id="commit-863847b">
+  <div class="commit-top">
+    <span class="commit-hash">863847b</span>
+    <span class="commit-date">2026-05-09</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">FR#33 — In-bucket text filter</div>
+  <div class="commit-body">
+    Adds a compact filter input directly in each bucket's header bar. While the
+    filter is active, all grouping, tree, and waterfall logic is bypassed — the
+    bucket displays a flat list of every matching task (case-insensitive match
+    against task text and notes). A match count badge shows alongside the total.
+    The filter resets automatically when the user switches to a different bucket,
+    so it never leaks state across views.
+  </div>
+  <div class="commit-lesson"><strong>React concept — short-circuit rendering:</strong>
+    The filter replaces the normal render path entirely with a <code>if (filterText) return &lt;FlatList /&gt;</code>
+    check. This "short-circuit" pattern is common in React: rather than adding
+    condition flags throughout the existing render tree, you intercept early and
+    return a completely different UI. Think of it like an early <code>return</code>
+    in a shell function before the main logic runs.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-search-filter">↑ Feature: Search &amp; Filter</a></div>
+</div>
+
+<!-- 35392d4 -->
+<div class="commit-entry" id="commit-35392d4">
+  <div class="commit-top">
+    <span class="commit-hash">35392d4</span>
+    <span class="commit-date">2026-05-09</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">FR#34 — Global search modal (Cmd+K)</div>
+  <div class="commit-body">
+    A new <code>SearchModal</code> component opens with Cmd+K (or Ctrl+K on
+    Windows) from anywhere in the app. It searches all non-archive, non-done
+    buckets in real time and displays results with bucket badges and highlighted
+    match text. Arrow keys navigate the list; Enter jumps to the task's bucket
+    and opens its detail panel; Escape closes the modal. A search button with a
+    ⌘K hint also appears in the sidebar Tools section.
+  </div>
+  <div class="commit-lesson"><strong>React concept — global keyboard listeners:</strong>
+    A <code>useEffect</code> in <code>App.jsx</code> calls
+    <code>window.addEventListener('keydown', handler)</code> once on mount and
+    returns a cleanup function that removes it on unmount. This is how you attach
+    keyboard shortcuts that work regardless of which element has focus — the
+    equivalent of a global <code>trap</code> in a shell script.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-search-filter">↑ Feature: Search &amp; Filter</a></div>
+</div>
+
+<!-- 0ce7e9b -->
+<div class="commit-entry" id="commit-0ce7e9b">
+  <div class="commit-top">
+    <span class="commit-hash">0ce7e9b</span>
+    <span class="commit-date">2026-05-09</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">FR#30 — Lazy task context in chat mode</div>
+  <div class="commit-body">
+    Previously, every chat-mode AI call included the full task list in the system
+    prompt, consuming a large number of tokens even for simple questions. Now,
+    chat mode sends only a compact bucket summary (e.g. "Next Actions: 12 tasks")
+    and instructs the AI to call a <code>get_task_context</code> tool if it needs
+    task details. All other modes (Process, Weekly Review, etc.) still receive the
+    full list. A "📋 Loading task list…" status chip appears while the tool call
+    resolves.
+  </div>
+  <div class="commit-lesson"><strong>AI concept — tool use / function calling:</strong>
+    Instead of pre-loading all data into every prompt, you give the AI a "tool"
+    it can call on demand. The model decides when it needs the data, requests it,
+    and the app fulfils the request. This mirrors lazy loading in software: only
+    fetch what's needed, when it's needed.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-ai-coach">↑ Feature: AI Coach</a></div>
+</div>
+
+<!-- 121b819 -->
+<div class="commit-entry" id="commit-121b819">
+  <div class="commit-top">
+    <span class="commit-hash">121b819</span>
+    <span class="commit-date">2026-05-10</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">FR#26/27 — Google Services unified auth &amp; API layer</div>
+  <div class="commit-body">
+    Replaced the separate Gmail and Calendar auth flows with a single unified
+    Google OAuth request covering Gmail, Calendar, Drive, Docs, Sheets, and
+    Slides scopes. Users pick which services to enable via a scope-preference
+    setting (stored in localStorage); a single "Authorize Google" button requests
+    only the scopes for enabled services. New API modules (<code>driveApi.js</code>,
+    <code>docsApi.js</code>, <code>sheetsApi.js</code>, <code>slidesApi.js</code>)
+    provide typed wrappers for each Google service. The Settings panel was
+    redesigned into a single "Google Services" section with per-service rows.
+  </div>
+  <div class="commit-lesson"><strong>OAuth scopes:</strong>
+    OAuth is the system that lets a user grant your app access to their Google
+    account without sharing their password. "Scopes" are the specific permissions
+    you request — like <code>gmail.readonly</code> or <code>drive.file</code>.
+    Requesting fewer scopes is better practice: users see exactly what you're
+    asking for, and a security compromise exposes less.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-google-services">↑ Feature: Google Services</a></div>
+</div>
+
+<!-- 15e1b81 -->
+<div class="commit-entry" id="commit-15e1b81">
+  <div class="commit-top">
+    <span class="commit-hash">15e1b81</span>
+    <span class="commit-date">2026-05-10</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">FR#39 — Drive file picker for tasks</div>
+  <div class="commit-body">
+    Tasks can now have Google Drive files attached directly from the Task Detail
+    Panel. A "Attach from Drive" button opens the Google Picker widget; selected
+    files are stored as <code>driveAttachments</code> on the task and rendered as
+    clickable links with a remove button. Multiple files are supported;
+    re-attaching the same file is a no-op (deduplicated on merge). A new
+    <code>drive_attachments</code> JSONB column was added to the Supabase
+    <code>tasks</code> table, with corresponding <code>taskToDb</code> /
+    <code>dbToTask</code> mapper updates.
+  </div>
+  <div class="commit-lesson"><strong>JSONB columns in Postgres:</strong>
+    JSONB is a column type that stores arbitrary JSON — objects, arrays, nested
+    data — and indexes it for fast querying. It's useful when a field's shape
+    isn't fully known at schema design time, like a list of file attachments
+    that might grow over time. Think of it as a structured blob that Postgres
+    understands natively.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-google-services">↑ Feature: Google Services</a></div>
+</div>
+
+<!-- 32a8ea1 -->
+<div class="commit-entry" id="commit-32a8ea1">
+  <div class="commit-top">
+    <span class="commit-hash">32a8ea1</span>
+    <span class="commit-date">2026-05-10</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">Fix: googleToken treated as object instead of string</div>
+  <div class="commit-body">
+    After the Google Services refactor, <code>googleToken</code> (the raw OAuth
+    access token string) was being passed as a prop named <code>googleToken</code>
+    but accessed in child components as if it were an object with a
+    <code>.token</code> property. Renamed the prop to
+    <code>googleAccessToken</code> throughout to make the type unambiguous and
+    eliminate the runtime error.
+  </div>
+  <div class="commit-lesson"><strong>Naming matters for type clarity:</strong>
+    When a variable holds a plain string, naming it <code>googleToken</code>
+    is ambiguous — is it the token itself or a wrapper object? Renaming it to
+    <code>googleAccessToken</code> encodes the type in the name. This is a
+    lightweight form of self-documentation that catches misuse without needing
+    TypeScript.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-google-services">↑ Feature: Google Services</a></div>
+</div>
+
+<h2>May 10–11 — Bug Fixes: Email, Inbox Processing &amp; Process Mode</h2>
+
+<!-- dd2891c -->
+<div class="commit-entry" id="commit-dd2891c">
+  <div class="commit-top">
+    <span class="commit-hash">dd2891c</span>
+    <span class="commit-date">2026-05-10</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">Issue#5 — Email body truncation: concatenate all text/plain MIME parts</div>
+  <div class="commit-body">
+    Gmail stores email body content in a MIME tree. Some messages split the
+    plain-text body across multiple parts at the same nesting level. The previous
+    <code>extractGmailPlainText</code> function returned on the first non-empty
+    part, silently discarding everything after it — causing emails to appear cut
+    off mid-sentence. Fixed by accumulating all <code>text/plain</code> parts
+    at every nesting level using <code>.map().join('')</code> instead of an
+    early-return loop.
+  </div>
+  <div class="commit-lesson"><strong>MIME trees:</strong>
+    A Gmail message is not a flat string — it's a tree of "parts", each with a
+    MIME type (<code>text/plain</code>, <code>text/html</code>,
+    <code>multipart/alternative</code>, etc.). Think of it like a directory tree
+    where the leaves are the actual content. Traversing it correctly requires
+    recursion and accumulating all matching leaves, not stopping at the first one.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-email">↑ Feature: Email Management</a></div>
+</div>
+
+<!-- 4202163 -->
+<div class="commit-entry" id="commit-4202163">
+  <div class="commit-top">
+    <span class="comm
