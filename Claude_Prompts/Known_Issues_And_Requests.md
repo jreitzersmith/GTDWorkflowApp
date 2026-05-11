@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#61**
+> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#62**
 
 ---
 
@@ -16,6 +16,8 @@
 ### Feature requests
 
 #### UI polish / quick wins
+
+- FR#62 [GH#61] (2026-05-11) — Projects view: re-clicking selected task row should toggle detail panel closed (set selectedTaskId to null)
 
 - FR#13 [GH#4] — Remove "Process with AI" button from the left sidebar navigation panel
 - FR#47 [GH#45] (2026-05-11) — Project view: toggle to show/hide completed subtasks
