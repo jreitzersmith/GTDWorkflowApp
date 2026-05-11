@@ -47,3 +47,4 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-09 | Code Quality | CQ#9    | GH#29  | Task detail panel field label color → COLORS.text2 (matches inactive sidebar buckets) | 98f94f5 |
 | 2026-05-09 | Code Quality | CQ#10   | GH#30  | Task detail panel inactive location button color → #81807a (mid-tier between labels and muted) | 98f94f5 |
 | 2026-05-11 | Feature      | FR#49   | GH#48  | 5-level project hierarchy — implemented via FR#48, FR#53, FR#54, FR#57                              | —                 |
+| 2026-05-11 | Feature      | FR#61   | GH#60  | Project view add bar: auto-select selected project-bucket item as parent                            | 40731df           |
