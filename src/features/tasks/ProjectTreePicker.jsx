@@ -2,27 +2,35 @@ import { useState, useRef, useEffect } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 
-// Converts a flat array of eligible project tasks into a nested tree using childIds.
-// Uses childIds (the same source of truth as the project view) rather than parentId,
-// so the picker always mirrors the structure visible in the project view.
-// Projects not referenced in any eligible sibling's childIds are treated as roots;
-// this also surfaces orphaned projects whose parentId points to a deleted/done parent.
+// Converts a flat array of eligible project tasks into a nested tree.
+// Uses childIds first (authoritative order, matches project view) then falls back
+// to parentId for projects whose parent's childIds was not updated (legacy data).
+// Projects not claimed as a child by either mechanism are treated as roots.
 function buildProjectTree(flatProjects) {
   const byId = {};
   flatProjects.forEach(p => { byId[p.id] = { ...p, children: [] }; });
 
-  // Wire up children in childIds order (preserves display order from project view).
+  const nestedIds = new Set();
+
+  // Pass 1: wire children in childIds order (authoritative for new data).
   flatProjects.forEach(p => {
     (p.childIds || []).forEach(cid => {
-      if (byId[cid]) byId[p.id].children.push(byId[cid]);
+      if (byId[cid]) {
+        byId[p.id].children.push(byId[cid]);
+        nestedIds.add(cid);
+      }
     });
   });
 
-  // Roots = eligible projects not appearing as a child of any other eligible project.
-  const nestedIds = new Set();
+  // Pass 2: add projects whose parentId points to an eligible parent but were
+  // not already covered by childIds (handles legacy / inconsistent data).
   flatProjects.forEach(p => {
-    (p.childIds || []).forEach(cid => { if (byId[cid]) nestedIds.add(cid); });
+    if (p.parentId && byId[p.parentId] && !nestedIds.has(p.id)) {
+      byId[p.parentId].children.push(byId[p.id]);
+      nestedIds.add(p.id);
+    }
   });
+
   return flatProjects.filter(p => !nestedIds.has(p.id)).map(p => byId[p.id]);
 }
 
@@ -91,8 +99,8 @@ ProjectTreeRow.propTypes = {
 };
 
 // Collapsible project tree picker. Shows all eligible projects as a nested
-// tree mirroring the project view (built from childIds); sub-projects are
-// collapsed by default and expand on hover or chevron click.
+// tree mirroring the project view; sub-projects are collapsed by default and
+// expand on hover or chevron click.
 // Calls onSelect(id | null) on row click, onNewProject() for the
 // new-project option (omitted when prop is absent).
 // showStandalone renders a "— Standalone" row at the top for TaskDetailPanel.
