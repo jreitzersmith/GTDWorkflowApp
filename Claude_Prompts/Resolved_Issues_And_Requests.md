@@ -54,3 +54,5 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-11 | Bug Fix      | Issue#3 | GH#2   | Weekly Review step tracking — closed as no longer reproducible                                      | —       |
 | 2026-05-11 | Bug Fix      | Issue#5 | —      | Email body truncated — extractGmailPlainText early-return replaced with full-part concatenation     | HEAD    |
 | 2026-05-09 | Feature      | FR#39   | GH#35  | Drive file picker for tasks — DriveAttachments component, Picker API, drive_attachments DB column | 15e1b81 |
+| 2026-05-11 | Bug Fix      | Issue#10| GH#21  | Add & Ask AI duplicate detection — expand process context to next+waiting; add →ACTION:delete duplicate rule | 4202163 |
+| 2026-05-11 | Bug Fix      | Issue#2 | GH#1   | Brain Dump auto-add to inbox — dump prompt emits →ACTION:create; gate expanded to chat\|dump mode      | 13dd66a |
