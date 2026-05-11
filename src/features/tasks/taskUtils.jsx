@@ -69,18 +69,22 @@ function extractAction(text) {
   const extras = isProjectType
     ? (m[4] || "")
     : (seg3 ? '|' + seg3 : '') + (m[4] || "");
-  const dueMatch    = extras.match(/\|due:(\d{4}-\d{2}-\d{2})/);
-  const deferMatch  = extras.match(/\|defer:(\d{4}-\d{2}-\d{2})/);
-  const recurMatch  = extras.match(/\|recur:([^|]+)/);
-  const parentMatch = extras.match(/\|parent:([^|]+)/);
+  const dueMatch      = extras.match(/\|due:(\d{4}-\d{2}-\d{2})/);
+  const deferMatch    = extras.match(/\|defer:(\d{4}-\d{2}-\d{2})/);
+  const recurMatch    = extras.match(/\|recur:([^|]+)/);
+  const parentMatch   = extras.match(/\|parent:([^|]+)/);
+  const effortMatch   = extras.match(/\|effort:([^|]+)/);
+  const categoryMatch = extras.match(/\|category:([^|]+)/);
   return {
     type:      m[1],
     title:     (m[2] || "").trim(),
     nextAction: isProjectType ? seg3 : '',
-    parentRef:  parentMatch ? parentMatch[1].trim() : null,
-    dueDate:    dueMatch   ? dueMatch[1]                                : null,
-    deferUntil: deferMatch ? deferMatch[1]                              : null,
-    recurrence: recurMatch ? parseRecurrenceValue(recurMatch[1].trim()) : null,
+    parentRef:  parentMatch   ? parentMatch[1].trim()                   : null,
+    dueDate:    dueMatch      ? dueMatch[1]                             : null,
+    deferUntil: deferMatch    ? deferMatch[1]                           : null,
+    recurrence: recurMatch    ? parseRecurrenceValue(recurMatch[1].trim()) : null,
+    effort:     effortMatch   ? effortMatch[1].trim()                   : null,
+    category:   categoryMatch ? categoryMatch[1].trim()                 : null,
   };
 }
 
@@ -135,6 +139,7 @@ function extractAddAction(text) {
     if (key === 'due')      fields.dueDate    = val;
     if (key === 'defer')    fields.deferUntil = val;
     if (key === 'effort')   fields.effort     = val;
+    if (key === 'category') fields.category   = val;
     if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
     if (key === 'dueTime') fields.dueTime = val;
