@@ -2,10 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 
-// Converts a flat array of eligible project tasks into a nested tree.
-// Uses childIds first (authoritative order, matches project view) then falls back
-// to parentId for projects whose parent's childIds was not updated (legacy data).
-// Projects not claimed as a child by either mechanism are treated as roots.
 function buildProjectTree(flatProjects) {
   const byId = {};
   flatProjects.forEach(p => { byId[p.id] = { ...p, children: [] }; });
@@ -31,7 +27,18 @@ function buildProjectTree(flatProjects) {
     }
   });
 
-  return flatProjects.filter(p => !nestedIds.has(p.id)).map(p => byId[p.id]);
+  const roots = flatProjects.filter(p => !nestedIds.has(p.id)).map(p => byId[p.id]);
+
+  // DEBUG — remove after diagnosing chevron issue
+  console.log("[ProjectTreePicker] eligibleProjects:", flatProjects.map(p => ({
+    id: p.id.slice(-6),
+    text: p.text,
+    parentId: p.parentId ? p.parentId.slice(-6) : null,
+    childIds: (p.childIds || []).map(c => c.slice(-6)),
+  })));
+  console.log("[ProjectTreePicker] roots:", roots.map(r => r.text), "  nested:", nestedIds.size);
+
+  return roots;
 }
 
 // Renders one row of the project tree. Recurses for expanded children.
@@ -98,12 +105,6 @@ ProjectTreeRow.propTypes = {
   onHoverExpand: PropTypes.func.isRequired,
 };
 
-// Collapsible project tree picker. Shows all eligible projects as a nested
-// tree mirroring the project view; sub-projects are collapsed by default and
-// expand on hover or chevron click.
-// Calls onSelect(id | null) on row click, onNewProject() for the
-// new-project option (omitted when prop is absent).
-// showStandalone renders a "— Standalone" row at the top for TaskDetailPanel.
 function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProject, showStandalone }) {
   const [expanded, setExpanded] = useState({});
   const hoverTimers = useRef({});
