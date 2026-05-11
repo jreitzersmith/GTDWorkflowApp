@@ -70,7 +70,6 @@ export default function GTDManager() {
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [standaloneProjectId, setStandaloneProjectId] = useState(null);
 
   // ── Auth ───────────────────────────────────────────────────────────────
   const { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink } = useSupabaseAuth();
@@ -86,10 +85,8 @@ export default function GTDManager() {
     authUser, tasks, setTasks,
     locations, efforts, calibrationOverrides, categories,
     skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
-    standaloneProjectId,
     setLocations, setEfforts, setCalibrationOverrides, setCategories,
     setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
-    setStandaloneProjectId,
     setGmailQueue,
   });
 
@@ -116,6 +113,14 @@ export default function GTDManager() {
   }, [googleToken]);
   useEffect(() => { if (currentBucket !== "project") setProjectParentId("__new__"); }, [currentBucket]);
   useEffect(() => { setSelectedTaskId(null); }, [currentBucket]);
+  // FR#61: when a project-bucket task is selected in Projects view, auto-populate the add bar parent.
+  // tasks intentionally omitted from deps — react only to selection changes, not every task mutation.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (currentBucket !== 'project') return;
+    const sel = tasks.find(t => t.id === selectedTaskId);
+    setProjectParentId(sel?.bucket === 'project' ? selectedTaskId : '__new__');
+  }, [selectedTaskId, currentBucket]);
 
   // Global search — Cmd+K / Ctrl+K
   useEffect(() => {
@@ -128,20 +133,6 @@ export default function GTDManager() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
-
-  // Auto-create the "Standalone" catch-all project task on first auth.
-  // If user_settings already has a standaloneProjectId (loaded by useSupabaseSync), skip creation.
-  // Otherwise, create the task and write its ID back via setStandaloneProjectId (which triggers settings sync).
-  useEffect(() => {
-    if (!supabaseReady || !authUser) return;
-    if (standaloneProjectId) return; // already exists
-    const existing = tasks.find(t => t.bucket === "project" && t.text === "Standalone" && !t.parentId);
-    if (existing) { setStandaloneProjectId(existing.id); return; }
-    const newId = genId();
-    const newTask = { id: newId, text: "Standalone", bucket: "project", done: false, created: Date.now(), priority: [], location: [], childIds: [], parentId: null };
-    setTasks(prev => [newTask, ...prev]);
-    setStandaloneProjectId(newId);
-  }, [supabaseReady, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-surface: on mount, move any standalone deferred tasks whose wake date has passed into Inbox.
   // Only moves tasks with no parentId (project subtasks stay in place; their deferUntil just stops hiding them).
@@ -803,7 +794,6 @@ export default function GTDManager() {
     categories,
     projectCategoryFilter,
     setProjectCategoryFilter,
-    standaloneProjectId,
   };
 
   return (
@@ -957,11 +947,12 @@ export default function GTDManager() {
                           onDrop={handleProjectDrop}
                           deferredDupeWarning={deferredDupeWarning}
                           onViewDeferred={() => setCurrentBucket("deferred")}
+                          loading={loading}
+                          onStartProjectReview={startProjectReview}
                           onBulkAssign={bulkAssignToProject}
                           categories={categories}
                           projectCategoryFilter={projectCategoryFilter}
                           setProjectCategoryFilter={setProjectCategoryFilter}
-                          standaloneProjectId={standaloneProjectId}
                         />
                       )}
                     </div>
