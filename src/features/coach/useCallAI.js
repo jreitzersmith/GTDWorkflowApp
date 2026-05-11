@@ -529,7 +529,24 @@ function useCallAI({
       }
 
       const action = extractAction(reply);
-      if (action) setPendingAction(action);
+      if (action) {
+        // Guard: if the AI asked a question AND included an →ACTION tag in the same
+        // response (violating the system prompt), suppress the pending action so the
+        // user can answer the question first. Strip [bracketed] id tokens before
+        // checking for '?' so parenthetical references don't false-positive.
+        const actionLineIdx = reply.search(/→ACTION:/);
+        const textBeforeAction = actionLineIdx !== -1 ? reply.slice(0, actionLineIdx) : '';
+        const hasQuestion = textBeforeAction.replace(/\[[^\]]*\]/g, '').includes('?');
+        if (!hasQuestion) {
+          // Resolve parent name for →ACTION:add so PendingActionBar can display it
+          if (action.type === 'add' && action.parentRef) {
+            const parent = tasks.find(t => t.id === action.parentRef)
+                        || tasks.find(t => t.text.toLowerCase() === action.parentRef.toLowerCase());
+            action.parentName = parent?.text || action.parentRef;
+          }
+          setPendingAction(action);
+        }
+      }
 
       return reply;
     } catch (e) {
