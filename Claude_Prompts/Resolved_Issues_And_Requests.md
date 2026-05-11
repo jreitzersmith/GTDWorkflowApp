@@ -66,3 +66,6 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-11 | Feature      | FR#53   | GH#52  | Increase project tree depth guard to 6 levels in ProjectTree and CompletedTree                      | 8fb66a0 |
 | 2026-05-11 | Feature      | FR#56   | GH#55  | Remove Review Projects button + loading/onStartProjectReview props from TaskBucketView              | 8fb66a0 |
 | 2026-05-11 | Feature      | FR#58   | GH#57  | Project view: alpha sort L1 and L2 nodes                                                            | 8fb66a0 |
+| 2026-05-11 | Feature      | FR#54   | GH#53  | Standalone catch-all project — auto-created task + user_settings.standalone_project_id              | 7b86973 |
+| 2026-05-11 | Feature      | FR#55   | GH#54  | Next Actions leaf filter — handled by existing waterfallFilter; no new code needed                  | 7b86973 |
+| 2026-05-11 | Feature      | FR#57   | GH#56  | Next Actions groupBy=Project: two-level L1/L2 nesting (groupByTwoLevelProject)                      | 7b86973 |

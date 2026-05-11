@@ -8,8 +8,6 @@
 
 - [ ] Issue#12 [GH#32] (2026-05-09) — Process mode: AI does not assign due date when user corrects a deferral assumption mid-conversation (task filed without dueDate after user overrides AI's proposed defer date)
 - [ ] Issue#13 [GH#33] (2026-05-09) — AI sets incorrect deferUntil on weekday-recurring tasks (defers to day after first calendar occurrence instead of next recurrence date)
-- [ ] Issue#14 [GH#43] (2026-05-11) — Process mode: AI asks question and emits →ACTION tag in same response, bypassing clarification (needs code-level guard in useCallAI.js)
-- [ ] Issue#15 [GH#44] (2026-05-11) — Process mode: no →ACTION:add type — AI can't place a task under an existing project (falls back to standalone →ACTION:next)
 
 ---
 
@@ -49,15 +47,9 @@
 - FR#45 [GH#41] (2026-05-09) — Unified Drive/Docs/Sheets search — search bar in coach or task panel that queries Drive full-text and returns matching files as context or task attachments
 - FR#46 [GH#42] (2026-05-09) — Receipt-to-Sheets pipeline — forward a receipt email to the app; AI extracts vendor/amount/date and appends a row to a designated Google Sheet
 
-#### Daily workflow / GTD core
-
-- FR#55 [GH#54] (2026-05-11) — Next Actions: show only lowest-level leaf items (L3–L6); exception for Standalone L2 items with no project parent. Blocked on FR#54
-- FR#57 [GH#56] (2026-05-11) — Next Actions groupBy=Project: two-level nesting — L1 header groups L2 sub-headers, each L2 lists its leaf tasks. Blocked on FR#54, FR#55
-
 #### Data model expansions
 
 - FR#49 [GH#48] (2026-05-11) — 5-level project hierarchy: general categories (L1, bucket:project) → project categories (L2, bucket:project) → projects (L3, bucket:project) → tasks (L4, bucket:next) → subtasks (L5, bucket:next); requires moveTaskInTree bucket preservation, addProjectTask childBucket param, Projects add bar tree picker, groupByField nearest-project walk
-- FR#54 [GH#53] (2026-05-11) — Add Standalone Project Category: catch-all for tasks with no project parent; needs design decision on identification (sentinel name vs user_settings ID vs virtual grouping)
 - FR#10 [GH#16] — Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
 - FR#16 [GH#17] — Shopping list manager (new bucket/sidebar section)
 
