@@ -58,3 +58,4 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-11 | Bug Fix      | Issue#2 | GH#1   | Brain Dump auto-add to inbox — dump prompt emits →ACTION:create; gate expanded to chat\|dump mode      | 13dd66a |
 | 2026-05-11 | Bug Fix      | Issue#14| GH#43  | Process mode: question+action bypass — code-level ? guard in useCallAI; prompt hardened             | 024e5b1 |
 | 2026-05-11 | Bug Fix      | Issue#15| GH#44  | Process mode: →ACTION:add type — place inbox item under existing project; full stack implementation | 3bd97ae |
+| 2026-05-11 | Feature      | FR#48   | GH#46  | Project picker dropdown: collapsible tree (ProjectTreePicker) replaces flat native select in TaskDetailPanel + InboxBars | 6eab4a4 |

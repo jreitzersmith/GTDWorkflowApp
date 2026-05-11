@@ -2,20 +2,28 @@ import { useState, useRef, useEffect } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 
-// Converts a flat array of project tasks into a nested tree using parentId.
-// Projects whose parentId is not in the set are treated as roots.
+// Converts a flat array of eligible project tasks into a nested tree using childIds.
+// Uses childIds (the same source of truth as the project view) rather than parentId,
+// so the picker always mirrors the structure visible in the project view.
+// Projects not referenced in any eligible sibling's childIds are treated as roots;
+// this also surfaces orphaned projects whose parentId points to a deleted/done parent.
 function buildProjectTree(flatProjects) {
   const byId = {};
   flatProjects.forEach(p => { byId[p.id] = { ...p, children: [] }; });
-  const roots = [];
+
+  // Wire up children in childIds order (preserves display order from project view).
   flatProjects.forEach(p => {
-    if (p.parentId && byId[p.parentId]) {
-      byId[p.parentId].children.push(byId[p.id]);
-    } else {
-      roots.push(byId[p.id]);
-    }
+    (p.childIds || []).forEach(cid => {
+      if (byId[cid]) byId[p.id].children.push(byId[cid]);
+    });
   });
-  return roots;
+
+  // Roots = eligible projects not appearing as a child of any other eligible project.
+  const nestedIds = new Set();
+  flatProjects.forEach(p => {
+    (p.childIds || []).forEach(cid => { if (byId[cid]) nestedIds.add(cid); });
+  });
+  return flatProjects.filter(p => !nestedIds.has(p.id)).map(p => byId[p.id]);
 }
 
 // Renders one row of the project tree. Recurses for expanded children.
@@ -83,8 +91,9 @@ ProjectTreeRow.propTypes = {
 };
 
 // Collapsible project tree picker. Shows all eligible projects as a nested
-// tree; sub-projects are collapsed by default and expand on hover or chevron
-// click. Calls onSelect(id | null) on row click, onNewProject() for the
+// tree mirroring the project view (built from childIds); sub-projects are
+// collapsed by default and expand on hover or chevron click.
+// Calls onSelect(id | null) on row click, onNewProject() for the
 // new-project option (omitted when prop is absent).
 // showStandalone renders a "— Standalone" row at the top for TaskDetailPanel.
 function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProject, showStandalone }) {

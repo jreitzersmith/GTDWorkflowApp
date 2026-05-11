@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#15** · Code Quality — **CQ#10** · Feature Requests — **FR#48**
+> **Last used numbers:** Known Issues — **Issue#16** · Code Quality — **CQ#10** · Feature Requests — **FR#48**
 
 ---
 
@@ -10,6 +10,7 @@
 - [ ] Issue#13 [GH#33] (2026-05-09) — AI sets incorrect deferUntil on weekday-recurring tasks (defers to day after first calendar occurrence instead of next recurrence date)
 - [ ] Issue#14 [GH#43] (2026-05-11) — Process mode: AI asks question and emits →ACTION tag in same response, bypassing clarification (needs code-level guard in useCallAI.js)
 - [ ] Issue#15 [GH#44] (2026-05-11) — Process mode: no →ACTION:add type — AI can't place a task under an existing project (falls back to standalone →ACTION:next)
+- [ ] Issue#16 [GH#47] (2026-05-11) — ProjectTreePicker chevrons missing: buildProjectTree uses parentId but project view uses childIds; switch to childIds to match project view structure
 
 ---
 
@@ -21,7 +22,6 @@
 
 - FR#13 [GH#4] — Remove "Process with AI" button from the left sidebar navigation panel
 - FR#47 [GH#45] (2026-05-11) — Project view: toggle to show/hide completed subtasks
-- FR#48 [GH#46] (2026-05-11) — Project picker dropdown (TaskDetailPanel + InboxBars): replace flat native select with collapsible tree; sub-projects hidden by default, expand on hover/click; enables selecting sub-projects as parent
 
 #### Daily workflow / GTD core
 
