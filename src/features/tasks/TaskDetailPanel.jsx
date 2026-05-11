@@ -504,6 +504,24 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             />
           </div>
 
+          {/* Due time */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Due time</span>
+            <input
+              type="time"
+              value={task.dueTime || ""}
+              onChange={e => onUpdate(task.id, { dueTime: e.target.value || null })}
+              style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px", colorScheme: "dark" }}
+            />
+            {task.dueTime && (
+              <button
+                onClick={() => onUpdate(task.id, { dueTime: null })}
+                style={{ background: "none", border: "none", color: COLORS.muted, cursor: "pointer", fontSize: 11, padding: "0 2px" }}
+                title="Clear time"
+              >✕</button>
+            )}
+          </div>
+
           {/* Defer until */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
             <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Defer</span>
