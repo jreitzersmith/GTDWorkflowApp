@@ -566,7 +566,11 @@ export default function GTDManager() {
   const suggestProjectGroup = useCallback(async (newTaskIds, newTaskTitles) => {
     const rootProjects = buildReviewQueue(tasks);
     const projectLines = rootProjects.length
-      ? rootProjects.map(p => `- [${p.id}] ${p.text}`).join("\n")
+      ? rootProjects.map(p => {
+          const sample = getOrderedChildren(p.id, tasks)
+            .slice(0, 3).map(c => c.text).join(', ');
+          return `- [${p.id}] ${p.text}${sample ? ` (e.g. ${sample})` : ''}`;
+        }).join("\n")
       : "(none)";
     const taskLines = newTaskTitles.map((t, i) => `${i + 1}. ${t}`).join("\n");
     const prompt = `You are a GTD coach. The user just added ${newTaskTitles.length} related tasks to their inbox:\n${taskLines}\n\nExisting projects:\n${projectLines}\n\nDo these tasks belong together as a project? If yes:\n- If an existing project is a strong match, reply with exactly: →GROUP:existing|<project_id>|<project_name>\n- If no good match exists, suggest a concise project name and reply with exactly: →GROUP:new|<project name>\n- If they do NOT belong together as a project, reply with exactly: →GROUP:none\n\nReply with only one line, no other text.`;
@@ -734,7 +738,12 @@ export default function GTDManager() {
           const meta = [
             `effort:${t.effort || "none"}`,
             `due:${t.dueDate || "none"}`,
+            `dueTime:${t.dueTime || "none"}`,
             `defer:${t.deferUntil || "none"}`,
+            `priority:${(t.priority || []).join(',') || "none"}`,
+            `location:${(t.location || []).join(',') || "none"}`,
+            `category:${t.category || "none"}`,
+            `nodeType:${t.nodeType || "none"}`,
           ].join(", ");
           return `- [${t.id}] ${t.text} (${meta})`;
         }).join("\n")
@@ -822,7 +831,15 @@ export default function GTDManager() {
     // Apply all accepted metadata suggestions
     metadataSuggestions
       .filter(s => s.accepted)
-      .forEach(s => updateTask(s.taskId, s.overrides));
+      .forEach(s => {
+        // Normalise fields the user may have edited as comma strings back to arrays
+        const overrides = { ...s.overrides };
+        if (typeof overrides.priority === 'string')
+          overrides.priority = overrides.priority.split(',').map(v => v.trim()).filter(Boolean);
+        if (typeof overrides.location === 'string')
+          overrides.location = overrides.location.split(',').map(v => v.trim()).filter(Boolean);
+        updateTask(s.taskId, overrides);
+      });
 
     const rootProjects = buildReviewQueue(tasks);
     const project = rootProjects[reviewProjectIdx];

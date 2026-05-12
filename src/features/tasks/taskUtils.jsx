@@ -531,10 +531,18 @@ function extractMetadata(text) {
       const [taskId, ...pairs] = l.split("|");
       const fields = {};
       pairs.forEach(p => {
-        const [k, v] = p.split(":").map(s => s.trim());
-        if (k === "effort")  fields.effort    = v;
-        if (k === "due")     fields.dueDate   = v;
-        if (k === "defer")   fields.deferUntil = v;
+        const ci = p.indexOf(':');
+        if (ci === -1) return;
+        const k = p.slice(0, ci).trim();
+        const v = p.slice(ci + 1).trim();
+        if (k === 'effort')   fields.effort    = v;
+        if (k === 'due')      fields.dueDate   = v;
+        if (k === 'dueTime')  fields.dueTime   = v;
+        if (k === 'defer')    fields.deferUntil = v;
+        if (k === 'priority') fields.priority  = v.split(',').map(s => s.trim()).filter(Boolean);
+        if (k === 'location') fields.location  = v.split(',').map(s => s.trim()).filter(Boolean);
+        if (k === 'category') fields.category  = v;
+        if (k === 'nodeType') fields.nodeType  = v;
       });
       return { taskId: taskId.trim(), fields };
     })

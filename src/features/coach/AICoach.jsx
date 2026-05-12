@@ -296,7 +296,14 @@ function MetadataReviewBar({ suggestions, onToggleAccepted, onChangeOverride, on
     ? (acceptedCount > 0 ? `Apply ${acceptedCount} & Finish ✓` : "Finish Review ✓")
     : (acceptedCount > 0 ? `Apply ${acceptedCount} & Next →` : "Next →");
 
-  const FIELD_LABELS = { effort: "Effort", dueDate: "Due", deferUntil: "Defer until" };
+  const FIELD_LABELS = {
+    effort: "Effort", dueDate: "Due", dueTime: "Time", deferUntil: "Defer",
+    priority: "Priority", location: "Location", category: "Category", nodeType: "Type",
+  };
+  const FIELD_WIDTHS = {
+    effort: 52, dueDate: 96, dueTime: 52, deferUntil: 96,
+    priority: 72, location: 130, category: 90, nodeType: 72,
+  };
 
   return (
     <div style={{ background: COLORS.surface3, border: `1px solid ${COLORS.project}44`, borderRadius: 9, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -325,10 +332,10 @@ function MetadataReviewBar({ suggestions, onToggleAccepted, onChangeOverride, on
                   <div key={field} style={{ display: "flex", alignItems: "center", gap: 4, background: COLORS.surface3, borderRadius: 5, padding: "2px 6px", border: `1px solid ${COLORS.border2}` }}>
                     <span style={{ fontSize: 10, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{FIELD_LABELS[field] || field}</span>
                     <input
-                      value={value || ""}
+                      value={Array.isArray(value) ? value.join(', ') : (value || "")}
                       onChange={e => onChangeOverride(idx, field, e.target.value)}
                       disabled={!s.accepted}
-                      style={{ width: field === "effort" ? 52 : 96, fontSize: 11, background: "transparent", border: "none", color: COLORS.text, fontFamily: "inherit", outline: "none", padding: 0 }}
+                      style={{ width: FIELD_WIDTHS[field] ?? 96, fontSize: 11, background: "transparent", border: "none", color: COLORS.text, fontFamily: "inherit", outline: "none", padding: 0 }}
                     />
                   </div>
                 ))}
