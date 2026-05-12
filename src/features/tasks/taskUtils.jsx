@@ -338,8 +338,8 @@ function groupByTwoLevelProject(taskList, allTasks) {
   if (standaloneItems.length) {
     result.push({
       l1Key: '__standalone__',
-      l1Label: 'Standalone',
-      subgroups: [{ l2: null, l2Label: 'Standalone', items: standaloneItems }],
+      l1Label: 'UnCategorized',
+      subgroups: [{ l2: null, l2Label: 'UnCategorized', items: standaloneItems }],
     });
   }
 

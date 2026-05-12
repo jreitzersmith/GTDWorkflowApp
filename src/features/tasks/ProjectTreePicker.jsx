@@ -122,7 +122,7 @@ function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProjec
             borderRadius: 4,
           }}
         >
-          — Standalone
+          — UnCategorized
         </div>
       )}
       {tree.map(node => (

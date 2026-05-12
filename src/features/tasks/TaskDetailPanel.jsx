@@ -32,7 +32,7 @@ function ProjectSelector({ taskId, parentId, eligibleProjects, onReassignProject
   }, [pickerOpen]);
 
   const selectedProject = eligibleProjects.find(p => p.id === parentId);
-  const triggerLabel = selectedProject ? selectedProject.text : "— Standalone";
+  const triggerLabel = selectedProject ? selectedProject.text : "— UnCategorized";
 
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12 }}>
