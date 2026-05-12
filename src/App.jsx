@@ -615,7 +615,7 @@ export default function GTDManager() {
   // Sub-projects (parentId set) are now included so every level gets reviewed.
   const buildReviewQueue = useCallback((allTasks) => {
     return allTasks.filter(t => {
-      if (t.bucket !== 'project' || t.done) return false;
+      if (t.bucket !== 'project' || t.done || t.processed) return false;
       const nt = t.nodeType ?? 'project';
       if (!reviewNodeTypes.includes(nt)) return false;
       // Pure container: all direct children are project-bucket nodes (subprojects/categories).
@@ -735,28 +735,31 @@ export default function GTDManager() {
     setCurrentBucket("project");
     const children = getOrderedChildren(project.id, tasks);
     const activeTasks = children.filter(t => !t.done);
-    const taskLines = activeTasks.length
-      ? activeTasks.map(t => {
-          const meta = [
-            `effort:${t.effort || "none"}`,
-            `due:${t.dueDate || "none"}`,
-            `dueTime:${t.dueTime || "none"}`,
-            `defer:${t.deferUntil || "none"}`,
-            `priority:${(t.priority || []).join(',') || "none"}`,
-            `location:${(t.location || []).join(',') || "none"}`,
-            `category:${t.category || "none"}`,
-            `nodeType:${t.nodeType || "none"}`,
-          ].join(", ");
-          return `- ${t.text} [id:${t.id}] (${meta})`;
-        }).join("\n")
-      : "(no active subtasks)";
+    const toMetaLine = t => {
+      const meta = [
+        `effort:${t.effort || "none"}`,
+        `due:${t.dueDate || "none"}`,
+        `dueTime:${t.dueTime || "none"}`,
+        `defer:${t.deferUntil || "none"}`,
+        `priority:${(t.priority || []).join(',') || "none"}`,
+        `location:${(t.location || []).join(',') || "none"}`,
+        `category:${t.category || "none"}`,
+        `nodeType:${t.nodeType || "none"}`,
+      ].join(", ");
+      return `- ${t.text} [id:${t.id}] (${meta})`;
+    };
+    const taskLines = [
+      toMetaLine(project) + ' ← container node',
+      ...(activeTasks.length ? activeTasks.map(toMetaLine) : ['  (no active subtasks)']),
+    ].join("\n");
 
     const path = getProjectPath(project, tasks);
     const prompt =
       `Project ${idx + 1} of ${total}: "${path}"\n` +
       `Today: ${todayStr()}\n` +
       (locations.length ? `Available locations: ${locations.join(', ')}\n` : '') +
-      `Active subtasks:\n${taskLines}`;
+      (efforts.length ? `Available efforts: ${efforts.join(', ')}\n` : '') +
+      `Nodes to review:\n${taskLines}`;
 
     setMessages(prev => [...prev, { role: "user", text: `🏷 Reviewing metadata for **"${project.text}"** (${idx + 1} of ${total})` }]);
     setReviewReady(false);
