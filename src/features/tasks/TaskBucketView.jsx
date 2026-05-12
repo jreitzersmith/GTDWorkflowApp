@@ -154,7 +154,7 @@ function TaskBucketView({
               }}
               title="Show project names only"
             >
-              ≡ Project Categories
+              🗂 Show Categories Only
             </ToolbarBtn>
             <ToolbarBtn
               onClick={() => {
@@ -168,7 +168,7 @@ function TaskBucketView({
               }}
               title="Collapse all projects to top-level tasks"
             >
-              ⊖ Collapse All
+              📂 Show SubCategories
             </ToolbarBtn>
             <ToolbarBtn
               onClick={() => setCollapsedNodes(new Set())}
