@@ -32,10 +32,10 @@ export const BUCKETS = {
 export const COACH_MODES = {
   chat:          { label: "Chat",           icon: "💬" },
   process:       { label: "Process Inbox",  icon: "📥" },
-  review:        { label: "Review",         icon: "📋" },
   dump:          { label: "Brain Dump",     icon: "🧠" },
   projectReview: { label: "Project Review", icon: "🔍" },
   daily:         { label: "Daily Review",   icon: "🌅" },
+  review:        { label: "Weekly Review",  icon: "📋" },
 };
 
 export const SYSTEM_PROMPTS = {
