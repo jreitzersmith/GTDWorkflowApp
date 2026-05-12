@@ -418,6 +418,7 @@ export default function GTDManager() {
       ].join('\n');
 
       switchCoachMode('daily', `Let's close out your day.\n\n${lines}`);
+      setCurrentView('gtd');
       const newPhase = 'start';
       setDailyReviewPhase(newPhase);
       localStorage.setItem('gtd-daily-phase', JSON.stringify({ phase: newPhase, date: today }));
