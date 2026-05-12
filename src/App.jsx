@@ -681,6 +681,7 @@ export default function GTDManager() {
       }
     }
 
+    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, processed: true } : t));
     setReviewSuggestions([]);
     setReviewReady(false);
     const nextIdx = reviewProjectIdx + 1;
@@ -698,9 +699,11 @@ export default function GTDManager() {
 
   // Advances to the next project without adding any suggested tasks.
   const skipProjectReview = useCallback(() => {
+    const rootProjects = buildReviewQueue(tasks);
+    const project = rootProjects[reviewProjectIdx];
+    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, processed: true } : t));
     setReviewSuggestions([]);
     setReviewReady(false);
-    const rootProjects = buildReviewQueue(tasks);
     const nextIdx = reviewProjectIdx + 1;
 
     if (nextIdx >= rootProjects.length) {
@@ -814,9 +817,11 @@ export default function GTDManager() {
       .filter(s => s.accepted)
       .forEach(s => updateTask(s.taskId, s.overrides));
 
+    const rootProjects = buildReviewQueue(tasks);
+    const project = rootProjects[reviewProjectIdx];
+    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, processed: true } : t));
     setMetadataSuggestions([]);
     setReviewReady(false);
-    const rootProjects = buildReviewQueue(tasks);
     const nextIdx = reviewProjectIdx + 1;
 
     if (nextIdx >= rootProjects.length) {
@@ -832,9 +837,11 @@ export default function GTDManager() {
 
   // Advances to the next project without applying any metadata suggestions.
   const skipMetadataReview = useCallback(() => {
+    const rootProjects = buildReviewQueue(tasks);
+    const project = rootProjects[reviewProjectIdx];
+    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, processed: true } : t));
     setMetadataSuggestions([]);
     setReviewReady(false);
-    const rootProjects = buildReviewQueue(tasks);
     const nextIdx = reviewProjectIdx + 1;
 
     if (nextIdx >= rootProjects.length) {

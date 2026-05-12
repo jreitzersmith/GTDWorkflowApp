@@ -595,13 +595,15 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             })()}
           </div>
 
-          {/* Processed */}
+          {/* Processed / Reviewed */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Processed</span>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>
+              {task.bucket === 'project' ? 'Reviewed' : 'Processed'}
+            </span>
             <StyledCheckbox
               checked={task.processed ?? false}
               onChange={e => onUpdate(task.id, { processed: e.target.checked })}
-              label="Metadata complete"
+              label={task.bucket === 'project' ? 'Project reviewed' : 'Metadata complete'}
               labelStyle={{ color: COLORS.text2, fontSize: 11 }}
             />
           </div>
