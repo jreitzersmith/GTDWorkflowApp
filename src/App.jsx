@@ -70,6 +70,7 @@ export default function GTDManager() {
   const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
+  const [standaloneProjectId, setStandaloneProjectId] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
   // Compute Today's Focus count from localStorage for sidebar badge
   const focusCount = (() => {
@@ -105,6 +106,7 @@ export default function GTDManager() {
     authUser, tasks, setTasks,
     locations, efforts, calibrationOverrides, categories,
     skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
+    standaloneProjectId, setStandaloneProjectId,
     setLocations, setEfforts, setCalibrationOverrides, setCategories,
     setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
     setGmailQueue,
@@ -878,6 +880,7 @@ export default function GTDManager() {
     projectCategoryFilter,
     setProjectCategoryFilter,
     showCompletedInProjects,
+    standaloneProjectId,
   };
 
   return (
