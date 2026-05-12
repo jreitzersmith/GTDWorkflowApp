@@ -237,6 +237,7 @@ export default function GTDManager() {
         if (t.priority?.length) meta.push(`priority:${t.priority.join(",")}`);
         if (t.notes)            meta.push(`has-notes`);
         if (t.category)         meta.push(`category:${t.category}`);
+        if (t.nodeType)         meta.push(`type:${t.nodeType}`);
         if (t.recurrence) {
           const r = t.recurrence;
           const days = r.weekDays?.length

@@ -156,7 +156,9 @@ Be concise — under 80 words before the tag. Never include the →ACTION tag mi
 5. Review Waiting For — any follow-ups needed?
 6. Review Someday/Maybe — anything ready to activate?
 7. New ideas or goals to add?
-Ask one step at a time. Acknowledge their answer, then move on. Under 90 words each.`,
+Ask one step at a time. Acknowledge their answer, then move on. Under 90 words each.
+
+Project tree structure note: tasks tagged [type:category] or [type:subcategory] are organisational containers — they group projects but do not require next actions themselves. Tasks tagged [type:project] or [type:subproject] are the reviewable items. Untagged project-bucket tasks are treated as [type:project] by default.`,
   projectReview: `You are reviewing a GTD project to identify missing next actions.
 
 Given a project name, its current subtasks, and any metadata, you will:
