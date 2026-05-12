@@ -75,3 +75,4 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-12 | Feature      | FR#32   | GH#71  | Inline next/waiting children under project tasks in process-mode AI context      | f0f8f3d           |
 | 2026-05-12 | Feature      | FR#35   | GH#23  | Suppress due-date parents from no-cal-event list when children have due dates    | f0f8f3d           |
 | 2026-05-12 | Feature      | FR#37   | GH#31  | Configurable calendar reminder interval in Settings; threaded to API create call  | f0f8f3d           |
+| 2026-05-12 | Feature      | FR#71   | GH#72  | Project Review covers all levels via buildReviewQueue; skips pure containers; adds path breadcrumb to AI prompt | feb0d8b           |
