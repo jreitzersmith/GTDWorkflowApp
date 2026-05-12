@@ -59,7 +59,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode } = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes } = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
@@ -107,6 +107,7 @@ export default function GTDManager() {
     locations, efforts, calibrationOverrides, categories,
     skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
     uncategorizedProjectId, setUncategorizedProjectId,
+    reviewNodeTypes, setReviewNodeTypes,
     setLocations, setEfforts, setCalibrationOverrides, setCategories,
     setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
     setGmailQueue,
@@ -615,14 +616,10 @@ export default function GTDManager() {
   const buildReviewQueue = useCallback((allTasks) => {
     return allTasks.filter(t => {
       if (t.bucket !== 'project' || t.done) return false;
-      // Skip organisational containers — they group projects but aren't themselves reviewed
-      if (t.nodeType === 'category' || t.nodeType === 'subcategory') return false;
-      const children = (t.childIds || []).map(id => allTasks.find(c => c.id === id)).filter(Boolean);
-      // Pure container: has children and ALL are project-bucket — skip
-      if (children.length > 0 && children.every(c => c.bucket === 'project')) return false;
-      return true;
+      const nt = t.nodeType ?? 'project';
+      return reviewNodeTypes.includes(nt);
     });
-  }, []);
+  }, [reviewNodeTypes]);
 
   // Returns "Grandparent > Parent > Project" path string for AI context
   const getProjectPath = useCallback((project, allTasks) => {
@@ -1053,6 +1050,8 @@ export default function GTDManager() {
                           onSetTagDisplay={setTagDisplay}
                           nextActionsViewMode={nextActionsViewMode}
                           onSetNextActionsViewMode={setNextActionsViewMode}
+                          reviewNodeTypes={reviewNodeTypes}
+                          onSetReviewNodeTypes={setReviewNodeTypes}
                           categories={categories}
                           onAddCategory={addCategory}
                           onRenameCategory={renameCategory}

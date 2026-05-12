@@ -561,4 +561,58 @@ EffortCalibrationManager.propTypes = {
   onClearOverride:      PropTypes.func.isRequired,
 };
 
-export { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager };
+// ── ReviewConfigManager ──────────────────────────────────────────────────────
+// Multiselect chips controlling which nodeTypes appear in the Project Review queue.
+const REVIEW_NODE_OPTIONS = [
+  { key: 'category',    label: 'General Categories' },
+  { key: 'subcategory', label: 'SubCategories' },
+  { key: 'project',     label: 'Projects' },
+  { key: 'subproject',  label: 'SubProjects' },
+  { key: 'task',        label: 'Tasks' },
+];
+
+function ReviewConfigManager({ reviewNodeTypes, onSetReviewNodeTypes }) {
+  const toggle = (key) => {
+    const next = reviewNodeTypes.includes(key)
+      ? reviewNodeTypes.filter(k => k !== key)
+      : [...reviewNodeTypes, key];
+    onSetReviewNodeTypes(next);
+  };
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12, lineHeight: 1.5 }}>
+        Choose which item types appear in the Project Review queue.
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {REVIEW_NODE_OPTIONS.map(({ key, label }) => {
+          const active = reviewNodeTypes.includes(key);
+          return (
+            <button
+              key={key}
+              onClick={() => toggle(key)}
+              style={{
+                padding: '4px 12px',
+                borderRadius: 14,
+                border: `1px solid ${active ? COLORS.accent : COLORS.border}`,
+                background: active ? COLORS.accent : 'transparent',
+                color: active ? '#fff' : COLORS.text2,
+                fontSize: 12,
+                cursor: 'pointer',
+                fontWeight: active ? 600 : 400,
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+ReviewConfigManager.propTypes = {
+  reviewNodeTypes:    PropTypes.arrayOf(PropTypes.string).isRequired,
+  onSetReviewNodeTypes: PropTypes.func.isRequired,
+};
+
+export { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager };

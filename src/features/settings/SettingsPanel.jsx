@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { SettingsSection } from "./SettingsSection.jsx";
-import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager } from "./SettingsManagerComponents.jsx";
+import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager } from "./SettingsManagerComponents.jsx";
 
 // ── Google Services section config ────────────────────────────────────────────
 const GOOGLE_SERVICES = [
@@ -79,6 +79,7 @@ function SettingsPanel({
   calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride,
   tagDisplay, onSetTagDisplay,
   nextActionsViewMode, onSetNextActionsViewMode,
+  reviewNodeTypes, onSetReviewNodeTypes,
   onExport, onImport, onClose,
   // Google props
   googleToken, gmailScope, gmailError,
@@ -324,6 +325,11 @@ function SettingsPanel({
           </div>
         </SettingsSection>
 
+        <SettingsSection label="Review Configuration" storageKey="gtd_settings_review_config">
+          <div style={{ fontSize: 12, color: COLORS.text2, fontWeight: 600, marginBottom: 8 }}>Project Review</div>
+          <ReviewConfigManager reviewNodeTypes={reviewNodeTypes} onSetReviewNodeTypes={onSetReviewNodeTypes} />
+        </SettingsSection>
+
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
           <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
         </SettingsSection>
@@ -406,6 +412,8 @@ SettingsPanel.propTypes = {
   onSetRecurringReviewDays:   PropTypes.func.isRequired,
   calendarReminderMinutes:    PropTypes.number.isRequired,
   onSetCalendarReminderMinutes: PropTypes.func.isRequired,
+  reviewNodeTypes:            PropTypes.arrayOf(PropTypes.string).isRequired,
+  onSetReviewNodeTypes:       PropTypes.func.isRequired,
 };
 
 export { SettingsPanel };

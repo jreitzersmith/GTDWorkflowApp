@@ -40,7 +40,13 @@ function useAppSettings() {
   );
   useEffect(() => { localStorage.setItem('gtd_next_actions_mode', nextActionsViewMode); }, [nextActionsViewMode]);
 
-  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode };
+  // reviewNodeTypes: which nodeTypes appear in the Project Review queue
+  const [reviewNodeTypes, setReviewNodeTypes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_review_node_types') || 'null') || ['project', 'subproject', 'task']; } catch { return ['project', 'subproject', 'task']; }
+  });
+  useEffect(() => { localStorage.setItem('gtd_review_node_types', JSON.stringify(reviewNodeTypes)); }, [reviewNodeTypes]);
+
+  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes };
 }
 
 

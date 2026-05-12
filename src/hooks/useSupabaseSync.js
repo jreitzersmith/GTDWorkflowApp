@@ -15,6 +15,7 @@ import { DEFAULT_EFFORTS } from '../features/settings/useAppSettings.js';
  *   skippedCalendarIds: Set, seenCalendarEventIds: Set,
  *   recurringAcknowledgedMap: Map, recurringReviewDays: number,
  *   uncategorizedProjectId: string|null,
+ *   reviewNodeTypes: Array, setReviewNodeTypes: Function,
  *   setLocations: Function, setEfforts: Function, setCalibrationOverrides: Function, setCategories: Function,
  *   setSkippedCalendarIds: Function, setSeenCalendarEventIds: Function,
  *   setRecurringAcknowledgedMap: Function, setRecurringReviewDays: Function,
@@ -29,6 +30,7 @@ function useSupabaseSync({
   locations, efforts, calibrationOverrides, categories,
   skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
   uncategorizedProjectId,
+  reviewNodeTypes, setReviewNodeTypes,
   setLocations, setEfforts, setCalibrationOverrides, setCategories,
   setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
   setUncategorizedProjectId,
@@ -111,6 +113,7 @@ function useSupabaseSync({
           if (Array.isArray(data.cal_seen_events))   setSeenCalendarEventIds(new Set(data.cal_seen_events));
           if (Array.isArray(data.cal_recurring_acknowledged)) setRecurringAcknowledgedMap(new Map(data.cal_recurring_acknowledged));
           if (typeof data.recurring_review_days === 'number') setRecurringReviewDays(data.recurring_review_days);
+          if (Array.isArray(data.review_node_types)) setReviewNodeTypes(data.review_node_types);
           if (data.uncategorized_project_id) setUncategorizedProjectId(data.uncategorized_project_id);
           settingsReadyRef.current = true;
         } else {
@@ -197,6 +200,7 @@ function useSupabaseSync({
           cal_seen_events:   [...seenCalendarEventIds],
           cal_recurring_acknowledged: [...recurringAcknowledgedMap.entries()],
           recurring_review_days: recurringReviewDays,
+          review_node_types: reviewNodeTypes,
           uncategorized_project_id: uncategorizedProjectId,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
@@ -206,7 +210,7 @@ function useSupabaseSync({
         });
     }, 1500);
     return () => clearTimeout(settingsDebounceRef.current);
-  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, uncategorizedProjectId, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, reviewNodeTypes, uncategorizedProjectId, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fallback: keep localStorage in sync for unauthenticated sessions
   useEffect(() => {
