@@ -559,7 +559,7 @@ export default function GTDManager() {
   // Lightweight AI call (no coach UI side-effects) to suggest a project home for a
   // batch of new tasks. Updates `pendingGroupSuggestion` state on success.
   const suggestProjectGroup = useCallback(async (newTaskIds, newTaskTitles) => {
-    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const rootProjects = buildReviewQueue(tasks);
     const projectLines = rootProjects.length
       ? rootProjects.map(p => `- [${p.id}] ${p.text}`).join("\n")
       : "(none)";
@@ -599,6 +599,33 @@ export default function GTDManager() {
     } catch { /* silent — non-critical */ }
   }, [tasks]);
 
+  // ── Project review queue ─────────────────────────────────────────────────
+  // Includes ALL non-done project-bucket tasks except pure containers
+  // (those whose direct children are exclusively other project-bucket tasks).
+  // Sub-projects (parentId set) are now included so every level gets reviewed.
+  const buildReviewQueue = useCallback((allTasks) => {
+    return allTasks.filter(t => {
+      if (t.bucket !== 'project' || t.done) return false;
+      const children = (t.childIds || []).map(id => allTasks.find(c => c.id === id)).filter(Boolean);
+      // Pure container: has children and ALL are project-bucket — skip
+      if (children.length > 0 && children.every(c => c.bucket === 'project')) return false;
+      return true;
+    });
+  }, []);
+
+  // Returns "Grandparent > Parent > Project" path string for AI context
+  const getProjectPath = useCallback((project, allTasks) => {
+    const parts = [project.text];
+    let cur = project;
+    while (cur.parentId) {
+      const parent = allTasks.find(t => t.id === cur.parentId);
+      if (!parent) break;
+      parts.unshift(parent.text);
+      cur = parent;
+    }
+    return parts.join(' > ');
+  }, []);
+
   // ── Mode A: Task-completeness review ────────────────────────────────────
   const reviewProject = useCallback(async (project, idx, total) => {
     setCurrentBucket("project");
@@ -612,8 +639,9 @@ export default function GTDManager() {
       (project.location || []).length        ? `Location: ${project.location.join(", ")}`         : null,
     ].filter(Boolean).join(" | ") || "No metadata set";
 
+    const path = getProjectPath(project, tasks);
     const prompt =
-      `Project ${idx + 1} of ${total}: "${project.text}"\n` +
+      `Project ${idx + 1} of ${total}: "${path}"\n` +
       `Metadata: ${meta}\n` +
       `Current subtasks:\n${subtaskLines}`;
 
@@ -628,10 +656,10 @@ export default function GTDManager() {
       setReviewProjectIdx(idx);
       setReviewReady(true);
     }
-  }, [tasks, callAI]);
+  }, [tasks, callAI, getProjectPath, buildReviewQueue]);
 
   const advanceProjectReview = useCallback(() => {
-    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const rootProjects = buildReviewQueue(tasks);
     const project = rootProjects[reviewProjectIdx];
 
     // Add checked suggestions as new subtasks of the current project
@@ -672,7 +700,7 @@ export default function GTDManager() {
   const skipProjectReview = useCallback(() => {
     setReviewSuggestions([]);
     setReviewReady(false);
-    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const rootProjects = buildReviewQueue(tasks);
     const nextIdx = reviewProjectIdx + 1;
 
     if (nextIdx >= rootProjects.length) {
@@ -702,8 +730,9 @@ export default function GTDManager() {
         }).join("\n")
       : "(no active subtasks)";
 
+    const path = getProjectPath(project, tasks);
     const prompt =
-      `Project ${idx + 1} of ${total}: "${project.text}"\n` +
+      `Project ${idx + 1} of ${total}: "${path}"\n` +
       `Today: ${todayStr()}\n` +
       `Active subtasks:\n${taskLines}`;
 
@@ -726,7 +755,7 @@ export default function GTDManager() {
       setReviewProjectIdx(idx);
       setReviewReady(true);
     }
-  }, [tasks, callAI]);
+  }, [tasks, callAI, getProjectPath, buildReviewQueue]);
 
   const updateTask = useCallback((id, changes) => {
     setTasks(prev => {
@@ -787,7 +816,7 @@ export default function GTDManager() {
 
     setMetadataSuggestions([]);
     setReviewReady(false);
-    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const rootProjects = buildReviewQueue(tasks);
     const nextIdx = reviewProjectIdx + 1;
 
     if (nextIdx >= rootProjects.length) {
@@ -805,7 +834,7 @@ export default function GTDManager() {
   const skipMetadataReview = useCallback(() => {
     setMetadataSuggestions([]);
     setReviewReady(false);
-    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const rootProjects = buildReviewQueue(tasks);
     const nextIdx = reviewProjectIdx + 1;
 
     if (nextIdx >= rootProjects.length) {
@@ -821,7 +850,7 @@ export default function GTDManager() {
 
   // ── Entry point + mode selection ────────────────────────────────────────
   const startProjectReview = useCallback(() => {
-    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const rootProjects = buildReviewQueue(tasks);
     if (!rootProjects.length) {
       switchCoachMode("chat", "You have no active projects to review. Add some projects first, then come back!");
       return;
@@ -842,7 +871,7 @@ export default function GTDManager() {
   }, [tasks, switchCoachMode]);
 
   const selectReviewMode = useCallback((mode) => {
-    const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
+    const rootProjects = buildReviewQueue(tasks);
     setReviewMode(mode);
     if (mode === "tasks") {
       reviewProject(rootProjects[0], 0, rootProjects.length);
@@ -1122,7 +1151,7 @@ export default function GTDManager() {
                 calendarSuggestions={calendarSuggestions}
                 pendingGroupSuggestion={pendingGroupSuggestion}
                 reviewProjectIdx={reviewProjectIdx}
-                totalReviewProjects={tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done).length}
+                totalReviewProjects={buildReviewQueue(tasks).length}
                 provider={provider}
                 setProvider={setProvider}
                 localModel={localModel}
