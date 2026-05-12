@@ -84,7 +84,7 @@ function TaskBucketView({
   categories,
   projectCategoryFilter,
   setProjectCategoryFilter,
-  standaloneProjectId,
+  uncategorizedProjectId,
   showCompletedInProjects,
   setShowCompletedInProjects,
 }) {
@@ -335,16 +335,16 @@ function TaskBucketView({
           if (nextGroupBy === "project") {
             return groupByTwoLevelProject(visible, tasks).map(({ l1Key, l1Label, subgroups }) => {
               const l1Total = subgroups.reduce((s, sg) => s + sg.items.length, 0);
-              const l1IsStandalone = l1Key === "__standalone__";
+              const l1IsUncategorized = l1Key === "__uncategorized__";
               return (
                 <div key={l1Key}>
-                  <GroupDivider label={l1Label} count={l1Total} isUngrouped={l1IsStandalone} />
+                  <GroupDivider label={l1Label} count={l1Total} isUngrouped={l1IsUncategorized} />
                   {subgroups.map(({ l2Key, l2Label, l2, items }) => {
                     const groupMin = items.reduce((sum, t) => sum + effortToMinutes(t.effort), 0);
                     const groupEffortLabel = minutesToEffortLabel(groupMin) || "0m";
                     // Skip the L2 sub-header when it would just echo the L1 label
                     // (direct children of L1 with no L2 ancestor, or the Standalone group)
-                    const skipSubHeader = l1IsStandalone || l2 === null;
+                    const skipSubHeader = l1IsUncategorized || l2 === null;
                     return (
                       <div key={l2Key || l2Label}>
                         {!skipSubHeader && (
@@ -439,7 +439,7 @@ TaskBucketView.propTypes = {
   deferredDupeWarning: PropTypes.object,
   onViewDeferred:    PropTypes.func.isRequired,
   onBulkAssign:      PropTypes.func.isRequired,
-  standaloneProjectId: PropTypes.string,
+  uncategorizedProjectId: PropTypes.string,
   showCompletedInProjects: PropTypes.bool,
   setShowCompletedInProjects: PropTypes.func,
 };

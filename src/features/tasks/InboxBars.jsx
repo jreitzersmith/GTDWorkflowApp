@@ -56,7 +56,7 @@ function InboxBulkBar({ selectedCount, allTasks, onAssign, onClear }) {
                     selectedId={chosen}
                     onSelect={id => id && setChosen(id)}
                     onNewProject={() => setMode("newName")}
-                    showStandalone={false}
+                    showUncategorized={false}
                   />
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -147,7 +147,7 @@ function ProjectGroupSuggestionBar({ suggestion, taskCount, allTasks, onAccept, 
               eligibleProjects={eligibleProjects}
               selectedId={altChoice}
               onSelect={id => id && setAltChoice(id)}
-              showStandalone={false}
+              showUncategorized={false}
             />
           </div>
           <button onClick={handleAltConfirm} disabled={!altChoice} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${COLORS.project}`, background: "transparent", color: altChoice ? COLORS.project : COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: altChoice ? "pointer" : "default", alignSelf: "flex-start" }}>Assign</button>

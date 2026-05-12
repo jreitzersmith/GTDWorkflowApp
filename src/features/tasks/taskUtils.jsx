@@ -309,14 +309,14 @@ function groupByTwoLevelProject(taskList, allTasks) {
   };
 
   const l1Map = new Map(); // l1Id -> { l1, l2Map: Map<l2Key, { l2, l2Label, items[] }> }
-  const standaloneItems = [];
+  const uncategorizedItems = [];
 
   taskList.forEach(task => {
     const ancestors = getProjectAncestors(task);
     const l1 = ancestors[0] || null;
     const l2 = ancestors[1] || null;
 
-    if (!l1) { standaloneItems.push(task); return; }
+    if (!l1) { uncategorizedItems.push(task); return; }
 
     if (!l1Map.has(l1.id)) l1Map.set(l1.id, { l1, l2Map: new Map() });
     const l1Entry = l1Map.get(l1.id);
@@ -335,11 +335,11 @@ function groupByTwoLevelProject(taskList, allTasks) {
       subgroups: [...l2Map.values()].sort((a, b) => a.l2Label.localeCompare(b.l2Label)),
     }));
 
-  if (standaloneItems.length) {
+  if (uncategorizedItems.length) {
     result.push({
-      l1Key: '__standalone__',
+      l1Key: '__uncategorized__',
       l1Label: 'UnCategorized',
-      subgroups: [{ l2: null, l2Label: 'UnCategorized', items: standaloneItems }],
+      subgroups: [{ l2: null, l2Label: 'UnCategorized', items: uncategorizedItems }],
     });
   }
 

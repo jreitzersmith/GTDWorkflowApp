@@ -14,7 +14,7 @@ import { DEFAULT_EFFORTS } from '../features/settings/useAppSettings.js';
  *   locations: Array, efforts: Array, calibrationOverrides: object, categories: Array,
  *   skippedCalendarIds: Set, seenCalendarEventIds: Set,
  *   recurringAcknowledgedMap: Map, recurringReviewDays: number,
- *   standaloneProjectId: string|null,
+ *   uncategorizedProjectId: string|null,
  *   setLocations: Function, setEfforts: Function, setCalibrationOverrides: Function, setCategories: Function,
  *   setSkippedCalendarIds: Function, setSeenCalendarEventIds: Function,
  *   setRecurringAcknowledgedMap: Function, setRecurringReviewDays: Function,
@@ -28,7 +28,7 @@ function useSupabaseSync({
   tasks, setTasks,
   locations, efforts, calibrationOverrides, categories,
   skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
-  standaloneProjectId,
+  uncategorizedProjectId,
   setLocations, setEfforts, setCalibrationOverrides, setCategories,
   setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
   setStandaloneProjectId,
@@ -111,7 +111,7 @@ function useSupabaseSync({
           if (Array.isArray(data.cal_seen_events))   setSeenCalendarEventIds(new Set(data.cal_seen_events));
           if (Array.isArray(data.cal_recurring_acknowledged)) setRecurringAcknowledgedMap(new Map(data.cal_recurring_acknowledged));
           if (typeof data.recurring_review_days === 'number') setRecurringReviewDays(data.recurring_review_days);
-          if (data.standalone_project_id) setStandaloneProjectId(data.standalone_project_id);
+          if (data.uncategorized_project_id) setUncategorizedProjectId(data.uncategorized_project_id);
           settingsReadyRef.current = true;
         } else {
           // Supabase empty — migrate from localStorage
@@ -197,7 +197,7 @@ function useSupabaseSync({
           cal_seen_events:   [...seenCalendarEventIds],
           cal_recurring_acknowledged: [...recurringAcknowledgedMap.entries()],
           recurring_review_days: recurringReviewDays,
-          standalone_project_id: standaloneProjectId,
+          uncategorized_project_id: uncategorizedProjectId,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         .then(({ error }) => {
@@ -206,7 +206,7 @@ function useSupabaseSync({
         });
     }, 1500);
     return () => clearTimeout(settingsDebounceRef.current);
-  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, standaloneProjectId, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, uncategorizedProjectId, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fallback: keep localStorage in sync for unauthenticated sessions
   useEffect(() => {

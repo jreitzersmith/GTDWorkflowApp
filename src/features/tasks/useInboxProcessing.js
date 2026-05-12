@@ -87,7 +87,7 @@ function useInboxProcessing({
             category: aiCategory || parent.category || null, processed: true },
         ]);
       } else {
-        // Parent not found — fall back to standalone next action
+        // Parent not found — fall back to uncategorized next action
         setTasks(prev => [{ id: childId, text: title || current.text, bucket: 'next', done: false,
           created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null,
           actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true }, ...prev]);

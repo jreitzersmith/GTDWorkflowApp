@@ -73,7 +73,7 @@ function ProjectSelector({ taskId, parentId, eligibleProjects, onReassignProject
                     setNewProjMode(true);
                     setNewProjName("");
                   }}
-                  showStandalone
+                  showUncategorized
                 />
               </div>
             )}

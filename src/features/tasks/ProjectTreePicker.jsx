@@ -100,8 +100,8 @@ ProjectTreeRow.propTypes = {
 // expand on hover or chevron click.
 // Calls onSelect(id | null) on row click, onNewProject() for the
 // new-project option (omitted when prop is absent).
-// showStandalone renders a "— Standalone" row at the top for TaskDetailPanel.
-function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProject, showStandalone }) {
+// showUncategorized renders a "— UnCategorized" row at the top for TaskDetailPanel.
+function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProject, showUncategorized }) {
   const [expanded, setExpanded] = useState({});
 
   const tree = buildProjectTree(eligibleProjects);
@@ -112,7 +112,7 @@ function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProjec
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
-      {showStandalone && (
+      {showUncategorized && (
         <div
           onClick={() => onSelect(null)}
           style={{
@@ -157,7 +157,7 @@ ProjectTreePicker.propTypes = {
   selectedId:       PropTypes.string,
   onSelect:         PropTypes.func.isRequired,
   onNewProject:     PropTypes.func,
-  showStandalone:   PropTypes.bool,
+  showUncategorized: PropTypes.bool,
 };
 
 export { buildProjectTree, ProjectTreePicker };

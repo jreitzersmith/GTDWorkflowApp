@@ -251,7 +251,7 @@ function useTaskCrud({
 
   // ── Project hierarchy mutations ──────────────────────────────────────────
 
-  // Move a task to a different project, or make it standalone (newProjectId === null).
+  // Move a task to a different project, or make it uncategorized (newProjectId === null).
   // Handles: removing from old parent's childIds, adding to new parent's childIds,
   // and guards against circular references (can't assign a task to one of its own descendants).
   const reassignProject = useCallback((taskId, newProjectId, newProjectName) => {

@@ -70,7 +70,7 @@ export default function GTDManager() {
   const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
-  const [standaloneProjectId, setStandaloneProjectId] = useState(null);
+  const [uncategorizedProjectId, setUncategorizedProjectId] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
   // Compute Today's Focus count from localStorage for sidebar badge
   const focusCount = (() => {
@@ -106,7 +106,7 @@ export default function GTDManager() {
     authUser, tasks, setTasks,
     locations, efforts, calibrationOverrides, categories,
     skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
-    standaloneProjectId, setStandaloneProjectId,
+    uncategorizedProjectId, setUncategorizedProjectId,
     setLocations, setEfforts, setCalibrationOverrides, setCategories,
     setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
     setGmailQueue,
@@ -156,7 +156,7 @@ export default function GTDManager() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Auto-surface: on mount, move any standalone deferred tasks whose wake date has passed into Inbox.
+  // Auto-surface: on mount, move any uncategorized deferred tasks whose wake date has passed into Inbox.
   // Only moves tasks with no parentId (project subtasks stay in place; their deferUntil just stops hiding them).
   useEffect(() => {
     const today = todayStr();
@@ -961,7 +961,7 @@ export default function GTDManager() {
     projectCategoryFilter,
     setProjectCategoryFilter,
     showCompletedInProjects,
-    standaloneProjectId,
+    uncategorizedProjectId,
   };
 
   return (
