@@ -395,6 +395,7 @@ export default function GTDManager() {
 
       const urgencyNote = overdue.length > 0 ? ` You have **${overdue.length} overdue item${overdue.length !== 1 ? 's' : ''}** that need attention.` : '';
       switchCoachMode('daily', `Good morning! Let's start your day.${urgencyNote}\n\n${lines}`);
+      setCurrentView('gtd');
       const newPhase = 'end';
       setDailyReviewPhase(newPhase);
       localStorage.setItem('gtd-daily-phase', JSON.stringify({ phase: newPhase, date: today }));
