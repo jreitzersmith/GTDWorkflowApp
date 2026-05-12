@@ -57,7 +57,7 @@ function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragO
     children = children.filter(t => t.category === projectCategoryFilter);
   }
   if (depth <= 1) {
-    // Alpha sort, but pin the Standalone project to the end at depth 0
+    // Alpha sort, but pin the UnCategorized project to the end at depth 0
     children = [...children].sort((a, b) => {
       if (depth === 0 && uncategorizedProjectId) {
         if (a.id === uncategorizedProjectId) return 1;

@@ -18,7 +18,7 @@ import { DEFAULT_EFFORTS } from '../features/settings/useAppSettings.js';
  *   setLocations: Function, setEfforts: Function, setCalibrationOverrides: Function, setCategories: Function,
  *   setSkippedCalendarIds: Function, setSeenCalendarEventIds: Function,
  *   setRecurringAcknowledgedMap: Function, setRecurringReviewDays: Function,
- *   setStandaloneProjectId: Function,
+ *   setUncategorizedProjectId: Function,
  *   setGmailQueue: Function,
  * }} params
  * @returns {{ syncStatus: string, supabaseReady: boolean }}

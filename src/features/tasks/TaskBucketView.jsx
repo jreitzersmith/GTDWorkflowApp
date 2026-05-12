@@ -248,7 +248,7 @@ function TaskBucketView({
                     selectedId={projectParentId === "__new__" ? null : projectParentId}
                     onSelect={id => { setProjectParentId(id || "__new__"); setProjPickerOpen(false); }}
                     onNewProject={() => { setProjectParentId("__new__"); setProjPickerOpen(false); }}
-                    showStandalone={false}
+                    showUncategorized={false}
                   />
                 </div>
               )}
@@ -343,7 +343,7 @@ function TaskBucketView({
                     const groupMin = items.reduce((sum, t) => sum + effortToMinutes(t.effort), 0);
                     const groupEffortLabel = minutesToEffortLabel(groupMin) || "0m";
                     // Skip the L2 sub-header when it would just echo the L1 label
-                    // (direct children of L1 with no L2 ancestor, or the Standalone group)
+                    // (direct children of L1 with no L2 ancestor, or the UnCategorized group)
                     const skipSubHeader = l1IsUncategorized || l2 === null;
                     return (
                       <div key={l2Key || l2Label}>

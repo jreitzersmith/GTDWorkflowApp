@@ -290,7 +290,7 @@ function groupByField(taskList, field, allTasks = []) {
 // Two-level project grouping for Next Actions.
 // Returns [{ l1Key, l1Label, subgroups: [{ l2Key, l2Label, items[] }] }]
 // — L1 = root project-bucket ancestor; L2 = second-level project-bucket ancestor.
-// — Tasks with no project ancestor appear in a trailing "Standalone" L1 group.
+// — Tasks with no project ancestor appear in a trailing "UnCategorized" L1 group.
 // — Within each L1, subgroups are sorted alphabetically. L1 groups are sorted alphabetically.
 // — If an L1 group's tasks are direct children of L1 (no L2 ancestor) the l2 field is null
 //   and the subgroup is keyed `l1Id + "__direct"`.
