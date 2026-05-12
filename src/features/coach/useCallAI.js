@@ -533,18 +533,14 @@ function useCallAI({
       }
 
       // After SoD response, inject MIT picker so user can select via checkboxes
-      // Only inject when triggered by a SoD message and focus not already set today
       let mitPickerMsg = null;
       if (mode === 'daily' && userMsg.includes('[SoD Summary]')) {
         const today8601 = new Date().toISOString().slice(0, 10);
-        const alreadySet = (() => { try { const d = JSON.parse(localStorage.getItem(`gtd-todays-focus-${today8601}`) || 'null'); return d?.ids?.length > 0; } catch { return false; } })();
-        if (!alreadySet) {
-          const active = tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
-          const overdueList = active.filter(t => t.dueDate && t.dueDate < today8601);
-          const dueTodayList = active.filter(t => t.dueDate === today8601);
-          if (overdueList.length > 0 || dueTodayList.length > 0) {
-            mitPickerMsg = { role: 'assistant', type: 'mit-picker', overdue: overdueList, dueToday: dueTodayList };
-          }
+        const active = tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
+        const overdueList = active.filter(t => t.dueDate && t.dueDate < today8601);
+        const dueTodayList = active.filter(t => t.dueDate === today8601);
+        if (overdueList.length > 0 || dueTodayList.length > 0) {
+          mitPickerMsg = { role: 'assistant', type: 'mit-picker', overdue: overdueList, dueToday: dueTodayList };
         }
       }
 
