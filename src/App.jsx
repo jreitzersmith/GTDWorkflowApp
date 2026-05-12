@@ -59,7 +59,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes } = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode } = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
@@ -67,7 +67,7 @@ export default function GTDManager() {
           sheetsEnabled, slidesEnabled, gmailError, scopePrefs,
           setScopePref, reauthorizeGoogle, connectCalendar, disconnectCalendar,
           disconnectAll, refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
-  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects } = useTaskUIState();
+  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects, pendingDeleteConfirm, setPendingDeleteConfirm } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
   const [uncategorizedProjectId, setUncategorizedProjectId] = useState(null);
@@ -303,6 +303,7 @@ export default function GTDManager() {
     setMessages, setChatHistory, setChatInput,
     setLoading, setAvailableModels, setPendingAction,
     calendarReminderMinutes,
+    uncategorizedProjectId,
   });
 
   const switchCoachMode = useCallback((mode, introMsg) => {
@@ -321,6 +322,7 @@ export default function GTDManager() {
     askAIAboutTask,
   } = useInboxProcessing({
     tasks, pendingAction, efforts,
+    uncategorizedProjectId,
     singleTaskMode, processingTaskId, skippedInSessionIds,
     setTasks, setCurrentBucket,
     setMessages, setChatHistory,
@@ -330,7 +332,7 @@ export default function GTDManager() {
 
   const {
     addTask, addAndProcess, addProjectTask,
-    moveTask, deleteTask,
+    moveTask, deleteTask, confirmDelete,
     completeTask, finishComplete,
     handleRollupConfirm, handleRollupSkip,
     handleDeferCheckSkip, handleDeferCheckReview,
@@ -339,6 +341,8 @@ export default function GTDManager() {
     reassignProject, assignToProject, bulkAssignToProject,
   } = useTaskCrud({
     tasks,
+    uncategorizedProjectId,
+    setPendingDeleteConfirm,
     addText, setAddText,
     currentBucket, setCurrentBucket,
     projectParentId,
@@ -1029,6 +1033,8 @@ export default function GTDManager() {
                           onClearCalibrationOverride={clearCalibrationOverride}
                           tagDisplay={tagDisplay}
                           onSetTagDisplay={setTagDisplay}
+                          nextActionsViewMode={nextActionsViewMode}
+                          onSetNextActionsViewMode={setNextActionsViewMode}
                           categories={categories}
                           onAddCategory={addCategory}
                           onRenameCategory={renameCategory}
@@ -1264,6 +1270,22 @@ export default function GTDManager() {
             onSkip={handleDeferCheckSkip}
             onReview={handleDeferCheckReview}
           />
+        )}
+        {pendingDeleteConfirm && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+            <div style={{ background: '#1a1c18', border: '1px solid #333530', borderRadius: 12, padding: '24px 28px', maxWidth: 400, width: '90%' }}>
+              <div style={{ fontSize: 15, fontWeight: 500, color: '#e8e4dc', marginBottom: 8 }}>Delete project?</div>
+              <div style={{ fontSize: 13, color: '#a8a49c', marginBottom: 20, lineHeight: 1.5 }}>
+                <strong style={{ color: '#e8e4dc' }}>{pendingDeleteConfirm.taskText}</strong> has subtasks.<br />
+                Delete all subtasks, or move them to UnCategorized?
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button onClick={() => setPendingDeleteConfirm(null)} style={{ padding: '7px 14px', borderRadius: 7, border: '1px solid #333530', background: 'transparent', color: '#a8a49c', fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={() => confirmDelete(pendingDeleteConfirm.taskId, false)} style={{ padding: '7px 14px', borderRadius: 7, border: '1px solid #5a8fd4', background: '#5a8fd422', color: '#5a8fd4', fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}>Move to UnCategorized</button>
+                <button onClick={() => confirmDelete(pendingDeleteConfirm.taskId, true)} style={{ padding: '7px 14px', borderRadius: 7, border: '1px solid #d4845a', background: '#d4845a22', color: '#d4845a', fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}>Delete all</button>
+              </div>
+            </div>
+          </div>
         )}
         {actualEffortPrompt && (
           <ActualEffortPrompt

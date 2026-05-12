@@ -78,6 +78,7 @@ function SettingsPanel({
   efforts, onAddEffort, onRenameEffort, onRemoveEffort,
   calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride,
   tagDisplay, onSetTagDisplay,
+  nextActionsViewMode, onSetNextActionsViewMode,
   onExport, onImport, onClose,
   // Google props
   googleToken, gmailScope, gmailError,
@@ -299,6 +300,30 @@ function SettingsPanel({
           </div>
         </SettingsSection>
 
+        {/* ── Next Actions ──────────────────────────────────────────────────── */}
+        <SettingsSection label="Next Actions" storageKey="gtd_settings_next_actions">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
+            How tasks are shown in the Next Actions view.
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[
+              { value: 'simple',     label: 'Simple',     desc: 'All next actions',          disabled: false },
+              { value: 'gtd-strict', label: 'GTD Strict', desc: 'One per project (coming soon)', disabled: true  },
+            ].map(({ value, label, desc, disabled }) => {
+              const active = nextActionsViewMode === value;
+              return (
+                <button
+                  key={value}
+                  onClick={() => { if (!disabled) onSetNextActionsViewMode(value); }}
+                  disabled={disabled}
+                  title={desc}
+                  style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${active ? COLORS.next : COLORS.border}`, background: active ? COLORS.next + '22' : 'transparent', color: disabled ? COLORS.muted : active ? COLORS.next : COLORS.text2, fontFamily: 'inherit', fontSize: 12, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}
+                >{label}</button>
+              );
+            })}
+          </div>
+        </SettingsSection>
+
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
           <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
         </SettingsSection>
@@ -357,6 +382,8 @@ SettingsPanel.propTypes = {
   onClearCalibrationOverride: PropTypes.func.isRequired,
   tagDisplay:                 PropTypes.string.isRequired,
   onSetTagDisplay:            PropTypes.func.isRequired,
+  nextActionsViewMode:        PropTypes.string.isRequired,
+  onSetNextActionsViewMode:   PropTypes.func.isRequired,
   onExport:                   PropTypes.func.isRequired,
   onImport:                   PropTypes.func.isRequired,
   onClose:                    PropTypes.func.isRequired,

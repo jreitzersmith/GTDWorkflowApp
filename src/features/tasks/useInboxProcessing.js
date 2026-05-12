@@ -28,6 +28,7 @@ import { normalizeEffort } from './taskUtils.jsx';
  */
 function useInboxProcessing({
   tasks, pendingAction, efforts,
+  uncategorizedProjectId,
   singleTaskMode, processingTaskId, skippedInSessionIds,
   setTasks, setCurrentBucket,
   setMessages, setChatHistory,
@@ -60,7 +61,14 @@ function useInboxProcessing({
 
     // Create new tasks based on action type, applying any AI-suggested dates
     if (type === 'next') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'next', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
+      const newId = genId();
+      const newTask = { id: newId, text: title || current.text, bucket: 'next', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true, ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
+      setTasks(prev => {
+        if (uncategorizedProjectId) {
+          return [newTask, ...prev.map(t => t.id === uncategorizedProjectId ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
+        }
+        return [newTask, ...prev];
+      });
     } else if (type === 'project') {
       const projectId = genId();
       const actionId = genId();
@@ -87,10 +95,17 @@ function useInboxProcessing({
             category: aiCategory || parent.category || null, processed: true },
         ]);
       } else {
-        // Parent not found — fall back to uncategorized next action
-        setTasks(prev => [{ id: childId, text: title || current.text, bucket: 'next', done: false,
+        // Parent not found — fall back to UnCategorized project
+        const fallbackTask = { id: childId, text: title || current.text, bucket: 'next', done: false,
           created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null,
-          actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
+          actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true,
+          ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
+        setTasks(prev => {
+          if (uncategorizedProjectId) {
+            return [fallbackTask, ...prev.map(t => t.id === uncategorizedProjectId ? { ...t, childIds: [...(t.childIds || []), childId] } : t)];
+          }
+          return [fallbackTask, ...prev];
+        });
       }
     }
     // type === 'delete': just archive, no new task

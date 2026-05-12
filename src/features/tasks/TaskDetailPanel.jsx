@@ -447,8 +447,8 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
 
-          {/* Type toggle — nodeType selector, visible only in Projects view */}
-          {currentBucket === 'project' && (
+          {/* Type toggle — nodeType selector, visible in Projects and Next Actions views */}
+          {(currentBucket === 'project' || currentBucket === 'next') && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
               <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Type</span>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>

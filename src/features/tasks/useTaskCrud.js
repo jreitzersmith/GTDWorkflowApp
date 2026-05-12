@@ -23,6 +23,8 @@ import { buildNextOccurrence } from './taskUtils.jsx';
  */
 function useTaskCrud({
   tasks,
+  uncategorizedProjectId,
+  setPendingDeleteConfirm,
   addText, setAddText,
   currentBucket, setCurrentBucket,
   projectParentId,
@@ -95,8 +97,71 @@ function useTaskCrud({
   }, [setTasks, setMoveMenu, setPendingAction]);
 
   const deleteTask = useCallback((id) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
-  }, [setTasks]);
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    const hasChildren = (task.childIds || []).length > 0 || tasks.some(t => t.parentId === id);
+    if (task.bucket === 'project' && hasChildren) {
+      setPendingDeleteConfirm({ taskId: id, taskText: task.text });
+      return;
+    }
+    // No children or leaf task — delete immediately
+    setTasks(prev => {
+      let updated = prev.filter(t => t.id !== id);
+      if (task.parentId) {
+        updated = updated.map(t => t.id === task.parentId
+          ? { ...t, childIds: (t.childIds || []).filter(cid => cid !== id) }
+          : t);
+      }
+      return updated;
+    });
+  }, [tasks, setPendingDeleteConfirm, setTasks]);
+
+  // Called from the delete confirmation modal.
+  // cascade=true  → delete task + all descendants recursively
+  // cascade=false → delete task only; re-parent direct children to UnCategorized
+  const confirmDelete = useCallback((id, cascade) => {
+    setPendingDeleteConfirm(null);
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    if (cascade) {
+      const toDelete = new Set([id]);
+      const queue = [id];
+      while (queue.length) {
+        const cur = queue.shift();
+        const node = tasks.find(t => t.id === cur);
+        (node?.childIds || []).forEach(cid => { toDelete.add(cid); queue.push(cid); });
+      }
+      setTasks(prev => {
+        let updated = prev.filter(t => !toDelete.has(t.id));
+        if (task.parentId) {
+          updated = updated.map(t => t.id === task.parentId
+            ? { ...t, childIds: (t.childIds || []).filter(cid => cid !== id) }
+            : t);
+        }
+        return updated;
+      });
+    } else {
+      // Re-parent direct children to UnCategorized, keep their own subtrees intact
+      const directChildIds = tasks.filter(t => t.parentId === id).map(t => t.id);
+      setTasks(prev => {
+        let updated = prev.filter(t => t.id !== id);
+        if (task.parentId) {
+          updated = updated.map(t => t.id === task.parentId
+            ? { ...t, childIds: (t.childIds || []).filter(cid => cid !== id) }
+            : t);
+        }
+        if (uncategorizedProjectId && directChildIds.length > 0) {
+          const childSet = new Set(directChildIds);
+          updated = updated.map(t => {
+            if (childSet.has(t.id)) return { ...t, parentId: uncategorizedProjectId };
+            if (t.id === uncategorizedProjectId) return { ...t, childIds: [...(t.childIds || []), ...directChildIds] };
+            return t;
+          });
+        }
+        return updated;
+      });
+    }
+  }, [tasks, uncategorizedProjectId, setPendingDeleteConfirm, setTasks]);
 
   // ── Completion flow ──────────────────────────────────────────────────────
 
@@ -358,7 +423,7 @@ function useTaskCrud({
 
   return {
     addTask, addAndProcess, addProjectTask,
-    moveTask, deleteTask,
+    moveTask, deleteTask, confirmDelete,
     completeTask, finishComplete,
     handleRollupConfirm, handleRollupSkip,
     handleDeferCheckSkip, handleDeferCheckReview,

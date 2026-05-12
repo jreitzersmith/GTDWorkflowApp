@@ -34,7 +34,13 @@ function useAppSettings() {
   useEffect(() => { localStorage.setItem("gtd_categories",         JSON.stringify(categories)); }, [categories]);
   useEffect(() => { localStorage.setItem("gtd_calendar_reminder_minutes", String(calendarReminderMinutes)); }, [calendarReminderMinutes]);
 
-  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes };
+  // Next Actions view mode: 'simple' (all bucket:next tasks) | 'gtd-strict' (one per project — stub, not yet implemented)
+  const [nextActionsViewMode, setNextActionsViewMode] = useState(() =>
+    localStorage.getItem('gtd_next_actions_mode') || 'simple'
+  );
+  useEffect(() => { localStorage.setItem('gtd_next_actions_mode', nextActionsViewMode); }, [nextActionsViewMode]);
+
+  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode };
 }
 
 

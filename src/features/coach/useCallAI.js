@@ -69,6 +69,7 @@ function useCallAI({
   setMessages, setChatHistory, setChatInput,
   setLoading, setAvailableModels, setPendingAction,
   calendarReminderMinutes,
+  uncategorizedProjectId,
 }) {
   const fetchModels = useCallback(async () => {
     try {
@@ -432,12 +433,20 @@ function useCallAI({
               const { title, bucket, dueDate = null, dueTime = null, deferUntil = null,
                       effort = null, location = [], recurrence = null } = create;
               const newId = genId();
+              const parentId = (bucket === 'next' && uncategorizedProjectId) ? uncategorizedProjectId : undefined;
               const newTask = {
                 id: newId, text: title, bucket, done: false, created: Date.now(),
                 priority: [], location, dueDate, dueTime, effort: normalizeEffort(effort, efforts), actualEffort: null,
                 deferUntil, notes: null, recurrence,
+                ...(parentId ? { parentId } : {}),
               };
-              workingTasks = [newTask, ...workingTasks];
+              if (parentId) {
+                workingTasks = [newTask, ...workingTasks.map(t => t.id === parentId
+                  ? { ...t, childIds: [...(t.childIds || []), newId] }
+                  : t)];
+              } else {
+                workingTasks = [newTask, ...workingTasks];
+              }
               chips.push({ taskName: title, fields: ['created in ' + bucket] });
             }
           }
