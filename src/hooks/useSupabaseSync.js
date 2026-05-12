@@ -31,7 +31,7 @@ function useSupabaseSync({
   uncategorizedProjectId,
   setLocations, setEfforts, setCalibrationOverrides, setCategories,
   setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
-  setStandaloneProjectId,
+  setUncategorizedProjectId,
   setGmailQueue,
 }) {
   // true once the initial Supabase read (or migration) has completed
