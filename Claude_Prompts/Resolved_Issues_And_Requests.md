@@ -70,3 +70,5 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-12 | Bug fix      | —       | —      | Process mode effort/category absent from ACTION format examples                  | ac0768d           |
 | 2026-05-12 | Bug fix      | —       | —      | AI re-emit instruction for effort/fields on second turn answers                  | 99cbca7           |
 | 2026-05-12 | Bug fix      | —       | —      | Effort label normalization + always emit label list in calibration context        | e6094ba           |
+| 2026-05-12 | Feature      | FR#69   | GH#69  | Process mode sibling category inference — confirmed working, prompt already had instruction | ac0768d           |
+| 2026-05-12 | Feature      | FR#19   | GH#10  | Inbox History AI exposure — policy decided: inboxHistory excluded from all AI context       | —                 |

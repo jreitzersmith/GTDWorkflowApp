@@ -22,9 +22,7 @@
 
 #### Inbox / processing improvements
 
-- FR#69 [GH#69] (2026-05-11) — Process mode: AI auto-infers category from sibling tasks when adding to existing project
 - FR#8 [GH#9] — Inbox Process mode — AI identifies co-related tasks during inbox processing and suggests grouping them into an existing project or a new one (similar to the calendar-event grouping flow)
-- FR#19 [GH#10] — Inbox History / AI exposure rethink (decide policy on what the AI sees; small code change once decided)
 
 #### Integrations / data
 
