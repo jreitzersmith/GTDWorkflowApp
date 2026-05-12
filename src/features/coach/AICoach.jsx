@@ -44,7 +44,7 @@ function RecurringReviewCard({ events, onStillFine, onNeedsWork }) {
   );
 }
 
-function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork }) {
+function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubmit }) {
   const isUser = msg.role === "user";
   if (msg.isSearchChip) return (
     <div style={{ display: "flex", alignItems: "center", gap: 6,
@@ -55,6 +55,9 @@ function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork }) {
   );
   if (msg.type === 'recurringReview') return (
     <RecurringReviewCard events={msg.events} onStillFine={onRecurringStillFine} onNeedsWork={onRecurringNeedsWork} />
+  );
+  if (msg.type === 'mit-picker') return (
+    <MITPicker overdue={msg.overdue || []} dueToday={msg.dueToday || []} onSubmit={onMITSubmit} />
   );
   return (
     <div style={{ display: "flex", gap: 7, flexDirection: isUser ? "row-reverse" : "row", maxWidth: "100%" }}>
@@ -439,6 +442,89 @@ ProjectReviewBar.propTypes = {
   totalProjects: PropTypes.number.isRequired,
 };
 
+
+function MITPicker({ overdue, dueToday, onSubmit }) {
+  const today8601 = new Date().toISOString().slice(0, 10);
+  const [selected, setSelected] = useState(() => new Set());
+  const toggle = (id) => setSelected(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const allTasks = [...overdue, ...dueToday];
+  const handleSubmit = () => {
+    if (selected.size === 0) return;
+    onSubmit([...selected]);
+  };
+  const TaskLine = ({ task, group }) => {
+    const isChecked = selected.has(task.id);
+    const dotColor = group === 'overdue' ? '#e05050' : COLORS.next;
+    return (
+      <div
+        onClick={() => toggle(task.id)}
+        style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 8px', borderRadius: 6,
+          cursor: 'pointer', background: isChecked ? dotColor + '18' : 'transparent',
+          border: `1px solid ${isChecked ? dotColor + '55' : 'transparent'}`, transition: 'all 0.1s' }}
+      >
+        <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${isChecked ? dotColor : COLORS.border2}`,
+          background: isChecked ? dotColor : 'transparent', flexShrink: 0, marginTop: 2,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.1s' }}>
+          {isChecked && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span>}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, color: COLORS.text, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.text}</div>
+          {task.dueDate && (
+            <div style={{ fontSize: 10, color: dotColor, marginTop: 1 }}>
+              {task.dueDate < today8601 ? `Overdue · ${task.dueDate}` : `Due today`}{task.dueTime ? ` · ${task.dueTime}` : ''}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+  return (
+    <div style={{ border: `1px solid ${COLORS.border2}`, borderRadius: 10, overflow: 'hidden', margin: '2px 0' }}>
+      <div style={{ padding: '8px 12px', background: COLORS.surface2, borderBottom: `1px solid ${COLORS.border}`,
+        fontSize: 11, fontWeight: 600, color: COLORS.text2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        Select your MUST ACCOMPLISH tasks
+      </div>
+      <div style={{ padding: '6px 8px', maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {overdue.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, color: '#e05050', fontWeight: 600, padding: '4px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Overdue ({overdue.length})
+            </div>
+            {overdue.map(t => <TaskLine key={t.id} task={t} group="overdue" />)}
+          </>
+        )}
+        {dueToday.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, color: COLORS.next, fontWeight: 600, padding: '6px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Due Today ({dueToday.length})
+            </div>
+            {dueToday.map(t => <TaskLine key={t.id} task={t} group="today" />)}
+          </>
+        )}
+        {allTasks.length === 0 && (
+          <div style={{ padding: '12px 8px', fontSize: 12, color: COLORS.muted, fontStyle: 'italic' }}>No overdue or due-today tasks.</div>
+        )}
+      </div>
+      <div style={{ padding: '8px 12px', borderTop: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ fontSize: 11, color: COLORS.muted }}>{selected.size} selected</span>
+        <button
+          onClick={handleSubmit}
+          disabled={selected.size === 0}
+          style={{ padding: '5px 14px', borderRadius: 6, border: 'none', background: selected.size > 0 ? '#f0c040' : COLORS.surface3,
+            color: selected.size > 0 ? '#1a1a0e' : COLORS.muted, fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+            cursor: selected.size > 0 ? 'pointer' : 'default', transition: 'all 0.15s' }}
+        >
+          Set as Today's Focus →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ProviderSelector({ provider, setProvider, localModel, setLocalModel, availableModels, fetchModels }) {
   const [open, setOpen] = useState(false);
 
@@ -514,4 +600,4 @@ function ProviderOption({ label, icon, color, active, onClick }) {
 }
 
 
-export { ActionBtn, RecurringReviewCard, ChatBubble, TypingIndicator, PendingActionBar, DeferCheckPrompt, NoteRollupPrompt, ActualEffortPrompt, ReviewModeBar, MetadataReviewBar, ProjectReviewBar, ProviderSelector, ProviderOption };
+export { ActionBtn, RecurringReviewCard, ChatBubble, MITPicker, TypingIndicator, PendingActionBar, DeferCheckPrompt, NoteRollupPrompt, ActualEffortPrompt, ReviewModeBar, MetadataReviewBar, ProjectReviewBar, ProviderSelector, ProviderOption };

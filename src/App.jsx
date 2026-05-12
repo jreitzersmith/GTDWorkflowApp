@@ -436,6 +436,20 @@ export default function GTDManager() {
     }
   };
 
+  // Daily review MIT picker — user selected tasks via checkboxes; write focus and trigger AI close
+  const handleMITSubmit = (ids) => {
+    const today8601 = new Date().toISOString().slice(0, 10);
+    localStorage.setItem(`gtd-todays-focus-${today8601}`, JSON.stringify({ ids, date: today8601 }));
+    const selected = tasks.filter(t => ids.includes(t.id));
+    const listText = selected.map(t => `- ${t.text} [id:${t.id}]`).join('\n');
+    // Remove the picker message so it doesn't stay in history
+    setMessages(prev => prev.filter(m => m.type !== 'mit-picker'));
+    // Show the user selection as a chat bubble
+    const userMsg = `My MITs for today:\n${listText}`;
+    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    callAI(userMsg, 'daily', chatHistory);
+  };
+
   // Prefill the coach chat with email content so the user can process it into tasks
   const processEmailWithAI = useCallback((email) => {
     const body = email.body ? email.body.slice(0, 4000) : email.snippet;
@@ -1137,6 +1151,7 @@ export default function GTDManager() {
                 onStartBrainDump={startBrainDump}
                 onStartProjectReview={startProjectReview}
                 onSwitchToChat={() => switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.")}
+                onMITSubmit={handleMITSubmit}
               />
             </ErrorBoundary>
           </div>

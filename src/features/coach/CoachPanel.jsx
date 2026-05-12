@@ -65,6 +65,7 @@ function CoachPanel({
   onStartBrainDump,
   onStartProjectReview,
   onSwitchToChat,
+  onMITSubmit,
 }) {
   return (
     <div style={{ height: coachHeight, display: "flex", flexDirection: "column", flexShrink: 0 }}>
@@ -98,7 +99,7 @@ function CoachPanel({
       {/* Message list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
         {messages.map((msg, i) => (
-          <ChatBubble key={i} msg={msg} onRecurringStillFine={onRecurringStillFine} onRecurringNeedsWork={onRecurringNeedsWork} />
+          <ChatBubble key={i} msg={msg} onRecurringStillFine={onRecurringStillFine} onRecurringNeedsWork={onRecurringNeedsWork} onMITSubmit={onMITSubmit} />
         ))}
         {loading && <TypingIndicator />}
         {pendingAction && (
