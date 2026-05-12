@@ -617,7 +617,12 @@ export default function GTDManager() {
     return allTasks.filter(t => {
       if (t.bucket !== 'project' || t.done) return false;
       const nt = t.nodeType ?? 'project';
-      return reviewNodeTypes.includes(nt);
+      if (!reviewNodeTypes.includes(nt)) return false;
+      // Pure container: all direct children are project-bucket nodes (subprojects/categories).
+      // These group other nodes but have no actionable tasks of their own — skip.
+      const children = (t.childIds || []).map(id => allTasks.find(c => c.id === id)).filter(Boolean);
+      if (children.length > 0 && children.every(c => c.bucket === 'project')) return false;
+      return true;
     });
   }, [reviewNodeTypes]);
 

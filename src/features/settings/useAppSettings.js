@@ -42,7 +42,7 @@ function useAppSettings() {
 
   // reviewNodeTypes: which nodeTypes appear in the Project Review queue
   const [reviewNodeTypes, setReviewNodeTypes] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('gtd_review_node_types') || 'null') || ['project', 'subproject', 'task']; } catch { return ['project', 'subproject', 'task']; }
+    try { return JSON.parse(localStorage.getItem('gtd_review_node_types') || 'null') || ['project', 'subproject']; } catch { return ['project', 'subproject']; }
   });
   useEffect(() => { localStorage.setItem('gtd_review_node_types', JSON.stringify(reviewNodeTypes)); }, [reviewNodeTypes]);
 
