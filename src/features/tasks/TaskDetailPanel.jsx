@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTaskDetailDrafts } from "./useTaskDetailDrafts.js";
 import PropTypes from "prop-types";
-import { COLORS, BUCKETS } from "../../constants.jsx";
+import { COLORS, BUCKETS, NODE_TYPES } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { collectDescendantIds, effortAccuracyColor, effortToMinutes } from "./taskUtils.jsx";
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
@@ -386,6 +386,8 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
     t => t.bucket === "project" && !t.done && !excludedIds.has(t.id)
   );
   const hasProjectChildren = allTasks.some(t => t.parentId === task.id && t.bucket === 'project');
+  // nodeType===null on existing project-bucket tasks displays as 'project'; on next-bucket tasks as 'task'
+  const effectiveNodeType = task.nodeType ?? (task.bucket === 'project' ? 'project' : 'task');
 
   return (
     <div style={{ ...style, background: COLORS.surface, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -445,20 +447,29 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
 
-          {/* Type toggle — project/task switch, visible only in Projects view */}
+          {/* Type toggle — nodeType selector, visible only in Projects view */}
           {currentBucket === 'project' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
               <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Type</span>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button
-                  onClick={() => onUpdate(task.id, { bucket: 'project' })}
-                  style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${task.bucket === 'project' ? COLORS.project : COLORS.border}`, background: task.bucket === 'project' ? COLORS.project + '22' : 'transparent', color: task.bucket === 'project' ? COLORS.project : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
-                >&#128193; Project</button>
-                <button
-                  onClick={() => { if (!hasProjectChildren) onUpdate(task.id, { bucket: 'next' }); }}
-                  title={hasProjectChildren ? 'Cannot demote: this node has sub-projects' : 'Convert to a leaf task (Next Actions)'}
-                  style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${task.bucket === 'next' ? COLORS.next : COLORS.border}`, background: task.bucket === 'next' ? COLORS.next + '22' : 'transparent', color: task.bucket === 'next' ? COLORS.next : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: hasProjectChildren ? 'not-allowed' : 'pointer', opacity: hasProjectChildren ? 0.5 : 1 }}
-                >&#9889; Task</button>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {NODE_TYPES.map(({ value, label, color }) => {
+                  const isTask = value === 'task';
+                  const isActive = effectiveNodeType === value;
+                  const disabled = isTask && hasProjectChildren;
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => {
+                        if (disabled) return;
+                        onUpdate(task.id, isTask
+                          ? { nodeType: 'task', bucket: 'next' }
+                          : { nodeType: value, bucket: 'project' });
+                      }}
+                      title={disabled ? 'Cannot convert to task: node has sub-projects' : undefined}
+                      style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${isActive ? color : COLORS.border}`, background: isActive ? color + '22' : 'transparent', color: isActive ? color : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}
+                    >{label}</button>
+                  );
+                })}
               </div>
               {hasProjectChildren && (
                 <span style={{ fontSize: 10, color: COLORS.muted }}>has sub-projects</span>

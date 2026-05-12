@@ -29,6 +29,14 @@ export const BUCKETS = {
   inboxHistory: { label: "📋 Inbox History",   desc: "Processed inbox items — archived for reference", color: COLORS.muted },
 };
 
+export const NODE_TYPES = [
+  { value: 'category',    label: 'Category',   color: '#5a8fd4' },
+  { value: 'subcategory', label: 'SubCategory', color: '#5a8fd4' },
+  { value: 'project',     label: 'Project',     color: '#5a8fd4' },
+  { value: 'subproject',  label: 'SubProject',  color: '#5a8fd4' },
+  { value: 'task',        label: 'Task',        color: '#5ab878' },
+];
+
 export const COACH_MODES = {
   chat:          { label: "Chat",           icon: "💬" },
   dump:          { label: "Brain Dump",     icon: "🧠" },

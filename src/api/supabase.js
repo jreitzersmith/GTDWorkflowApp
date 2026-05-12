@@ -65,6 +65,7 @@ function taskToDb(task, userId) {
     calendar_event_id:  task.calendarEventId ?? null,
     drive_attachments:  task.driveAttachments ?? [],
     processed:          task.processed ?? false,
+    node_type:          task.nodeType ?? null,
     updated_at:         new Date().toISOString(),
   };
 }
@@ -91,6 +92,7 @@ function dbToTask(row) {
     calendarEventId:   row.calendar_event_id   ?? null,
     driveAttachments:  row.drive_attachments   ?? [],
     processed:         row.processed           ?? false,
+    nodeType:          row.node_type           ?? null,
   };
   if (row.parent_id) t.parentId = row.parent_id;
   return t;

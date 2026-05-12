@@ -606,6 +606,8 @@ export default function GTDManager() {
   const buildReviewQueue = useCallback((allTasks) => {
     return allTasks.filter(t => {
       if (t.bucket !== 'project' || t.done) return false;
+      // Skip organisational containers — they group projects but aren't themselves reviewed
+      if (t.nodeType === 'category' || t.nodeType === 'subcategory') return false;
       const children = (t.childIds || []).map(id => allTasks.find(c => c.id === id)).filter(Boolean);
       // Pure container: has children and ALL are project-bucket — skip
       if (children.length > 0 && children.every(c => c.bucket === 'project')) return false;
