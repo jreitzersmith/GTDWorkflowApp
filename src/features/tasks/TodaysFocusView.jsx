@@ -64,7 +64,7 @@ function TodaysFocusView({ tasks, calendarEvents, calendarEnabled, onDailyReview
     emptyState: { padding: '40px 20px', textAlign: 'center' },
     emptyText: { fontSize: 14, color: COLORS.text2, marginBottom: 16 },
     startBtn: { background: FOCUS_COLOR, color: '#1a1a0e', border: 'none', borderRadius: 6, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-    tierHeader: { padding: '14px 20px 6px', fontSize: 10, color: COLORS.muted, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 },
+    tierHeader: { padding: '14px 20px 6px', fontSize: 10, color: COLORS.text2, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 },
     row: { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 20px', cursor: 'pointer', borderLeft: '3px solid transparent', transition: 'background 0.1s' },
     rowText: { flex: 1, fontSize: 13, color: COLORS.text, lineHeight: 1.4 },
     badge: (color, bg) => ({ fontSize: 10, color, background: bg, padding: '1px 6px', borderRadius: 8, fontWeight: 500, flexShrink: 0, whiteSpace: 'nowrap' }),
