@@ -81,7 +81,7 @@ function parseRRULE(rruleStr) {
   return rec;
 }
 
-async function doCalendarCreateEvent(token, { summary, description, date, startTime, endTime, recurrence, attendees, sendUpdates }) {
+async function doCalendarCreateEvent(token, { summary, description, date, startTime, endTime, recurrence, attendees, sendUpdates, reminderMinutes }) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const body = (startTime && endTime)
     ? { summary, description: description || '',
@@ -92,6 +92,10 @@ async function doCalendarCreateEvent(token, { summary, description, date, startT
         end:   { date } };
   if (recurrence?.length) body.recurrence = recurrence;
   if (attendees?.length) body.attendees = attendees;
+  // FR#37: add popup reminder for timed events when interval is set
+  if (startTime && endTime && reminderMinutes != null) {
+    body.reminders = { useDefault: false, overrides: [{ method: 'popup', minutes: Number(reminderMinutes) }] };
+  }
   const notifyParam = sendUpdates === 'all' ? 'all' : 'none';
   const res = await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=${notifyParam}`,

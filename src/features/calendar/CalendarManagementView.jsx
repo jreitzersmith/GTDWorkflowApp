@@ -10,7 +10,7 @@ import {
 import { CalendarNewEventsSection, CalendarPendingTasksSection } from "./CalendarManagementSections.jsx";
 import { CalendarMonthView, CalendarWeekView, CalendarDayView, MONTH_NAMES } from "./CalendarEventDisplay.jsx";
 
-function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, setCalendarTab, tasks, setTasks, calendarEvents, setCalendarEvents, processCalendarEventWithAI, onConnectCalendar, onOpenDetail, selectedTaskId, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, setRecurringAcknowledgedMap }) {
+function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, setCalendarTab, tasks, setTasks, calendarEvents, setCalendarEvents, processCalendarEventWithAI, onConnectCalendar, onOpenDetail, selectedTaskId, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, setRecurringAcknowledgedMap, calendarReminderMinutes }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [navDate, setNavDate] = useState(new Date());
@@ -111,12 +111,17 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
     const getEffectiveDate = t => t.recurrence?.weekDays?.length
       ? firstOccurrenceDate(t.recurrence)
       : t.dueDate;
+    // FR#35: suppress parents whose children already have due dates
+    const dueDateChildParents = new Set(
+      tasks.filter(t => t.dueDate && t.parentId && !t.done).map(t => t.parentId)
+    );
     return tasks
       .filter(t => {
         const d = getEffectiveDate(t);
         return d && !t.done && !t.calendarEventId &&
           t.bucket !== 'inboxHistory' && t.bucket !== 'done' &&
-          new Date(d + 'T00:00:00') <= horizon;
+          new Date(d + 'T00:00:00') <= horizon &&
+          !dueDateChildParents.has(t.id);
       })
       .sort((a, b) => getEffectiveDate(a).localeCompare(getEffectiveDate(b)));
   }, [tasks, today]);
@@ -165,6 +170,7 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
         summary: task.text, description: `GTD task added from your task manager.`,
         date: startDate,
         ...(rrule ? { recurrence: [rrule] } : {}),
+        reminderMinutes: calendarReminderMinutes ?? 10,
       });
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, calendarEventId: ev.id } : t));
       // Recurring events: refetch so the calendar shows all expanded instances.

@@ -59,7 +59,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories } = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes } = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
@@ -215,7 +215,16 @@ export default function GTDManager() {
         displayItems.filter(t => !seen.has(t.id)).forEach(t => ordered.push(t));
         orderedItems = ordered;
       }
-      const lines = orderedItems.map(t => {
+      // FR#32: build map of next/waiting children per project parent
+      const nextChildrenMap = new Map();
+      if (k === 'project') {
+        tasks.filter(t => (t.bucket === 'next' || t.bucket === 'waiting') && t.parentId && !t.done)
+          .forEach(t => {
+            if (!nextChildrenMap.has(t.parentId)) nextChildrenMap.set(t.parentId, []);
+            nextChildrenMap.get(t.parentId).push(t);
+          });
+      }
+      const buildLine = (t, overrideDepth) => {
         const meta = [];
         if (t.parentId)         meta.push(`parent:${t.parentId}`);
         if (t.dueDate)          meta.push(`due:${t.dueDate}${t.dueTime ? ' ' + t.dueTime : ''}`);
@@ -236,9 +245,19 @@ export default function GTDManager() {
           const until = r.until ? `:${r.until}` : "";
           meta.push(`recur:${r.frequency}:${r.interval || 1}${days}${until}`);
         }
-        const indent = depthMap.has(t.id) ? '  '.repeat(depthMap.get(t.id)) : '';
+        const depth = overrideDepth !== undefined ? overrideDepth : (depthMap.has(t.id) ? depthMap.get(t.id) : 0);
+        const indent = '  '.repeat(depth);
         const idTag = `[id:${t.id}] `;
-        return meta.length ? `${indent}- ${idTag}${t.text} [${meta.join("] [")}]` : `${indent}- ${idTag}${t.text}`;
+        const bucketTag = overrideDepth !== undefined ? ` [${t.bucket}]` : '';
+        return meta.length ? `${indent}- ${idTag}${t.text}${bucketTag} [${meta.join("] [")}]` : `${indent}- ${idTag}${t.text}${bucketTag}`;
+      };
+      const lines = orderedItems.flatMap(t => {
+        const line = buildLine(t);
+        if (k !== 'project') return [line];
+        const depth = depthMap.has(t.id) ? depthMap.get(t.id) : 0;
+        const children = nextChildrenMap.get(t.id) || [];
+        const childLines = children.map(c => buildLine(c, depth + 1));
+        return [line, ...childLines];
       });
       return `${label} (${items.length}):\n${lines.join("\n")}${omitted ? `\n[… ${omitted} older items omitted]` : ''}`;
     });
@@ -282,6 +301,7 @@ export default function GTDManager() {
     setTasks, setCalendarEvents, setGmailQueue,
     setMessages, setChatHistory, setChatInput,
     setLoading, setAvailableModels, setPendingAction,
+    calendarReminderMinutes,
   });
 
   const switchCoachMode = useCallback((mode, introMsg) => {
@@ -382,7 +402,8 @@ export default function GTDManager() {
       const overdue        = active.filter(t => t.dueDate && t.dueDate < today8601);
       const dueToday       = active.filter(t => t.dueDate === today8601);
       const dueThisWeek    = active.filter(t => t.dueDate && t.dueDate > today8601 && t.dueDate <= weekEnd8601 && effortToMinutes(t.effort) > 60);
-      const noCalEvent     = active.filter(t => t.dueDate && !t.calendarEventId && calendarEnabled);
+      const dueDateChildParents = new Set(active.filter(t => t.dueDate && t.parentId).map(t => t.parentId));
+      const noCalEvent     = active.filter(t => t.dueDate && !t.calendarEventId && calendarEnabled && !dueDateChildParents.has(t.id));
       const unprocessedInbox = tasks.filter(t => t.bucket === 'inbox' && !t.done).length;
 
       const lines = [
@@ -991,6 +1012,8 @@ export default function GTDManager() {
                           onDisconnectAll={disconnectAll}
                           recurringReviewDays={recurringReviewDays}
                           onSetRecurringReviewDays={setRecurringReviewDays}
+                          calendarReminderMinutes={calendarReminderMinutes}
+                          onSetCalendarReminderMinutes={setCalendarReminderMinutes}
                         />
                       ) : showUsage ? (
                         <UsagePanel
@@ -1032,6 +1055,7 @@ export default function GTDManager() {
                           recurringAcknowledgedMap={recurringAcknowledgedMap}
                           recurringReviewDays={recurringReviewDays}
                           setRecurringAcknowledgedMap={setRecurringAcknowledgedMap}
+                          calendarReminderMinutes={calendarReminderMinutes}
                         />
                       ) : currentView === "focus" ? (
                         <TodaysFocusView

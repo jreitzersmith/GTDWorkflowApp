@@ -34,12 +34,17 @@ function TodaysFocusView({ tasks, calendarEvents, calendarEnabled, onDailyReview
     effortToMinutes(t.effort) > 60 &&
     !focusIds.includes(t.id) && t.dueDate !== today8601
   );
+  // FR#35: suppress parents whose children already have due dates
+  const dueDateChildParents = new Set(
+    active.filter(t => t.dueDate && t.parentId).map(t => t.parentId)
+  );
   const noCalEvent     = calendarEnabled
     ? active.filter(t =>
         t.dueDate && !t.calendarEventId &&
         !focusIds.includes(t.id) && t.dueDate !== today8601 &&
         !(t.dueDate < today8601) &&
-        !(t.dueDate > today8601 && t.dueDate <= weekEnd8601 && effortToMinutes(t.effort) > 60)
+        !(t.dueDate > today8601 && t.dueDate <= weekEnd8601 && effortToMinutes(t.effort) > 60) &&
+        !dueDateChildParents.has(t.id)
       )
     : [];
 

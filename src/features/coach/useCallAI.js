@@ -68,6 +68,7 @@ function useCallAI({
   setTasks, setCalendarEvents, setGmailQueue,
   setMessages, setChatHistory, setChatInput,
   setLoading, setAvailableModels, setPendingAction,
+  calendarReminderMinutes,
 }) {
   const fetchModels = useCallback(async () => {
     try {
@@ -466,6 +467,7 @@ function useCallAI({
               date: calCreate.date, startTime: calCreate.startTime, endTime: calCreate.endTime,
               attendees: calCreate.attendees, sendUpdates: calCreate.sendUpdates,
               recurrence: calCreate.recurrence || null,
+              reminderMinutes: calendarReminderMinutes ?? 10,
             });
             setCalendarEvents(prev => [...prev, ev]);
             if (calCreate.taskId) {

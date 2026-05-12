@@ -21,14 +21,20 @@ function useAppSettings() {
   const [categories, setCategories] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_categories") || "null") || []; } catch { return []; }
   });
+  // FR#37: calendar reminder interval (minutes, device-local preference)
+  const [calendarReminderMinutes, setCalendarReminderMinutes] = useState(() => {
+    const v = parseInt(localStorage.getItem("gtd_calendar_reminder_minutes"), 10);
+    return isNaN(v) ? 10 : v;
+  });
 
   useEffect(() => { localStorage.setItem("gtd_locations",          JSON.stringify(locations)); }, [locations]);
   useEffect(() => { localStorage.setItem("gtd_efforts",            JSON.stringify(efforts)); }, [efforts]);
   useEffect(() => { localStorage.setItem("gtd_effort_calibration", JSON.stringify(calibrationOverrides)); }, [calibrationOverrides]);
   useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
   useEffect(() => { localStorage.setItem("gtd_categories",         JSON.stringify(categories)); }, [categories]);
+  useEffect(() => { localStorage.setItem("gtd_calendar_reminder_minutes", String(calendarReminderMinutes)); }, [calendarReminderMinutes]);
 
-  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories };
+  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes };
 }
 
 

@@ -86,6 +86,7 @@ function SettingsPanel({
   onReauthorizeGoogle, onDisconnectCalendar, onDisconnectAll,
   // Other
   recurringReviewDays, onSetRecurringReviewDays,
+  calendarReminderMinutes, onSetCalendarReminderMinutes,
 }) {
   const fileInputRef = useRef(null);
   const [importMode, setImportMode] = useState("replace");
@@ -199,6 +200,20 @@ function SettingsPanel({
                             : <span style={{ color: COLORS.muted }}>Off</span>
                         }
                       </span>
+                      {isConnected && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
+                          <span style={{ fontSize: 11, color: COLORS.muted }}>Reminder:</span>
+                          <select
+                            value={calendarReminderMinutes}
+                            onChange={e => onSetCalendarReminderMinutes(Number(e.target.value))}
+                            style={{ fontSize: 11, background: COLORS.surface2, color: COLORS.text, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: '2px 4px', fontFamily: 'inherit' }}
+                          >
+                            {[0, 5, 10, 15, 30, 60].map(m => (
+                              <option key={m} value={m}>{m === 0 ? 'None' : `${m} min`}</option>
+                            ))}
+                          </select>
+                        </span>
+                      )}
                     </div>
                   ) : (
                     /* Other services: segmented scope selector */
@@ -362,6 +377,8 @@ SettingsPanel.propTypes = {
   // Other
   recurringReviewDays:        PropTypes.number.isRequired,
   onSetRecurringReviewDays:   PropTypes.func.isRequired,
+  calendarReminderMinutes:    PropTypes.number.isRequired,
+  onSetCalendarReminderMinutes: PropTypes.func.isRequired,
 };
 
 export { SettingsPanel };
