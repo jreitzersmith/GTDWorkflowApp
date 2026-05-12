@@ -31,8 +31,8 @@ export const BUCKETS = {
 
 export const COACH_MODES = {
   chat:          { label: "Chat",           icon: "💬" },
-  process:       { label: "Process Inbox",  icon: "📥" },
   dump:          { label: "Brain Dump",     icon: "🧠" },
+  process:       { label: "Process Inbox",  icon: "📥" },
   projectReview: { label: "Project Review", icon: "🔍" },
   daily:         { label: "Daily Review",   icon: "🌅" },
   review:        { label: "Weekly Review",  icon: "📋" },
