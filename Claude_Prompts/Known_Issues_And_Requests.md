@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#17** · Code Quality — **CQ#10** · Feature Requests — **FR#76**
+> **Last used numbers:** Known Issues — **Issue#17** · Code Quality — **CQ#11** · Feature Requests — **FR#76**
 
 ---
 
@@ -8,6 +8,12 @@
 
 - [ ] Issue#12 [GH#32] (2026-05-09) — Process mode: AI does not assign due date when user corrects a deferral assumption mid-conversation (task filed without dueDate after user overrides AI's proposed defer date)
 - [ ] Issue#13 [GH#33] (2026-05-09) — AI sets incorrect deferUntil on weekday-recurring tasks (defers to day after first calendar occurrence instead of next recurrence date)
+
+---
+
+## Code quality
+
+- [ ] CQ#11 [GH#77] (2026-05-12) — Rename `processed` field and all references → `reviewed` throughout codebase (task field, DB column, mappers, handlers, comments)
 
 ---
 
