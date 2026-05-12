@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#17** · Code Quality — **CQ#10** · Feature Requests — **FR#69**
+> **Last used numbers:** Known Issues — **Issue#17** · Code Quality — **CQ#10** · Feature Requests — **FR#70**
 
 ---
 
