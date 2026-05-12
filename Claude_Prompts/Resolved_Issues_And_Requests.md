@@ -60,3 +60,13 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-11 | Feature      | FR#66   | GH#65  | Calendar-aware tasks in Today's Focus (no-calendar-event tier)                                       | 7be7535           |
 | 2026-05-11 | Feature      | FR#67   | GH#66  | dueTime field on tasks with UI time input in TaskDetailPanel                                         | 368d0a4           |
 | 2026-05-11 | Issue        | Issue#17| GH#68  | Process mode: effort and category silently dropped from ACTION lines                                  | 4408b89           |
+| 2026-05-12 | Feature      | FR#7    | GH#6   | Daily focus view — Today's Focus sidebar with tier grouping and focusCount badge | 0baaeff           |
+| 2026-05-12 | Feature      | FR#15   | GH#7   | AI-assisted daily planning — SoD/EoD coach mode with MIT picker                  | 0baaeff           |
+| 2026-05-12 | Bug fix      | —       | —      | standaloneProjectId not passed to useSupabaseSync → TypeError on hard refresh    | 045af85           |
+| 2026-05-12 | Bug fix      | —       | —      | Daily review called switchCoachMode (static msg) instead of callAI → no MIT step | e4455be           |
+| 2026-05-12 | Bug fix      | —       | —      | MIT picker alreadySet guard blocked picker on same-day re-runs                   | c7888a8           |
+| 2026-05-12 | Bug fix      | —       | —      | effortToMinutes not imported in App.jsx → startDailyReview silently crashed      | 14eb862           |
+| 2026-05-12 | Bug fix      | —       | —      | setCurrentView missing from SoD branch of startDailyReview                       | 649f3f9           |
+| 2026-05-12 | Bug fix      | —       | —      | Process mode effort/category absent from ACTION format examples                  | ac0768d           |
+| 2026-05-12 | Bug fix      | —       | —      | AI re-emit instruction for effort/fields on second turn answers                  | 99cbca7           |
+| 2026-05-12 | Bug fix      | —       | —      | Effort label normalization + always emit label list in calibration context        | e6094ba           |

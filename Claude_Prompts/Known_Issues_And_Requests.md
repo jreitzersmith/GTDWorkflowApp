@@ -19,8 +19,6 @@
 
 #### Daily workflow / GTD core
 
-- FR#7 [GH#6] — Daily focus view (pick 3 Most Important Tasks from Next Actions)
-- FR#15 [GH#7] — AI-assisted daily planning (new coach mode; evaluates calendar + tasks + travel time)
 
 #### Inbox / processing improvements
 
