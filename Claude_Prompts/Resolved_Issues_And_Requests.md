@@ -75,4 +75,9 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-12 | Feature      | FR#32   | GH#71  | Inline next/waiting children under project tasks in process-mode AI context      | f0f8f3d           |
 | 2026-05-12 | Feature      | FR#35   | GH#23  | Suppress due-date parents from no-cal-event list when children have due dates    | f0f8f3d           |
 | 2026-05-12 | Feature      | FR#37   | GH#31  | Configurable calendar reminder interval in Settings; threaded to API create call  | f0f8f3d           |
-| 2026-05-12 | Feature      | FR#71   | GH#72  | Project Review covers all levels via buildReviewQueue; skips pure containers; adds path breadcrumb to AI prompt | feb0d8b           |
+| 2026-05-12 | Feature      | FR#71   | GH#72  | Expand metadata review to 8 fields + extractMetadata indexOf fix                 | 4d7a01b           |
+| 2026-05-12 | Feature      | FR#73   | GH#73  | Enrich project routing context with sample child task titles                     | 4d7a01b           |
+| 2026-05-12 | Bug fix      | —       | —      | Metadata review AI uses task names in prose, not IDs                             | 63b8fd1           |
+| 2026-05-12 | Feature      | FR#74   | GH#74  | Constrain metadata review location suggestions to configured locations list      | b3f93c9           |
+| 2026-05-12 | Feature      | FR#75   | GH#75  | Rename Processed label to Reviewed for all task types in TaskDetailPanel         | b35009f           |
+| 2026-05-12 | Feature      | FR#76   | GH#76  | Review Configuration settings — control which nodeTypes appear in Project Review | 7ec9bfa           |
