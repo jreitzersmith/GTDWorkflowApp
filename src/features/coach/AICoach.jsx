@@ -363,10 +363,8 @@ MetadataReviewBar.propTypes = {
   suggestions: PropTypes.arrayOf(PropTypes.shape({
     taskId:    PropTypes.string.isRequired,
     taskText:  PropTypes.string.isRequired,
-    field:     PropTypes.string.isRequired,
-    value:     PropTypes.string.isRequired,
+    overrides: PropTypes.object.isRequired,
     accepted:  PropTypes.bool.isRequired,
-    override:  PropTypes.string,
   })).isRequired,
   onToggleAccepted: PropTypes.func.isRequired,
   onChangeOverride: PropTypes.func.isRequired,
