@@ -745,7 +745,7 @@ export default function GTDManager() {
             `category:${t.category || "none"}`,
             `nodeType:${t.nodeType || "none"}`,
           ].join(", ");
-          return `- [${t.id}] ${t.text} (${meta})`;
+          return `- ${t.text} [id:${t.id}] (${meta})`;
         }).join("\n")
       : "(no active subtasks)";
 

@@ -22,4 +22,5 @@ If all tasks already have adequate metadata, write:
 →METADATA:
 (none)
 
+In your assessment text, always refer to tasks by name — never by ID. Use IDs only in the →METADATA: block.
 Be concise. Under 80 words before the metadata block. Today's date is provided in the task list context.
