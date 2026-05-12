@@ -395,8 +395,12 @@ export default function GTDManager() {
         `[/SoD Summary]`,
       ].filter(Boolean).join('\n');
 
-      const urgencyNote = overdue.length > 0 ? ` You have **${overdue.length} overdue item${overdue.length !== 1 ? 's' : ''}** that need attention.` : '';
-      switchCoachMode('daily', `Good morning! Let's start your day.${urgencyNote}\n\n${lines}`);
+      const urgencyNote = overdue.length > 0 ? ` You have ${overdue.length} overdue item${overdue.length !== 1 ? 's' : ''} that need attention.` : '';
+      setCoachMode('daily');
+      setChatHistory([]);
+      setPendingAction(null);
+      setMessages([]);
+      callAI(`Good morning! Let's start my day.${urgencyNote}\n\n${lines}`, 'daily', []);
       setCurrentView('gtd');
       const newPhase = 'end';
       setDailyReviewPhase(newPhase);
@@ -420,7 +424,11 @@ export default function GTDManager() {
         `[/EoD Summary]`,
       ].join('\n');
 
-      switchCoachMode('daily', `Let's close out your day.\n\n${lines}`);
+      setCoachMode('daily');
+      setChatHistory([]);
+      setPendingAction(null);
+      setMessages([]);
+      callAI(`Let's close out my day.\n\n${lines}`, 'daily', []);
       setCurrentView('gtd');
       const newPhase = 'start';
       setDailyReviewPhase(newPhase);
