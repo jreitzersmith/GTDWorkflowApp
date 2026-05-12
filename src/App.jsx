@@ -753,6 +753,7 @@ export default function GTDManager() {
     const prompt =
       `Project ${idx + 1} of ${total}: "${path}"\n` +
       `Today: ${todayStr()}\n` +
+      (locations.length ? `Available locations: ${locations.join(', ')}\n` : '') +
       `Active subtasks:\n${taskLines}`;
 
     setMessages(prev => [...prev, { role: "user", text: `🏷 Reviewing metadata for **"${project.text}"** (${idx + 1} of ${total})` }]);
