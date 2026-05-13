@@ -120,6 +120,17 @@ Chat · Process · Weekly Review · Brain Dump · Project Review. Action lines: 
 
 ---
 
+## Branching model
+
+- `main` — stable/releasable only. Never commit directly to main.
+- `develop` — integration branch. All feature branches are cut from here and merged back here.
+- Feature branches — named `feature/<slug>`, `fix/<slug>`, or `cq/<slug>`. Cut from `develop`, merge into `develop` when done.
+- Releases — merge `develop` → `main` when a batch of work is stable and tested.
+
+**At session start:** check out `develop` (or the relevant feature branch) before making any changes. Never commit to `main`.
+
+---
+
 ## Ongoing maintenance
 
 **Vite timestamp cleanup:** At session start, check for `vite.config.js.timestamp-*.mjs` in the project root. If 5 or more exist, delete them:
