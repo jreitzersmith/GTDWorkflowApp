@@ -485,7 +485,21 @@ export default function GTDManager() {
   // Prefill the coach chat with email content so the user can process it into tasks
   const processEmailWithAI = useCallback((email) => {
     const body = email.body ? email.body.slice(0, 4000) : email.snippet;
-    const prompt = `Please review this email and identify any action items, commitments, or tasks I should add to my GTD system. For each item found, suggest the best bucket (Next Actions, Projects, Waiting For, etc.) and offer to create it.\n\nFrom: ${email.from}\nSubject: ${email.subject}\nDate: ${email.date}\n\n${body}`;
+    const senderDomain = (email.from || '').match(/@(\S+)>?$/)?.[1] || '';
+    const prompt = [
+      `Please review this email and identify any action items, commitments, or tasks I should add to my GTD system.`,
+      `For each item found, suggest the best bucket (Next Actions, Projects, Waiting For, etc.) and offer to create it.`,
+      ``,
+      `After any tasks are created, do the following two steps automatically:`,
+      `1. Search Gmail for other emails from this sender (${email.from}) or with a similar subject to check whether related items also need action. Report what you find — if nothing relevant, say so briefly.`,
+      `2. Ask me whether I'd like a Gmail filter + label created so future emails like this are automatically organised. If I say yes, create the label and filter using the available Gmail tools.`,
+      ``,
+      `From: ${email.from}`,
+      `Subject: ${email.subject}`,
+      `Date: ${email.date}`,
+      ``,
+      body,
+    ].join('\n');
     setCoachMode("chat");
     setChatInput("");
     setMessages(prev => [...prev, { role: "user", text: prompt }]);

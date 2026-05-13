@@ -368,9 +368,13 @@ function useCallAI({
       let updateChip = null;
       let actionError = null;
       if (mode === 'chat' || mode === 'dump' || mode === 'daily') {
-        const taskActionLines = reply.split('\n')
-          .map(l => l.trim())
-          .filter(l => /^→ACTION:(update|add|create)\|/.test(l));
+        // Extract →ACTION lines — notes values may span multiple lines, so match
+        // each action block greedily until the next →ACTION: or end of string.
+        const taskActionLines = [];
+        const actionRe = /→ACTION:(?:update|add|create)\|[^\n]*(?:\n(?!→ACTION:)[^\n]*)*/g;
+        for (const am of reply.matchAll(actionRe)) {
+          taskActionLines.push(am[0].trimEnd());
+        }
 
         if (taskActionLines.length > 0) {
           // Process all actions against a local working copy so parent lookups
