@@ -6,7 +6,7 @@ import { COLORS } from "../../constants.jsx";
 // Uses childIds first (authoritative order, matches project view) then falls back
 // to parentId for projects whose parent's childIds was not updated (legacy data).
 // Projects not claimed as a child by either mechanism are treated as roots.
-function buildProjectTree(flatProjects) {
+function buildProjectTree(flatProjects, sorted = false) {
   const byId = {};
   flatProjects.forEach(p => { byId[p.id] = { ...p, children: [] }; });
 
