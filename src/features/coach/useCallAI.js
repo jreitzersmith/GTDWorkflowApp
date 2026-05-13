@@ -372,7 +372,7 @@ function useCallAI({
         // so match each block until the first blank line (\n\n) which separates
         // action lines from the AI's subsequent prose response.
         const taskActionLines = [];
-        const actionRe = /→ACTION:(?:update|add|create)\|(?:[^\n]|\n(?!\n))+/g;
+        const actionRe = /→ACTION:(?:update|add|create|link_email)\|(?:[^\n]|\n(?!\n))+/g;
         for (const am of reply.matchAll(actionRe)) {
           taskActionLines.push(am[0].trimEnd());
         }
@@ -459,6 +459,27 @@ function useCallAI({
                 workingTasks = [newTask, ...workingTasks];
               }
               chips.push({ taskName: title, fields: ['created in ' + (createIsNext ? 'Next Actions' : bucket)] });
+            }
+
+            // →ACTION:link_email|<task_title_or_id>|<gmail_message_id>[|<subject>]
+            if (line.startsWith('→ACTION:link_email|')) {
+              const parts = line.slice('→ACTION:link_email|'.length).split('|');
+              const ref     = (parts[0] || '').trim();
+              const gmailId = (parts[1] || '').trim();
+              const subj    = (parts[2] || ref).trim();
+              if (ref && gmailId) {
+                const target = workingTasks.find(t => t.id === ref || t.text.toLowerCase() === ref.toLowerCase());
+                if (target) {
+                  workingTasks = workingTasks.map(t => {
+                    if (t.id !== target.id) return t;
+                    const existing = t.driveAttachments || [];
+                    if (existing.find(a => a.id === gmailId)) return t;
+                    return { ...t, driveAttachments: [...existing, { id: gmailId, name: subj, type: 'email' }] };
+                  });
+                  chips.push({ taskName: target.text, fields: ['email linked'] });
+                }
+              }
+              continue;
             }
           }
 

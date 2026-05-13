@@ -485,18 +485,22 @@ export default function GTDManager() {
   // Prefill the coach chat with email content so the user can process it into tasks
   const processEmailWithAI = useCallback((email) => {
     const body = email.body ? email.body.slice(0, 4000) : email.snippet;
-    const senderDomain = (email.from || '').match(/@(\S+)>?$/)?.[1] || '';
     const prompt = [
-      `Please review this email and identify any action items, commitments, or tasks I should add to my GTD system.`,
-      `For each item found, suggest the best bucket (Next Actions, Projects, Waiting For, etc.) and offer to create it.`,
+      `Please review this email and handle it completely using this workflow:`,
       ``,
-      `After any tasks are created, do the following two steps automatically:`,
-      `1. Search Gmail for other emails from this sender (${email.from}) or with a similar subject to check whether related items also need action. Report what you find — if nothing relevant, say so briefly.`,
-      `2. Ask me whether I'd like a Gmail filter + label created so future emails like this are automatically organised. If I say yes, create the label and filter using the available Gmail tools.`,
+      `**Tasks:** Identify all action items and offer to create them. When creating a task, ALWAYS emit →ACTION:link_email|<exact task title>|${email.id}|${email.subject} immediately after the task creation action so the email is attached to the task.`,
       ``,
+      `**Similar emails:** After tasks are confirmed, search Gmail for other emails from this sender or with a similar subject — report findings briefly (or confirm nothing similar found).`,
+      ``,
+      `**Filter / label:** Ask whether I'd like a Gmail filter + label for future emails like this. If yes, create the label then the filter using the available Gmail tools.`,
+      ``,
+      `**Archive:** Once ALL other steps are complete, archive this email by calling gmail_batch_label with message_ids: ["${email.id}"] and remove_label_ids: ["INBOX"]. Confirm when done.`,
+      ``,
+      `Email:`,
       `From: ${email.from}`,
       `Subject: ${email.subject}`,
       `Date: ${email.date}`,
+      `Gmail-ID: ${email.id}`,
       ``,
       body,
     ].join('\n');
