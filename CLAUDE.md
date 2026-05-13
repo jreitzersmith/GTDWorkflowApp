@@ -220,3 +220,4 @@ Update the Last used numbers line at the top of the file.
 - Use `mcp__git__git_commit` for commits, not bash git (avoids HEAD.lock on Windows mount)
 - Use `git -C "path" push origin main` for push, not `cd && git push` (PowerShell `&&` is invalid)
 - Claude Desktop on this mac
+- Supabase migrations: confirm John is ready, then run using the Management API directly (project ref `tudmteqljgpocffalssz`, token in `.env` as `SUPABASE_MANAGEMENT_TOKEN`). Verify with an `information_schema.columns` query before proceeding to testing. Never hand copy-paste SQL steps to John.

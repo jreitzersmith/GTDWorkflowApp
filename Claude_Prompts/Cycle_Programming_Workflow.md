@@ -121,6 +121,25 @@ John clicks items to mark state, then submits. Do not ask for a general "did it 
 
 ---
 
+## Supabase migrations
+
+When a cycle includes a SQL migration (new columns, new tables, ALTER TABLE):
+
+1. **Confirm readiness** — before running, confirm John is ready (app not actively in use, data is clean).
+2. **Run it yourself** using the Supabase Management API — do not hand copy-paste steps to John:
+   ```
+   curl -s -X POST \
+     "https://api.supabase.com/v1/projects/tudmteqljgpocffalssz/database/query" \
+     -H "Authorization: Bearer $SUPABASE_MANAGEMENT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"query": "<SQL here>"}'
+   ```
+   Credentials are in `.env` (`SUPABASE_MANAGEMENT_TOKEN`, project ref = `tudmteqljgpocffalssz`).
+3. **Verify** — follow up with a `SELECT` on `information_schema.columns` to confirm the schema change landed.
+4. **Only then** proceed to the testing checklist — persistence tests are meaningless without the columns present.
+
+---
+
 ## Phase 6 — Feedback and Iteration
 
 John reports results using the checklist. If items are unchecked:
