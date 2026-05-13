@@ -368,10 +368,11 @@ function useCallAI({
       let updateChip = null;
       let actionError = null;
       if (mode === 'chat' || mode === 'dump' || mode === 'daily') {
-        // Extract →ACTION lines — notes values may span multiple lines, so match
-        // each action block greedily until the next →ACTION: or end of string.
+        // Extract →ACTION lines — notes values may span multiple non-blank lines,
+        // so match each block until the first blank line (\n\n) which separates
+        // action lines from the AI's subsequent prose response.
         const taskActionLines = [];
-        const actionRe = /→ACTION:(?:update|add|create)\|[^\n]*(?:\n(?!→ACTION:)[^\n]*)*/g;
+        const actionRe = /→ACTION:(?:update|add|create)\|(?:[^\n]|\n(?!\n))+/g;
         for (const am of reply.matchAll(actionRe)) {
           taskActionLines.push(am[0].trimEnd());
         }
