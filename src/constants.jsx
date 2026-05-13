@@ -52,7 +52,7 @@ export const SYSTEM_PROMPTS = {
 To update an existing task, end your response with EXACTLY one line:
 →ACTION:update|<task_id>|field:value|field:value...
 
-Updatable fields: due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · actualEffort:<label> · bucket:<inbox|next|project> · waitingFor:true/false · someday:true/false · title:<new name> · priority:<p1,p2> · location:<loc1,loc2> · recur:<frequency>:<interval>:<days>:<until:YYYY-MM-DD> or recur:off (days and until are optional segments) · notes:<text — use \\n for line breaks, must be the last field>
+Updatable fields: due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · actualEffort:<label> · bucket:<inbox|next|project> · waitingFor:true/false · someday:true/false · nextAction:true/false · title:<new name> · priority:<p1,p2> · location:<loc1,loc2> · recur:<frequency>:<interval>:<days>:<until:YYYY-MM-DD> or recur:off (days and until are optional segments) · notes:<text — use \\n for line breaks, must be the last field>
 
 Recurrence format: frequency is daily/weekly/monthly/yearly; interval is a number. For weekly on specific days add comma-separated abbreviations: mon,tue,wed,thu,fri,sat,sun (e.g. recur:weekly:1:mon,fri). To set an end date add it as the last segment (e.g. recur:weekly:1:mon,fri:2026-06-30). Use recur:off to remove recurrence.
 

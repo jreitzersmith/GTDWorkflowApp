@@ -35,10 +35,10 @@ const GET_TASK_CONTEXT_TOOL = {
 // Buckets to include in the task context for each coach mode.
 // Modes not listed here receive all buckets (null = no filter).
 const MODE_CONTEXT_BUCKETS = {
-  process:         ['inbox', 'next', 'project', 'waiting'],
+  process:         ['inbox', 'project', 'waiting'],
   projectReview:   ['project'],
   projectMetadata: ['project'],
-  calendarEvent:   ['next', 'project'],
+  calendarEvent:   ['project'],
 };
 
 /**
@@ -401,18 +401,21 @@ function useCallAI({
 
             const add = extractAddAction(line);
             if (add) {
-              const { title, parentId: parentRef, bucket = 'next', dueDate = null,
+              const { title, parentId: parentRef, bucket: addBucket = 'next', dueDate = null,
                       deferUntil = null, effort = null, location = [], recurrence = null, category = null } = add;
+              const addIsNext = addBucket === 'next';
+              const addBucketFinal = addIsNext ? 'project' : addBucket;
               // ID lookup first; fall back to exact title match (supports newly-created parents)
               const parent = workingTasks.find(t => t.id === parentRef)
                           || workingTasks.find(t => t.text.toLowerCase() === parentRef.toLowerCase());
               if (parent) {
                 const newId = genId();
                 const newTask = {
-                  id: newId, text: title, bucket, done: false, created: Date.now(),
+                  id: newId, text: title, bucket: addBucketFinal, done: false, created: Date.now(),
                   parentId: parent.id, priority: [], location, dueDate, effort: normalizeEffort(effort, efforts),
                   actualEffort: null, deferUntil, notes: null, recurrence,
                   category: category || parent.category || null,
+                  ...(addIsNext ? { isNextAction: true } : {}),
                 };
                 workingTasks = [
                   ...workingTasks.map(t => t.id === parent.id
@@ -430,14 +433,17 @@ function useCallAI({
 
             const create = extractCreateAction(line);
             if (create) {
-              const { title, bucket, dueDate = null, dueTime = null, deferUntil = null,
+              const { title, bucket: rawBucket, dueDate = null, dueTime = null, deferUntil = null,
                       effort = null, location = [], recurrence = null } = create;
+              const createIsNext = rawBucket === 'next';
+              const bucket = createIsNext ? 'project' : rawBucket;
               const newId = genId();
-              const parentId = (bucket === 'next' && uncategorizedProjectId) ? uncategorizedProjectId : undefined;
+              const parentId = (createIsNext && uncategorizedProjectId) ? uncategorizedProjectId : undefined;
               const newTask = {
                 id: newId, text: title, bucket, done: false, created: Date.now(),
                 priority: [], location, dueDate, dueTime, effort: normalizeEffort(effort, efforts), actualEffort: null,
                 deferUntil, notes: null, recurrence,
+                ...(createIsNext ? { isNextAction: true } : {}),
                 ...(parentId ? { parentId } : {}),
               };
               if (parentId) {
@@ -447,7 +453,7 @@ function useCallAI({
               } else {
                 workingTasks = [newTask, ...workingTasks];
               }
-              chips.push({ taskName: title, fields: ['created in ' + bucket] });
+              chips.push({ taskName: title, fields: ['created in ' + (createIsNext ? 'Next Actions' : bucket)] });
             }
           }
 

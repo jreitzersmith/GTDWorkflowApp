@@ -127,6 +127,7 @@ function extractUpdateAction(text) {
     if (key === 'dueTime') changes.dueTime = val;
     if (key === 'waitingFor') changes.isWaitingFor = val === 'true';
     if (key === 'someday')    changes.isSomeday    = val === 'true';
+    if (key === 'nextAction') changes.isNextAction = val === 'true';
   });
   if (notesRaw !== null) changes.notes = notesRaw.replace(/\\n/g, '\n');
 

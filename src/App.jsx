@@ -67,7 +67,7 @@ export default function GTDManager() {
           sheetsEnabled, slidesEnabled, gmailError, scopePrefs,
           setScopePref, reauthorizeGoogle, connectCalendar, disconnectCalendar,
           disconnectAll, refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
-  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects, showWFSomeDayInProjects, setShowWFSomeDayInProjects, pendingDeleteConfirm, setPendingDeleteConfirm } = useTaskUIState();
+  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects, showWaitingInProjects, setShowWaitingInProjects, showSomeDayInProjects, setShowSomeDayInProjects, pendingDeleteConfirm, setPendingDeleteConfirm } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
   const [uncategorizedProjectId, setUncategorizedProjectId] = useState(null);
@@ -182,7 +182,9 @@ export default function GTDManager() {
     const BUCKET_CAPS = { next: 75, someday: 40 };
     const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe" };
     const sections = Object.entries(bucketNames).filter(([k]) => !allowedBuckets || allowedBuckets.includes(k)).map(([k, label]) => {
-      const items = tasks.filter(t => t.bucket === k && !t.done);
+      const items = k === 'next'
+        ? tasks.filter(t => t.isNextAction && !t.isSomeday && !t.isWaitingFor && !t.done)
+        : tasks.filter(t => t.bucket === k && !t.done);
       if (!items.length) return `${label}: empty`;
       const cap = BUCKET_CAPS[k];
       let displayItems;
@@ -221,7 +223,7 @@ export default function GTDManager() {
       // FR#32: build map of next/waiting children per project parent
       const nextChildrenMap = new Map();
       if (k === 'project') {
-        tasks.filter(t => t.bucket === 'next' && t.parentId && !t.done)
+        tasks.filter(t => t.isNextAction && t.parentId && !t.done)
           .forEach(t => {
             if (!nextChildrenMap.has(t.parentId)) nextChildrenMap.set(t.parentId, []);
             nextChildrenMap.get(t.parentId).push(t);
@@ -694,7 +696,7 @@ export default function GTDManager() {
       const selected = reviewSuggestions.filter(s => s.checked);
       if (selected.length) {
         const newSubtasks = selected.map(s => ({
-          id: genId(), text: s.text, bucket: "next", done: false,
+          id: genId(), text: s.text, bucket: "project", isNextAction: true, done: false,
           created: Date.now(), parentId: project.id,
           priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null,
         }));
@@ -963,6 +965,8 @@ export default function GTDManager() {
     ? tasks.filter(t => t.isWaitingFor && !t.done)
     : currentBucket === "someday"
     ? tasks.filter(t => t.isSomeday && !t.done)
+    : currentBucket === "next"
+    ? tasks.filter(t => t.isNextAction && !t.isSomeday && !t.isWaitingFor && !t.done)
     : tasks.filter(t => t.bucket === currentBucket);
   const counts = Object.fromEntries(Object.keys(BUCKETS).map(k =>
     k === "deferred"
@@ -971,6 +975,8 @@ export default function GTDManager() {
       ? [k, tasks.filter(t => t.isWaitingFor && !t.done).length]
       : k === "someday"
       ? [k, tasks.filter(t => t.isSomeday && !t.done).length]
+      : k === "next"
+      ? [k, tasks.filter(t => t.isNextAction && !t.isSomeday && !t.isWaitingFor && !t.done).length]
       : [k, tasks.filter(t => t.bucket === k).length]
   ));
 
@@ -1021,7 +1027,8 @@ export default function GTDManager() {
     projectCategoryFilter,
     setProjectCategoryFilter,
     showCompletedInProjects,
-    showWFSomeDayInProjects,
+    showWaitingInProjects,
+    showSomeDayInProjects,
     uncategorizedProjectId,
   };
 
@@ -1203,8 +1210,10 @@ export default function GTDManager() {
                           projectCategoryFilter={projectCategoryFilter}
                           setProjectCategoryFilter={setProjectCategoryFilter}
                           showCompletedInProjects={showCompletedInProjects}
-                          showWFSomeDayInProjects={showWFSomeDayInProjects}
-                          setShowWFSomeDayInProjects={setShowWFSomeDayInProjects}
+                          showWaitingInProjects={showWaitingInProjects}
+                          setShowWaitingInProjects={setShowWaitingInProjects}
+                          showSomeDayInProjects={showSomeDayInProjects}
+                          setShowSomeDayInProjects={setShowSomeDayInProjects}
                           setShowCompletedInProjects={setShowCompletedInProjects}
                         />
                       )}

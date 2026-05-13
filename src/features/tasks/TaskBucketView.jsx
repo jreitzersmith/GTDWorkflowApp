@@ -87,12 +87,18 @@ function TaskBucketView({
   uncategorizedProjectId,
   showCompletedInProjects,
   setShowCompletedInProjects,
-  showWFSomeDayInProjects,
-  setShowWFSomeDayInProjects,
+  showWaitingInProjects,
+  setShowWaitingInProjects,
+  showSomeDayInProjects,
+  setShowSomeDayInProjects,
 }) {
   const [filterText, setFilterText] = useState("");
   const [projPickerOpen, setProjPickerOpen] = useState(false);
+  const [quickSortOpen, setQuickSortOpen] = useState(false);
+  const [displayOpen, setDisplayOpen] = useState(false);
   const projPickerRef = useRef(null);
+  const quickSortRef = useRef(null);
+  const displayRef = useRef(null);
 
   // Reset filter when switching buckets
   useEffect(() => { setFilterText(""); }, [currentBucket]);
@@ -106,6 +112,20 @@ function TaskBucketView({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [projPickerOpen]);
+
+  useEffect(() => {
+    if (!quickSortOpen) return;
+    const handler = e => { if (quickSortRef.current && !quickSortRef.current.contains(e.target)) setQuickSortOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [quickSortOpen]);
+
+  useEffect(() => {
+    if (!displayOpen) return;
+    const handler = e => { if (displayRef.current && !displayRef.current.contains(e.target)) setDisplayOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [displayOpen]);
 
   const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
   const allProjectTasks = tasks.filter(t => t.bucket === "project" && !t.done);
@@ -148,50 +168,71 @@ function TaskBucketView({
 
         {currentBucket === "project" && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            <ToolbarBtn
-              onClick={() => {
-                const next = new Set();
-                rootProjects.forEach(p => next.add(p.id));
-                setCollapsedNodes(next);
-              }}
-              title="Show project names only"
-            >
-              🗂 Show Categories Only
-            </ToolbarBtn>
-            <ToolbarBtn
-              onClick={() => {
-                const next = new Set();
-                function addAllDescendants(id) {
-                  const task = tasks.find(t => t.id === id);
-                  (task?.childIds || []).forEach(cid => { next.add(cid); addAllDescendants(cid); });
-                }
-                rootProjects.forEach(p => addAllDescendants(p.id));
-                setCollapsedNodes(next);
-              }}
-              title="Collapse all projects to top-level tasks"
-            >
-              📂 Show SubCategories
-            </ToolbarBtn>
-            <ToolbarBtn
-              onClick={() => setCollapsedNodes(new Set())}
-              title="Expand all projects fully"
-            >
-              ⊕ Expand All
-            </ToolbarBtn>
-            <ToolbarBtn
-              onClick={() => setShowCompletedInProjects(v => !v)}
-              active={showCompletedInProjects}
-              title={showCompletedInProjects ? 'Hide completed tasks' : 'Show completed tasks'}
-            >
-              ✓ Completed
-            </ToolbarBtn>
-            <ToolbarBtn
-              onClick={() => setShowWFSomeDayInProjects(v => !v)}
-              active={!showWFSomeDayInProjects}
-              title={showWFSomeDayInProjects ? 'Hide Waiting For and Someday items' : 'Show Waiting For and Someday items'}
-            >
-              ⏳ WF / SD
-            </ToolbarBtn>
+            {/* Quick Sort popover */}
+            <div ref={quickSortRef} style={{ position: "relative" }}>
+              <ToolbarBtn
+                onClick={() => { setQuickSortOpen(o => !o); setDisplayOpen(false); }}
+                active={quickSortOpen}
+                title="Quick sort options"
+              >
+                Sort ▾
+              </ToolbarBtn>
+              {quickSortOpen && (
+                <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 190, boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+                  {[
+                    { icon: "🗂", label: "Show Categories Only", action: () => { const s = new Set(); rootProjects.forEach(p => s.add(p.id)); setCollapsedNodes(s); setQuickSortOpen(false); } },
+                    { icon: "📂", label: "Show SubCategories",   action: () => { const s = new Set(); const addDesc = id => { const t = tasks.find(x => x.id === id); (t?.childIds||[]).forEach(cid => { s.add(cid); addDesc(cid); }); }; rootProjects.forEach(p => addDesc(p.id)); setCollapsedNodes(s); setQuickSortOpen(false); } },
+                    { icon: "⊕", label: "Expand All",           action: () => { setCollapsedNodes(new Set()); setQuickSortOpen(false); } },
+                  ].map(({ icon, label, action }) => (
+                    <button key={label} onClick={action}
+                      style={{ display: "block", width: "100%", textAlign: "left", padding: "7px 10px", background: "none", border: "none", color: COLORS.text, fontFamily: "inherit", fontSize: 12, cursor: "pointer", borderRadius: 4, whiteSpace: "nowrap" }}
+                      onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
+                      onMouseLeave={e => e.currentTarget.style.background = "none"}
+                    >
+                      {icon} {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Display popover */}
+            {(() => {
+              const anyHidden = !showCompletedInProjects || !showWaitingInProjects || !showSomeDayInProjects;
+              return (
+                <div ref={displayRef} style={{ position: "relative" }}>
+                  <ToolbarBtn
+                    onClick={() => { setDisplayOpen(o => !o); setQuickSortOpen(false); }}
+                    active={displayOpen}
+                    title="Show / hide item types"
+                    style={{ borderColor: anyHidden ? "#d4a844" : undefined, color: anyHidden ? "#d4a844" : undefined }}
+                  >
+                    Display{anyHidden ? " •" : ""} ▾
+                  </ToolbarBtn>
+                  {displayOpen && (
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 185, boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+                      {[
+                        { label: "✓  Completed",     state: showCompletedInProjects, toggle: () => setShowCompletedInProjects(v => !v) },
+                        { label: "🛑  Waiting For",   state: showWaitingInProjects,   toggle: () => setShowWaitingInProjects(v => !v) },
+                        { label: "⏳  Someday/Maybe", state: showSomeDayInProjects,   toggle: () => setShowSomeDayInProjects(v => !v) },
+                      ].map(({ label, state, toggle }) => (
+                        <button key={label} onClick={toggle}
+                          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "7px 10px", background: "none", border: "none", color: COLORS.text, fontFamily: "inherit", fontSize: 12, cursor: "pointer", borderRadius: 4, whiteSpace: "nowrap" }}
+                          onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
+                          onMouseLeave={e => e.currentTarget.style.background = "none"}
+                        >
+                          <span style={{ width: 14, height: 14, border: `1px solid ${state ? COLORS.next+"88" : COLORS.border2}`, borderRadius: 3, background: state ? COLORS.next+"22" : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.1s" }}>
+                            {state && <span style={{ color: COLORS.next, fontSize: 10, lineHeight: 1 }}>✓</span>}
+                          </span>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {categories && categories.length > 0 && (
               <select
                 value={projectCategoryFilter || ''}
@@ -462,8 +503,10 @@ TaskBucketView.propTypes = {
   onBulkAssign:      PropTypes.func.isRequired,
   uncategorizedProjectId: PropTypes.string,
   showCompletedInProjects:   PropTypes.bool,
-  showWFSomeDayInProjects:   PropTypes.bool,
-  setShowWFSomeDayInProjects: PropTypes.func,
+  showWaitingInProjects:   PropTypes.bool,
+  showSomeDayInProjects:   PropTypes.bool,
+  setShowWaitingInProjects: PropTypes.func,
+  setShowSomeDayInProjects: PropTypes.func,
   setShowCompletedInProjects: PropTypes.func,
 };
 
