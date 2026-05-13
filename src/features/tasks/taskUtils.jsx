@@ -47,6 +47,7 @@ function buildNextOccurrence(task) {
   const nextDue = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const { id: _id, done: _done, actualEffort: _ae, ...rest } = task;
   return { ...rest, id: genId(), done: false, dueDate: nextDue, created: Date.now(),
+    deferUntil: null,
     bucket: rec.sendToInbox ? "inbox" : task.bucket };
 }
 
