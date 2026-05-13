@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 import { doGmailFetchInbox, doGmailGetMessageBody, doGmailBatchLabel } from "./gmailTools.js";
@@ -20,6 +20,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
   const [showTaskPicker, setShowTaskPicker] = useState(false);
   const [taskFilter, setTaskFilter] = useState('');
   const [linkedConfirm, setLinkedConfirm] = useState(null);
+  const pickerRef = useRef(null);
 
   // Load inbox on mount / when token changes
   useEffect(() => {
@@ -43,6 +44,18 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
     setTaskFilter('');
     setLinkedConfirm(null);
   }, [selectedId]);
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (!showTaskPicker) return;
+    const handleClickOutside = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setShowTaskPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showTaskPicker]);
 
   const loadInbox = async (pageToken = null) => {
     setInboxLoading(true);
@@ -201,39 +214,62 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                     {linkedConfirm ? (
                       <div style={{ fontSize: 11, color: COLORS.project, padding: '4px 0' }}>✓ Linked to "{linkedConfirm}"</div>
                     ) : (
-                      <button
-                        style={{ ...gmailBtn(), textAlign: 'left', width: '100%' }}
-                        onClick={() => setShowTaskPicker(p => !p)}
-                      >
-                        📎 Link to task{showTaskPicker ? ' ▴' : ' ▾'}
-                      </button>
-                    )}
-                    {showTaskPicker && (
-                      <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <input
-                          autoFocus
-                          value={taskFilter}
-                          onChange={e => setTaskFilter(e.target.value)}
-                          placeholder="Filter tasks…"
-                          style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, padding: '4px 8px', fontFamily: 'inherit', fontSize: 11, outline: 'none' }}
-                        />
-                        <div style={{ maxHeight: 160, overflowY: 'auto', border: `1px solid ${COLORS.border}`, borderRadius: 5, background: COLORS.surface2 }}>
-                          {filteredTasks.length === 0 && (
-                            <div style={{ padding: '8px 10px', fontSize: 11, color: COLORS.muted }}>No tasks found</div>
-                          )}
-                          {filteredTasks.slice(0, 50).map(t => (
-                            <div
-                              key={t.id}
-                              onClick={() => handleLinkToTask(t.id, t.text)}
-                              style={{ padding: '5px 10px', fontSize: 11, color: COLORS.text, cursor: 'pointer', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                              onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
-                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                              title={t.text}
-                            >
-                              {t.text}
+                      <div ref={pickerRef} style={{ position: 'relative' }}>
+                        <button
+                          onClick={() => setShowTaskPicker(p => !p)}
+                          style={{
+                            width: '100%', background: COLORS.surface2, border: `1px solid ${COLORS.border}`,
+                            borderRadius: 6, padding: '5px 8px', color: COLORS.text, fontFamily: 'inherit',
+                            fontSize: 12, outline: 'none', boxSizing: 'border-box', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left',
+                          }}
+                        >
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: COLORS.muted }}>
+                            📎 Link to task
+                          </span>
+                          <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>{showTaskPicker ? '▴' : '▾'}</span>
+                        </button>
+                        {showTaskPicker && (
+                          <div style={{
+                            position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
+                            background: COLORS.surface2, border: `1px solid ${COLORS.border2}`,
+                            borderRadius: 6, padding: 4, zIndex: 50,
+                            maxHeight: 240, overflowY: 'auto',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                          }}>
+                            <div style={{ padding: '4px 4px 6px' }}>
+                              <input
+                                autoFocus
+                                value={taskFilter}
+                                onChange={e => setTaskFilter(e.target.value)}
+                                placeholder="Filter tasks…"
+                                style={{
+                                  width: '100%', background: COLORS.surface3, border: `1px solid ${COLORS.border}`,
+                                  borderRadius: 5, color: COLORS.text, padding: '4px 8px', fontFamily: 'inherit',
+                                  fontSize: 11, outline: 'none', boxSizing: 'border-box',
+                                }}
+                              />
                             </div>
-                          ))}
-                        </div>
+                            {filteredTasks.length === 0 && (
+                              <div style={{ padding: '6px 10px', fontSize: 11, color: COLORS.muted }}>No tasks found</div>
+                            )}
+                            {filteredTasks.slice(0, 50).map(t => (
+                              <div
+                                key={t.id}
+                                onClick={() => handleLinkToTask(t.id, t.text)}
+                                style={{
+                                  padding: '5px 8px', fontSize: 12, color: COLORS.text, cursor: 'pointer',
+                                  borderRadius: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                title={t.text}
+                              >
+                                {t.text}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
