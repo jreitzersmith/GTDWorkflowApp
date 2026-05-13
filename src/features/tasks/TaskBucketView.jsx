@@ -1,6 +1,7 @@
 import PropTypes from "prop-types";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useContext } from "react";
 import { COLORS, BUCKETS } from "../../constants.jsx";
+import { TaskRowContext } from "../../contexts.js";
 import { Btn, ToolbarBtn } from "../../shared/SidebarComponents.jsx";
 import { TaskRow } from "./TaskRow.jsx";
 import { CompletedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListHelpers.jsx";
@@ -92,6 +93,7 @@ function TaskBucketView({
   showSomeDayInProjects,
   setShowSomeDayInProjects,
 }) {
+  const { efforts } = useContext(TaskRowContext);
   const [filterText, setFilterText] = useState("");
   const [projPickerOpen, setProjPickerOpen] = useState(false);
   const [quickSortOpen, setQuickSortOpen] = useState(false);
@@ -407,7 +409,7 @@ function TaskBucketView({
               );
             });
           }
-          return groupByField(visible, nextGroupBy, tasks).map(({ key, label, items }) => {
+          return groupByField(visible, nextGroupBy, tasks, { effortLabels: efforts }).map(({ key, label, items }) => {
             const groupMin = items.reduce((sum, t) => sum + effortToMinutes(t.effort), 0);
             const groupEffortLabel = minutesToEffortLabel(groupMin) || "0m";
             return (

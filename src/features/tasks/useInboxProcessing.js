@@ -151,7 +151,7 @@ function useInboxProcessing({
       if (created.length >= 2 && onSessionTasksCreated) {
         onSessionTasksCreated(created.map(t => t.id), created.map(t => t.text));
       }
-      setMessages(prev => [...prev, { role: 'assistant', text: '🎉 **Inbox is clear!** Every item has been processed. Well done.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', text: '🎉 **All items processed.** Your inbox is clear — well done.' }]);
     }
   }, [pendingAction, tasks, processingTaskId, skippedInSessionIds, singleTaskMode,
       setTasks, setPendingAction, setMessages, processNextInboxItem, onSessionTasksCreated]);

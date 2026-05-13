@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#87**
+> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#88**
 
 ---
 
@@ -19,6 +19,7 @@
 ### Feature requests
 
 - [ ] FR#86 [GH#91] (2026-05-13) — Keyboard shortcuts / arrow key navigation in Projects, Next Actions, Waiting For, Someday/Maybe views
+- [ ] FR#88 [GH#93] (2026-05-13) — Email processing improvements: filter suggestion, similar email search, note field fix
 
 #### UI polish / quick wins
 

@@ -59,7 +59,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes } = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults } = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
@@ -1096,6 +1096,8 @@ export default function GTDManager() {
                           onClearCalibrationOverride={clearCalibrationOverride}
                           tagDisplay={tagDisplay}
                           onSetTagDisplay={setTagDisplay}
+                          focusExpandedDefaults={focusExpandedDefaults}
+                          onSetFocusExpandedDefaults={setFocusExpandedDefaults}
                           nextActionsViewMode={nextActionsViewMode}
                           onSetNextActionsViewMode={setNextActionsViewMode}
                           reviewNodeTypes={reviewNodeTypes}
@@ -1176,6 +1178,9 @@ export default function GTDManager() {
                           calendarEnabled={calendarEnabled}
                           onDailyReview={startDailyReview}
                           onOpenDetail={setSelectedTaskId}
+                          tagDisplay={tagDisplay}
+                          focusExpandedDefaults={focusExpandedDefaults}
+                          onSetFocusExpandedDefaults={setFocusExpandedDefaults}
                         />
                       ) : (
                         <TaskBucketView

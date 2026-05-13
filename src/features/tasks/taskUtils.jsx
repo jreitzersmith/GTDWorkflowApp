@@ -254,7 +254,7 @@ function waterfallFilter(nextTasks, allTasks) {
 // Multi-value fields (location, priority) use the first value.
 // "project" walks up the parent chain to find the root project name.
 // Tasks with no value for the field go into a field-specific fallback bucket.
-function groupByField(taskList, field, allTasks = []) {
+function groupByField(taskList, field, allTasks = [], { effortLabels = null } = {}) {
   const ungroupedLabel = field === "project" ? "No Project" : field === "effort" ? "No Effort" : field === "category" ? "No Category" : "Ungrouped";
   const groups = {};
   const ungrouped = [];
@@ -267,7 +267,8 @@ function groupByField(taskList, field, allTasks = []) {
     } else if (field === "dueDate") {
       keys = task.dueDate ? [task.dueDate] : [];
     } else if (field === "effort") {
-      keys = task.effort ? [task.effort] : [];
+      const effortKey = task.effort ? (effortLabels ? normalizeEffort(task.effort, effortLabels) : task.effort) : null;
+      keys = effortKey ? [effortKey] : [];
     } else if (field === "category") {
       keys = task.category ? [task.category] : [];
     } else if (field === "project") {
