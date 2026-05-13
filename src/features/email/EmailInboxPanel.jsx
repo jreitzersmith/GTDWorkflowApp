@@ -95,9 +95,15 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
 
   const allTasks = tasks || [];
   const isContainer = t => ['category', 'subcategory', 'project', 'subproject'].includes(t.nodeType);
-  const nextAndProjectTasks = allTasks.filter(t => (!t.done || isContainer(t)) && ['next', 'project'].includes(t.bucket));
-  const waitingTasks = allTasks.filter(t => (!t.done || isContainer(t)) && t.bucket === 'waiting');
-  const somedayTasks = allTasks.filter(t => (!t.done || isContainer(t)) && t.bucket === 'someday');
+  // Containers are always valid link targets regardless of bucket or done status
+  const allContainerNodes = allTasks.filter(t => isContainer(t));
+  const nextAndProjectTasks = [
+    ...allContainerNodes,
+    ...allTasks.filter(t => !isContainer(t) && !t.done && ['next', 'project'].includes(t.bucket)),
+  ];
+  // Waiting For / Someday sections show leaf tasks only (containers already in main tree)
+  const waitingTasks = allTasks.filter(t => !isContainer(t) && !t.done && t.bucket === 'waiting');
+  const somedayTasks  = allTasks.filter(t => !isContainer(t) && !t.done && t.bucket === 'someday');
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -247,6 +253,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                               <ProjectTreePicker
                                 eligibleProjects={nextAndProjectTasks}
                                 selectedId={null}
+                                sorted={true}
                                 onSelect={(id) => {
                                   const task = nextAndProjectTasks.find(t => t.id === id);
                                   if (task) handleLinkToTask(task.id, task.text);
@@ -266,6 +273,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                                   <ProjectTreePicker
                                     eligibleProjects={waitingTasks}
                                     selectedId={null}
+                                    sorted={true}
                                     onSelect={(id) => {
                                       const task = waitingTasks.find(t => t.id === id);
                                       if (task) handleLinkToTask(task.id, task.text);
@@ -287,6 +295,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                                   <ProjectTreePicker
                                     eligibleProjects={somedayTasks}
                                     selectedId={null}
+                                    sorted={true}
                                     onSelect={(id) => {
                                       const task = somedayTasks.find(t => t.id === id);
                                       if (task) handleLinkToTask(task.id, task.text);
