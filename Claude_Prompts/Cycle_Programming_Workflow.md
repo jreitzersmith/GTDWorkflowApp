@@ -282,4 +282,4 @@ If a new issue arrives during Phases 5–6: log it immediately in `Known_Issues_
 
 If a new issue is discovered during morning review: log it, add to the next work order. Do not patch it ad hoc during the review session unless it is a critical regression blocking use of the app.
 
-If the worker encountered unexpected scope (e.g., a dependent file changed and the replacement string was wrong): log in the work order report, add a revised item to the next planning session. Do not attempt
+If the worker encountered unexpected scope (e.g., a dependent file changed and the replacement string was wrong): log in the work order report, add a revised item to the next planning session. Do not attempt to recover mid-batch.
