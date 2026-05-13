@@ -156,7 +156,9 @@ These preferences apply to all sessions and both workflow variants. They exist t
 - Ask for explicit go-ahead only when: scope has changed unexpectedly, a HALT condition was triggered, or a decision requires user judgment that wasn't anticipated in the plan.
 
 **Testing checklists**
-- Always present as an interactive widget (mcp__visualize__show_widget): state button cycles Pass → Fail → Skip → Note per item, per-item notes text field, Submit button calling sendPrompt() with full summary. See Cycle_Programming_Workflow.md Phase 5 for full spec.
+- Always present as an interactive widget (mcp__visualize__show_widget): state button cycles Pass → Fail → Skip → Note per item, per-item notes text field, Submit button calling sendPrompt() with full summary.
+- Render the widget in TWO situations: (1) at the end of a cycle when presenting the checklist for the first time, and (2) whenever John asks which tests are outstanding or remaining — never answer that question in plain text.
+- See Cycle_Programming_Workflow.md Phase 5 for full spec.
 
 **Clarifying questions**
 - Ask one clarifying question when category is ambiguous, not a list.

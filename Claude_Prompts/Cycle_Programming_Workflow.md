@@ -106,6 +106,10 @@ If an item in the work order hits a HALT condition, the worker logs it and skips
 
 After all changes for a cycle are complete, provide a specific manual testing checklist. Generic advice is not acceptable.
 
+**Always render as a widget** — this applies in two situations:
+1. At the end of a cycle, when presenting the full checklist for the first time
+2. Whenever John asks which tests are outstanding, remaining, or not yet passed — render only the unresolved items as a fresh widget, never answer in plain text
+
 **Format:** Always present the checklist as an interactive widget using `mcp__visualize__show_widget`. Each item must:
 - Have a state button that cycles through **unchecked → Pass → Fail → Skip → Note** on click
   - Pass = green · Fail = red · Skip = grey · Note = amber
