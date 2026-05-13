@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
+import { ProjectTreePicker } from "../tasks/ProjectTreePicker.jsx";
 import { doGmailFetchInbox, doGmailGetMessageBody, doGmailBatchLabel } from "./gmailTools.js";
 import { avatarInitials, avatarColor, formatEmailDate, gmailBtn, gmailBtnPrimary, gmailBtnSm, gmailBtnSmDanger } from "./emailUtils.js";
 
@@ -18,7 +19,8 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
 
   // Task-link picker state
   const [showTaskPicker, setShowTaskPicker] = useState(false);
-  const [taskFilter, setTaskFilter] = useState('');
+  const [showWaiting, setShowWaiting] = useState(false);
+  const [showSomeday, setShowSomeday] = useState(false);
   const [linkedConfirm, setLinkedConfirm] = useState(null);
   const pickerRef = useRef(null);
 
@@ -41,7 +43,8 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
   // Reset task picker when email changes
   useEffect(() => {
     setShowTaskPicker(false);
-    setTaskFilter('');
+    setShowWaiting(false);
+    setShowSomeday(false);
     setLinkedConfirm(null);
   }, [selectedId]);
 
@@ -86,15 +89,15 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
     };
     attachEmailToTask(taskId, att);
     setShowTaskPicker(false);
-    setTaskFilter('');
     setLinkedConfirm(taskText);
-    setTimeout(() => setLinkedConfirm(null), 2500);
+    setTimeout(() => setLinkedConfirm(null), 4000);
   };
 
-  const actionTasks = (tasks || []).filter(t => !t.done && ['next', 'project', 'waiting', 'someday'].includes(t.bucket));
-  const filteredTasks = taskFilter
-    ? actionTasks.filter(t => t.text.toLowerCase().includes(taskFilter.toLowerCase()))
-    : actionTasks;
+  const allTasks = tasks || [];
+  const isContainer = t => ['category', 'subcategory', 'project', 'subproject'].includes(t.nodeType);
+  const nextAndProjectTasks = allTasks.filter(t => (!t.done || isContainer(t)) && ['next', 'project'].includes(t.bucket));
+  const waitingTasks = allTasks.filter(t => (!t.done || isContainer(t)) && t.bucket === 'waiting');
+  const somedayTasks = allTasks.filter(t => (!t.done || isContainer(t)) && t.bucket === 'someday');
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -237,37 +240,61 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                             maxHeight: 240, overflowY: 'auto',
                             boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
                           }}>
-                            <div style={{ padding: '4px 4px 6px' }}>
-                              <input
-                                autoFocus
-                                value={taskFilter}
-                                onChange={e => setTaskFilter(e.target.value)}
-                                placeholder="Filter tasks…"
-                                style={{
-                                  width: '100%', background: COLORS.surface3, border: `1px solid ${COLORS.border}`,
-                                  borderRadius: 5, color: COLORS.text, padding: '4px 8px', fontFamily: 'inherit',
-                                  fontSize: 11, outline: 'none', boxSizing: 'border-box',
-                                }}
-                              />
-                            </div>
-                            {filteredTasks.length === 0 && (
+                            {nextAndProjectTasks.length === 0 && waitingTasks.length === 0 && somedayTasks.length === 0 && (
                               <div style={{ padding: '6px 10px', fontSize: 11, color: COLORS.muted }}>No tasks found</div>
                             )}
-                            {filteredTasks.slice(0, 50).map(t => (
-                              <div
-                                key={t.id}
-                                onClick={() => handleLinkToTask(t.id, t.text)}
-                                style={{
-                                  padding: '5px 8px', fontSize: 12, color: COLORS.text, cursor: 'pointer',
-                                  borderRadius: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            {nextAndProjectTasks.length > 0 && (
+                              <ProjectTreePicker
+                                eligibleProjects={nextAndProjectTasks}
+                                selectedId={null}
+                                onSelect={(id) => {
+                                  const task = nextAndProjectTasks.find(t => t.id === id);
+                                  if (task) handleLinkToTask(task.id, task.text);
                                 }}
-                                onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
-                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                title={t.text}
-                              >
-                                {t.text}
-                              </div>
-                            ))}
+                              />
+                            )}
+                            {waitingTasks.length > 0 && (
+                              <>
+                                <div
+                                  onClick={() => setShowWaiting(w => !w)}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 8px', fontSize: 11, color: COLORS.muted, cursor: 'pointer', borderTop: `1px solid ${COLORS.border}`, marginTop: 2 }}
+                                >
+                                  <span style={{ fontSize: 9, transition: 'transform 0.15s', transform: showWaiting ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block' }}>▶</span>
+                                  <span style={{ marginLeft: 2 }}>Waiting For</span>
+                                </div>
+                                {showWaiting && (
+                                  <ProjectTreePicker
+                                    eligibleProjects={waitingTasks}
+                                    selectedId={null}
+                                    onSelect={(id) => {
+                                      const task = waitingTasks.find(t => t.id === id);
+                                      if (task) handleLinkToTask(task.id, task.text);
+                                    }}
+                                  />
+                                )}
+                              </>
+                            )}
+                            {somedayTasks.length > 0 && (
+                              <>
+                                <div
+                                  onClick={() => setShowSomeday(s => !s)}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 8px', fontSize: 11, color: COLORS.muted, cursor: 'pointer', borderTop: `1px solid ${COLORS.border}`, marginTop: 2 }}
+                                >
+                                  <span style={{ fontSize: 9, transition: 'transform 0.15s', transform: showSomeday ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block' }}>▶</span>
+                                  <span style={{ marginLeft: 2 }}>Someday/Maybe</span>
+                                </div>
+                                {showSomeday && (
+                                  <ProjectTreePicker
+                                    eligibleProjects={somedayTasks}
+                                    selectedId={null}
+                                    onSelect={(id) => {
+                                      const task = somedayTasks.find(t => t.id === id);
+                                      if (task) handleLinkToTask(task.id, task.text);
+                                    }}
+                                  />
+                                )}
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
