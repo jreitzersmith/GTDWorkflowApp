@@ -5,7 +5,7 @@ import { doGmailFetchInbox, doGmailGetMessageBody, doGmailBatchLabel } from "./g
 import { avatarInitials, avatarColor, formatEmailDate, gmailBtn, gmailBtnPrimary, gmailBtnSm, gmailBtnSmDanger } from "./emailUtils.js";
 
 // Inbox list with checkboxes, avatar chips, pagination, and a detail slide-out panel.
-function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI }) {
+function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachEmailToTask, tasks }) {
   const [inboxEmails, setInboxEmails] = useState([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError] = useState(null);
@@ -15,6 +15,11 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI }) {
   const [emailDetail, setEmailDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [archiving, setArchiving] = useState(false);
+
+  // Task-link picker state
+  const [showTaskPicker, setShowTaskPicker] = useState(false);
+  const [taskFilter, setTaskFilter] = useState('');
+  const [linkedConfirm, setLinkedConfirm] = useState(null);
 
   // Load inbox on mount / when token changes
   useEffect(() => {
@@ -31,6 +36,13 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI }) {
       .catch(e => setEmailDetail({ error: e.message }))
       .finally(() => setDetailLoading(false));
   }, [selectedId, googleToken]);
+
+  // Reset task picker when email changes
+  useEffect(() => {
+    setShowTaskPicker(false);
+    setTaskFilter('');
+    setLinkedConfirm(null);
+  }, [selectedId]);
 
   const loadInbox = async (pageToken = null) => {
     setInboxLoading(true);
@@ -49,6 +61,27 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI }) {
     n.has(id) ? n.delete(id) : n.add(id);
     return n;
   });
+
+  const handleLinkToTask = (taskId, taskText) => {
+    const email = emailDetail;
+    if (!email || !attachEmailToTask) return;
+    const att = {
+      id: email.id || selectedId,
+      name: email.subject || '(no subject)',
+      mimeType: 'message/rfc822',
+      url: `https://mail.google.com/mail/#inbox/${email.id || selectedId}`,
+    };
+    attachEmailToTask(taskId, att);
+    setShowTaskPicker(false);
+    setTaskFilter('');
+    setLinkedConfirm(taskText);
+    setTimeout(() => setLinkedConfirm(null), 2500);
+  };
+
+  const actionTasks = (tasks || []).filter(t => !t.done && ['next', 'project', 'waiting', 'someday'].includes(t.bucket));
+  const filteredTasks = taskFilter
+    ? actionTasks.filter(t => t.text.toLowerCase().includes(taskFilter.toLowerCase()))
+    : actionTasks;
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -161,6 +194,51 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI }) {
                   onClick={() => processEmailWithAI(emailDetail)}>
                   Process with AI ↗
                 </button>
+
+                {/* Link to task */}
+                {attachEmailToTask && (
+                  <div>
+                    {linkedConfirm ? (
+                      <div style={{ fontSize: 11, color: COLORS.project, padding: '4px 0' }}>✓ Linked to "{linkedConfirm}"</div>
+                    ) : (
+                      <button
+                        style={{ ...gmailBtn(), textAlign: 'left', width: '100%' }}
+                        onClick={() => setShowTaskPicker(p => !p)}
+                      >
+                        📎 Link to task{showTaskPicker ? ' ▴' : ' ▾'}
+                      </button>
+                    )}
+                    {showTaskPicker && (
+                      <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <input
+                          autoFocus
+                          value={taskFilter}
+                          onChange={e => setTaskFilter(e.target.value)}
+                          placeholder="Filter tasks…"
+                          style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, padding: '4px 8px', fontFamily: 'inherit', fontSize: 11, outline: 'none' }}
+                        />
+                        <div style={{ maxHeight: 160, overflowY: 'auto', border: `1px solid ${COLORS.border}`, borderRadius: 5, background: COLORS.surface2 }}>
+                          {filteredTasks.length === 0 && (
+                            <div style={{ padding: '8px 10px', fontSize: 11, color: COLORS.muted }}>No tasks found</div>
+                          )}
+                          {filteredTasks.slice(0, 50).map(t => (
+                            <div
+                              key={t.id}
+                              onClick={() => handleLinkToTask(t.id, t.text)}
+                              style={{ padding: '5px 10px', fontSize: 11, color: COLORS.text, cursor: 'pointer', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                              onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                              title={t.text}
+                            >
+                              {t.text}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <button style={{ ...gmailBtn(), textAlign: 'left' }}
                   disabled={archiving}
                   onClick={async () => {
@@ -192,6 +270,8 @@ EmailInboxPanel.propTypes = {
   googleToken:        PropTypes.string.isRequired,
   googleScope:        PropTypes.string,
   processEmailWithAI: PropTypes.func.isRequired,
+  attachEmailToTask:  PropTypes.func,
+  tasks:              PropTypes.array,
 };
 
 export { EmailInboxPanel };

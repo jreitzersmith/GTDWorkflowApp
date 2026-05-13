@@ -7,7 +7,7 @@ import { useGmailRulesCache } from "./useGmailRulesCache.js";
 
 // Tab container for the Email Management view — renders one of three panels
 // (Inbox, Cleanup, Rules) based on the active emailTab prop.
-function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, processEmailWithAI, openCoachChat, authUser }) {
+function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, processEmailWithAI, attachEmailToTask, tasks, openCoachChat, authUser }) {
   const { gmailLabels, setGmailLabels, gmailFilters, setGmailFilters } = useGmailRulesCache();
 
   const tabStyle = (t) => ({
@@ -42,7 +42,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
         ))}
       </div>
 
-      {emailTab === 'inbox'   && <EmailInboxPanel   googleToken={googleToken} googleScope={googleScope} processEmailWithAI={processEmailWithAI} />}
+      {emailTab === 'inbox'   && <EmailInboxPanel   googleToken={googleToken} googleScope={googleScope} processEmailWithAI={processEmailWithAI} attachEmailToTask={attachEmailToTask} tasks={tasks} />}
       {emailTab === 'cleanup' && <EmailCleanupPanel gmailQueue={gmailQueue} setGmailQueue={setGmailQueue} googleToken={googleToken} authUser={authUser} openCoachChat={openCoachChat} />}
       {emailTab === 'rules'   && <EmailRulesPanel   googleToken={googleToken} googleScope={googleScope} gmailLabels={gmailLabels} setGmailLabels={setGmailLabels} gmailFilters={gmailFilters} setGmailFilters={setGmailFilters} />}
     </div>
@@ -57,6 +57,8 @@ EmailManagementView.propTypes = {
   emailTab:           PropTypes.string.isRequired,
   setEmailTab:        PropTypes.func.isRequired,
   processEmailWithAI: PropTypes.func.isRequired,
+  attachEmailToTask:  PropTypes.func,
+  tasks:              PropTypes.array,
   openCoachChat:      PropTypes.func.isRequired,
   authUser:           PropTypes.object,
 };

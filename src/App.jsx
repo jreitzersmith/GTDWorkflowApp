@@ -329,6 +329,7 @@ export default function GTDManager() {
     setMessages, setChatHistory,
     setPendingAction,
     callAI, switchCoachMode,
+    onSessionTasksCreated: suggestProjectGroup,
   });
 
   const {
@@ -486,6 +487,16 @@ export default function GTDManager() {
     setMessages(prev => [...prev, { role: "user", text: prompt }]);
     callAI(prompt, "chat", chatHistory);
   }, [setCoachMode, setChatInput, setMessages, callAI, chatHistory]);
+
+  // Attach an email as a driveAttachments entry on a task (FR#40)
+  const attachEmailToTask = useCallback((taskId, emailAttachment) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      const existing = t.driveAttachments || [];
+      if (existing.find(a => a.id === emailAttachment.id)) return t; // dedup
+      return { ...t, driveAttachments: [...existing, emailAttachment] };
+    }));
+  }, [setTasks]);
 
   // Prefill the coach chat with a raw prompt (no email wrapper) — used by cleanup workflow buttons
   const openCoachChat = useCallback((prompt) => {
@@ -1101,6 +1112,8 @@ export default function GTDManager() {
                           emailTab={emailTab}
                           setEmailTab={setEmailTab}
                           processEmailWithAI={processEmailWithAI}
+                          attachEmailToTask={attachEmailToTask}
+                          tasks={tasks}
                           openCoachChat={openCoachChat}
                           authUser={authUser}
                         />

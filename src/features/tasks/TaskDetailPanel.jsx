@@ -332,30 +332,59 @@ function DriveAttachments({ taskId, attachments, driveEnabled, googleAccessToken
   if (!driveEnabled) return null;
 
   const list = attachments || [];
+  const emailAtts = list.filter(a => a.mimeType === 'message/rfc822');
+  const driveAtts = list.filter(a => a.mimeType !== 'message/rfc822');
+
   return (
-    <div>
-      <div style={fieldLabel}>Drive Files</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        {list.map(att => (
-          <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <a
-              href={att.url}
-              target="_blank"
-              rel="noreferrer"
-              style={{ flex: 1, fontSize: 12, color: COLORS.project, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-              title={att.name}
-            >{att.name}</a>
-            <button
-              onClick={() => removeAttachment(att.id)}
-              title="Remove"
-              style={{ background: 'none', border: 'none', color: COLORS.muted, cursor: 'pointer', padding: '0 2px', fontSize: 15, lineHeight: 1, flexShrink: 0 }}
-            >×</button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {emailAtts.length > 0 && (
+        <div>
+          <div style={fieldLabel}>Linked Emails</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {emailAtts.map(att => (
+              <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 12, flexShrink: 0 }}>📧</span>
+                <a
+                  href={att.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ flex: 1, fontSize: 12, color: COLORS.inbox, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title={att.name}
+                >{att.name}</a>
+                <button
+                  onClick={() => removeAttachment(att.id)}
+                  title="Remove"
+                  style={{ background: 'none', border: 'none', color: COLORS.muted, cursor: 'pointer', padding: '0 2px', fontSize: 15, lineHeight: 1, flexShrink: 0 }}
+                >×</button>
+              </div>
+            ))}
           </div>
-        ))}
-        <button
-          onClick={openPicker}
-          style={{ alignSelf: 'flex-start', padding: '3px 10px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
-        >+ Attach Drive file</button>
+        </div>
+      )}
+      <div>
+        <div style={fieldLabel}>Drive Files</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {driveAtts.map(att => (
+            <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <a
+                href={att.url}
+                target="_blank"
+                rel="noreferrer"
+                style={{ flex: 1, fontSize: 12, color: COLORS.project, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                title={att.name}
+              >{att.name}</a>
+              <button
+                onClick={() => removeAttachment(att.id)}
+                title="Remove"
+                style={{ background: 'none', border: 'none', color: COLORS.muted, cursor: 'pointer', padding: '0 2px', fontSize: 15, lineHeight: 1, flexShrink: 0 }}
+              >×</button>
+            </div>
+          ))}
+          <button
+            onClick={openPicker}
+            style={{ alignSelf: 'flex-start', padding: '3px 10px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+          >+ Attach Drive file</button>
+        </div>
       </div>
     </div>
   );

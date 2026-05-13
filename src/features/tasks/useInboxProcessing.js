@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { genId } from '../calendar/calendarApi.js';
 import { normalizeEffort } from './taskUtils.jsx';
 
@@ -16,6 +16,7 @@ import { normalizeEffort } from './taskUtils.jsx';
  *   setMessages: Function, setChatHistory: Function,
  *   setPendingAction: Function,
  *   callAI: Function, switchCoachMode: Function,
+ *   onSessionTasksCreated: Function,
  * }} params
  * @returns {{
  *   processNextInboxItem: Function,
@@ -34,7 +35,11 @@ function useInboxProcessing({
   setMessages, setChatHistory,
   setPendingAction,
   callAI, switchCoachMode,
+  onSessionTasksCreated,
 }) {
+  // Tracks tasks created during this processing session (for FR#8 group suggestion).
+  const sessionCreatedTasksRef = useRef([]);
+
   const processNextInboxItem = useCallback(async (task) => {
     processingTaskId.current = task.id;
     setPendingAction(null);
@@ -63,6 +68,7 @@ function useInboxProcessing({
     if (type === 'next') {
       const newId = genId();
       const newTask = { id: newId, text: title || current.text, bucket: 'next', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true, ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
+      sessionCreatedTasksRef.current.push({ id: newId, text: newTask.text });
       setTasks(prev => {
         if (uncategorizedProjectId) {
           return [newTask, ...prev.map(t => t.id === uncategorizedProjectId ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
@@ -77,26 +83,35 @@ function useInboxProcessing({
         { id: actionId, text: nextAction || title, bucket: 'next', done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: null, reviewed: true },
         ...prev,
       ]);
+      // type === 'project' already has its own project structure — omit from group suggestion
     } else if (type === 'someday') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'someday', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true }, ...prev]);
+      const newId = genId();
+      const taskText = title || current.text;
+      sessionCreatedTasksRef.current.push({ id: newId, text: taskText });
+      setTasks(prev => [{ id: newId, text: taskText, bucket: 'someday', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true }, ...prev]);
     } else if (type === 'waiting') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'waiting', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: aiCategory || null, reviewed: true }, ...prev]);
+      const newId = genId();
+      const taskText = title || current.text;
+      sessionCreatedTasksRef.current.push({ id: newId, text: taskText });
+      setTasks(prev => [{ id: newId, text: taskText, bucket: 'waiting', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: aiCategory || null, reviewed: true }, ...prev]);
     } else if (type === 'add') {
       // Add as child of existing project (ID or title lookup)
       const parent = tasks.find(t => t.id === parentRef)
                   || tasks.find(t => t.text.toLowerCase() === (parentRef || '').toLowerCase());
       const childId = genId();
+      const taskText = title || current.text;
+      sessionCreatedTasksRef.current.push({ id: childId, text: taskText });
       if (parent) {
         setTasks(prev => [
           ...prev.map(t => t.id === parent.id ? { ...t, childIds: [...(t.childIds || []), childId] } : t),
-          { id: childId, text: title || current.text, bucket: 'next', done: false, created: Date.now(),
+          { id: childId, text: taskText, bucket: 'next', done: false, created: Date.now(),
             parentId: parent.id, priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null,
             actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null,
             category: aiCategory || parent.category || null, reviewed: true },
         ]);
       } else {
         // Parent not found — fall back to UnCategorized project
-        const fallbackTask = { id: childId, text: title || current.text, bucket: 'next', done: false,
+        const fallbackTask = { id: childId, text: taskText, bucket: 'next', done: false,
           created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null,
           actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true,
           ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
@@ -119,10 +134,15 @@ function useInboxProcessing({
       singleTaskMode.current = false;
       setMessages(prev => [...prev, { role: 'assistant', text: '✅ **Done!** Your task has been processed and filed.' }]);
     } else {
+      // Inbox cleared — offer project grouping if 2+ action tasks were created this session
+      const created = sessionCreatedTasksRef.current;
+      if (created.length >= 2 && onSessionTasksCreated) {
+        onSessionTasksCreated(created.map(t => t.id), created.map(t => t.text));
+      }
       setMessages(prev => [...prev, { role: 'assistant', text: '🎉 **Inbox is clear!** Every item has been processed. Well done.' }]);
     }
   }, [pendingAction, tasks, processingTaskId, skippedInSessionIds, singleTaskMode,
-      setTasks, setPendingAction, setMessages, processNextInboxItem]);
+      setTasks, setPendingAction, setMessages, processNextInboxItem, onSessionTasksCreated]);
 
   const handleSkipPendingAction = useCallback(() => {
     const current = tasks.find(t => t.id === processingTaskId.current);
@@ -163,6 +183,7 @@ function useInboxProcessing({
   const startProcessInbox = useCallback(async () => {
     singleTaskMode.current = false;
     skippedInSessionIds.current = new Set();
+    sessionCreatedTasksRef.current = [];
     setCurrentBucket('inbox');
     const inbox = tasks.filter(t => t.bucket === 'inbox');
     if (inbox.length === 0) {
