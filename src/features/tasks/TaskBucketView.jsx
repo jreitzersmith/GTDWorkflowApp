@@ -368,11 +368,16 @@ function TaskBucketView({
               </div>
             );
           });
-        })() : (currentBucket === "waiting" || currentBucket === "someday") ? (() => {
+        })() : (currentBucket === "waiting" || currentBucket === "someday" || currentBucket === "deferred") ? (() => {
           const flaggedIds = bucketTasks.map(t => t.id);
           const visibleSet = computeVisibleIds(flaggedIds, tasks);
           return (
             <div>
+              {currentBucket === "deferred" && (
+                <div style={{ padding: "6px 18px 4px", fontSize: 11, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
+                  Tasks with a defer date — shown in project hierarchy. Move to Inbox automatically when their date arrives.
+                </div>
+              )}
               <ProjectTree
                 parentId={null}
                 depth={0}
@@ -382,14 +387,7 @@ function TaskBucketView({
               />
             </div>
           );
-        })() : currentBucket === "deferred" ? (
-          <div>
-            <div style={{ padding: "6px 18px 4px", fontSize: 11, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
-              Sorted by wake date — earliest first. Tasks move to Inbox automatically when their date arrives.
-            </div>
-            {bucketTasks.map(task => <TaskRow key={task.id} task={task} />)}
-          </div>
-        ) : (
+        })() : (
           <>
             {currentBucket === "done" && <EffortAccuracyBar bucketTasks={bucketTasks} />}
             {currentBucket === "done" ? (
