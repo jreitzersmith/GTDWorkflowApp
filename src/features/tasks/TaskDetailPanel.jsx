@@ -477,7 +477,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
           </div>
 
           {/* Type toggle — nodeType selector, visible in Projects and Next Actions views */}
-          {(currentBucket === 'project' || currentBucket === 'next') && (
+          {(['project', 'next', 'waiting', 'someday', 'deferred'].includes(currentBucket)) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
               <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Type</span>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -490,9 +490,10 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
                       key={value}
                       onClick={() => {
                         if (disabled) return;
-                        onUpdate(task.id, isTask
-                          ? { nodeType: 'task', bucket: 'next' }
-                          : { nodeType: value, bucket: 'project' });
+                        const moveBucket = ['project', 'next'].includes(currentBucket);
+                        onUpdate(task.id, moveBucket
+                          ? (isTask ? { nodeType: 'task', bucket: 'next' } : { nodeType: value, bucket: 'project' })
+                          : { nodeType: value });
                       }}
                       title={disabled ? 'Cannot convert to task: node has sub-projects' : undefined}
                       style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${isActive ? color : COLORS.border}`, background: isActive ? color + '22' : 'transparent', color: isActive ? color : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}

@@ -241,11 +241,11 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                         </button>
                         {showTaskPicker && (
                           <div style={{
-                            position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
+                            position: 'absolute', bottom: 'calc(100% + 2px)', left: 0, right: 0,
                             background: COLORS.surface2, border: `1px solid ${COLORS.border2}`,
                             borderRadius: 6, padding: 4, zIndex: 50,
-                            maxHeight: 240, overflowY: 'auto',
-                            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                            maxHeight: 320, overflowY: 'auto',
+                            boxShadow: '0 -4px 16px rgba(0,0,0,0.4)',
                           }}>
                             {nextAndProjectTasks.length === 0 && waitingTasks.length === 0 && somedayTasks.length === 0 && (
                               <div style={{ padding: '6px 10px', fontSize: 11, color: COLORS.muted }}>No tasks found</div>
