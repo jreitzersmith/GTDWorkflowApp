@@ -15,6 +15,7 @@ function useTaskUIState() {
   const [inboxSelectedIds, setInboxSelectedIds] = useState(new Set());
   const [pendingGroupSuggestion, setPendingGroupSuggestion] = useState(null);
   const [showCompletedInProjects, setShowCompletedInProjects] = useState(false);
+  const [showWFSomeDayInProjects, setShowWFSomeDayInProjects] = useState(true);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(null); // { taskId, taskText }
 
   const toggleCollapse = useCallback((id) => {
@@ -55,6 +56,7 @@ function useTaskUIState() {
     inboxSelectedIds, setInboxSelectedIds,
     pendingGroupSuggestion, setPendingGroupSuggestion,
     showCompletedInProjects, setShowCompletedInProjects,
+    showWFSomeDayInProjects, setShowWFSomeDayInProjects,
     pendingDeleteConfirm, setPendingDeleteConfirm,
   };
 }

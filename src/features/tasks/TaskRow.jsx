@@ -164,7 +164,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, color: task.isWaitingFor ? "#c04040" : COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 13.5, color: task.isWaitingFor ? "#c04040" : task.isSomeday ? "#b8960c" : COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
             <span
               onClick={(e) => { e.stopPropagation(); onOpenDetail?.(selectedTaskId === task.id ? null : task.id); }}
               title="Open detail panel"

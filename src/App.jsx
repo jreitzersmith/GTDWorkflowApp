@@ -67,7 +67,7 @@ export default function GTDManager() {
           sheetsEnabled, slidesEnabled, gmailError, scopePrefs,
           setScopePref, reauthorizeGoogle, connectCalendar, disconnectCalendar,
           disconnectAll, refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
-  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects, pendingDeleteConfirm, setPendingDeleteConfirm } = useTaskUIState();
+  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects, showWFSomeDayInProjects, setShowWFSomeDayInProjects, pendingDeleteConfirm, setPendingDeleteConfirm } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
   const [uncategorizedProjectId, setUncategorizedProjectId] = useState(null);
@@ -803,8 +803,9 @@ export default function GTDManager() {
       const ch = (existing && "dueDate" in changes && changes.dueDate && !existing.originalDueDate)
         ? { ...changes, originalDueDate: changes.dueDate }
         : changes;
-      // Fast path: no deferUntil change — simple single-task update
-      if (!("deferUntil" in ch)) {
+      // Fast path: no cascadeable fields changed — simple single-task update
+      const hasCascade = "deferUntil" in ch || "isWaitingFor" in ch || "isSomeday" in ch;
+      if (!hasCascade) {
         return prev.map(t => t.id === id ? { ...t, ...ch } : t);
       }
       // Collect all descendant IDs recursively via childIds
@@ -815,19 +816,28 @@ export default function GTDManager() {
       };
       const target = prev.find(t => t.id === id);
       if (!target) return prev.map(t => t.id === id ? { ...t, ...ch } : t);
-      const oldDefer = target.deferUntil;
-      const newDefer = ch.deferUntil ?? null;
       const descendants = new Set(getDescendants(id));
+      // Build cascade changes for descendants
+      const descendantChanges = {};
+      if ("deferUntil" in ch) {
+        const oldDefer2 = target.deferUntil;
+        const newDefer2 = ch.deferUntil ?? null;
+        descendantChanges._deferUntil = { old: oldDefer2, new: newDefer2 };
+      }
+      if ("isWaitingFor" in ch) descendantChanges._isWaitingFor = ch.isWaitingFor;
+      if ("isSomeday" in ch) descendantChanges._isSomeday = ch.isSomeday;
       return prev.map(t => {
         if (t.id === id) return { ...t, ...ch };
         if (!descendants.has(t.id)) return t;
-        if (newDefer !== null) {
-          // Setting: cascade new date to all descendants
-          return { ...t, deferUntil: newDefer };
-        } else {
-          // Clearing: only clear descendants that shared the old value
-          return t.deferUntil === oldDefer ? { ...t, deferUntil: null } : t;
+        const dc = {};
+        if (descendantChanges._deferUntil !== undefined) {
+          const { old: oldD, new: newD } = descendantChanges._deferUntil;
+          if (newD !== null) dc.deferUntil = newD;
+          else if (t.deferUntil === oldD) dc.deferUntil = null;
         }
+        if (descendantChanges._isWaitingFor !== undefined) dc.isWaitingFor = descendantChanges._isWaitingFor;
+        if (descendantChanges._isSomeday !== undefined) dc.isSomeday = descendantChanges._isSomeday;
+        return Object.keys(dc).length ? { ...t, ...dc } : t;
       });
     });
   }, []);
@@ -1011,6 +1021,7 @@ export default function GTDManager() {
     projectCategoryFilter,
     setProjectCategoryFilter,
     showCompletedInProjects,
+    showWFSomeDayInProjects,
     uncategorizedProjectId,
   };
 
@@ -1192,6 +1203,8 @@ export default function GTDManager() {
                           projectCategoryFilter={projectCategoryFilter}
                           setProjectCategoryFilter={setProjectCategoryFilter}
                           showCompletedInProjects={showCompletedInProjects}
+                          showWFSomeDayInProjects={showWFSomeDayInProjects}
+                          setShowWFSomeDayInProjects={setShowWFSomeDayInProjects}
                           setShowCompletedInProjects={setShowCompletedInProjects}
                         />
                       )}

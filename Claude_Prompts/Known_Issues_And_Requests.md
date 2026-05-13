@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#85**
+> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#86**
 
 ---
 
@@ -17,6 +17,8 @@
 ## Suggested next features (in rough priority order)
 
 ### Feature requests
+
+- [ ] FR#86 [GH#91] (2026-05-13) — Keyboard shortcuts / arrow key navigation in Projects, Next Actions, Waiting For, Someday/Maybe views
 
 #### UI polish / quick wins
 

@@ -87,6 +87,8 @@ function TaskBucketView({
   uncategorizedProjectId,
   showCompletedInProjects,
   setShowCompletedInProjects,
+  showWFSomeDayInProjects,
+  setShowWFSomeDayInProjects,
 }) {
   const [filterText, setFilterText] = useState("");
   const [projPickerOpen, setProjPickerOpen] = useState(false);
@@ -179,9 +181,16 @@ function TaskBucketView({
             <ToolbarBtn
               onClick={() => setShowCompletedInProjects(v => !v)}
               active={showCompletedInProjects}
-              title={showCompletedInProjects ? 'Hide completed subtasks' : 'Show completed subtasks'}
+              title={showCompletedInProjects ? 'Hide completed tasks' : 'Show completed tasks'}
             >
-              ✓ Done
+              ✓ Completed
+            </ToolbarBtn>
+            <ToolbarBtn
+              onClick={() => setShowWFSomeDayInProjects(v => !v)}
+              active={!showWFSomeDayInProjects}
+              title={showWFSomeDayInProjects ? 'Hide Waiting For and Someday items' : 'Show Waiting For and Someday items'}
+            >
+              ⏳ WF / SD
             </ToolbarBtn>
             {categories && categories.length > 0 && (
               <select
@@ -452,7 +461,9 @@ TaskBucketView.propTypes = {
   onViewDeferred:    PropTypes.func.isRequired,
   onBulkAssign:      PropTypes.func.isRequired,
   uncategorizedProjectId: PropTypes.string,
-  showCompletedInProjects: PropTypes.bool,
+  showCompletedInProjects:   PropTypes.bool,
+  showWFSomeDayInProjects:   PropTypes.bool,
+  setShowWFSomeDayInProjects: PropTypes.func,
   setShowCompletedInProjects: PropTypes.func,
 };
 
