@@ -101,6 +101,8 @@ export default function GTDManager() {
   const processingTaskId = useRef(null);
   // inbox task IDs skipped in the current processing session; reset on fresh startProcessInbox
   const skippedInSessionIds = useRef(new Set());
+  // Stable ref so useInboxProcessing can call suggestProjectGroup without a TDZ forward-reference
+  const suggestProjectGroupRef = useRef(null);
 
   const { syncStatus, supabaseReady } = useSupabaseSync({
     authUser, tasks, setTasks,
@@ -329,7 +331,7 @@ export default function GTDManager() {
     setMessages, setChatHistory,
     setPendingAction,
     callAI, switchCoachMode,
-    onSessionTasksCreated: suggestProjectGroup,
+    onSessionTasksCreated: (ids, titles) => suggestProjectGroupRef.current?.(ids, titles),
   });
 
   const {
@@ -619,6 +621,7 @@ export default function GTDManager() {
       }
     } catch { /* silent — non-critical */ }
   }, [tasks]);
+  suggestProjectGroupRef.current = suggestProjectGroup;
 
   // ── Project review queue ─────────────────────────────────────────────────
   // Includes ALL non-done project-bucket tasks except pure containers
