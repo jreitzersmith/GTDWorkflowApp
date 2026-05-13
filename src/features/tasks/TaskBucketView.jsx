@@ -198,16 +198,15 @@ function TaskBucketView({
 
             {/* Display popover */}
             {(() => {
-              const anyHidden = !showCompletedInProjects || !showWaitingInProjects || !showSomeDayInProjects;
+              const visibleCount = [showCompletedInProjects, showWaitingInProjects, showSomeDayInProjects].filter(Boolean).length;
               return (
                 <div ref={displayRef} style={{ position: "relative" }}>
                   <ToolbarBtn
                     onClick={() => { setDisplayOpen(o => !o); setQuickSortOpen(false); }}
                     active={displayOpen}
                     title="Show / hide item types"
-                    style={{ borderColor: anyHidden ? "#d4a844" : undefined, color: anyHidden ? "#d4a844" : undefined }}
                   >
-                    Display{anyHidden ? " •" : ""} ▾
+                    Display [{visibleCount}/3] ▾
                   </ToolbarBtn>
                   {displayOpen && (
                     <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 185, boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
