@@ -92,3 +92,7 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-13 | Feature      | FR#80   | GH#82  | Link to Task picker: include empty containers regardless of done status          | b135446           |
 | 2026-05-13 | Bug Fix      | Issue#19| GH#83  | Link to Task picker: containers missing when bucket not next/project             | b0d106e           |
 | 2026-05-13 | Feature      | FR#81   | GH#84  | Link to Task picker: alphabetical sort (sorted prop on ProjectTreePicker)        | b0d106e           |
+| 2026-05-13 | Bug Fix      | Issue#20| GH#85  | buildProjectTree: sorted param missing from signature (ReferenceError on picker load) | 22b8219           |
+| 2026-05-13 | Bug Fix      | Issue#21| GH#86  | Email picker: project-type tasks in Waiting/Someday not visible                       | e2c620b           |
+| 2026-05-13 | Feature      | FR#82   | GH#87  | Type field in Waiting For / Someday/Maybe / Deferred task detail panel                | 8d8c3a3           |
+| 2026-05-13 | Feature      | FR#83   | GH#88  | Email link-to-task picker opens upward (maxHeight 320px)                              | 8d8c3a3           |
