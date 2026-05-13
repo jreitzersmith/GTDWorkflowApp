@@ -74,6 +74,7 @@ function ProjectSelector({ taskId, parentId, eligibleProjects, onReassignProject
                     setNewProjName("");
                   }}
                   showUncategorized
+                  sorted
                 />
               </div>
             )}
@@ -507,6 +508,21 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             </div>
           )}
 
+          {/* Waiting For / Someday flags */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Flags</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => onUpdate(task.id, { isWaitingFor: !task.isWaitingFor })}
+                style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${task.isWaitingFor ? '#c04040' : COLORS.border}`, background: task.isWaitingFor ? '#c0404022' : 'transparent', color: task.isWaitingFor ? '#c04040' : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+              >Waiting For</button>
+              <button
+                onClick={() => onUpdate(task.id, { isSomeday: !task.isSomeday })}
+                style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${task.isSomeday ? COLORS.someday || '#888' : COLORS.border}`, background: task.isSomeday ? (COLORS.someday || '#888') + '22' : 'transparent', color: task.isSomeday ? COLORS.someday || '#888' : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+              >Someday/Maybe</button>
+            </div>
+          </div>
+
           {/* Move to bucket */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
             <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Move to</span>
@@ -515,7 +531,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
               onChange={e => onUpdate(task.id, { bucket: e.target.value })}
               style={{ ...fieldInput, flex: 1, fontSize: 12, colorScheme: 'dark' }}
             >
-              {Object.entries(BUCKETS).filter(([k]) => k !== 'inboxHistory').map(([key, cfg]) => (
+              {Object.entries(BUCKETS).filter(([k]) => !['inboxHistory', 'waiting', 'someday', 'deferred'].includes(k)).map(([key, cfg]) => (
                 <option key={key} value={key}>{cfg.label}</option>
               ))}
             </select>

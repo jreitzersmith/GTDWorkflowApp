@@ -221,7 +221,7 @@ export default function GTDManager() {
       // FR#32: build map of next/waiting children per project parent
       const nextChildrenMap = new Map();
       if (k === 'project') {
-        tasks.filter(t => (t.bucket === 'next' || t.bucket === 'waiting') && t.parentId && !t.done)
+        tasks.filter(t => t.bucket === 'next' && t.parentId && !t.done)
           .forEach(t => {
             if (!nextChildrenMap.has(t.parentId)) nextChildrenMap.set(t.parentId, []);
             nextChildrenMap.get(t.parentId).push(t);
@@ -949,10 +949,18 @@ export default function GTDManager() {
   // "deferred" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
   const bucketTasks = currentBucket === "deferred"
     ? tasks.filter(t => isDeferred(t) && !t.done).sort((a, b) => (a.deferUntil > b.deferUntil ? 1 : -1))
+    : currentBucket === "waiting"
+    ? tasks.filter(t => t.isWaitingFor && !t.done)
+    : currentBucket === "someday"
+    ? tasks.filter(t => t.isSomeday && !t.done)
     : tasks.filter(t => t.bucket === currentBucket);
   const counts = Object.fromEntries(Object.keys(BUCKETS).map(k =>
     k === "deferred"
       ? [k, tasks.filter(t => isDeferred(t) && !t.done).length]
+      : k === "waiting"
+      ? [k, tasks.filter(t => t.isWaitingFor && !t.done).length]
+      : k === "someday"
+      ? [k, tasks.filter(t => t.isSomeday && !t.done).length]
       : [k, tasks.filter(t => t.bucket === k).length]
   ));
 

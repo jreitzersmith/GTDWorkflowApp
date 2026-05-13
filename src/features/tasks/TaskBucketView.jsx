@@ -6,7 +6,7 @@ import { TaskRow } from "./TaskRow.jsx";
 import { CompletedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListHelpers.jsx";
 import { InboxBulkBar } from "./InboxBars.jsx";
 import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
-import { waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, minutesToEffortLabel, effortAccuracyColor, isDeferred } from "./taskUtils.jsx";
+import { waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, minutesToEffortLabel, effortAccuracyColor, isDeferred, computeVisibleIds } from "./taskUtils.jsx";
 
 const ADD_ROW_STYLE = { display: "flex", gap: 6, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}` };
 const PANEL_HEADER_STYLE = { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 };
@@ -214,7 +214,7 @@ function TaskBucketView({
       </div>
 
       {/* Add row */}
-      {currentBucket !== "deferred" && (
+      {!(["deferred", "waiting", "someday"].includes(currentBucket)) && (
         currentBucket === "project" ? (
           <div style={ADD_ROW_STYLE}>
             <input
@@ -368,6 +368,20 @@ function TaskBucketView({
               </div>
             );
           });
+        })() : (currentBucket === "waiting" || currentBucket === "someday") ? (() => {
+          const flaggedIds = bucketTasks.map(t => t.id);
+          const visibleSet = computeVisibleIds(flaggedIds, tasks);
+          return (
+            <div>
+              <ProjectTree
+                parentId={null}
+                depth={0}
+                dragId={null}
+                dropTarget={null}
+                visibilitySet={visibleSet}
+              />
+            </div>
+          );
         })() : currentBucket === "deferred" ? (
           <div>
             <div style={{ padding: "6px 18px 4px", fontSize: 11, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>

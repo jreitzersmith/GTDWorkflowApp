@@ -19,8 +19,6 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
 
   // Task-link picker state
   const [showTaskPicker, setShowTaskPicker] = useState(false);
-  const [showWaiting, setShowWaiting] = useState(false);
-  const [showSomeday, setShowSomeday] = useState(false);
   const [linkedConfirm, setLinkedConfirm] = useState(null);
   const pickerRef = useRef(null);
 
@@ -43,8 +41,6 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
   // Reset task picker when email changes
   useEffect(() => {
     setShowTaskPicker(false);
-    setShowWaiting(false);
-    setShowSomeday(false);
     setLinkedConfirm(null);
   }, [selectedId]);
 
@@ -95,16 +91,12 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
 
   const allTasks = tasks || [];
   const isContainer = t => ['category', 'subcategory', 'project', 'subproject'].includes(t.nodeType);
-  // Containers from next/project buckets anchor the main tree.
-  // Containers in waiting/someday belong to those sections instead (no duplicates).
-  const allContainerNodes = allTasks.filter(t => isContainer(t) && !['waiting', 'someday'].includes(t.bucket));
+  // All project-tree containers plus non-done next/project tasks for the link picker.
+  const allContainerNodes = allTasks.filter(t => isContainer(t));
   const nextAndProjectTasks = [
     ...allContainerNodes,
     ...allTasks.filter(t => !isContainer(t) && !t.done && ['next', 'project'].includes(t.bucket)),
   ];
-  // Waiting For / Someday sections include all task types from those buckets.
-  const waitingTasks = allTasks.filter(t => !t.done && t.bucket === 'waiting');
-  const somedayTasks  = allTasks.filter(t => !t.done && t.bucket === 'someday');
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -247,7 +239,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                             maxHeight: 320, overflowY: 'auto',
                             boxShadow: '0 -4px 16px rgba(0,0,0,0.4)',
                           }}>
-                            {nextAndProjectTasks.length === 0 && waitingTasks.length === 0 && somedayTasks.length === 0 && (
+                            {nextAndProjectTasks.length === 0 && (
                               <div style={{ padding: '6px 10px', fontSize: 11, color: COLORS.muted }}>No tasks found</div>
                             )}
                             {nextAndProjectTasks.length > 0 && (
@@ -260,50 +252,6 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                                   if (task) handleLinkToTask(task.id, task.text);
                                 }}
                               />
-                            )}
-                            {waitingTasks.length > 0 && (
-                              <>
-                                <div
-                                  onClick={() => setShowWaiting(w => !w)}
-                                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 8px', fontSize: 11, color: COLORS.muted, cursor: 'pointer', borderTop: `1px solid ${COLORS.border}`, marginTop: 2 }}
-                                >
-                                  <span style={{ fontSize: 9, transition: 'transform 0.15s', transform: showWaiting ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block' }}>▶</span>
-                                  <span style={{ marginLeft: 2 }}>Waiting For</span>
-                                </div>
-                                {showWaiting && (
-                                  <ProjectTreePicker
-                                    eligibleProjects={waitingTasks}
-                                    selectedId={null}
-                                    sorted={true}
-                                    onSelect={(id) => {
-                                      const task = waitingTasks.find(t => t.id === id);
-                                      if (task) handleLinkToTask(task.id, task.text);
-                                    }}
-                                  />
-                                )}
-                              </>
-                            )}
-                            {somedayTasks.length > 0 && (
-                              <>
-                                <div
-                                  onClick={() => setShowSomeday(s => !s)}
-                                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 8px', fontSize: 11, color: COLORS.muted, cursor: 'pointer', borderTop: `1px solid ${COLORS.border}`, marginTop: 2 }}
-                                >
-                                  <span style={{ fontSize: 9, transition: 'transform 0.15s', transform: showSomeday ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block' }}>▶</span>
-                                  <span style={{ marginLeft: 2 }}>Someday/Maybe</span>
-                                </div>
-                                {showSomeday && (
-                                  <ProjectTreePicker
-                                    eligibleProjects={somedayTasks}
-                                    selectedId={null}
-                                    sorted={true}
-                                    onSelect={(id) => {
-                                      const task = somedayTasks.find(t => t.id === id);
-                                      if (task) handleLinkToTask(task.id, task.text);
-                                    }}
-                                  />
-                                )}
-                              </>
                             )}
                           </div>
                         )}

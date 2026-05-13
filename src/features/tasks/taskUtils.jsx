@@ -78,6 +78,8 @@ function extractAction(text) {
   const categoryMatch = extras.match(/\|category:([^|]+)/);
   const priorityMatch = extras.match(/\|priority:([^|]+)/);
   const locationMatch = extras.match(/\|location:([^|]+)/);
+  const somedayMatch    = extras.match(/\|someday:(true|false)/);
+  const waitingForMatch = extras.match(/\|waitingFor:(true|false)/);
   return {
     type:      m[1],
     title:     (m[2] || "").trim(),
@@ -90,6 +92,8 @@ function extractAction(text) {
     category:   categoryMatch ? categoryMatch[1].trim()                 : null,
     priority:   priorityMatch ? priorityMatch[1].split(',').map(s => s.trim()).filter(Boolean) : [],
     location:   locationMatch ? locationMatch[1].split(',').map(s => s.trim()).filter(Boolean) : [],
+    isSomeday:    somedayMatch    ? somedayMatch[1] === 'true'    : false,
+    isWaitingFor: waitingForMatch ? waitingForMatch[1] === 'true' : false,
   };
 }
 
@@ -121,6 +125,8 @@ function extractUpdateAction(text) {
     if (key === 'location')     changes.location     = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') changes.recurrence = parseRecurrenceValue(val);
     if (key === 'dueTime') changes.dueTime = val;
+    if (key === 'waitingFor') changes.isWaitingFor = val === 'true';
+    if (key === 'someday')    changes.isSomeday    = val === 'true';
   });
   if (notesRaw !== null) changes.notes = notesRaw.replace(/\\n/g, '\n');
 
@@ -683,4 +689,20 @@ function useResizer(storageKey, defaultSize, { min, max, direction = 'h', sign =
 }
 
 
-export { todayStr, isDeferred, normalizeEffort, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, collectDescendantIds, moveTaskInTree, useResizer };
+// Walk the parentId chain for each flagged task and collect all ancestor IDs.
+// Returns a Set of IDs that should be visible in a filter view hierarchy.
+function computeVisibleIds(flaggedIds, allTasks) {
+  const idMap = {};
+  allTasks.forEach(t => { idMap[t.id] = t; });
+  const visible = new Set(flaggedIds);
+  flaggedIds.forEach(id => {
+    let cur = idMap[id];
+    while (cur && cur.parentId) {
+      visible.add(cur.parentId);
+      cur = idMap[cur.parentId];
+    }
+  });
+  return visible;
+}
+
+export { todayStr, isDeferred, normalizeEffort, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, collectDescendantIds, moveTaskInTree, computeVisibleIds, useResizer };
