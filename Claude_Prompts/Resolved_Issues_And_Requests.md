@@ -81,3 +81,8 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-12 | Feature      | FR#74   | GH#74  | Constrain metadata review location suggestions to configured locations list      | b3f93c9           |
 | 2026-05-12 | Feature      | FR#75   | GH#75  | Rename Processed label to Reviewed for all task types in TaskDetailPanel         | b35009f           |
 | 2026-05-12 | Feature      | FR#76   | GH#76  | Review Configuration settings — control which nodeTypes appear in Project Review | 7ec9bfa           |
+| 2026-05-12 | Code Quality | CQ#11   | GH#77  | Rename `processed` field → `reviewed` throughout codebase (DB col, mappers, contexts, handlers) | d773f4a           |
+| 2026-05-12 | Bug fix      | Issue#12| GH#32  | Process mode: swap defer→due when user overrides AI deferral assumption                          | a0a3a13           |
+| 2026-05-12 | Bug fix      | Issue#13| GH#33  | Clear stale deferUntil in buildNextOccurrence; prompt omits defer for recurring tasks             | a0a3a13           |
+| 2026-05-12 | Feature      | FR#8    | GH#9   | Inbox group suggestion: fire suggestProjectGroup after session creates 2+ action tasks            | 6a227d3           |
+| 2026-05-12 | Feature      | FR#40   | GH#36  | Gmail email → task linking: attach email as driveAttachments entry with 📧 rendering             | 6a227d3           |
