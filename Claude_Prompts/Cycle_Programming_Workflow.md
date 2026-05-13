@@ -107,10 +107,13 @@ If an item in the work order hits a HALT condition, the worker logs it and skips
 After all changes for a cycle are complete, provide a specific manual testing checklist. Generic advice is not acceptable.
 
 **Format:** Always present the checklist as an interactive widget using `mcp__visualize__show_widget`. Each item must:
-- Cycle through unchecked → pass → fail → note on click
+- Have a state button that cycles through **unchecked → Pass → Fail → Skip → Note** on click
+  - Pass = green · Fail = red · Skip = grey · Note = amber
+- Have a per-item text input field for optional notes/observations
 - Pre-populate state if the user has already reported results in chat before the widget is rendered
-- Include a "Send results" button that calls `sendPrompt()` with a compact summary (e.g. `FR#XX test results — Item: pass · Item: fail`)
-- Use `note` state (amber) for items that partially passed or have a known caveat
+- Include a **Submit** button that calls `sendPrompt()` with a compact summary including all states and any notes
+  - Format: `FR#XX test results — [Item label]: Pass · [Item label]: Fail (note text) · ...`
+- Use `Note` state (amber) for items that partially passed or have a known caveat
 
 Each checklist item: specific action + specific expected result. Group by feature area if multiple items were implemented.
 
