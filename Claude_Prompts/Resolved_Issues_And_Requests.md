@@ -90,3 +90,5 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-13 | Bug Fix      | Issue#18| GH#80  | Remove stale setTaskFilter call in handleLinkToTask; bump confirm timeout 4000ms | b135446           |
 | 2026-05-13 | Feature      | FR#79   | GH#81  | Link to Task picker: Waiting For and Someday/Maybe as collapsible sections       | b135446           |
 | 2026-05-13 | Feature      | FR#80   | GH#82  | Link to Task picker: include empty containers regardless of done status          | b135446           |
+| 2026-05-13 | Bug Fix      | Issue#19| GH#83  | Link to Task picker: containers missing when bucket not next/project             | b0d106e           |
+| 2026-05-13 | Feature      | FR#81   | GH#84  | Link to Task picker: alphabetical sort (sorted prop on ProjectTreePicker)        | b0d106e           |
