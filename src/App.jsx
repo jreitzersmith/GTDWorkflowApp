@@ -1258,6 +1258,10 @@ export default function GTDManager() {
                 tasks={tasks}
                 onStartProcessInbox={startProcessInbox}
                 onStartWeeklyReview={startWeeklyReview}
+                efforts={efforts}
+                locations={locations}
+                categories={categories}
+                onUpdatePendingAction={(field, value) => setPendingAction(prev => prev ? ({ ...prev, [field]: value }) : prev)}
                 onStartBrainDump={startBrainDump}
                 onStartProjectReview={startProjectReview}
                 onSwitchToChat={() => switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.")}

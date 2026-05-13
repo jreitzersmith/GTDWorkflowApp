@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#17** · Code Quality — **CQ#11** · Feature Requests — **FR#76**
+> **Last used numbers:** Known Issues — **Issue#17** · Code Quality — **CQ#11** · Feature Requests — **FR#77**
 
 ---
 
@@ -49,3 +49,7 @@
 
 - FR#9 [GH#18] — Todoist export / two-way sync (previously Issue#4 / GH#3)
 - FR#20 [GH#19] — Mobile layout (significant; requires media queries throughout)
+
+## Inbox / processing improvements
+
+- [ ] FR#77 [GH#78] (2026-05-13) — Process mode: editable metadata panel in pending action bar (priority, category, effort, due, defer, location, recurrence editable before confirm)

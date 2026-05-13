@@ -66,6 +66,10 @@ function CoachPanel({
   onStartProjectReview,
   onSwitchToChat,
   onMITSubmit,
+  efforts,
+  locations,
+  categories,
+  onUpdatePendingAction,
 }) {
   return (
     <div style={{ height: coachHeight, display: "flex", flexDirection: "column", flexShrink: 0 }}>
@@ -108,6 +112,10 @@ function CoachPanel({
             onConfirm={onConfirmMove}
             onDismiss={onDismissPendingAction}
             onDelete={onDeleteInboxItem}
+            efforts={efforts}
+            locations={locations}
+            categories={categories}
+            onUpdatePendingAction={onUpdatePendingAction}
           />
         )}
         {coachMode === "projectReview" && reviewMode === null && !loading && (
@@ -236,6 +244,10 @@ CoachPanel.propTypes = {
   onStartBrainDump:       PropTypes.func.isRequired,
   onStartProjectReview:   PropTypes.func.isRequired,
   onSwitchToChat:         PropTypes.func.isRequired,
+  efforts:                PropTypes.array,
+  locations:              PropTypes.array,
+  categories:             PropTypes.array,
+  onUpdatePendingAction:  PropTypes.func,
 };
 
 export { CoachPanel };

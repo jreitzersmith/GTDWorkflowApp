@@ -76,6 +76,8 @@ function extractAction(text) {
   const parentMatch   = extras.match(/\|parent:([^|]+)/);
   const effortMatch   = extras.match(/\|effort:([^|]+)/);
   const categoryMatch = extras.match(/\|category:([^|]+)/);
+  const priorityMatch = extras.match(/\|priority:([^|]+)/);
+  const locationMatch = extras.match(/\|location:([^|]+)/);
   return {
     type:      m[1],
     title:     (m[2] || "").trim(),
@@ -86,6 +88,8 @@ function extractAction(text) {
     recurrence: recurMatch    ? parseRecurrenceValue(recurMatch[1].trim()) : null,
     effort:     effortMatch   ? effortMatch[1].trim()                   : null,
     category:   categoryMatch ? categoryMatch[1].trim()                 : null,
+    priority:   priorityMatch ? priorityMatch[1].split(',').map(s => s.trim()).filter(Boolean) : [],
+    location:   locationMatch ? locationMatch[1].split(',').map(s => s.trim()).filter(Boolean) : [],
   };
 }
 

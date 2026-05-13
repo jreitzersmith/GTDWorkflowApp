@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 import { formatBubble } from "../tasks/taskUtils.jsx";
+import { PRIORITIES } from "../tasks/TaskRow.jsx";
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
 
 function ActionBtn({ children, onClick, color }) {
@@ -93,9 +94,9 @@ function TypingIndicator() {
   );
 }
 
-function PendingActionBar({ action, onConfirm, onDismiss, onDelete }) {
+function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, locations, categories, onUpdatePendingAction }) {
   if (!action) return null;
-  const { type, title, nextAction, parentName } = action;
+  const { type, title, nextAction, parentName, dueDate, deferUntil, effort, category, priority = [], location = [] } = action;
 
   const configs = {
     next:    { color: COLORS.next,    label: "Next Actions", confirmText: "Create ✓" },
@@ -106,6 +107,28 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete }) {
     add:     { color: COLORS.project, label: "Add to existing project", confirmText: "Add ✓" },
   };
   const cfg = configs[type] || configs.next;
+
+  const hasAIValues = !!(dueDate || deferUntil || effort || category);
+  const [expanded, setExpanded] = useState(hasAIValues);
+
+  const showDue      = ['next', 'project', 'add', 'waiting'].includes(type);
+  const showDefer    = ['next', 'project', 'add', 'someday'].includes(type);
+  const showEffort   = ['next', 'add', 'someday', 'waiting'].includes(type);
+  const showPriority = ['next', 'add'].includes(type);
+  const showLocation = ['next', 'add'].includes(type);
+  const showMeta     = type !== 'delete';
+
+  const chip = (label, active, color, onClick) => (
+    <button
+      key={label}
+      onClick={onClick}
+      style={{ padding: "2px 8px", borderRadius: 10, border: `1px solid ${active ? color : COLORS.border}`, background: active ? color + "22" : "transparent", color: active ? color : COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "all 0.1s" }}
+    >{label}</button>
+  );
+
+  const collapsedHint = !expanded && hasAIValues
+    ? ` (${[dueDate && `due ${dueDate}`, deferUntil && `defer ${deferUntil}`, effort, category].filter(Boolean).join(", ")})`
+    : "";
 
   return (
     <div style={{ background: COLORS.surface3, border: `1px solid ${cfg.color}44`, borderRadius: 9, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
@@ -125,6 +148,98 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete }) {
           <strong style={{ color: cfg.color }}>{title}</strong>
         </div>
       ) : null}
+
+      {showMeta && (
+        <div>
+          <button
+            onClick={() => setExpanded(e => !e)}
+            style={{ background: "none", border: "none", padding: 0, color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}
+          >
+            {expanded ? "▾" : "▸"} metadata{collapsedHint}
+          </button>
+          {expanded && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${COLORS.border}` }}>
+              <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: -4 }}>Category</div>
+              <div>
+                <input
+                  list="pending-cats"
+                  value={category || ""}
+                  onChange={e => onUpdatePendingAction("category", e.target.value || null)}
+                  placeholder="category…"
+                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: COLORS.text, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box" }}
+                />
+                <datalist id="pending-cats">
+                  {(categories || []).map(c => <option key={c} value={c} />)}
+                </datalist>
+              </div>
+
+              {showEffort && (efforts || []).length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Effort</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {(efforts || []).map(e => chip(e, effort === e, COLORS.effort, () => onUpdatePendingAction("effort", effort === e ? null : e)))}
+                  </div>
+                </div>
+              )}
+
+              {showPriority && (
+                <div>
+                  <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Priority</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {PRIORITIES.map(p => chip(p, priority.includes(p), COLORS.inbox, () => {
+                      const next = priority.includes(p) ? priority.filter(x => x !== p) : [...priority, p];
+                      onUpdatePendingAction("priority", next);
+                    }))}
+                  </div>
+                </div>
+              )}
+
+              {showDue && (
+                <div>
+                  <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Due Date</div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      type="date"
+                      value={dueDate || ""}
+                      onChange={e => onUpdatePendingAction("dueDate", e.target.value || null)}
+                      style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
+                    />
+                    {dueDate && <button onClick={() => onUpdatePendingAction("dueDate", null)} style={{ padding: "3px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕</button>}
+                  </div>
+                </div>
+              )}
+
+              {showDefer && (
+                <div>
+                  <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Defer Until</div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      type="date"
+                      value={deferUntil || ""}
+                      onChange={e => onUpdatePendingAction("deferUntil", e.target.value || null)}
+                      style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontFamily: "inherit", fontSize: 12, outline: "none", colorScheme: "dark" }}
+                    />
+                    {deferUntil && <button onClick={() => onUpdatePendingAction("deferUntil", null)} style={{ padding: "3px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕</button>}
+                  </div>
+                </div>
+              )}
+
+              {showLocation && (locations || []).length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Location</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {(locations || []).map(loc => chip(loc, location.includes(loc), COLORS.project, () => {
+                      const next = location.includes(loc) ? location.filter(x => x !== loc) : [...location, loc];
+                      onUpdatePendingAction("location", next);
+                    }))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 6 }}>
         <button onClick={onConfirm} style={{ padding: "4px 14px", borderRadius: 6, border: `1px solid ${cfg.color}`, background: "transparent", color: cfg.color, fontFamily: "inherit", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
           {cfg.confirmText}
