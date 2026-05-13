@@ -62,7 +62,7 @@ function useInboxProcessing({
     // Create new tasks based on action type, applying any AI-suggested dates
     if (type === 'next') {
       const newId = genId();
-      const newTask = { id: newId, text: title || current.text, bucket: 'next', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true, ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
+      const newTask = { id: newId, text: title || current.text, bucket: 'next', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true, ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
       setTasks(prev => {
         if (uncategorizedProjectId) {
           return [newTask, ...prev.map(t => t.id === uncategorizedProjectId ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
@@ -73,14 +73,14 @@ function useInboxProcessing({
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true },
-        { id: actionId, text: nextAction || title, bucket: 'next', done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: null, processed: true },
+        { id: projectId, text: title || current.text, bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true },
+        { id: actionId, text: nextAction || title, bucket: 'next', done: false, created: Date.now(), parentId: projectId, priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: null, reviewed: true },
         ...prev,
       ]);
     } else if (type === 'someday') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'someday', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'someday', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true }, ...prev]);
     } else if (type === 'waiting') {
-      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'waiting', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: aiCategory || null, processed: true }, ...prev]);
+      setTasks(prev => [{ id: genId(), text: title || current.text, bucket: 'waiting', done: false, created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: aiCategory || null, reviewed: true }, ...prev]);
     } else if (type === 'add') {
       // Add as child of existing project (ID or title lookup)
       const parent = tasks.find(t => t.id === parentRef)
@@ -92,13 +92,13 @@ function useInboxProcessing({
           { id: childId, text: title || current.text, bucket: 'next', done: false, created: Date.now(),
             parentId: parent.id, priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null,
             actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null,
-            category: aiCategory || parent.category || null, processed: true },
+            category: aiCategory || parent.category || null, reviewed: true },
         ]);
       } else {
         // Parent not found — fall back to UnCategorized project
         const fallbackTask = { id: childId, text: title || current.text, bucket: 'next', done: false,
           created: Date.now(), priority: [], location: [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null,
-          actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, processed: true,
+          actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true,
           ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
         setTasks(prev => {
           if (uncategorizedProjectId) {

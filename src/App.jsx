@@ -615,7 +615,7 @@ export default function GTDManager() {
   // Sub-projects (parentId set) are now included so every level gets reviewed.
   const buildReviewQueue = useCallback((allTasks) => {
     return allTasks.filter(t => {
-      if (t.bucket !== 'project' || t.done || t.processed) return false;
+      if (t.bucket !== 'project' || t.done || t.reviewed) return false;
       const nt = t.nodeType ?? 'project';
       if (!reviewNodeTypes.includes(nt)) return false;
       // Pure container: all direct children are project-bucket nodes (subprojects/categories).
@@ -694,7 +694,7 @@ export default function GTDManager() {
       }
     }
 
-    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, processed: true } : t));
+    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, reviewed: true } : t));
     setReviewSuggestions([]);
     setReviewReady(false);
     const nextIdx = reviewProjectIdx + 1;
@@ -714,7 +714,7 @@ export default function GTDManager() {
   const skipProjectReview = useCallback(() => {
     const rootProjects = buildReviewQueue(tasks);
     const project = rootProjects[reviewProjectIdx];
-    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, processed: true } : t));
+    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, reviewed: true } : t));
     setReviewSuggestions([]);
     setReviewReady(false);
     const nextIdx = reviewProjectIdx + 1;
@@ -849,7 +849,7 @@ export default function GTDManager() {
 
     const rootProjects = buildReviewQueue(tasks);
     const project = rootProjects[reviewProjectIdx];
-    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, processed: true } : t));
+    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, reviewed: true } : t));
     setMetadataSuggestions([]);
     setReviewReady(false);
     const nextIdx = reviewProjectIdx + 1;
@@ -869,7 +869,7 @@ export default function GTDManager() {
   const skipMetadataReview = useCallback(() => {
     const rootProjects = buildReviewQueue(tasks);
     const project = rootProjects[reviewProjectIdx];
-    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, processed: true } : t));
+    if (project) setTasks(prev => prev.map(t => t.id === project.id ? { ...t, reviewed: true } : t));
     setMetadataSuggestions([]);
     setReviewReady(false);
     const nextIdx = reviewProjectIdx + 1;

@@ -612,8 +612,8 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
               {'Reviewed'}
             </span>
             <StyledCheckbox
-              checked={task.processed ?? false}
-              onChange={e => onUpdate(task.id, { processed: e.target.checked })}
+              checked={task.reviewed ?? false}
+              onChange={e => onUpdate(task.id, { reviewed: e.target.checked })}
             />
           </div>
 

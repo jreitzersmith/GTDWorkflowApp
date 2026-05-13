@@ -23,7 +23,7 @@ const taskShape = PropTypes.shape({
   notes:        PropTypes.string,
   recurrence:   PropTypes.object,
   dueTime:      PropTypes.string,
-  processed:    PropTypes.bool,
+  reviewed:     PropTypes.bool,
   parentId:     PropTypes.string,
   childIds:     PropTypes.arrayOf(PropTypes.string),
 });
