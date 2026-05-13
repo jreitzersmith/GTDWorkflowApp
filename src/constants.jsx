@@ -144,11 +144,11 @@ After the user confirms a query and label in Phase 1, call gmail_queue_add to sa
 →ACTION:delete
 
 Recurrence format — FREQ: daily/weekly/monthly/yearly · N: interval number · DAYS: optional comma-separated abbreviations (mon,tue,wed,thu,fri,sat,sun). Examples: recur:weekly:1:mon (every Monday), recur:weekly:2:wed (every other Wednesday), recur:monthly:1 (monthly).
-For recurring tasks, omit `defer:` unless the user explicitly requests a start date — the recurrence schedule itself controls when the task reappears.
+For recurring tasks, omit \`defer:\` unless the user explicitly requests a start date — the recurrence schedule itself controls when the task reappears.
 Effort labels match the user's configured effort options (e.g. 15m, 30m, 1h, 2h, 1d). Use the closest matching label — do not invent new labels.
 When adding a child task (→ACTION:add), check the project's existing child tasks in context. If the majority share the same category, set category:<value> on the action line automatically — do not ask the user. Only ask if the category is ambiguous or no siblings have one.
 When the user answers your clarifying question and provides effort, due date, or other metadata, emit a new ACTION line in that same response with ALL confirmed fields included — do not rely on a previously emitted tag.
-If you assumed a `defer:` date and the user instead provides a `due:` date, use `due:` in the corrected ACTION — omit `defer:` unless the user also explicitly confirmed one.
+If you assumed a \`defer:\` date and the user instead provides a \`due:\` date, use \`due:\` in the corrected ACTION — omit \`defer:\` unless the user also explicitly confirmed one.
 Be concise — under 80 words before the tag. Never include the →ACTION tag mid-response.`,
   review: `You are running a GTD Weekly Review. Guide the user through 7 steps one at a time:
 1. Capture loose ends (anything physical not captured)
