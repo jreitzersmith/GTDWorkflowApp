@@ -263,11 +263,13 @@ A work order is valid for worker execution only if:
 ## File edit rules for App.jsx
 
 - Use `mcp__workspace__bash` with a Python script for all changes — never the Edit tool directly
-- Never do multiple Python write passes — the Windows filesystem mount truncates the file
-- Read the exact target lines first with the `Read` tool to get precise strings for replacement
+- **Read source via `git show`:** use `subprocess.run(['git','show','HEAD:path'])` to get file content, never `open(path,'r')` directly from the mount. The virtiofs FUSE page cache does not invalidate on Windows-side writes (git commit/checkout, rebase, PowerShell), so direct reads can return stale/truncated content. `git show` reads from the ext4 object store and is always fresh.
+- **Write with `open(path,'w')` mode** — `O_TRUNC` bypasses the stale cache. Safe regardless of what Windows did to the file.
+- **Never use `open(path,'a')` (append mode)** — seeks to the cached (possibly stale) EOF, writes at the wrong offset.
+- Multiple Python writes in separate calls are fine as long as each uses `'w'` mode and content comes from `git show`.
 - Use `str.replace(old, new)` — never regex on JSX
 - Verify each replacement succeeded before writing (check for `✗` in output)
-- After write, confirm line count grew (not shrank)
+- After write, confirm size with `wc -c` and that it matches expected byte count
 - In a work order, capture the exact old string during the planning turn while the file is loaded
 
 ---
