@@ -99,4 +99,6 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-13 | Feature      | FR#84   | GH#89  | Convert Waiting For / Someday/Maybe to flag-based filter views with full hierarchy | 62404ec           |
 | 2026-05-13 | Feature      | FR#85   | GH#90  | Deferred view — full parent hierarchy via ProjectTree + visibilitySet             | 676a1ba           |
 | 2026-05-13 | Feature      | FR#87   | GH#92  | Next Actions as filter view (isNextAction flag) + Projects toolbar Sort/Display popovers | 109c29b           |
-| 2026-05-13 | Feature      | FR#88a  | GH#93  | Email processing: change completion message from "Inbox is clear" to "All items processed" | (this commit) |
+| 2026-05-13 | Feature      | FR#88a  | GH#93  | Email processing: change completion message from "Inbox is clear" to "All items processed" | ec0cd31 |
+| 2026-05-13 | Bug Fix      | —       | —      | handleConfirmMove: chat pending actions (→ACTION from coach) failed silently when inbox was empty | d29826b |
+| 2026-05-13 | Feature      | FR#88b  | GH#93  | Sidebar: Projects moved before Next Actions; coach mode dropdown; Today's Focus collapsible tiers + tag display; effort group dedup | ec0cd31 |
