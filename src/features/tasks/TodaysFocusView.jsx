@@ -143,7 +143,7 @@ function TodaysFocusView({ tasks, calendarEvents, calendarEnabled, onDailyReview
         >
           {isCollapsible && <span style={{ fontSize: 9, color: COLORS.muted, marginRight: 2 }}>{isOpen ? '▾' : '▸'}</span>}
           {label}
-          <span style={{ marginLeft: 'auto', fontSize: 10, color: COLORS.muted, fontWeight: 400 }}>{tierTasks.length}</span>
+          <span style={{ fontSize: 9, color: COLORS.muted, fontWeight: 400, opacity: 0.6 }}>[{tierTasks.length} Task{tierTasks.length !== 1 ? 's' : ''}]</span>
         </div>
         {isOpen && sortTier(tierTasks).map(t => (
           <TaskRowItem key={t.id} task={t} dotColor={dotColor} accentColor={accentColor} />

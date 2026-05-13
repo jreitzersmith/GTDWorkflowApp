@@ -57,17 +57,21 @@ function useInboxProcessing({
       ?? tasks.filter(t => t.bucket === 'inbox')[0];
     const nextItem = tasks.filter(t => t.bucket === 'inbox' && t.id !== current?.id && !skippedInSessionIds.current.has(t.id))[0];
 
-    if (!current) return;
+    // current may be null when the pending action was triggered from chat (not inbox processing).
+    // In that case skip archiving and inbox advancement; just create the task.
+    const hasInboxContext = !!current;
 
-    // Archive the original inbox item
-    setTasks(prev => prev.map(t =>
-      t.id === current.id ? { ...t, bucket: 'inboxHistory' } : t
-    ));
+    if (hasInboxContext) {
+      // Archive the original inbox item
+      setTasks(prev => prev.map(t =>
+        t.id === current.id ? { ...t, bucket: 'inboxHistory' } : t
+      ));
+    }
 
     // Create new tasks based on action type, applying any AI-suggested dates
     if (type === 'next') {
       const newId = genId();
-      const newTask = { id: newId, text: title || current.text, bucket: 'project', isNextAction: true, done: false, created: Date.now(), priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true, ...(aiSomeday ? { isSomeday: true } : {}), ...(aiWaitingFor ? { isWaitingFor: true } : {}), ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
+      const newTask = { id: newId, text: title || current?.text || '', bucket: 'project', isNextAction: true, done: false, created: Date.now(), priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true, ...(aiSomeday ? { isSomeday: true } : {}), ...(aiWaitingFor ? { isWaitingFor: true } : {}), ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
       sessionCreatedTasksRef.current.push({ id: newId, text: newTask.text });
       setTasks(prev => {
         if (uncategorizedProjectId) {
@@ -79,7 +83,7 @@ function useInboxProcessing({
       const projectId = genId();
       const actionId = genId();
       setTasks(prev => [
-        { id: projectId, text: title || current.text, bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true },
+        { id: projectId, text: title || current?.text || '', bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: null, category: aiCategory || null, reviewed: true },
         { id: actionId, text: nextAction || title, bucket: 'project', isNextAction: true, done: false, created: Date.now(), parentId: projectId, priority: aiPriority || [], location: aiLocation || [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: null, category: null, reviewed: true },
         ...prev,
       ]);
@@ -138,6 +142,9 @@ function useInboxProcessing({
     // type === 'delete': just archive, no new task
 
     setPendingAction(null);
+
+    // Only auto-advance inbox when this action came from formal inbox processing
+    if (!hasInboxContext) return;
 
     // Auto-continue to next inbox item (skip in single-task mode)
     if (nextItem && !singleTaskMode.current) {
