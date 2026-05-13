@@ -95,15 +95,16 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
 
   const allTasks = tasks || [];
   const isContainer = t => ['category', 'subcategory', 'project', 'subproject'].includes(t.nodeType);
-  // Containers are always valid link targets regardless of bucket or done status
-  const allContainerNodes = allTasks.filter(t => isContainer(t));
+  // Containers from next/project buckets anchor the main tree.
+  // Containers in waiting/someday belong to those sections instead (no duplicates).
+  const allContainerNodes = allTasks.filter(t => isContainer(t) && !['waiting', 'someday'].includes(t.bucket));
   const nextAndProjectTasks = [
     ...allContainerNodes,
     ...allTasks.filter(t => !isContainer(t) && !t.done && ['next', 'project'].includes(t.bucket)),
   ];
-  // Waiting For / Someday sections show leaf tasks only (containers already in main tree)
-  const waitingTasks = allTasks.filter(t => !isContainer(t) && !t.done && t.bucket === 'waiting');
-  const somedayTasks  = allTasks.filter(t => !isContainer(t) && !t.done && t.bucket === 'someday');
+  // Waiting For / Someday sections include all task types from those buckets.
+  const waitingTasks = allTasks.filter(t => !t.done && t.bucket === 'waiting');
+  const somedayTasks  = allTasks.filter(t => !t.done && t.bucket === 'someday');
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
