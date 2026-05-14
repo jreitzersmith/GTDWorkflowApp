@@ -6,7 +6,7 @@ import { COLORS } from "../../constants.jsx";
 // Uses childIds first (authoritative order, matches project view) then falls back
 // to parentId for projects whose parent's childIds was not updated (legacy data).
 // Projects not claimed as a child by either mechanism are treated as roots.
-function buildProjectTree(flatProjects, sorted = false) {
+function buildProjectTree(flatProjects) {
   const byId = {};
   flatProjects.forEach(p => { byId[p.id] = { ...p, children: [] }; });
 
@@ -31,15 +31,7 @@ function buildProjectTree(flatProjects, sorted = false) {
     }
   });
 
-  const roots = flatProjects.filter(p => !nestedIds.has(p.id)).map(p => byId[p.id]);
-  if (sorted) {
-    const sortNodes = (nodes) => {
-      nodes.sort((a, b) => (a.text || '').localeCompare(b.text || ''));
-      nodes.forEach(n => sortNodes(n.children));
-    };
-    sortNodes(roots);
-  }
-  return roots;
+  return flatProjects.filter(p => !nestedIds.has(p.id)).map(p => byId[p.id]);
 }
 
 // Renders one row of the project tree. Recurses for expanded children.
@@ -109,10 +101,10 @@ ProjectTreeRow.propTypes = {
 // Calls onSelect(id | null) on row click, onNewProject() for the
 // new-project option (omitted when prop is absent).
 // showUncategorized renders a "— UnCategorized" row at the top for TaskDetailPanel.
-function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProject, showUncategorized, sorted }) {
+function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProject, showUncategorized }) {
   const [expanded, setExpanded] = useState({});
 
-  const tree = buildProjectTree(eligibleProjects, sorted);
+  const tree = buildProjectTree(eligibleProjects);
 
   const handleToggle = (id) => {
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
@@ -161,12 +153,11 @@ function ProjectTreePicker({ eligibleProjects, selectedId, onSelect, onNewProjec
 }
 
 ProjectTreePicker.propTypes = {
-  eligibleProjects:  PropTypes.array.isRequired,
-  selectedId:        PropTypes.string,
-  onSelect:          PropTypes.func.isRequired,
-  onNewProject:      PropTypes.func,
+  eligibleProjects: PropTypes.array.isRequired,
+  selectedId:       PropTypes.string,
+  onSelect:         PropTypes.func.isRequired,
+  onNewProject:     PropTypes.func,
   showUncategorized: PropTypes.bool,
-  sorted:            PropTypes.bool,
 };
 
 export { buildProjectTree, ProjectTreePicker };

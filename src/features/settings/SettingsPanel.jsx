@@ -78,7 +78,6 @@ function SettingsPanel({
   efforts, onAddEffort, onRenameEffort, onRemoveEffort,
   calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride,
   tagDisplay, onSetTagDisplay,
-  focusExpandedDefaults, onSetFocusExpandedDefaults,
   nextActionsViewMode, onSetNextActionsViewMode,
   reviewNodeTypes, onSetReviewNodeTypes,
   onExport, onImport, onClose,
@@ -331,31 +330,6 @@ function SettingsPanel({
           <ReviewConfigManager reviewNodeTypes={reviewNodeTypes} onSetReviewNodeTypes={onSetReviewNodeTypes} />
         </SettingsSection>
 
-        <SettingsSection label="Today's Focus" storageKey="gtd_settings_todays_focus">
-          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
-            Choose which sections are expanded by default when you open Today's Focus.
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[
-              { key: 'dueToday',    label: '📅 Due Today' },
-              { key: 'overdue',     label: '⚠ Overdue' },
-              { key: 'dueThisWeek', label: '📆 Due This Week (>1 hr)' },
-              { key: 'noCalEvent',  label: '📆 Due · No Calendar Event' },
-            ].map(({ key, label }) => (
-              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: COLORS.text, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={!!(focusExpandedDefaults || {})[key]}
-                  onChange={e => onSetFocusExpandedDefaults(prev => ({ ...prev, [key]: e.target.checked }))}
-                  style={{ accentColor: COLORS.next, width: 14, height: 14 }}
-                />
-                {label}
-                <span style={{ fontSize: 10, color: COLORS.muted }}>(expanded by default)</span>
-              </label>
-            ))}
-          </div>
-        </SettingsSection>
-
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
           <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
         </SettingsSection>
@@ -414,8 +388,6 @@ SettingsPanel.propTypes = {
   onClearCalibrationOverride: PropTypes.func.isRequired,
   tagDisplay:                 PropTypes.string.isRequired,
   onSetTagDisplay:            PropTypes.func.isRequired,
-  focusExpandedDefaults:      PropTypes.object.isRequired,
-  onSetFocusExpandedDefaults: PropTypes.func.isRequired,
   nextActionsViewMode:        PropTypes.string.isRequired,
   onSetNextActionsViewMode:   PropTypes.func.isRequired,
   onExport:                   PropTypes.func.isRequired,

@@ -67,7 +67,7 @@ export default function GTDManager() {
           sheetsEnabled, slidesEnabled, gmailError, scopePrefs,
           setScopePref, reauthorizeGoogle, connectCalendar, disconnectCalendar,
           disconnectAll, refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
-  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects, showWaitingInProjects, setShowWaitingInProjects, showSomeDayInProjects, setShowSomeDayInProjects, pendingDeleteConfirm, setPendingDeleteConfirm } = useTaskUIState();
+  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects, showWaitingInProjects, setShowWaitingInProjects, showSomeDayInProjects, setShowSomeDayInProjects, focusedTaskId, setFocusedTaskId, pendingDeleteConfirm, setPendingDeleteConfirm } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
   const [uncategorizedProjectId, setUncategorizedProjectId] = useState(null);
@@ -1088,6 +1088,8 @@ export default function GTDManager() {
     showWaitingInProjects,
     showSomeDayInProjects,
     uncategorizedProjectId,
+    focusedTaskId,
+    setFocusedTaskId,
   };
 
   return (
@@ -1278,6 +1280,8 @@ export default function GTDManager() {
                           showSomeDayInProjects={showSomeDayInProjects}
                           setShowSomeDayInProjects={setShowSomeDayInProjects}
                           setShowCompletedInProjects={setShowCompletedInProjects}
+                          focusedTaskId={focusedTaskId}
+                          setFocusedTaskId={setFocusedTaskId}
                         />
                       )}
                     </div>

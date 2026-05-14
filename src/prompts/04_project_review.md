@@ -1,3 +1,19 @@
+<!--
+  Prompt:     Project Review Mode — Tasks sub-mode
+  Key:        SYSTEM_PROMPTS.projectReview
+  Defined in: src/constants.jsx (line ~143)
+  Used by:    src/features/coach/useCallAI.js → callAI()
+              src/features/coach/useProjectReview.js → reviewMode state ('tasks')
+              src/features/coach/AICoach.jsx — Project Review panel, Tasks tab
+  Mode key:   'projectReview' (COACH_MODES.projectReview)
+  Purpose:    Reviews one GTD project at a time to identify missing next actions.
+              The AI assesses the project's momentum and suggests 2–4 concrete
+              missing actions. Returns a →SUGGESTIONS block that the app parses
+              to show an accept/reject UI for each suggestion.
+  Note:       The "IMPORTANT: Do not suggest..." guard was added to prevent the
+              AI from re-suggesting actions already in the task list.
+-->
+
 You are reviewing a GTD project to identify missing next actions.
 
 Given a project name, its current subtasks, and any metadata, you will:

@@ -74,7 +74,6 @@ function ProjectSelector({ taskId, parentId, eligibleProjects, onReassignProject
                     setNewProjName("");
                   }}
                   showUncategorized
-                  sorted
                 />
               </div>
             )}
@@ -332,11 +331,9 @@ function DriveAttachments({ taskId, attachments, driveEnabled, googleAccessToken
 
   if (!driveEnabled) return null;
 
-  // Deduplicate by id before rendering — guards against duplicate entries in driveAttachments
-  const seen = new Set();
-  const list = (attachments || []).filter(a => { if (!a.id || seen.has(a.id)) return false; seen.add(a.id); return true; });
-  const emailAtts = list.filter(a => a.mimeType === 'message/rfc822' || a.type === 'email');
-  const driveAtts = list.filter(a => a.mimeType !== 'message/rfc822' && a.type !== 'email');
+  const list = attachments || [];
+  const emailAtts = list.filter(a => a.mimeType === 'message/rfc822');
+  const driveAtts = list.filter(a => a.mimeType !== 'message/rfc822');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -419,7 +416,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
   );
   const hasProjectChildren = allTasks.some(t => t.parentId === task.id && t.bucket === 'project');
   // nodeType===null on existing project-bucket tasks displays as 'project'; on next-bucket tasks as 'task'
-  const effectiveNodeType = task.nodeType ?? (task.isNextAction ? 'task' : task.bucket === 'project' ? 'project' : 'task');
+  const effectiveNodeType = task.nodeType ?? (task.bucket === 'project' ? 'project' : 'task');
 
   return (
     <div style={{ ...style, background: COLORS.surface, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -480,7 +477,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
           </div>
 
           {/* Type toggle — nodeType selector, visible in Projects and Next Actions views */}
-          {(['project', 'next', 'waiting', 'someday', 'deferred'].includes(currentBucket)) && (
+          {(currentBucket === 'project' || currentBucket === 'next') && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
               <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Type</span>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -493,10 +490,9 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
                       key={value}
                       onClick={() => {
                         if (disabled) return;
-                        const moveBucket = ['project', 'next'].includes(currentBucket);
-                        onUpdate(task.id, moveBucket
-                          ? (isTask ? { nodeType: 'task', isNextAction: true, bucket: 'project' } : { nodeType: value, isNextAction: false, bucket: 'project' })
-                          : { nodeType: value });
+                        onUpdate(task.id, isTask
+                          ? { nodeType: 'task', bucket: 'next' }
+                          : { nodeType: value, bucket: 'project' });
                       }}
                       title={disabled ? 'Cannot convert to task: node has sub-projects' : undefined}
                       style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${isActive ? color : COLORS.border}`, background: isActive ? color + '22' : 'transparent', color: isActive ? color : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}
@@ -510,21 +506,6 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             </div>
           )}
 
-          {/* Waiting For / Someday flags */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Flags</span>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                onClick={() => onUpdate(task.id, { isWaitingFor: !task.isWaitingFor })}
-                style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${task.isWaitingFor ? '#c04040' : COLORS.border}`, background: task.isWaitingFor ? '#c0404022' : 'transparent', color: task.isWaitingFor ? '#c04040' : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
-              >Waiting For</button>
-              <button
-                onClick={() => onUpdate(task.id, { isSomeday: !task.isSomeday })}
-                style={{ padding: '2px 10px', borderRadius: 10, border: `1px solid ${task.isSomeday ? COLORS.someday || '#888' : COLORS.border}`, background: task.isSomeday ? (COLORS.someday || '#888') + '22' : 'transparent', color: task.isSomeday ? COLORS.someday || '#888' : COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
-              >Someday/Maybe</button>
-            </div>
-          </div>
-
           {/* Move to bucket */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
             <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Move to</span>
@@ -533,7 +514,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
               onChange={e => onUpdate(task.id, { bucket: e.target.value })}
               style={{ ...fieldInput, flex: 1, fontSize: 12, colorScheme: 'dark' }}
             >
-              {Object.entries(BUCKETS).filter(([k]) => !['inboxHistory', 'waiting', 'someday', 'deferred'].includes(k)).map(([key, cfg]) => (
+              {Object.entries(BUCKETS).filter(([k]) => k !== 'inboxHistory').map(([key, cfg]) => (
                 <option key={key} value={key}>{cfg.label}</option>
               ))}
             </select>

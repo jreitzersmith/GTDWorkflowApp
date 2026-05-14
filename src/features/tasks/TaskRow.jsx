@@ -14,7 +14,7 @@ const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
 function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelected }) {
   const { onComplete, onDelete, onMove, onAskAI, onUpdateTask, onAssignToProject, onSkipRecurrence, onNavigate, onOpenDetail, onToggleCollapse, onToggleCollapseLevel } = useContext(TaskActionsContext);
-  const { currentBucket, allTasks, moveMenu, setMoveMenu, pendingAction, collapsedNodes, selectedTaskId, locations, efforts, tagDisplay, categories } = useContext(TaskRowContext);
+  const { currentBucket, allTasks, moveMenu, setMoveMenu, pendingAction, collapsedNodes, selectedTaskId, focusedTaskId, setFocusedTaskId, locations, efforts, tagDisplay, categories } = useContext(TaskRowContext);
   const {
     hover, setHover,
     expanded, setExpanded,
@@ -120,14 +120,18 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
 
   const hasMetadata = taskPriority.length > 0 || taskLocation.length > 0 || taskDueDate || !!taskEffort || !!task.deferUntil || !!task.category;
 
+  const isFocused = focusedTaskId === task.id;
+
   return (
     <div
+      data-task-id={task.id}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ borderLeft: `3px solid ${highlight ? COLORS.inbox : isSubtask ? COLORS.project + "55" : "transparent"}`, opacity: task.done ? 0.4 : (deferred && currentBucket === "project") ? 0.55 : 1, transition: "all 0.12s" }}
+      onClick={() => setFocusedTaskId?.(task.id)}
+      style={{ borderLeft: `3px solid ${isFocused ? COLORS.next : highlight ? COLORS.inbox : isSubtask ? COLORS.project + "55" : "transparent"}`, opacity: task.done ? 0.4 : (deferred && currentBucket === "project") ? 0.55 : 1, transition: "all 0.12s", outline: isFocused ? `1px solid ${COLORS.next}22` : "none" }}
     >
       {/* Main task row */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: highlight ? COLORS.inboxBg : (selectedTaskId === task.id ? COLORS.surface3 : hover ? COLORS.surface2 : "transparent") }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: isFocused ? COLORS.next + "11" : highlight ? COLORS.inboxBg : (selectedTaskId === task.id ? COLORS.surface3 : hover ? COLORS.surface2 : "transparent") }}>
         {/* Bulk-selection checkbox — shown in Inbox when a selection handler is provided */}
         {onSelect && (
           <StyledCheckbox

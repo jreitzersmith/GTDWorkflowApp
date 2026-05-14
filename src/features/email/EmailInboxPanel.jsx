@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
-import { ProjectTreePicker } from "../tasks/ProjectTreePicker.jsx";
 import { doGmailFetchInbox, doGmailGetMessageBody, doGmailBatchLabel } from "./gmailTools.js";
 import { avatarInitials, avatarColor, formatEmailDate, gmailBtn, gmailBtnPrimary, gmailBtnSm, gmailBtnSmDanger } from "./emailUtils.js";
 
@@ -19,6 +18,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
 
   // Task-link picker state
   const [showTaskPicker, setShowTaskPicker] = useState(false);
+  const [taskFilter, setTaskFilter] = useState('');
   const [linkedConfirm, setLinkedConfirm] = useState(null);
   const pickerRef = useRef(null);
 
@@ -41,6 +41,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
   // Reset task picker when email changes
   useEffect(() => {
     setShowTaskPicker(false);
+    setTaskFilter('');
     setLinkedConfirm(null);
   }, [selectedId]);
 
@@ -85,19 +86,15 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
     };
     attachEmailToTask(taskId, att);
     setShowTaskPicker(false);
-    // Note: attachEmailToTask deduplicates by id — linking the same email twice is a no-op
+    setTaskFilter('');
     setLinkedConfirm(taskText);
-    setTimeout(() => setLinkedConfirm(null), 4000);
+    setTimeout(() => setLinkedConfirm(null), 2500);
   };
 
-  const allTasks = tasks || [];
-  const isContainer = t => ['category', 'subcategory', 'project', 'subproject'].includes(t.nodeType);
-  // All project-tree containers plus non-done next/project tasks for the link picker.
-  const allContainerNodes = allTasks.filter(t => isContainer(t));
-  const nextAndProjectTasks = [
-    ...allContainerNodes,
-    ...allTasks.filter(t => !isContainer(t) && !t.done && ['next', 'project'].includes(t.bucket)),
-  ];
+  const actionTasks = (tasks || []).filter(t => !t.done && ['next', 'project', 'waiting', 'someday'].includes(t.bucket));
+  const filteredTasks = taskFilter
+    ? actionTasks.filter(t => t.text.toLowerCase().includes(taskFilter.toLowerCase()))
+    : actionTasks;
 
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -234,26 +231,43 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                         </button>
                         {showTaskPicker && (
                           <div style={{
-                            position: 'absolute', bottom: 'calc(100% + 2px)', left: 0, right: 0,
+                            position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
                             background: COLORS.surface2, border: `1px solid ${COLORS.border2}`,
                             borderRadius: 6, padding: 4, zIndex: 50,
-                            maxHeight: 320, overflowY: 'auto',
-                            boxShadow: '0 -4px 16px rgba(0,0,0,0.4)',
+                            maxHeight: 240, overflowY: 'auto',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
                           }}>
-                            {nextAndProjectTasks.length === 0 && (
-                              <div style={{ padding: '6px 10px', fontSize: 11, color: COLORS.muted }}>No tasks found</div>
-                            )}
-                            {nextAndProjectTasks.length > 0 && (
-                              <ProjectTreePicker
-                                eligibleProjects={nextAndProjectTasks}
-                                selectedId={null}
-                                sorted={true}
-                                onSelect={(id) => {
-                                  const task = nextAndProjectTasks.find(t => t.id === id);
-                                  if (task) handleLinkToTask(task.id, task.text);
+                            <div style={{ padding: '4px 4px 6px' }}>
+                              <input
+                                autoFocus
+                                value={taskFilter}
+                                onChange={e => setTaskFilter(e.target.value)}
+                                placeholder="Filter tasks…"
+                                style={{
+                                  width: '100%', background: COLORS.surface3, border: `1px solid ${COLORS.border}`,
+                                  borderRadius: 5, color: COLORS.text, padding: '4px 8px', fontFamily: 'inherit',
+                                  fontSize: 11, outline: 'none', boxSizing: 'border-box',
                                 }}
                               />
+                            </div>
+                            {filteredTasks.length === 0 && (
+                              <div style={{ padding: '6px 10px', fontSize: 11, color: COLORS.muted }}>No tasks found</div>
                             )}
+                            {filteredTasks.slice(0, 50).map(t => (
+                              <div
+                                key={t.id}
+                                onClick={() => handleLinkToTask(t.id, t.text)}
+                                style={{
+                                  padding: '5px 8px', fontSize: 12, color: COLORS.text, cursor: 'pointer',
+                                  borderRadius: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                title={t.text}
+                              >
+                                {t.text}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>

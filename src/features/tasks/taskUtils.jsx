@@ -60,7 +60,7 @@ function formatBubble(text) {
 }
 
 function extractAction(text) {
-  const m = text.match(/→ACTION:(next|project|someday|waiting|delete)\|?([^|\n]*)?\|?([^|\n]*)?((?:\|[^\n]*)*)?/);
+  const m = text.match(/→ACTION:(next|project|someday|waiting|delete|add)\|?([^|\n]*)?\|?([^|\n]*)?((?:\|[^\n]*)*)?/);
   if (!m) return null;
   // For 'project' type m[3] is the first next action; for all other types the
   // third positional segment may be a due/defer/recur field captured before the
@@ -78,8 +78,6 @@ function extractAction(text) {
   const categoryMatch = extras.match(/\|category:([^|]+)/);
   const priorityMatch = extras.match(/\|priority:([^|]+)/);
   const locationMatch = extras.match(/\|location:([^|]+)/);
-  const somedayMatch    = extras.match(/\|someday:(true|false)/);
-  const waitingForMatch = extras.match(/\|waitingFor:(true|false)/);
   return {
     type:      m[1],
     title:     (m[2] || "").trim(),
@@ -92,8 +90,6 @@ function extractAction(text) {
     category:   categoryMatch ? categoryMatch[1].trim()                 : null,
     priority:   priorityMatch ? priorityMatch[1].split(',').map(s => s.trim()).filter(Boolean) : [],
     location:   locationMatch ? locationMatch[1].split(',').map(s => s.trim()).filter(Boolean) : [],
-    isSomeday:    somedayMatch    ? somedayMatch[1] === 'true'    : false,
-    isWaitingFor: waitingForMatch ? waitingForMatch[1] === 'true' : false,
   };
 }
 
@@ -125,9 +121,6 @@ function extractUpdateAction(text) {
     if (key === 'location')     changes.location     = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') changes.recurrence = parseRecurrenceValue(val);
     if (key === 'dueTime') changes.dueTime = val;
-    if (key === 'waitingFor') changes.isWaitingFor = val === 'true';
-    if (key === 'someday')    changes.isSomeday    = val === 'true';
-    if (key === 'nextAction') changes.isNextAction = val === 'true';
   });
   if (notesRaw !== null) changes.notes = notesRaw.replace(/\\n/g, '\n');
 
@@ -254,7 +247,7 @@ function waterfallFilter(nextTasks, allTasks) {
 // Multi-value fields (location, priority) use the first value.
 // "project" walks up the parent chain to find the root project name.
 // Tasks with no value for the field go into a field-specific fallback bucket.
-function groupByField(taskList, field, allTasks = [], { effortLabels = null } = {}) {
+function groupByField(taskList, field, allTasks = []) {
   const ungroupedLabel = field === "project" ? "No Project" : field === "effort" ? "No Effort" : field === "category" ? "No Category" : "Ungrouped";
   const groups = {};
   const ungrouped = [];
@@ -267,8 +260,7 @@ function groupByField(taskList, field, allTasks = [], { effortLabels = null } = 
     } else if (field === "dueDate") {
       keys = task.dueDate ? [task.dueDate] : [];
     } else if (field === "effort") {
-      const effortKey = task.effort ? (effortLabels ? normalizeEffort(task.effort, effortLabels) : task.effort) : null;
-      keys = effortKey ? [effortKey] : [];
+      keys = task.effort ? [task.effort] : [];
     } else if (field === "category") {
       keys = task.category ? [task.category] : [];
     } else if (field === "project") {
@@ -691,20 +683,4 @@ function useResizer(storageKey, defaultSize, { min, max, direction = 'h', sign =
 }
 
 
-// Walk the parentId chain for each flagged task and collect all ancestor IDs.
-// Returns a Set of IDs that should be visible in a filter view hierarchy.
-function computeVisibleIds(flaggedIds, allTasks) {
-  const idMap = {};
-  allTasks.forEach(t => { idMap[t.id] = t; });
-  const visible = new Set(flaggedIds);
-  flaggedIds.forEach(id => {
-    let cur = idMap[id];
-    while (cur && cur.parentId) {
-      visible.add(cur.parentId);
-      cur = idMap[cur.parentId];
-    }
-  });
-  return visible;
-}
-
-export { todayStr, isDeferred, normalizeEffort, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, collectDescendantIds, moveTaskInTree, computeVisibleIds, useResizer };
+export { todayStr, isDeferred, normalizeEffort, subtractFromDate, buildNextOccurrence, formatBubble, extractAction, extractUpdateAction, extractAddAction, extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction, extractCalendarDeleteAction, waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, effortAccuracyColor, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES, buildCalibrationContext, sumDescendantEffort, countDescendants, extractSuggestions, extractMetadata, getOrderedChildren, collectDescendantIds, moveTaskInTree, useResizer };

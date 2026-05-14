@@ -106,41 +106,15 @@ If an item in the work order hits a HALT condition, the worker logs it and skips
 
 After all changes for a cycle are complete, provide a specific manual testing checklist. Generic advice is not acceptable.
 
-**Always render as a widget** — this applies in two situations:
-1. At the end of a cycle, when presenting the full checklist for the first time
-2. Whenever John asks which tests are outstanding, remaining, or not yet passed — render only the unresolved items as a fresh widget, never answer in plain text
-
 **Format:** Always present the checklist as an interactive widget using `mcp__visualize__show_widget`. Each item must:
-- Have a state button that cycles through **unchecked → Pass → Fail → Skip → Note** on click
-  - Pass = green · Fail = red · Skip = grey · Note = amber
-- Have a per-item text input field for optional notes/observations
+- Cycle through unchecked → pass → fail → note on click
 - Pre-populate state if the user has already reported results in chat before the widget is rendered
-- Include a **Submit** button that calls `sendPrompt()` with a compact summary including all states and any notes
-  - Format: `FR#XX test results — [Item label]: Pass · [Item label]: Fail (note text) · ...`
-- Use `Note` state (amber) for items that partially passed or have a known caveat
+- Include a "Send results" button that calls `sendPrompt()` with a compact summary (e.g. `FR#XX test results — Item: pass · Item: fail`)
+- Use `note` state (amber) for items that partially passed or have a known caveat
 
 Each checklist item: specific action + specific expected result. Group by feature area if multiple items were implemented.
 
 John clicks items to mark state, then submits. Do not ask for a general "did it work" — wait for the widget submission. On receipt, treat pass = confirmed, fail = needs fix (diagnose), note = log as new FR if not already tracked.
-
----
-
-## Supabase migrations
-
-When a cycle includes a SQL migration (new columns, new tables, ALTER TABLE):
-
-1. **Confirm readiness** — before running, confirm John is ready (app not actively in use, data is clean).
-2. **Run it yourself** using the Supabase Management API — do not hand copy-paste steps to John:
-   ```
-   curl -s -X POST \
-     "https://api.supabase.com/v1/projects/tudmteqljgpocffalssz/database/query" \
-     -H "Authorization: Bearer $SUPABASE_MANAGEMENT_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"query": "<SQL here>"}'
-   ```
-   Credentials are in `.env` (`SUPABASE_MANAGEMENT_TOKEN`, project ref = `tudmteqljgpocffalssz`).
-3. **Verify** — follow up with a `SELECT` on `information_schema.columns` to confirm the schema change landed.
-4. **Only then** proceed to the testing checklist — persistence tests are meaningless without the columns present.
 
 ---
 
@@ -289,13 +263,11 @@ A work order is valid for worker execution only if:
 ## File edit rules for App.jsx
 
 - Use `mcp__workspace__bash` with a Python script for all changes — never the Edit tool directly
-- **Read source via `git show`:** use `subprocess.run(['git','show','HEAD:path'])` to get file content, never `open(path,'r')` directly from the mount. The virtiofs FUSE page cache does not invalidate on Windows-side writes (git commit/checkout, rebase, PowerShell), so direct reads can return stale/truncated content. `git show` reads from the ext4 object store and is always fresh.
-- **Write with `open(path,'w')` mode** — `O_TRUNC` bypasses the stale cache. Safe regardless of what Windows did to the file.
-- **Never use `open(path,'a')` (append mode)** — seeks to the cached (possibly stale) EOF, writes at the wrong offset.
-- Multiple Python writes in separate calls are fine as long as each uses `'w'` mode and content comes from `git show`.
+- Never do multiple Python write passes — the Windows filesystem mount truncates the file
+- Read the exact target lines first with the `Read` tool to get precise strings for replacement
 - Use `str.replace(old, new)` — never regex on JSX
 - Verify each replacement succeeded before writing (check for `✗` in output)
-- After write, confirm size with `wc -c` and that it matches expected byte count
+- After write, confirm line count grew (not shrank)
 - In a work order, capture the exact old string during the planning turn while the file is loaded
 
 ---
@@ -311,37 +283,3 @@ If a new issue arrives during Phases 5–6: log it immediately in `Known_Issues_
 If a new issue is discovered during morning review: log it, add to the next work order. Do not patch it ad hoc during the review session unless it is a critical regression blocking use of the app.
 
 If the worker encountered unexpected scope (e.g., a dependent file changed and the replacement string was wrong): log in the work order report, add a revised item to the next planning session. Do not attempt to recover mid-batch.
-
----
-
-## Virtual / flag-based bucket architecture (added 2026-05-13)
-
-Four buckets are now virtual filter views driven by boolean flags on tasks, not by `task.bucket`:
-
-| View | Flag | Default |
-|---|---|---|
-| Next Actions | `isNextAction` | false |
-| Waiting For | `isWaitingFor` | false |
-| Someday/Maybe | `isSomeday` | false |
-| Deferred | `deferUntil > today` | — |
-
-All flagged tasks have `bucket: 'project'` — they live in the Projects tree and are surfaced in their respective views by filter. The `bucket` field no longer uses `'next'`, `'waiting'`, or `'someday'` as values.
-
-**Creating next actions:** always `bucket: 'project', isNextAction: true, parentId: uncategorizedProjectId` (or an explicit parent). Never `bucket: 'next'`.
-
-**Supabase columns:** `is_next_action`, `is_waiting_for`, `is_someday`, `defer_until` on the `tasks` table.
-
-**uncategorizedProjectId:** stored in `user_settings.uncategorized_project_id`. The live project ID is `mp1esqmp51mo`. If this ever gets stale, query `tasks WHERE lower(text) LIKE '%uncategorized%'` to find the real ID and update `user_settings`.
-
----
-
-## Email processing architecture (added 2026-05-13)
-
-`processEmailWithAI` (App.jsx) sends the email body to the AI in chat mode with a structured prompt covering: task identification → project/metadata clarification → similar-email search → filter/label offer → archive.
-
-**Auto-link mechanism:** `pendingEmailContext` state + `preEmailTaskIdsRef` (App.jsx). When `processEmailWithAI` is called, a snapshot of current task IDs is taken. A `useEffect` watches `tasks` and attaches the email to any newly created task. Clears when `switchCoachMode` is called.
-
-**→ACTION:link_email** is also supported as an explicit AI-emitted directive: `→ACTION:link_email|<task_title_or_id>|<gmail_message_id>[|<subject>]`. Handled in the `taskActionLines` loop in `useCallAI.js`.
-
-**Duplicate-task guard:** `→ACTION:add` was removed from `extractAction`'s regex pattern — it is handled only by `taskActionLines` (auto-processed), not by `setPendingAction` (which would show a confirm bar and cause a second creation).
-

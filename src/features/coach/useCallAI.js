@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SYSTEM_PROMPTS, OPENWEBUI_URL } from '../../constants.jsx';
 import { TOOLS, doWebSearch } from './webSearch.js';
 import { GMAIL_SEARCH_TOOL, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL,
@@ -35,10 +35,10 @@ const GET_TASK_CONTEXT_TOOL = {
 // Buckets to include in the task context for each coach mode.
 // Modes not listed here receive all buckets (null = no filter).
 const MODE_CONTEXT_BUCKETS = {
-  process:         ['inbox', 'project', 'waiting'],
+  process:         ['inbox', 'next', 'project', 'waiting'],
   projectReview:   ['project'],
   projectMetadata: ['project'],
-  calendarEvent:   ['project'],
+  calendarEvent:   ['next', 'project'],
 };
 
 /**
@@ -87,11 +87,8 @@ function useCallAI({
   }, [provider, fetchModels]);
 
   const [lastInputLog, setLastInputLog] = useState(null);
-  // Persists email context across multi-turn conversations initiated by processEmailWithAI
-  const emailContextRef = useRef(null);
-  const setEmailContext = useCallback((ctx) => { emailContextRef.current = ctx; }, []);
 
-  const callAI = useCallback(async (userMsg, mode, history, { emailContext = null } = {}) => {
+  const callAI = useCallback(async (userMsg, mode, history) => {
     // Inject calibration context only for modes that suggest effort estimates
     const calibCtx = (mode === 'process' || mode === 'projectMetadata')
       ? buildCalibrationContext(tasks, efforts, calibrationOverrides)
@@ -371,14 +368,9 @@ function useCallAI({
       let updateChip = null;
       let actionError = null;
       if (mode === 'chat' || mode === 'dump' || mode === 'daily') {
-        // Extract →ACTION lines — notes values may span multiple non-blank lines,
-        // so match each block until the first blank line (\n\n) which separates
-        // action lines from the AI's subsequent prose response.
-        const taskActionLines = [];
-        const actionRe = /→ACTION:(?:update|add|create|link_email)\|(?:[^\n]|\n(?!\n))+/g;
-        for (const am of reply.matchAll(actionRe)) {
-          taskActionLines.push(am[0].trimEnd());
-        }
+        const taskActionLines = reply.split('\n')
+          .map(l => l.trim())
+          .filter(l => /^→ACTION:(update|add|create)\|/.test(l));
 
         if (taskActionLines.length > 0) {
           // Process all actions against a local working copy so parent lookups
@@ -409,21 +401,18 @@ function useCallAI({
 
             const add = extractAddAction(line);
             if (add) {
-              const { title, parentId: parentRef, bucket: addBucket = 'next', dueDate = null,
+              const { title, parentId: parentRef, bucket = 'next', dueDate = null,
                       deferUntil = null, effort = null, location = [], recurrence = null, category = null } = add;
-              const addIsNext = addBucket === 'next';
-              const addBucketFinal = addIsNext ? 'project' : addBucket;
               // ID lookup first; fall back to exact title match (supports newly-created parents)
               const parent = workingTasks.find(t => t.id === parentRef)
                           || workingTasks.find(t => t.text.toLowerCase() === parentRef.toLowerCase());
               if (parent) {
                 const newId = genId();
                 const newTask = {
-                  id: newId, text: title, bucket: addBucketFinal, done: false, created: Date.now(),
+                  id: newId, text: title, bucket, done: false, created: Date.now(),
                   parentId: parent.id, priority: [], location, dueDate, effort: normalizeEffort(effort, efforts),
                   actualEffort: null, deferUntil, notes: null, recurrence,
                   category: category || parent.category || null,
-                  ...(addIsNext ? { isNextAction: true } : {}),
                 };
                 workingTasks = [
                   ...workingTasks.map(t => t.id === parent.id
@@ -441,17 +430,14 @@ function useCallAI({
 
             const create = extractCreateAction(line);
             if (create) {
-              const { title, bucket: rawBucket, dueDate = null, dueTime = null, deferUntil = null,
+              const { title, bucket, dueDate = null, dueTime = null, deferUntil = null,
                       effort = null, location = [], recurrence = null } = create;
-              const createIsNext = rawBucket === 'next';
-              const bucket = createIsNext ? 'project' : rawBucket;
               const newId = genId();
-              const parentId = (createIsNext && uncategorizedProjectId) ? uncategorizedProjectId : undefined;
+              const parentId = (bucket === 'next' && uncategorizedProjectId) ? uncategorizedProjectId : undefined;
               const newTask = {
                 id: newId, text: title, bucket, done: false, created: Date.now(),
                 priority: [], location, dueDate, dueTime, effort: normalizeEffort(effort, efforts), actualEffort: null,
                 deferUntil, notes: null, recurrence,
-                ...(createIsNext ? { isNextAction: true } : {}),
                 ...(parentId ? { parentId } : {}),
               };
               if (parentId) {
@@ -461,28 +447,7 @@ function useCallAI({
               } else {
                 workingTasks = [newTask, ...workingTasks];
               }
-              chips.push({ taskName: title, fields: ['created in ' + (createIsNext ? 'Next Actions' : bucket)] });
-            }
-
-            // →ACTION:link_email|<task_title_or_id>|<gmail_message_id>[|<subject>]
-            if (line.startsWith('→ACTION:link_email|')) {
-              const parts = line.slice('→ACTION:link_email|'.length).split('|');
-              const ref     = (parts[0] || '').trim();
-              const gmailId = (parts[1] || '').trim();
-              const subj    = (parts[2] || ref).trim();
-              if (ref && gmailId) {
-                const target = workingTasks.find(t => t.id === ref || t.text.toLowerCase() === ref.toLowerCase());
-                if (target) {
-                  workingTasks = workingTasks.map(t => {
-                    if (t.id !== target.id) return t;
-                    const existing = t.driveAttachments || [];
-                    if (existing.find(a => a.id === gmailId)) return t;
-                    return { ...t, driveAttachments: [...existing, { id: gmailId, name: subj, type: 'email' }] };
-                  });
-                  chips.push({ taskName: target.text, fields: ['email linked'] });
-                }
-              }
-              continue;
+              chips.push({ taskName: title, fields: ['created in ' + bucket] });
             }
           }
 
@@ -642,10 +607,10 @@ function useCallAI({
     if (!text || loading) return;
     setChatInput('');
     setMessages(prev => [...prev, { role: 'user', text }]);
-    await callAI(text, coachMode, chatHistory, { emailContext: emailContextRef.current });
+    await callAI(text, coachMode, chatHistory);
   }, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages]);
 
-  return { callAI, sendChat, fetchModels, lastInputLog, setEmailContext };
+  return { callAI, sendChat, fetchModels, lastInputLog };
 }
 
 export { useCallAI }

@@ -92,6 +92,8 @@ function TaskBucketView({
   setShowWaitingInProjects,
   showSomeDayInProjects,
   setShowSomeDayInProjects,
+  focusedTaskId,
+  setFocusedTaskId,
 }) {
   const { efforts } = useContext(TaskRowContext);
   const [filterText, setFilterText] = useState("");
@@ -101,9 +103,10 @@ function TaskBucketView({
   const projPickerRef = useRef(null);
   const quickSortRef = useRef(null);
   const displayRef = useRef(null);
+  const taskListRef = useRef(null);
 
   // Reset filter when switching buckets
-  useEffect(() => { setFilterText(""); }, [currentBucket]);
+  useEffect(() => { setFilterText(""); setFocusedTaskId?.(null); }, [currentBucket]);
 
   // Close project picker on outside click
   useEffect(() => {
@@ -128,6 +131,53 @@ function TaskBucketView({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [displayOpen]);
+
+  // Keyboard navigation: arrow keys move focus through visible task rows,
+  // Enter opens the detail panel, j/k are vim-style aliases, Left/Right collapse/expand in Projects.
+  useEffect(() => {
+    const container = taskListRef.current;
+    if (!container) return;
+
+    const handler = (e) => {
+      // Skip when typing in any input/textarea/select
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Skip modifier combos that belong to other shortcuts (Cmd+K etc.)
+      if (e.metaKey || e.ctrlKey) return;
+
+      const rows = Array.from(container.querySelectorAll('[data-task-id]'));
+      if (!rows.length) return;
+
+      const currentIdx = rows.findIndex(el => el.dataset.taskId === focusedTaskId);
+
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault();
+        const nextIdx = currentIdx < rows.length - 1 ? currentIdx + 1 : 0;
+        setFocusedTaskId(rows[nextIdx].dataset.taskId);
+        rows[nextIdx].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault();
+        const prevIdx = currentIdx > 0 ? currentIdx - 1 : rows.length - 1;
+        setFocusedTaskId(rows[prevIdx].dataset.taskId);
+        rows[prevIdx].scrollIntoView({ block: 'nearest' });
+      } else if ((e.key === 'Enter' || e.key === ' ') && focusedTaskId) {
+        e.preventDefault();
+        // Delegate to the task actions context open-detail handler
+        container.querySelector(`[data-task-id="${focusedTaskId}"] span[title="Open detail panel"]`)?.click();
+      } else if (e.key === 'ArrowRight' && focusedTaskId && currentBucket === 'project') {
+        e.preventDefault();
+        container.querySelector(`[data-task-id="${focusedTaskId}"] button[title="Expand"]`)?.click();
+      } else if (e.key === 'ArrowLeft' && focusedTaskId && currentBucket === 'project') {
+        e.preventDefault();
+        container.querySelector(`[data-task-id="${focusedTaskId}"] button[title="Collapse"]`)?.click();
+      } else if (e.key === 'Escape') {
+        setFocusedTaskId(null);
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [focusedTaskId, setFocusedTaskId, currentBucket]);
 
   const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
   const allProjectTasks = tasks.filter(t => t.bucket === "project" && !t.done);
@@ -344,7 +394,7 @@ function TaskBucketView({
       )}
 
       {/* Task list */}
-      <div style={TASK_LIST_STYLE}>
+      <div style={TASK_LIST_STYLE} ref={taskListRef}>
         {filterActive ? (
           filteredTasks.length === 0 ? (
             <div style={{ padding: "28px 24px", textAlign: "center", color: COLORS.muted, fontSize: 12 }}>
@@ -506,6 +556,8 @@ TaskBucketView.propTypes = {
   showCompletedInProjects:   PropTypes.bool,
   showWaitingInProjects:   PropTypes.bool,
   showSomeDayInProjects:   PropTypes.bool,
+  focusedTaskId:           PropTypes.string,
+  setFocusedTaskId:        PropTypes.func,
   setShowWaitingInProjects: PropTypes.func,
   setShowSomeDayInProjects: PropTypes.func,
   setShowCompletedInProjects: PropTypes.func,

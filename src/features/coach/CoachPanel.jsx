@@ -1,5 +1,4 @@
 import PropTypes from "prop-types";
-import { useState, useRef, useEffect } from "react";
 import { COLORS, COACH_MODES } from "../../constants.jsx";
 import {
   ActionBtn, ChatBubble, TypingIndicator,
@@ -82,50 +81,23 @@ function CoachPanel({
           localModel={localModel} setLocalModel={setLocalModel}
           availableModels={availableModels} fetchModels={fetchModels}
         />
-        {(() => {
-          const [modeOpen, setModeOpen] = useState(false);
-          const modeRef = useRef(null);
-          useEffect(() => {
-            if (!modeOpen) return;
-            const h = e => { if (modeRef.current && !modeRef.current.contains(e.target)) setModeOpen(false); };
-            document.addEventListener('mousedown', h);
-            return () => document.removeEventListener('mousedown', h);
-          }, [modeOpen]);
-          const activeCfg = COACH_MODES[coachMode] || COACH_MODES.chat;
-          return (
-            <div ref={modeRef} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ fontSize: 11, color: COLORS.text2 }}>Mode:</span>
-              <button
-                onClick={() => setModeOpen(o => !o)}
-                style={{ background: 'transparent', border: `0.5px solid ${COLORS.border2}`, borderRadius: 6, padding: '3px 9px', fontFamily: 'inherit', fontSize: 12, color: '#d4a844', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-              >
-                {activeCfg.icon} {activeCfg.label} ▾
-              </button>
-              {modeOpen && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 160, boxShadow: '0 4px 16px rgba(0,0,0,0.35)' }}>
-                  {Object.entries(COACH_MODES).map(([key, cfg]) => (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        setModeOpen(false);
-                        if (key === 'process') onStartProcessInbox();
-                        else if (key === 'review') onStartWeeklyReview();
-                        else if (key === 'dump') onStartBrainDump();
-                        else if (key === 'projectReview') onStartProjectReview();
-                        else onSwitchToChat();
-                      }}
-                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', borderRadius: 4, color: coachMode === key ? '#d4a844' : COLORS.text, fontWeight: coachMode === key ? 600 : 400 }}
-                      onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
-                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                    >
-                      {cfg.icon} {cfg.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        <div style={{ display: "flex", gap: 4 }}>
+          {Object.entries(COACH_MODES).map(([key, cfg]) => (
+            <ToolbarBtn
+              key={key}
+              active={coachMode === key}
+              onClick={() => {
+                if (key === "process") onStartProcessInbox();
+                else if (key === "review") onStartWeeklyReview();
+                else if (key === "dump") onStartBrainDump();
+                else if (key === "projectReview") onStartProjectReview();
+                else onSwitchToChat();
+              }}
+            >
+              {cfg.label}
+            </ToolbarBtn>
+          ))}
+        </div>
       </div>
 
       {/* Message list */}

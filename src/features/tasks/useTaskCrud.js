@@ -41,20 +41,9 @@ function useTaskCrud({
   const addTask = useCallback((bucket) => {
     const text = addText.trim();
     if (!text) return;
-    const effectiveBucket = bucket || currentBucket;
-    const isNextAction = effectiveBucket === 'next';
-    const finalBucket = isNextAction ? 'project' : effectiveBucket;
-    const newId = genId();
-    if (isNextAction && uncategorizedProjectId) {
-      setTasks(prev => [
-        ...prev.map(t => t.id === uncategorizedProjectId ? { ...t, childIds: [...(t.childIds || []), newId] } : t),
-        { id: newId, text, bucket: 'project', isNextAction: true, done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null, parentId: uncategorizedProjectId },
-      ]);
-    } else {
-      setTasks(prev => [{ id: newId, text, bucket: finalBucket, ...(isNextAction ? { isNextAction: true } : {}), done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null }, ...prev]);
-    }
+    setTasks(prev => [{ id: genId(), text, bucket: bucket || currentBucket, done: false, created: Date.now(), priority: [], location: [], dueDate: null, effort: null, actualEffort: null, deferUntil: null, notes: null }, ...prev]);
     setAddText('');
-  }, [addText, currentBucket, uncategorizedProjectId, setTasks, setAddText]);
+  }, [addText, currentBucket, setTasks, setAddText]);
 
   const addAndProcess = useCallback(() => {
     const text = addText.trim();
@@ -79,15 +68,12 @@ function useTaskCrud({
       const childId = genId();
       setTasks(prev => {
         const parent = prev.find(t => t.id === projectParentId);
-        const isNextActionChild = childBucket === 'next';
-      const finalChildBucket = isNextActionChild ? 'project' : childBucket;
-      const newChild = {
-          id: childId, text, bucket: finalChildBucket, done: false, created: Date.now(),
+        const newChild = {
+          id: childId, text, bucket: childBucket, done: false, created: Date.now(),
           parentId: projectParentId, priority: [], location: [], dueDate: null,
           effort: null, actualEffort: null, deferUntil: null, notes: null,
           category: parent?.category ?? null,
           ...(childBucket === 'project' ? { childIds: [] } : {}),
-          ...(isNextActionChild ? { isNextAction: true } : {}),
         };
         return [
           ...prev.map(t =>
@@ -105,16 +91,7 @@ function useTaskCrud({
   // ── Simple mutations ─────────────────────────────────────────────────────
 
   const moveTask = useCallback((id, bucket) => {
-    const isNextMove = bucket === 'next';
-    const effectiveBucket = isNextMove ? 'project' : bucket;
-    setTasks(prev => prev.map(t => {
-      if (t.id !== id) return t;
-      const base = { ...t, bucket: effectiveBucket, done: effectiveBucket === 'done' };
-      if (isNextMove) return { ...base, isNextAction: true };
-      // Leaving 'next' (i.e. clearing isNextAction) when moving to another bucket
-      if (t.isNextAction && !isNextMove) return { ...base, isNextAction: false };
-      return base;
-    }));
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, bucket, done: bucket === 'done' } : t));
     setMoveMenu(null);
     setPendingAction(null);
   }, [setTasks, setMoveMenu, setPendingAction]);

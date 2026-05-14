@@ -48,14 +48,11 @@ CompletedTree.propTypes = {
 };
 
 // Drag-and-drop reorderable tree of project children.
-function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop, visibilitySet }) {
-  const { allTasks, collapsedNodes, projectCategoryFilter, uncategorizedProjectId, currentBucket, showCompletedInProjects, showWaitingInProjects, showSomeDayInProjects } = useContext(TaskRowContext);
+function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop }) {
+  const { allTasks, collapsedNodes, projectCategoryFilter, uncategorizedProjectId, showCompletedInProjects } = useContext(TaskRowContext);
   if (depth > 6) return null;
   let children = getOrderedChildren(parentId, allTasks);
   if (!showCompletedInProjects) children = children.filter(t => !t.done);
-  if (visibilitySet) children = children.filter(t => visibilitySet.has(t.id));
-  if (!showWaitingInProjects && currentBucket === 'project') children = children.filter(t => !t.isWaitingFor);
-  if (!showSomeDayInProjects  && currentBucket === 'project') children = children.filter(t => !t.isSomeday);
   if (depth === 0 && projectCategoryFilter) {
     children = children.filter(t => t.category === projectCategoryFilter);
   }
@@ -83,11 +80,11 @@ function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragO
             {isTarget && dt.position === "before" && <DropLine depth={depth} />}
 
             <div
-              draggable={!!onDragStart}
-              onDragStart={onDragStart ? (e => { e.stopPropagation(); onDragStart(task.id); }) : undefined}
-              onDragOver={onDragOver ? (e => { e.preventDefault(); e.stopPropagation(); onDragOver(e, task.id); }) : undefined}
-              onDragEnd={onDragEnd ? (e => { e.stopPropagation(); onDragEnd(); }) : undefined}
-              onDrop={onDrop ? (e => { e.preventDefault(); e.stopPropagation(); onDrop(task.id); }) : undefined}
+              draggable
+              onDragStart={e => { e.stopPropagation(); onDragStart(task.id); }}
+              onDragOver={e => { e.preventDefault(); e.stopPropagation(); onDragOver(e, task.id); }}
+              onDragEnd={e => { e.stopPropagation(); onDragEnd(); }}
+              onDrop={e => { e.preventDefault(); e.stopPropagation(); onDrop(task.id); }}
               style={{
                 opacity: isDragging ? 0.35 : 1,
                 outline: isTarget && dt.position === "inside" ? `2px solid ${COLORS.project}66` : "none",
@@ -109,7 +106,6 @@ function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragO
                 onDragOver={onDragOver}
                 onDragEnd={onDragEnd}
                 onDrop={onDrop}
-                visibilitySet={visibilitySet}
               />
             )}
 
@@ -125,11 +121,10 @@ ProjectTree.propTypes = {
   depth:       PropTypes.number.isRequired,
   dragId:      PropTypes.string,
   dropTarget:  PropTypes.object,
-  onDragStart: PropTypes.func,
-  onDragOver:  PropTypes.func,
-  onDragEnd:   PropTypes.func,
-  onDrop:      PropTypes.func,
-  visibilitySet: PropTypes.instanceOf(Set),
+  onDragStart: PropTypes.func.isRequired,
+  onDragOver:  PropTypes.func.isRequired,
+  onDragEnd:   PropTypes.func.isRequired,
+  onDrop:      PropTypes.func.isRequired,
 };
 
 // Section header separating task groups (by location, project, due date, etc.).

@@ -40,20 +40,13 @@ function useAppSettings() {
   );
   useEffect(() => { localStorage.setItem('gtd_next_actions_mode', nextActionsViewMode); }, [nextActionsViewMode]);
 
-  // focusExpandedDefaults: which Today's Focus tiers are expanded by default
-  const [focusExpandedDefaults, setFocusExpandedDefaults] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('gtd_focus_expanded') || 'null') || { dueToday: true, overdue: true, dueThisWeek: false, noCalEvent: false }; }
-    catch { return { dueToday: true, overdue: true, dueThisWeek: false, noCalEvent: false }; }
-  });
-  useEffect(() => { localStorage.setItem('gtd_focus_expanded', JSON.stringify(focusExpandedDefaults)); }, [focusExpandedDefaults]);
-
   // reviewNodeTypes: which nodeTypes appear in the Project Review queue
   const [reviewNodeTypes, setReviewNodeTypes] = useState(() => {
     try { return JSON.parse(localStorage.getItem('gtd_review_node_types') || 'null') || ['project', 'subproject']; } catch { return ['project', 'subproject']; }
   });
   useEffect(() => { localStorage.setItem('gtd_review_node_types', JSON.stringify(reviewNodeTypes)); }, [reviewNodeTypes]);
 
-  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults };
+  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes };
 }
 
 
