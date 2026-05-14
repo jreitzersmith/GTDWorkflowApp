@@ -1,4 +1,4 @@
-import "access-key-label-polyfill";
+import "./utils/accessKeyLabelPolyfill.js";
 import { StrictMode, Component } from "react";
 import { createRoot } from "react-dom/client";
 import GTDManager from "./App.jsx";
