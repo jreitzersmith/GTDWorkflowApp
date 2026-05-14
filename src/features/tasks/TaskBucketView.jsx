@@ -4,7 +4,7 @@ import { COLORS, BUCKETS } from "../../constants.jsx";
 import { TaskRowContext } from "../../contexts.js";
 import { Btn, ToolbarBtn } from "../../shared/SidebarComponents.jsx";
 import { TaskRow } from "./TaskRow.jsx";
-import { CompletedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListHelpers.jsx";
+import { ArchivedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListHelpers.jsx";
 import { InboxBulkBar } from "./InboxBars.jsx";
 import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
 import { waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, minutesToEffortLabel, effortAccuracyColor, isDeferred, computeVisibleIds } from "./taskUtils.jsx";
@@ -268,7 +268,7 @@ function TaskBucketView({
                   {displayOpen && (
                     <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 185, boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
                       {[
-                        { label: "✓  Completed",     state: showCompletedInProjects, toggle: () => setShowCompletedInProjects(v => !v) },
+                        { label: "🗄  Archive",     state: showCompletedInProjects, toggle: () => setShowCompletedInProjects(v => !v) },
                         { label: "🛑  Waiting For",   state: showWaitingInProjects,   toggle: () => setShowWaitingInProjects(v => !v) },
                         { label: "⏳  Someday/Maybe", state: showSomeDayInProjects,   toggle: () => setShowSomeDayInProjects(v => !v) },
                       ].map(({ label, state, toggle }) => (
@@ -497,7 +497,7 @@ function TaskBucketView({
           <>
             {currentBucket === "done" && <EffortAccuracyBar bucketTasks={bucketTasks} />}
             {currentBucket === "done" ? (
-              <CompletedTree parentId={null} depth={0} />
+              <ArchivedTree parentId={null} depth={0} />
             ) : currentBucket === "inbox" ? (
               <>
                 {inboxSelectedIds.size > 0 && (

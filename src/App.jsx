@@ -163,6 +163,7 @@ export default function GTDManager() {
 
   // Stable ref updated every render so the shortcut listener below never goes stale
   const shortcutActionsRef = useRef({});
+  const pendingModelCycleRef = useRef(false);
   useEffect(() => {
     const nav = (bucket) => () => { setCurrentBucket(bucket); setCurrentView("gtd"); setShowSettings(false); setSelectedTaskId(null); };
     shortcutActionsRef.current = {
@@ -183,6 +184,7 @@ export default function GTDManager() {
       U: () => setShowUsage(v => !v),
       // Modes
       Q: () => startDailyReview(),
+      V: () => startDailyReview(),
       R: () => startWeeklyReview(),
       X: () => startProjectReview(),
       Z: () => startProcessInbox(),
@@ -221,6 +223,14 @@ export default function GTDManager() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  // Complete a pending model cycle once availableModels populates
+  useEffect(() => {
+    if (!pendingModelCycleRef.current || !availableModels.length) return;
+    pendingModelCycleRef.current = false;
+    setProvider('local');
+    setLocalModel(availableModels[0]);
+  }, [availableModels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-link email to any tasks created during an active email processing session
   useEffect(() => {
@@ -270,7 +280,7 @@ export default function GTDManager() {
     const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0);
     const cutoff14 = new Date(todayDate); cutoff14.setDate(cutoff14.getDate() + 14);
     const BUCKET_CAPS = { next: 75, someday: 40 };
-    const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe" };
+    const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe", done: "Archive" };
     const sections = Object.entries(bucketNames).filter(([k]) => !allowedBuckets || allowedBuckets.includes(k)).map(([k, label]) => {
       const items = k === 'next'
         ? tasks.filter(t => t.isNextAction && !t.isSomeday && !t.isWaitingFor && !t.done)
@@ -433,7 +443,7 @@ export default function GTDManager() {
   const {
     addTask, addAndProcess, addProjectTask,
     moveTask, deleteTask, confirmDelete,
-    completeTask, finishComplete,
+    archiveTask, finishComplete,
     handleRollupConfirm, handleRollupSkip,
     handleDeferCheckSkip, handleDeferCheckReview,
     handleActualEffortSave, handleActualEffortSkip,
@@ -1119,7 +1129,7 @@ export default function GTDManager() {
 
   // ── Context values ─────────────────────────────────────────────────────
   const taskActionsValue = {
-    onComplete:           completeTask,
+    onComplete:           archiveTask,
     onDelete:             deleteTask,
     onMove:               moveTask,
     onAskAI:              askAIAboutTask,
@@ -1450,7 +1460,7 @@ export default function GTDManager() {
                     driveEnabled={driveEnabled}
                     googleAccessToken={googleToken}
                     onUpdate={updateTask}
-                    onComplete={(id) => { completeTask(id); setSelectedTaskId(null); }}
+                    onComplete={(id) => { archiveTask(id); setSelectedTaskId(null); }}
                     onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
                     onReassignProject={reassignProject}
                     onSkipRecurrence={(id) => { skipRecurrence(id); setSelectedTaskId(null); }}

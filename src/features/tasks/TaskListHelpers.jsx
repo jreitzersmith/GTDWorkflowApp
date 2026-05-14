@@ -15,7 +15,7 @@ function DropLine({ depth }) {
 // Read-only hierarchical view of completed tasks.
 // parentId === null  -> virtual roots: done tasks whose parent is not also done.
 // parentId !== null  -> done children of parentId, in childIds order.
-function CompletedTree({ parentId, depth }) {
+function ArchivedTree({ parentId, depth }) {
   const { allTasks, collapsedNodes } = useContext(TaskRowContext);
   if (depth > 6) return null;
 
@@ -35,24 +35,27 @@ function CompletedTree({ parentId, depth }) {
         <div key={task.id}>
           <TaskRow task={task} isSubtask={depth > 0} indentOverride={depth * 22} depth={depth} />
           {!collapsedNodes?.has(task.id) && (
-            <CompletedTree parentId={task.id} depth={depth + 1} />
+            <ArchivedTree parentId={task.id} depth={depth + 1} />
           )}
         </div>
       ))}
     </>
   );
 }
-CompletedTree.propTypes = {
+ArchivedTree.propTypes = {
   parentId: PropTypes.string,
   depth:    PropTypes.number.isRequired,
 };
 
 // Drag-and-drop reorderable tree of project children.
-function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop }) {
-  const { allTasks, collapsedNodes, projectCategoryFilter, uncategorizedProjectId, showCompletedInProjects } = useContext(TaskRowContext);
+function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop, visibilitySet }) {
+  const { allTasks, collapsedNodes, projectCategoryFilter, uncategorizedProjectId, currentBucket, showCompletedInProjects, showWaitingInProjects, showSomeDayInProjects } = useContext(TaskRowContext);
   if (depth > 6) return null;
   let children = getOrderedChildren(parentId, allTasks);
   if (!showCompletedInProjects) children = children.filter(t => !t.done);
+  if (visibilitySet) children = children.filter(t => visibilitySet.has(t.id));
+  if (!showWaitingInProjects && currentBucket === 'project') children = children.filter(t => !t.isWaitingFor);
+  if (!showSomeDayInProjects  && currentBucket === 'project') children = children.filter(t => !t.isSomeday);
   if (depth === 0 && projectCategoryFilter) {
     children = children.filter(t => t.category === projectCategoryFilter);
   }
@@ -80,11 +83,11 @@ function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragO
             {isTarget && dt.position === "before" && <DropLine depth={depth} />}
 
             <div
-              draggable
-              onDragStart={e => { e.stopPropagation(); onDragStart(task.id); }}
-              onDragOver={e => { e.preventDefault(); e.stopPropagation(); onDragOver(e, task.id); }}
-              onDragEnd={e => { e.stopPropagation(); onDragEnd(); }}
-              onDrop={e => { e.preventDefault(); e.stopPropagation(); onDrop(task.id); }}
+              draggable={!!onDragStart}
+              onDragStart={onDragStart ? (e => { e.stopPropagation(); onDragStart(task.id); }) : undefined}
+              onDragOver={onDragOver ? (e => { e.preventDefault(); e.stopPropagation(); onDragOver(e, task.id); }) : undefined}
+              onDragEnd={onDragEnd ? (e => { e.stopPropagation(); onDragEnd(); }) : undefined}
+              onDrop={onDrop ? (e => { e.preventDefault(); e.stopPropagation(); onDrop(task.id); }) : undefined}
               style={{
                 opacity: isDragging ? 0.35 : 1,
                 outline: isTarget && dt.position === "inside" ? `2px solid ${COLORS.project}66` : "none",
@@ -106,6 +109,7 @@ function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragO
                 onDragOver={onDragOver}
                 onDragEnd={onDragEnd}
                 onDrop={onDrop}
+                visibilitySet={visibilitySet}
               />
             )}
 
@@ -121,10 +125,11 @@ ProjectTree.propTypes = {
   depth:       PropTypes.number.isRequired,
   dragId:      PropTypes.string,
   dropTarget:  PropTypes.object,
-  onDragStart: PropTypes.func.isRequired,
-  onDragOver:  PropTypes.func.isRequired,
-  onDragEnd:   PropTypes.func.isRequired,
-  onDrop:      PropTypes.func.isRequired,
+  onDragStart: PropTypes.func,
+  onDragOver:  PropTypes.func,
+  onDragEnd:   PropTypes.func,
+  onDrop:      PropTypes.func,
+  visibilitySet: PropTypes.instanceOf(Set),
 };
 
 // Section header separating task groups (by location, project, due date, etc.).
@@ -172,4 +177,4 @@ EmptyState.propTypes = {
   bucket: PropTypes.string.isRequired,
 };
 
-export { CompletedTree, ProjectTree, GroupDivider, EmptyState };
+export { ArchivedTree, ProjectTree, GroupDivider, EmptyState };
