@@ -169,15 +169,22 @@ export default function GTDManager() {
       !(t.driveAttachments || []).some(a => a.id === pendingEmailContext.id)
     );
     if (!newTasks.length) return;
+    // Immediately extend the snapshot so re-firing the effect skips these tasks
+    newTasks.forEach(t => preEmailTaskIdsRef.current.add(t.id));
+    const emailId = pendingEmailContext.id;
+    const emailAtt = {
+      id: emailId,
+      name: pendingEmailContext.subject || 'Email',
+      mimeType: 'message/rfc822',
+      url: `https://mail.google.com/mail/#inbox/${emailId}`,
+    };
+    const newIds = new Set(newTasks.map(t => t.id));
     setTasks(prev => prev.map(t => {
-      if (!newTasks.find(nt => nt.id === t.id)) return t;
+      if (!newIds.has(t.id)) return t;
       const existing = t.driveAttachments || [];
-      return { ...t, driveAttachments: [...existing, {
-        id: pendingEmailContext.id,
-        name: pendingEmailContext.subject || 'Email',
-        mimeType: 'message/rfc822',
-        url: `https://mail.google.com/mail/#inbox/${pendingEmailContext.id}`,
-      }] };
+      // Dedup inside the functional update — guards against concurrent calls
+      if (existing.some(a => a.id === emailId)) return t;
+      return { ...t, driveAttachments: [...existing, emailAtt] };
     }));
   }, [tasks, pendingEmailContext]); // eslint-disable-line react-hooks/exhaustive-deps
 

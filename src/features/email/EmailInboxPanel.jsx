@@ -85,6 +85,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
     };
     attachEmailToTask(taskId, att);
     setShowTaskPicker(false);
+    // Note: attachEmailToTask deduplicates by id — linking the same email twice is a no-op
     setLinkedConfirm(taskText);
     setTimeout(() => setLinkedConfirm(null), 4000);
   };

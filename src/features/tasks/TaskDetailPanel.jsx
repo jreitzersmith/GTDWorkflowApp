@@ -332,7 +332,9 @@ function DriveAttachments({ taskId, attachments, driveEnabled, googleAccessToken
 
   if (!driveEnabled) return null;
 
-  const list = attachments || [];
+  // Deduplicate by id before rendering — guards against duplicate entries in driveAttachments
+  const seen = new Set();
+  const list = (attachments || []).filter(a => { if (!a.id || seen.has(a.id)) return false; seen.add(a.id); return true; });
   const emailAtts = list.filter(a => a.mimeType === 'message/rfc822' || a.type === 'email');
   const driveAtts = list.filter(a => a.mimeType !== 'message/rfc822' && a.type !== 'email');
 
