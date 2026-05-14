@@ -51,11 +51,11 @@ const SHORTCUT_SECTIONS = [
     ],
   },
   {
-    heading: 'NAVIGATION  (task list)',
+    heading: 'NAVIGATION',
     rows: [
-      { keys: ['↓', 'j'], label: 'Focus next task' },
-      { keys: ['↑', 'k'], label: 'Focus previous task' },
-      { keys: ['Enter', 'Space'], label: 'Open task detail' },
+      { keys: ['↓', 'j'], label: 'Focus next task', alt: true },
+      { keys: ['↑', 'k'], label: 'Focus previous task', alt: true },
+      { keys: ['Enter', 'Space'], label: 'Open task detail', alt: true },
       { keys: ['→'], label: 'Expand project  (Projects view)' },
       { keys: ['←'], label: 'Collapse project  (Projects view)' },
       { keys: ['Esc'], label: 'Clear focus' },
@@ -77,7 +77,7 @@ function ShortcutMap() {
                 <span style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
                   {row.keys.map((k, i) => (
                     <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                      {i > 0 && <span style={{ color: COLORS.muted, fontSize: 9 }}>+</span>}
+                      {i > 0 && <span style={{ color: COLORS.muted, fontSize: 9 }}>{row.alt ? '/' : '+'}</span>}
                       <Key>{k}</Key>
                     </span>
                   ))}
