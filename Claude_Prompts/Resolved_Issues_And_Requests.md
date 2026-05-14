@@ -85,4 +85,22 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-12 | Bug fix      | Issue#12| GH#32  | Process mode: swap defer→due when user overrides AI deferral assumption                          | a0a3a13           |
 | 2026-05-12 | Bug fix      | Issue#13| GH#33  | Clear stale deferUntil in buildNextOccurrence; prompt omits defer for recurring tasks             | a0a3a13           |
 | 2026-05-12 | Feature      | FR#8    | GH#9   | Inbox group suggestion: fire suggestProjectGroup after session creates 2+ action tasks            | 6a227d3           |
-| 2026-05-12 | Feature      | FR#40   | GH#36  | Gmail email → task linking: attach email as driveAttachments entry with 📧 rendering             | 6a227d3           |
+| 2026-05-12 | Feature      | FR#40   | GH#36  | Gmail email → task linking: attach
+| 2026-05-13 | Feature      | FR#78   | GH#79  | Link to Task picker uses ProjectTreePicker collapsible tree (EmailInboxPanel)    | 55a7b1a           |
+| 2026-05-13 | Bug Fix      | Issue#18| GH#80  | Remove stale setTaskFilter call in handleLinkToTask; bump confirm timeout 4000ms | b135446           |
+| 2026-05-13 | Feature      | FR#79   | GH#81  | Link to Task picker: Waiting For and Someday/Maybe as collapsible sections       | b135446           |
+| 2026-05-13 | Feature      | FR#80   | GH#82  | Link to Task picker: include empty containers regardless of done status          | b135446           |
+| 2026-05-13 | Bug Fix      | Issue#19| GH#83  | Link to Task picker: containers missing when bucket not next/project             | b0d106e           |
+| 2026-05-13 | Feature      | FR#81   | GH#84  | Link to Task picker: alphabetical sort (sorted prop on ProjectTreePicker)        | b0d106e           |
+| 2026-05-13 | Bug Fix      | Issue#20| GH#85  | buildProjectTree: sorted param missing from signature (ReferenceError on picker load) | 22b8219           |
+| 2026-05-13 | Bug Fix      | Issue#21| GH#86  | Email picker: project-type tasks in Waiting/Someday not visible                       | e2c620b           |
+| 2026-05-13 | Feature      | FR#82   | GH#87  | Type field in Waiting For / Someday/Maybe / Deferred task detail panel                | 8d8c3a3           |
+| 2026-05-13 | Feature      | FR#83   | GH#88  | Email link-to-task picker opens upward (maxHeight 320px)                              | 8d8c3a3           |
+| 2026-05-13 | Feature      | FR#84   | GH#89  | Convert Waiting For / Someday/Maybe to flag-based filter views with full hierarchy | 62404ec           |
+| 2026-05-13 | Feature      | FR#85   | GH#90  | Deferred view — full parent hierarchy via ProjectTree + visibilitySet             | 676a1ba           |
+| 2026-05-13 | Feature      | FR#87   | GH#92  | Next Actions as filter view (isNextAction flag) + Projects toolbar Sort/Display popovers | 109c29b           |
+| 2026-05-13 | Feature      | FR#88a  | GH#93  | Email processing: change completion message from "Inbox is clear" to "All items processed" | ec0cd31 |
+| 2026-05-13 | Bug Fix      | —       | —      | handleConfirmMove: chat pending actions (→ACTION from coach) failed silently when inbox was empty | d29826b |
+| 2026-05-13 | Feature      | FR#88b  | GH#93  | Sidebar: Projects moved before Next Actions; coach mode dropdown; Today's Focus collapsible tiers + tag display; effort group dedup | ec0cd31 |
+| 2026-05-13 | Feature      | FR#77   | GH#78  | Process mode: editable metadata panel in pending action bar | 73e77fb           |
+| 2026-05-14 | Feature      | FR#86   | GH#91  | Keyboard navigation: ↑↓/jk focus, Enter opens detail, ←→ collapse/expand, Escape clears | 568db30 |

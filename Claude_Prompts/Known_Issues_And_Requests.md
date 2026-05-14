@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#17** · Code Quality — **CQ#11** · Feature Requests — **FR#77**
+> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#88**
 
 ---
 
@@ -17,6 +17,8 @@
 ## Suggested next features (in rough priority order)
 
 ### Feature requests
+
+- [ ] FR#88 [GH#93] (2026-05-13) — Email processing improvements (mostly done — remaining: gmail.settings.basic scope verification, note field consistency across all prompt modes)
 
 #### UI polish / quick wins
 
@@ -50,6 +52,3 @@
 - FR#9 [GH#18] — Todoist export / two-way sync (previously Issue#4 / GH#3)
 - FR#20 [GH#19] — Mobile layout (significant; requires media queries throughout)
 
-## Inbox / processing improvements
-
-- [ ] FR#77 [GH#78] (2026-05-13) — Process mode: editable metadata panel in pending action bar (priority, category, effort, due, defer, location, recurrence editable before confirm)
