@@ -67,6 +67,9 @@ function taskToDb(task, userId) {
     reviewed:           task.reviewed ?? false,
     node_type:          task.nodeType ?? null,
     updated_at:         new Date().toISOString(),
+    is_waiting_for:     task.isWaitingFor  ?? false,
+    is_someday:         task.isSomeday     ?? false,
+    is_next_action:     task.isNextAction  ?? false,
   };
 }
 
@@ -95,6 +98,9 @@ function dbToTask(row) {
     nodeType:          row.node_type           ?? null,
   };
   if (row.parent_id) t.parentId = row.parent_id;
+  if (row.is_waiting_for) t.isWaitingFor  = true;
+  if (row.is_someday)     t.isSomeday     = true;
+  if (row.is_next_action) t.isNextAction  = true;
   return t;
 }
 

@@ -3888,6 +3888,158 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
   </p>
   <p>Commits: <a href="project-commits.html#commit-0ce7e9b">0ce7e9b</a></p>
 </section>
+
+<!-- ═══════════════════ SESSION: May 13–14 2026 ═══════════════════ -->
+
+<section id="fr84-85-flag-views">
+  <h2>FR#84 + FR#85 — Flag-based Virtual Views: Waiting For, Someday/Maybe, Deferred (2026-05-13)</h2>
+  <p>
+    Previously "Waiting For" and "Someday/Maybe" were separate buckets — moving a task there
+    cut it from its project tree. Now they are <em>flags</em> on a task: <code>isWaitingFor</code>
+    and <code>isSomeday</code>. Tasks stay in the Projects bucket with their parent hierarchy intact.
+    Each view is a <em>virtual filter</em> — it shows tasks that have the flag set, rendered using
+    the full project tree so the parent/child relationship is visible. Deferred tasks use the
+    existing <code>deferUntil</code> date field as their flag.
+  </p>
+  <p><strong>React concept — derived / virtual state:</strong>
+    <code>bucketTasks</code> for these views is computed as
+    <code>tasks.filter(t =&gt; t.isWaitingFor &amp;&amp; !t.done)</code> — never stored separately.
+    This pattern (computing a value from existing state rather than maintaining a parallel copy)
+    avoids the classic bug where two pieces of state drift out of sync.
+  </p>
+  <p><strong>Design decision — flag cascade:</strong>
+    Setting a flag on a parent project cascades to all descendants. The <code>updateTask</code>
+    function walks the childIds tree and applies the same flag update to every child, keeping
+    the hierarchy consistent without requiring the user to flag each item individually.
+  </p>
+  <p>Commits: <a href="project-commits.html#commit-62404ec">62404ec</a>, <a href="project-commits.html#commit-676a1ba">676a1ba</a>, <a href="project-commits.html#commit-74803e6">74803e6</a></p>
+</section>
+
+<section id="fr87-next-actions-filter">
+  <h2>FR#87 — Next Actions as Filter View + Projects Toolbar Refactor (2026-05-13)</h2>
+  <p>
+    Next Actions is now the fourth virtual filter view, driven by an <code>isNextAction</code>
+    boolean flag. All tasks that were in the "next" bucket were migrated to
+    <code>bucket: 'project'</code> with <code>isNextAction: true</code>. Tasks continue to
+    show in the Projects tree (under their parent project or the Uncategorized project) and also
+    appear in the Next Actions view. A Supabase migration added the <code>is_next_action</code>
+    column and moved all existing data automatically.
+  </p>
+  <p>
+    The Projects toolbar was also simplified: five inline buttons became two dropdown popovers.
+    <strong>Sort ▾</strong> offers three quick-collapse actions with no saved state.
+    <strong>Display [n/3] ▾</strong> toggles Completed, Waiting For, and Someday/Maybe items
+    independently, with a live counter showing how many categories are currently visible.
+    The Display toggles are scoped to the Projects view only — hiding Waiting For in Projects
+    does not affect the dedicated Waiting For view.
+  </p>
+  <p><strong>React concept — ref for popover close-on-click-outside:</strong>
+    Each popover attaches a <code>useRef</code> to its container div. A <code>useEffect</code>
+    adds a <code>mousedown</code> listener to <code>document</code>; if the click target is
+    outside the ref's DOM node the popover closes. The effect returns a cleanup function that
+    removes the listener, preventing stale handlers from accumulating.
+  </p>
+  <p>Commits: <a href="project-commits.html#commit-bc0a36f">bc0a36f</a>, <a href="project-commits.html#commit-484ff91">484ff91</a>, <a href="project-commits.html#commit-109c29b">109c29b</a></p>
+</section>
+
+<section id="fr88-batch-ux">
+  <h2>FR#88 Batch — Sidebar Order, Today's Focus Tiers, Coach Mode Dropdown, Effort Dedup (2026-05-13)</h2>
+  <p>
+    A batch of quality-of-life changes shipped together:
+  </p>
+  <ul>
+    <li><strong>Sidebar order:</strong> Projects now appears before Next Actions, matching the GTD workflow of project-first thinking.</li>
+    <li><strong>Today's Focus collapsible tiers:</strong> Each section (Due Today, Overdue, Due This Week, No Calendar Event) can be expanded or collapsed individually. The default expanded state for each tier is configurable in Settings → Today's Focus and persisted to localStorage.</li>
+    <li><strong>Today's Focus tag display:</strong> The view now respects the Tag Display setting (inline / below / hidden) so effort and location badges match the rest of the app.</li>
+    <li><strong>Coach mode dropdown:</strong> The row of mode buttons was replaced with a single "Mode: [active] ▾" dropdown. The active mode name is shown in amber. This saves significant header space, especially on smaller screens.</li>
+    <li><strong>Effort group deduplication:</strong> Grouping Next Actions by Effort used to create separate groups for "10m" and "10 min" (the same duration, different formats). The groupByField function now normalises effort values through the user's configured effort labels before grouping, so equivalent durations collapse into one group.</li>
+  </ul>
+  <p>Commits: <a href="project-commits.html#commit-ec0cd31">ec0cd31</a>, <a href="project-commits.html#commit-d29826b">d29826b</a></p>
+</section>
+
+<section id="fr88-email-processing">
+  <h2>FR#88 — Email Processing Improvements (2026-05-13–14)</h2>
+  <p>
+    The "Process email with AI" workflow was significantly upgraded. When you click the button on
+    an email, the AI now follows a structured four-step workflow automatically:
+  </p>
+  <ol>
+    <li><strong>Tasks:</strong> identifies action items and asks for project placement, category, effort, and due date before creating each task — never defaulting to Uncategorized.</li>
+    <li><strong>Similar emails:</strong> searches Gmail for other emails from the same sender or with a similar subject, reports any related items that may also need action.</li>
+    <li><strong>Filter/label offer:</strong> asks whether a Gmail filter + label should be created for future emails like this. If you say yes, creates the label and filter via the Gmail API.</li>
+    <li><strong>Archive:</strong> after all steps are confirmed, automatically archives the processed email.</li>
+  </ol>
+  <p><strong>Auto-link mechanism:</strong>
+    Every task created during an email-processing conversation automatically gets the source email
+    attached to it. A <code>pendingEmailContext</code> React state is set when processing starts.
+    A <code>useEffect</code> watches the <code>tasks</code> array for newly created tasks (compared
+    against a snapshot taken at processing start) and attaches the email to each new task.
+    Deduplication is applied both in the effect and inside the <code>setTasks</code> functional
+    update to prevent the same email from being attached twice.
+  </p>
+  <p><strong>Multi-line notes fix:</strong>
+    The action-line regex was updated to stop at blank lines (<code>\n\n</code>) rather than end
+    of message, preventing the AI's follow-up text from being captured as part of the notes value.
+  </p>
+  <p><strong>Duplicate-task guard:</strong>
+    <code>→ACTION:add</code> was removed from the <code>extractAction</code> regex, which previously
+    caused it to be processed twice: once by the auto-action loop (immediate) and once via the
+    confirm bar (on user click), creating two identical tasks.
+  </p>
+  <p>Commits: <a href="project-commits.html#commit-55a17c1">55a17c1</a>, <a href="project-commits.html#commit-7a470a7">7a470a7</a>, <a href="project-commits.html#commit-33df544">33df544</a>, <a href="project-commits.html#commit-5cf5ad0">5cf5ad0</a>, <a href="project-commits.html#commit-32616d1">32616d1</a></p>
+</section>
+
+
+<!-- ═══════════════════ FR#89 — Keyboard shortcuts (May 14 2026) ═══════════════════ -->
+
+<section id="fr89-keyboard-shortcuts">
+  <h2>FR#89 — Global Keyboard Shortcuts + Configurable Modifier (2026-05-14)</h2>
+  <p>
+    17 global keyboard shortcuts for navigating views and triggering coach modes,
+    with a user-configurable modifier key to avoid browser conflicts.
+    The default is <strong>Ctrl+Alt</strong> (fewest conflicts on US keyboards).
+    Alt+Shift and Ctrl+Shift are also available as options in Settings → Keyboard Shortcuts.
+  </p>
+  <p>
+    <strong>View shortcuts:</strong> I=Inbox · N=Next Actions · P=Projects ·
+    W=Waiting For · S=Someday/Maybe · D=Deferred · A=Archived · F=Today's Focus ·
+    E=Email · L=Calendar · K=Search
+  </p>
+  <p>
+    <strong>Mode shortcuts:</strong> Q=Start/End Day · V=Daily Review · Z=Process Inbox ·
+    X=Project Review · B=Brain Dump · R=Weekly Review · Y=Cycle AI model
+  </p>
+  <p>
+    <strong>Shortcut reference map:</strong> Opening the Search modal (Ctrl/Cmd+K) with
+    no query displays a full keyboard reference divided into four sections:
+    VIEWS · MODES · NAVIGATION · SETTINGS &amp; USAGE.
+    Key badges are rendered as bordered boxes. The modifier keys shown update live
+    when the setting changes.
+  </p>
+  <p><strong>React concept — stable event listener with a mutable ref:</strong>
+    A single <code>window.addEventListener('keydown')</code> is registered once (empty
+    dependency array). Inside the handler, actions are read from
+    <code>shortcutActionsRef.current</code> — a plain object updated on every render
+    via an effect with no dependencies. This avoids the stale-closure problem: the
+    listener never needs to be re-registered, yet it always calls the freshest version
+    of each action.
+  </p>
+  <p>
+    <strong>Renamed:</strong> The "Completed" bucket was renamed to "Archived" throughout
+    (label, emoji 📦, <code>archiveTask</code> function, <code>ArchivedTree</code>
+    component). The sidebar also gained a fixed-width emoji container in
+    <code>BucketItem</code> so all labels align regardless of whether an emoji renders
+    as single-width or double-width.
+  </p>
+  <p>
+    <strong>accessKey polyfill:</strong> Vendored at <code>src/utils/accessKeyLabelPolyfill.js</code>
+    (no npm dependency) — patches <code>HTMLElement.prototype.accessKeyLabel</code> on
+    Chrome/Edge so the Search modal can display the platform-correct native modifier hint.
+  </p>
+  <p>Commits: <a href="project-commits.html#commit-f88b1e3">f88b1e3</a> →
+     <a href="project-commits.html#commit-1ef4544">1ef4544</a></p>
+</section>
+
 </body>
 </html>
 

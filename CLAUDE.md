@@ -156,7 +156,9 @@ These preferences apply to all sessions and both workflow variants. They exist t
 - Ask for explicit go-ahead only when: scope has changed unexpectedly, a HALT condition was triggered, or a decision requires user judgment that wasn't anticipated in the plan.
 
 **Testing checklists**
-- Always present as an interactive widget (mcp__visualize__show_widget): click-to-cycle pass/fail/note, Send results button calling sendPrompt(). See Cycle_Programming_Workflow.md Phase 5 for full spec.
+- Always present as an interactive widget (mcp__visualize__show_widget): state button cycles Pass → Fail → Skip → Note per item, per-item notes text field, Submit button calling sendPrompt() with full summary.
+- Render the widget in TWO situations: (1) at the end of a cycle when presenting the checklist for the first time, and (2) whenever John asks which tests are outstanding or remaining — never answer that question in plain text.
+- See Cycle_Programming_Workflow.md Phase 5 for full spec.
 
 **Clarifying questions**
 - Ask one clarifying question when category is ambiguous, not a list.
@@ -220,3 +222,4 @@ Update the Last used numbers line at the top of the file.
 - Use `mcp__git__git_commit` for commits, not bash git (avoids HEAD.lock on Windows mount)
 - Use `git -C "path" push origin main` for push, not `cd && git push` (PowerShell `&&` is invalid)
 - Claude Desktop on this mac
+- Supabase migrations: confirm John is ready, then run using the Management API directly (project ref `tudmteqljgpocffalssz`, token in `.env` as `SUPABASE_MANAGEMENT_TOKEN`). Verify with an `information_schema.columns` query before proceeding to testing. Never hand copy-paste SQL steps to John.
