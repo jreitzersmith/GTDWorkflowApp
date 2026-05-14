@@ -10,7 +10,13 @@ function BucketItem({ bkey, cfg, count, active, onClick }) {
       style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: active ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${active ? cfg.color : "transparent"}`, transition: "background 0.1s" }}
     >
       <div style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.color, flexShrink: 0 }} />
-      <span style={{ flex: 1, fontSize: 13, color: active ? COLORS.text : COLORS.text2 }}>{cfg.label}</span>
+      <span style={{ flex: 1, fontSize: 13, color: active ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center", gap: 0 }}>
+        {/* Emoji in fixed-width container so all labels align regardless of emoji width */}
+        <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>
+          {cfg.label.split(" ")[0]}
+        </span>
+        {cfg.label.split(" ").slice(1).join(" ")}
+      </span>
       <span style={{ fontSize: 11, background: COLORS.surface3, color: COLORS.muted, padding: "1px 7px", borderRadius: 10, minWidth: 22, textAlign: "center" }}>{count}</span>
     </div>
   );
