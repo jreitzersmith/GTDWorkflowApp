@@ -101,7 +101,7 @@ function AppSidebar({
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.text2, flexShrink: 0 }} />
           <span style={{ flex: 1, fontSize: 13, color: COLORS.text2 }}>🔍 Search</span>
-          <kbd style={{ fontSize: 9, color: COLORS.muted, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "1px 4px" }}>⌘K</kbd>
+          <kbd style={{ fontSize: 9, color: COLORS.text2, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "1px 4px" }}>⌘K</kbd>
         </div>
       </div>
 

@@ -5,6 +5,93 @@ import { COLORS, BUCKETS } from "../constants.jsx";
 // Buckets included in global search (exclude archive-like and done)
 const SEARCH_BUCKETS = ["inbox", "next", "project", "waiting", "someday", "deferred"];
 
+
+// Semi-graphical keyboard key badge
+function Key({ children }) {
+  return (
+    <kbd style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      padding: '1px 5px', borderRadius: 4,
+      border: `1px solid ${COLORS.border2}`,
+      background: COLORS.surface2,
+      fontSize: 9, fontFamily: 'inherit',
+      color: COLORS.text2, lineHeight: 1.4,
+      minWidth: 18, whiteSpace: 'nowrap',
+    }}>
+      {children}
+    </kbd>
+  );
+}
+
+const SHORTCUT_SECTIONS = [
+  {
+    heading: 'VIEWS',
+    rows: [
+      { keys: ['Ctrl', '⇧', 'I'], label: 'Inbox' },
+      { keys: ['Ctrl', '⇧', 'P'], label: 'Projects' },
+      { keys: ['Ctrl', '⇧', 'W'], label: 'Waiting For' },
+      { keys: ['Ctrl', '⇧', 'S'], label: 'Someday / Maybe' },
+      { keys: ['Ctrl', '⇧', 'D'], label: 'Deferred' },
+      { keys: ['Ctrl', '⇧', 'C'], label: 'Completed' },
+      { keys: ['Ctrl', '⇧', 'F'], label: "Today's Focus" },
+      { keys: ['Ctrl', '⇧', 'E'], label: 'Email' },
+      { keys: ['Ctrl', '⇧', 'L'], label: 'Calendar' },
+      { keys: ['Ctrl', '⇧', 'K'], label: 'Search  (also ⌘K)' },
+    ],
+  },
+  {
+    heading: 'MODES',
+    rows: [
+      { keys: ['Ctrl', '⇧', 'Q'], label: 'Start Day' },
+      { keys: ['Ctrl', '⇧', 'R'], label: 'Weekly Review' },
+      { keys: ['Ctrl', '⇧', 'X'], label: 'Project Review' },
+      { keys: ['Ctrl', '⇧', 'Z'], label: 'Process Inbox' },
+      { keys: ['Ctrl', '⇧', 'B'], label: 'Brain Dump' },
+      { keys: ['Ctrl', '⇧', 'Y'], label: 'Cycle AI model' },
+    ],
+  },
+  {
+    heading: 'NAVIGATION  (task list)',
+    rows: [
+      { keys: ['↓', 'j'], label: 'Focus next task' },
+      { keys: ['↑', 'k'], label: 'Focus previous task' },
+      { keys: ['Enter', 'Space'], label: 'Open task detail' },
+      { keys: ['→'], label: 'Expand project  (Projects view)' },
+      { keys: ['←'], label: 'Collapse project  (Projects view)' },
+      { keys: ['Esc'], label: 'Clear focus' },
+    ],
+  },
+];
+
+function ShortcutMap() {
+  return (
+    <div style={{ padding: '10px 16px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {SHORTCUT_SECTIONS.map(section => (
+        <div key={section.heading}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: COLORS.text2, letterSpacing: '0.08em', marginBottom: 6 }}>
+            {section.heading}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px' }}>
+            {section.rows.map(row => (
+              <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: COLORS.text2 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                  {row.keys.map((k, i) => (
+                    <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                      {i > 0 && <span style={{ color: COLORS.muted, fontSize: 9 }}>+</span>}
+                      <Key>{k}</Key>
+                    </span>
+                  ))}
+                </span>
+                <span style={{ color: COLORS.text2, marginLeft: 4 }}>{row.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SearchModal({ tasks, onSelect, onClose }) {
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
@@ -84,6 +171,13 @@ function SearchModal({ tasks, onSelect, onClose }) {
           />
           <kbd style={{ fontSize: 10, color: COLORS.muted, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "2px 5px" }}>Esc</kbd>
         </div>
+
+        {/* Shortcut map — shown when no query is typed */}
+        {query.trim().length === 0 && (
+          <div style={{ borderBottom: `1px solid ${COLORS.border}`, maxHeight: 360, overflowY: 'auto' }}>
+            <ShortcutMap />
+          </div>
+        )}
 
         {/* Results */}
         <div ref={listRef} style={{ maxHeight: 360, overflowY: "auto" }}>

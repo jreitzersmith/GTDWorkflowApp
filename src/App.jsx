@@ -161,6 +161,58 @@ export default function GTDManager() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  // Stable ref updated every render so the shortcut listener below never goes stale
+  const shortcutActionsRef = useRef({});
+  useEffect(() => {
+    const nav = (bucket) => () => { setCurrentBucket(bucket); setCurrentView("gtd"); setShowSettings(false); setSelectedTaskId(null); };
+    shortcutActionsRef.current = {
+      // Views
+      I: nav("inbox"),
+      P: nav("project"),
+      W: nav("waiting"),
+      S: nav("someday"),
+      D: nav("deferred"),
+      C: nav("done"),
+      F: () => { setCurrentView("focus"); setShowSettings(false); setSelectedTaskId(null); },
+      E: () => { setCurrentView("email"); setShowSettings(false); setSelectedTaskId(null); },
+      L: () => { setCurrentView("calendar"); setShowSettings(false); setSelectedTaskId(null); },
+      K: () => setSearchOpen(true),
+      // Modes
+      Q: () => startDailyReview(),
+      R: () => startWeeklyReview(),
+      X: () => startProjectReview(),
+      Z: () => startProcessInbox(),
+      B: () => startBrainDump(),
+      Y: () => {
+        // Cycle: claude → local[0] → local[1] → ... → claude
+        const allModels = ['claude', ...(availableModels.length ? availableModels : [])];
+        const currentKey = provider === 'claude' ? 'claude' : localModel;
+        const currentIdx = allModels.indexOf(currentKey);
+        const nextIdx = (currentIdx + 1) % allModels.length;
+        const next = allModels[nextIdx];
+        if (next === 'claude') {
+          setProvider('claude');
+        } else {
+          setProvider('local');
+          setLocalModel(next);
+        }
+      },
+    };
+  });
+
+  // Global Ctrl+Shift shortcuts — views and coach modes
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.ctrlKey || !e.shiftKey || e.metaKey) return;
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const action = shortcutActionsRef.current[e.key.toUpperCase()];
+      if (action) { e.preventDefault(); action(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   // Auto-link email to any tasks created during an active email processing session
   useEffect(() => {
     if (!pendingEmailContext || !preEmailTaskIdsRef.current) return;
