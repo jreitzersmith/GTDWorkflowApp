@@ -68,7 +68,10 @@ function AppSidebar({
           onMouseLeave={e => { if (currentView !== "focus") { e.currentTarget.style.background = "transparent"; } }}
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#f0c040", flexShrink: 0 }} />
-          <span style={{ flex: 1, fontSize: 13, color: currentView === "focus" ? COLORS.text : COLORS.text2 }}>📋 Today's Focus</span>
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "focus" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>📋</span>
+            Today's Focus
+          </span>
           {focusCount > 0 && (
             <span style={{ fontSize: 11, background: "#f0c04022", color: "#f0c040", padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{focusCount}</span>
           )}
@@ -80,7 +83,10 @@ function AppSidebar({
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "email" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "email" ? COLORS.inbox : "transparent"}`, transition: "background 0.1s" }}
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.inbox, flexShrink: 0 }} />
-          <span style={{ flex: 1, fontSize: 13, color: currentView === "email" ? COLORS.text : COLORS.text2 }}>📧 Email</span>
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "email" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>📧</span>
+            Email
+          </span>
           {gmailUnreadCount != null && gmailUnreadCount > 0 && (
             <span style={{ fontSize: 11, background: COLORS.inbox + "22", color: COLORS.inbox, padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{gmailUnreadCount}</span>
           )}
@@ -92,7 +98,10 @@ function AppSidebar({
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "calendar" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "calendar" ? COLORS.calendar : "transparent"}`, transition: "background 0.1s" }}
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.calendar, flexShrink: 0 }} />
-          <span style={{ flex: 1, fontSize: 13, color: currentView === "calendar" ? COLORS.text : COLORS.text2 }}>📅 Calendar</span>
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "calendar" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>📅</span>
+            Calendar
+          </span>
           {calendarEnabled && <span style={{ fontSize: 9, background: COLORS.calendar + "33", color: COLORS.calendar, padding: "1px 5px", borderRadius: 8, fontWeight: 500 }}>✓</span>}
         </div>
 
@@ -104,7 +113,10 @@ function AppSidebar({
           onMouseLeave={e => e.currentTarget.style.background = "transparent"}
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.text2, flexShrink: 0 }} />
-          <span style={{ flex: 1, fontSize: 13, color: COLORS.text2 }}>🔍 Search</span>
+          <span style={{ flex: 1, fontSize: 13, color: COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>🔍</span>
+            Search
+          </span>
           <kbd style={{ fontSize: 9, color: COLORS.text2, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "1px 4px" }}>⌘K</kbd>
         </div>
       </div>
