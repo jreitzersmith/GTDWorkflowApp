@@ -28,11 +28,12 @@ const SHORTCUT_SECTIONS = [
     heading: 'VIEWS',
     rows: [
       { keys: ['I'], label: 'Inbox' },
+      { keys: ['N'], label: 'Next Actions' },
       { keys: ['P'], label: 'Projects' },
       { keys: ['W'], label: 'Waiting For' },
       { keys: ['S'], label: 'Someday / Maybe' },
       { keys: ['D'], label: 'Deferred' },
-      { keys: ['C'], label: 'Completed' },
+      { keys: ['A'], label: 'Completed' },
       { keys: ['F'], label: "Today's Focus" },
       { keys: ['E'], label: 'Email' },
       { keys: ['L'], label: 'Calendar' },
@@ -48,6 +49,13 @@ const SHORTCUT_SECTIONS = [
       { keys: ['Z'], label: 'Process Inbox' },
       { keys: ['B'], label: 'Brain Dump' },
       { keys: ['Y'], label: 'Cycle AI model' },
+    ],
+  },
+  {
+    heading: 'SETTINGS & USAGE',
+    rows: [
+      { keys: ['O'], label: 'Open / close Settings' },
+      { keys: ['U'], label: 'Open / close Usage' },
     ],
   },
   {
