@@ -203,7 +203,7 @@ export default function GTDManager() {
   // Global Ctrl+Shift shortcuts — views and coach modes
   useEffect(() => {
     const handler = (e) => {
-      if (!e.ctrlKey || !e.shiftKey || e.metaKey) return;
+      if (!e.altKey || !e.shiftKey) return;
       const tag = e.target.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       const action = shortcutActionsRef.current[e.key.toUpperCase()];

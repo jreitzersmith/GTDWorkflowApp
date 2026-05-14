@@ -27,27 +27,27 @@ const SHORTCUT_SECTIONS = [
   {
     heading: 'VIEWS',
     rows: [
-      { keys: ['Ctrl', '⇧', 'I'], label: 'Inbox' },
-      { keys: ['Ctrl', '⇧', 'P'], label: 'Projects' },
-      { keys: ['Ctrl', '⇧', 'W'], label: 'Waiting For' },
-      { keys: ['Ctrl', '⇧', 'S'], label: 'Someday / Maybe' },
-      { keys: ['Ctrl', '⇧', 'D'], label: 'Deferred' },
-      { keys: ['Ctrl', '⇧', 'C'], label: 'Completed' },
-      { keys: ['Ctrl', '⇧', 'F'], label: "Today's Focus" },
-      { keys: ['Ctrl', '⇧', 'E'], label: 'Email' },
-      { keys: ['Ctrl', '⇧', 'L'], label: 'Calendar' },
-      { keys: ['Ctrl', '⇧', 'K'], label: 'Search  (also ⌘K)' },
+      { keys: ['Alt', '⇧', 'I'], label: 'Inbox' },
+      { keys: ['Alt', '⇧', 'P'], label: 'Projects' },
+      { keys: ['Alt', '⇧', 'W'], label: 'Waiting For' },
+      { keys: ['Alt', '⇧', 'S'], label: 'Someday / Maybe' },
+      { keys: ['Alt', '⇧', 'D'], label: 'Deferred' },
+      { keys: ['Alt', '⇧', 'C'], label: 'Completed' },
+      { keys: ['Alt', '⇧', 'F'], label: "Today's Focus" },
+      { keys: ['Alt', '⇧', 'E'], label: 'Email' },
+      { keys: ['Alt', '⇧', 'L'], label: 'Calendar' },
+      { keys: ['Alt', '⇧', 'K'], label: 'Search  (also ⌘K)' },
     ],
   },
   {
     heading: 'MODES',
     rows: [
-      { keys: ['Ctrl', '⇧', 'Q'], label: 'Start Day' },
-      { keys: ['Ctrl', '⇧', 'R'], label: 'Weekly Review' },
-      { keys: ['Ctrl', '⇧', 'X'], label: 'Project Review' },
-      { keys: ['Ctrl', '⇧', 'Z'], label: 'Process Inbox' },
-      { keys: ['Ctrl', '⇧', 'B'], label: 'Brain Dump' },
-      { keys: ['Ctrl', '⇧', 'Y'], label: 'Cycle AI model' },
+      { keys: ['Alt', '⇧', 'Q'], label: 'Start Day' },
+      { keys: ['Alt', '⇧', 'R'], label: 'Weekly Review' },
+      { keys: ['Alt', '⇧', 'X'], label: 'Project Review' },
+      { keys: ['Alt', '⇧', 'Z'], label: 'Process Inbox' },
+      { keys: ['Alt', '⇧', 'B'], label: 'Brain Dump' },
+      { keys: ['Alt', '⇧', 'Y'], label: 'Cycle AI model' },
     ],
   },
   {
@@ -64,12 +64,19 @@ const SHORTCUT_SECTIONS = [
 ];
 
 function ShortcutMap() {
+  const [nativeMod, setNativeMod] = useState('');
+  useEffect(() => {
+    const el = document.createElement('div');
+    el.accessKey = 'x';
+    const label = el.accessKeyLabel;
+    if (label) setNativeMod(' (native: ' + label.replace('x', '').trim() + '+key)');
+  }, []);
   return (
     <div style={{ padding: '10px 16px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {SHORTCUT_SECTIONS.map(section => (
         <div key={section.heading}>
           <div style={{ fontSize: 10, fontWeight: 600, color: COLORS.text2, letterSpacing: '0.08em', marginBottom: 6 }}>
-            {section.heading}
+            {section.heading}{section.heading === 'VIEWS' || section.heading === 'MODES' ? <span style={{ fontWeight: 400, opacity: 0.7 }}>{nativeMod}</span> : null}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px' }}>
             {section.rows.map(row => (

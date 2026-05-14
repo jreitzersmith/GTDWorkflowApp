@@ -62,6 +62,7 @@ function AppSidebar({
 
         <div
           onClick={onSelectFocus}
+          accessKey="f"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "focus" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "focus" ? "#f0c040" : "transparent"}`, transition: "background 0.1s" }}
           onMouseEnter={e => { if (currentView !== "focus") { e.currentTarget.style.background = COLORS.surface2; } }}
           onMouseLeave={e => { if (currentView !== "focus") { e.currentTarget.style.background = "transparent"; } }}
@@ -75,6 +76,7 @@ function AppSidebar({
 
         <div
           onClick={onSelectEmail}
+          accessKey="e"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "email" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "email" ? COLORS.inbox : "transparent"}`, transition: "background 0.1s" }}
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.inbox, flexShrink: 0 }} />
@@ -86,6 +88,7 @@ function AppSidebar({
 
         <div
           onClick={onSelectCalendar}
+          accessKey="l"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "calendar" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "calendar" ? COLORS.calendar : "transparent"}`, transition: "background 0.1s" }}
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.calendar, flexShrink: 0 }} />
@@ -95,6 +98,7 @@ function AppSidebar({
 
         <div
           onClick={onOpenSearch}
+          accessKey="k"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: "transparent", borderLeft: "3px solid transparent", transition: "background 0.1s" }}
           onMouseEnter={e => e.currentTarget.style.background = COLORS.surface2}
           onMouseLeave={e => e.currentTarget.style.background = "transparent"}
@@ -106,9 +110,9 @@ function AppSidebar({
       </div>
 
       <div style={{ padding: 10, borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
-        <SidebarBtn primary onClick={onDailyReview}>{dailyReviewPhase === 'end' ? '🌇 End Day' : '🌅 Start Day'}</SidebarBtn>
-        <SidebarBtn onClick={onWeeklyReview}>📋 Weekly Review</SidebarBtn>
-        <SidebarBtn onClick={onBrainDump}>🧠 Brain Dump</SidebarBtn>
+        <SidebarBtn primary onClick={onDailyReview} accessKey="q">{dailyReviewPhase === 'end' ? '🌇 End Day' : '🌅 Start Day'}</SidebarBtn>
+        <SidebarBtn onClick={onWeeklyReview} accessKey="r">📋 Weekly Review</SidebarBtn>
+        <SidebarBtn onClick={onBrainDump} accessKey="b">🧠 Brain Dump</SidebarBtn>
       </div>
 
       <div style={{ padding: "8px 10px", borderTop: `1px solid ${COLORS.border}`, display: "flex", gap: 6 }}>
