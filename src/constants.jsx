@@ -22,7 +22,7 @@ export const BUCKETS = {
   inbox:        { label: "📥 Inbox",           desc: "Unprocessed — capture everything here first", color: COLORS.inbox },
   project:      { label: "📁 Projects",        desc: "Anything requiring more than one step",        color: COLORS.project },
   next:         { label: "⚡ Next Actions",     desc: "Concrete physical actions to do this week",   color: COLORS.next },
-  waiting:      { label: "⏳  Waiting For",     desc: "Delegated — ball in someone else's court",     color: COLORS.waiting },
+  waiting:      { label: "⏳   Waiting For",     desc: "Delegated — ball in someone else's court",     color: COLORS.waiting },
   someday:      { label: "💭 Someday / Maybe", desc: "Ideas and aspirations, not commitments",       color: COLORS.someday },
   deferred:     { label: "⏰ Deferred",          desc: "Deferred tasks waiting for their wake date",  color: COLORS.deferred },
   done:         { label: "📦 Archived",          desc: "Completed tasks — archived for reference",   color: COLORS.done },
