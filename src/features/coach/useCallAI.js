@@ -383,7 +383,6 @@ function useCallAI({
         if (taskActionLines.length > 0) {
           // Process all actions against a local working copy so parent lookups
           // work across the batch (e.g. create parent then add children in same response)
-          const preActionIds = new Set(tasks.map(t => t.id));
           let workingTasks = [...tasks];
           const chips = [];
           const actionErrors = [];
@@ -485,16 +484,6 @@ function useCallAI({
               }
               continue;
             }
-          }
-
-          // Auto-attach email context to any newly created tasks
-          if (emailContext?.id) {
-            workingTasks = workingTasks.map(t => {
-              if (preActionIds.has(t.id)) return t; // not new
-              const existing = t.driveAttachments || [];
-              if (existing.find(a => a.id === emailContext.id)) return t;
-              return { ...t, driveAttachments: [...existing, { id: emailContext.id, name: emailContext.subject || 'Email', type: 'email' }] };
-            });
           }
 
           // Commit all mutations in one setTasks call

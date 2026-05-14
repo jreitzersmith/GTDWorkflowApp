@@ -71,6 +71,8 @@ export default function GTDManager() {
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
   const [uncategorizedProjectId, setUncategorizedProjectId] = useState(null);
+  const [pendingEmailContext, setPendingEmailContext] = useState(null); // { id, subject } — set while processing an email
+  const preEmailTaskIdsRef = useRef(null); // snapshot of task IDs at email processing start
   const [searchOpen, setSearchOpen] = useState(false);
   // Compute Today's Focus count from localStorage for sidebar badge
   const focusCount = (() => {
@@ -158,6 +160,26 @@ export default function GTDManager() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  // Auto-link email to any tasks created during an active email processing session
+  useEffect(() => {
+    if (!pendingEmailContext || !preEmailTaskIdsRef.current) return;
+    const newTasks = tasks.filter(t =>
+      !preEmailTaskIdsRef.current.has(t.id) &&
+      !(t.driveAttachments || []).some(a => a.id === pendingEmailContext.id)
+    );
+    if (!newTasks.length) return;
+    setTasks(prev => prev.map(t => {
+      if (!newTasks.find(nt => nt.id === t.id)) return t;
+      const existing = t.driveAttachments || [];
+      return { ...t, driveAttachments: [...existing, {
+        id: pendingEmailContext.id,
+        name: pendingEmailContext.subject || 'Email',
+        mimeType: 'message/rfc822',
+        url: `https://mail.google.com/mail/#inbox/${pendingEmailContext.id}`,
+      }] };
+    }));
+  }, [tasks, pendingEmailContext]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-surface: on mount, move any uncategorized deferred tasks whose wake date has passed into Inbox.
   // Only moves tasks with no parentId (project subtasks stay in place; their deferUntil just stops hiding them).
@@ -314,6 +336,8 @@ export default function GTDManager() {
 
   const switchCoachMode = useCallback((mode, introMsg) => {
     setEmailContext(null);
+    setPendingEmailContext(null);
+    preEmailTaskIdsRef.current = null;
     setCoachMode(mode);
     setChatHistory([]);
     setPendingAction(null);
@@ -510,6 +534,8 @@ export default function GTDManager() {
       ``,
       body,
     ].join('\n');
+    preEmailTaskIdsRef.current = new Set(tasks.map(t => t.id));
+    setPendingEmailContext({ id: email.id, subject: email.subject });
     setEmailContext({ id: email.id, subject: email.subject });
     setCoachMode("chat");
     setChatInput("");

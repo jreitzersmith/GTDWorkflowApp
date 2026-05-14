@@ -60,7 +60,7 @@ function formatBubble(text) {
 }
 
 function extractAction(text) {
-  const m = text.match(/→ACTION:(next|project|someday|waiting|delete|add)\|?([^|\n]*)?\|?([^|\n]*)?((?:\|[^\n]*)*)?/);
+  const m = text.match(/→ACTION:(next|project|someday|waiting|delete)\|?([^|\n]*)?\|?([^|\n]*)?((?:\|[^\n]*)*)?/);
   if (!m) return null;
   // For 'project' type m[3] is the first next action; for all other types the
   // third positional segment may be a due/defer/recur field captured before the
