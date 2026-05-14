@@ -33,7 +33,7 @@ const SHORTCUT_SECTIONS = [
       { keys: ['P'], label: 'Projects' },
       { keys: ['S'], label: 'Someday / Maybe' },
       { keys: ['D'], label: 'Deferred' },
-      { keys: ['A'], label: 'Archive' },
+      { keys: ['A'], label: 'Archived' },
       { keys: ['L'], label: 'Calendar' },
       { keys: ['F'], label: "Today's Focus" },
       { keys: ['E'], label: 'Email' },
@@ -66,8 +66,8 @@ const SHORTCUT_SECTIONS = [
     heading: 'SETTINGS & USAGE',
     rows: [
       { keys: ['O'], label: 'Open / close Settings' },
-      { keys: ['U'], label: 'Open / close Usage' },
       { keys: ['K'], label: 'Search  (also ⌘K)' },
+      { keys: ['U'], label: 'Open / close Usage' },
     ],
   },
 ];

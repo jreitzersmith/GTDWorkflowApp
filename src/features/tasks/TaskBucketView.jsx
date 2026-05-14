@@ -268,7 +268,7 @@ function TaskBucketView({
                   {displayOpen && (
                     <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 185, boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
                       {[
-                        { label: "🗄  Archive",     state: showCompletedInProjects, toggle: () => setShowCompletedInProjects(v => !v) },
+                        { label: "🗄  Archived",     state: showCompletedInProjects, toggle: () => setShowCompletedInProjects(v => !v) },
                         { label: "🛑  Waiting For",   state: showWaitingInProjects,   toggle: () => setShowWaitingInProjects(v => !v) },
                         { label: "⏳  Someday/Maybe", state: showSomeDayInProjects,   toggle: () => setShowSomeDayInProjects(v => !v) },
                       ].map(({ label, state, toggle }) => (

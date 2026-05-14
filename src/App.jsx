@@ -149,6 +149,9 @@ export default function GTDManager() {
     setProjectParentId(sel?.bucket === 'project' ? selectedTaskId : '__new__');
   }, [selectedTaskId, currentBucket]);
 
+  // Eagerly fetch local models on mount so Ctrl+Alt+Y can cycle immediately
+  useEffect(() => { fetchModels(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Global search — Cmd+K / Ctrl+K
   useEffect(() => {
     const handler = (e) => {
