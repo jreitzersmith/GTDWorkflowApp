@@ -297,7 +297,8 @@ export default function GTDManager() {
     return `Today's date: ${today}\n\n${sections.join("\n\n")}${calSection}`;
   }, [tasks, calendarEnabled, calendarEvents]);
 
-  const { callAI, sendChat, fetchModels, lastInputLog } = useCallAI({
+  const { callAI, sendChat, fetchModels, lastInputLog, setEmailContext,
+} = useCallAI({
     tasks, efforts, calibrationOverrides,
     provider, localModel,
     googleToken, googleScope, calendarEnabled,
@@ -312,6 +313,7 @@ export default function GTDManager() {
   });
 
   const switchCoachMode = useCallback((mode, introMsg) => {
+    setEmailContext(null);
     setCoachMode(mode);
     setChatHistory([]);
     setPendingAction(null);
@@ -508,6 +510,7 @@ export default function GTDManager() {
       ``,
       body,
     ].join('\n');
+    setEmailContext({ id: email.id, subject: email.subject });
     setCoachMode("chat");
     setChatInput("");
     setMessages(prev => [...prev, { role: "user", text: prompt }]);

@@ -56,13 +56,13 @@ Updatable fields: due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · actual
 
 Recurrence format: frequency is daily/weekly/monthly/yearly; interval is a number. For weekly on specific days add comma-separated abbreviations: mon,tue,wed,thu,fri,sat,sun (e.g. recur:weekly:1:mon,fri). To set an end date add it as the last segment (e.g. recur:weekly:1:mon,fri:2026-06-30). Use recur:off to remove recurrence.
 
-To add a new task as a child of an existing task, add a line:
+To add a task under a specific parent project (ALWAYS prefer this when the user specifies a project or you can identify a relevant one), add a line:
 →ACTION:add|<task title>|parent:<parent_task_id_or_exact_title>
-Optional fields (each preceded by |): bucket:next or bucket:project · due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments)
+Optional fields (each preceded by |): bucket:next or bucket:project · due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · category:<name> · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments)
 
 Use bucket:project for container tasks that will themselves have subtasks (sub-projects); use bucket:next (default) for leaf-level actions to complete. Write plain titles in parent references with no backticks, quotes, or markdown formatting.
 
-To create a new standalone task, add a line:
+To create a new standalone task with no known parent, add a line:
 →ACTION:create|<task title>|bucket:<inbox|next|project>
 Optional fields (each preceded by |): due:YYYY-MM-DD · dueTime:HH:MM · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments)
 

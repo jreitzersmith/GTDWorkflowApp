@@ -87,6 +87,9 @@ function useCallAI({
   }, [provider, fetchModels]);
 
   const [lastInputLog, setLastInputLog] = useState(null);
+  // Persists email context across multi-turn conversations initiated by processEmailWithAI
+  const emailContextRef = useRef(null);
+  const setEmailContext = useCallback((ctx) => { emailContextRef.current = ctx; }, []);
 
   const callAI = useCallback(async (userMsg, mode, history, { emailContext = null } = {}) => {
     // Inject calibration context only for modes that suggest effort estimates
@@ -650,10 +653,10 @@ function useCallAI({
     if (!text || loading) return;
     setChatInput('');
     setMessages(prev => [...prev, { role: 'user', text }]);
-    await callAI(text, coachMode, chatHistory);
+    await callAI(text, coachMode, chatHistory, { emailContext: emailContextRef.current });
   }, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages]);
 
-  return { callAI, sendChat, fetchModels, lastInputLog };
+  return { callAI, sendChat, fetchModels, lastInputLog, setEmailContext };
 }
 
 export { useCallAI }

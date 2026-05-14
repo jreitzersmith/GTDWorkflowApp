@@ -333,8 +333,8 @@ function DriveAttachments({ taskId, attachments, driveEnabled, googleAccessToken
   if (!driveEnabled) return null;
 
   const list = attachments || [];
-  const emailAtts = list.filter(a => a.mimeType === 'message/rfc822');
-  const driveAtts = list.filter(a => a.mimeType !== 'message/rfc822');
+  const emailAtts = list.filter(a => a.mimeType === 'message/rfc822' || a.type === 'email');
+  const driveAtts = list.filter(a => a.mimeType !== 'message/rfc822' && a.type !== 'email');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -417,7 +417,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
   );
   const hasProjectChildren = allTasks.some(t => t.parentId === task.id && t.bucket === 'project');
   // nodeType===null on existing project-bucket tasks displays as 'project'; on next-bucket tasks as 'task'
-  const effectiveNodeType = task.nodeType ?? (task.bucket === 'project' ? 'project' : 'task');
+  const effectiveNodeType = task.nodeType ?? (task.isNextAction ? 'task' : task.bucket === 'project' ? 'project' : 'task');
 
   return (
     <div style={{ ...style, background: COLORS.surface, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -493,7 +493,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
                         if (disabled) return;
                         const moveBucket = ['project', 'next'].includes(currentBucket);
                         onUpdate(task.id, moveBucket
-                          ? (isTask ? { nodeType: 'task', bucket: 'next' } : { nodeType: value, bucket: 'project' })
+                          ? (isTask ? { nodeType: 'task', isNextAction: true, bucket: 'project' } : { nodeType: value, isNextAction: false, bucket: 'project' })
                           : { nodeType: value });
                       }}
                       title={disabled ? 'Cannot convert to task: node has sub-projects' : undefined}
