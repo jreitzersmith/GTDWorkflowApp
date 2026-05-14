@@ -27,27 +27,27 @@ const SHORTCUT_SECTIONS = [
   {
     heading: 'VIEWS',
     rows: [
-      { keys: ['Alt', '⇧', 'I'], label: 'Inbox' },
-      { keys: ['Alt', '⇧', 'P'], label: 'Projects' },
-      { keys: ['Alt', '⇧', 'W'], label: 'Waiting For' },
-      { keys: ['Alt', '⇧', 'S'], label: 'Someday / Maybe' },
-      { keys: ['Alt', '⇧', 'D'], label: 'Deferred' },
-      { keys: ['Alt', '⇧', 'C'], label: 'Completed' },
-      { keys: ['Alt', '⇧', 'F'], label: "Today's Focus" },
-      { keys: ['Alt', '⇧', 'E'], label: 'Email' },
-      { keys: ['Alt', '⇧', 'L'], label: 'Calendar' },
-      { keys: ['Alt', '⇧', 'K'], label: 'Search  (also ⌘K)' },
+      { keys: ['I'], label: 'Inbox' },
+      { keys: ['P'], label: 'Projects' },
+      { keys: ['W'], label: 'Waiting For' },
+      { keys: ['S'], label: 'Someday / Maybe' },
+      { keys: ['D'], label: 'Deferred' },
+      { keys: ['C'], label: 'Completed' },
+      { keys: ['F'], label: "Today's Focus" },
+      { keys: ['E'], label: 'Email' },
+      { keys: ['L'], label: 'Calendar' },
+      { keys: ['K'], label: 'Search  (also ⌘K)' },
     ],
   },
   {
     heading: 'MODES',
     rows: [
-      { keys: ['Alt', '⇧', 'Q'], label: 'Start Day' },
-      { keys: ['Alt', '⇧', 'R'], label: 'Weekly Review' },
-      { keys: ['Alt', '⇧', 'X'], label: 'Project Review' },
-      { keys: ['Alt', '⇧', 'Z'], label: 'Process Inbox' },
-      { keys: ['Alt', '⇧', 'B'], label: 'Brain Dump' },
-      { keys: ['Alt', '⇧', 'Y'], label: 'Cycle AI model' },
+      { keys: ['Q'], label: 'Start Day' },
+      { keys: ['R'], label: 'Weekly Review' },
+      { keys: ['X'], label: 'Project Review' },
+      { keys: ['Z'], label: 'Process Inbox' },
+      { keys: ['B'], label: 'Brain Dump' },
+      { keys: ['Y'], label: 'Cycle AI model' },
     ],
   },
   {
@@ -63,7 +63,7 @@ const SHORTCUT_SECTIONS = [
   },
 ];
 
-function ShortcutMap() {
+function ShortcutMap({ shortcutModifier }) {
   const [nativeMod, setNativeMod] = useState('');
   useEffect(() => {
     const el = document.createElement('div');
@@ -71,6 +71,12 @@ function ShortcutMap() {
     const label = el.accessKeyLabel;
     if (label) setNativeMod(' (native: ' + label.replace('x', '').trim() + '+key)');
   }, []);
+
+  const modKeys =
+    shortcutModifier === 'ctrl+shift' ? ['Ctrl', '⇧'] :
+    shortcutModifier === 'alt+shift'  ? ['Alt',  '⇧'] :
+                                        ['Ctrl', 'Alt']; // ctrl+alt default
+
   return (
     <div style={{ padding: '10px 16px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {SHORTCUT_SECTIONS.map(section => (
@@ -82,7 +88,7 @@ function ShortcutMap() {
             {section.rows.map(row => (
               <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: COLORS.text2 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                  {row.keys.map((k, i) => (
+                  {(section.heading !== 'NAVIGATION' ? [...modKeys, ...row.keys] : row.keys).map((k, i, arr) => (
                     <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                       {i > 0 && <span style={{ color: COLORS.muted, fontSize: 9 }}>{row.alt ? '/' : '+'}</span>}
                       <Key>{k}</Key>
@@ -99,7 +105,7 @@ function ShortcutMap() {
   );
 }
 
-function SearchModal({ tasks, onSelect, onClose }) {
+function SearchModal({ tasks, onSelect, onClose, shortcutModifier = 'ctrl+alt' }) {
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef(null);
@@ -182,7 +188,7 @@ function SearchModal({ tasks, onSelect, onClose }) {
         {/* Shortcut map — shown when no query is typed */}
         {query.trim().length === 0 && (
           <div style={{ borderBottom: `1px solid ${COLORS.border}`, maxHeight: 360, overflowY: 'auto' }}>
-            <ShortcutMap />
+            <ShortcutMap shortcutModifier={shortcutModifier} />
           </div>
         )}
 

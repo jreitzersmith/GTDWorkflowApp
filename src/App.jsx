@@ -59,7 +59,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults } = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier } = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
@@ -166,6 +166,7 @@ export default function GTDManager() {
   useEffect(() => {
     const nav = (bucket) => () => { setCurrentBucket(bucket); setCurrentView("gtd"); setShowSettings(false); setSelectedTaskId(null); };
     shortcutActionsRef.current = {
+      _modifier: shortcutModifier,
       // Views
       I: nav("inbox"),
       P: nav("project"),
@@ -203,7 +204,12 @@ export default function GTDManager() {
   // Global Ctrl+Shift shortcuts — views and coach modes
   useEffect(() => {
     const handler = (e) => {
-      if (!e.altKey || !e.shiftKey) return;
+      const mod = shortcutActionsRef.current._modifier || 'ctrl+alt';
+      const match =
+        mod === 'ctrl+alt'  ? (e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey) :
+        mod === 'alt+shift' ? (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey) :
+        mod === 'ctrl+shift'? (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) : false;
+      if (!match) return;
       const tag = e.target.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       const action = shortcutActionsRef.current[e.key.toUpperCase()];
@@ -1181,6 +1187,8 @@ export default function GTDManager() {
             tasks={tasks}
             onSelect={handleSearchSelect}
             onClose={() => setSearchOpen(false)}
+          
+            shortcutModifier={shortcutModifier}
           />
         )}
         <ResizeHandle onMouseDown={sidebarDragDown} direction="h" />
@@ -1210,6 +1218,8 @@ export default function GTDManager() {
                           onSetTagDisplay={setTagDisplay}
                           focusExpandedDefaults={focusExpandedDefaults}
                           onSetFocusExpandedDefaults={setFocusExpandedDefaults}
+                          shortcutModifier={shortcutModifier}
+                          onSetShortcutModifier={setShortcutModifier}
                           nextActionsViewMode={nextActionsViewMode}
                           onSetNextActionsViewMode={setNextActionsViewMode}
                           reviewNodeTypes={reviewNodeTypes}
@@ -1293,6 +1303,8 @@ export default function GTDManager() {
                           tagDisplay={tagDisplay}
                           focusExpandedDefaults={focusExpandedDefaults}
                           onSetFocusExpandedDefaults={setFocusExpandedDefaults}
+                          shortcutModifier={shortcutModifier}
+                          onSetShortcutModifier={setShortcutModifier}
                         />
                       ) : (
                         <TaskBucketView

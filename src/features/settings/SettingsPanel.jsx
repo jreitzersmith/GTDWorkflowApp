@@ -78,6 +78,8 @@ function SettingsPanel({
   efforts, onAddEffort, onRenameEffort, onRemoveEffort,
   calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride,
   tagDisplay, onSetTagDisplay,
+  focusExpandedDefaults, onSetFocusExpandedDefaults,
+  shortcutModifier, onSetShortcutModifier,
   nextActionsViewMode, onSetNextActionsViewMode,
   reviewNodeTypes, onSetReviewNodeTypes,
   onExport, onImport, onClose,
@@ -330,6 +332,59 @@ function SettingsPanel({
           <ReviewConfigManager reviewNodeTypes={reviewNodeTypes} onSetReviewNodeTypes={onSetReviewNodeTypes} />
         </SettingsSection>
 
+        <SettingsSection label="Keyboard Shortcuts" storageKey="gtd_settings_keyboard">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
+            Choose the modifier key combination used for global view and mode shortcuts.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              { value: 'ctrl+alt',   label: 'Ctrl + Alt + key',   hint: 'Recommended — fewest browser conflicts. Note: equals AltGr on European keyboards.' },
+              { value: 'alt+shift',  label: 'Alt + Shift + key',  hint: 'Some combos conflict with Chrome accessibility shortcuts (Alt+Shift+I etc.).' },
+              { value: 'ctrl+shift', label: 'Ctrl + Shift + key', hint: 'Some combos conflict with browser DevTools (Ctrl+Shift+I/J/C).' },
+            ].map(({ value, label, hint }) => (
+              <label key={value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: COLORS.text, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="shortcutModifier"
+                  value={value}
+                  checked={shortcutModifier === value}
+                  onChange={() => onSetShortcutModifier(value)}
+                  style={{ accentColor: COLORS.next, marginTop: 2, flexShrink: 0 }}
+                />
+                <div>
+                  <div style={{ fontWeight: 500 }}>{label}</div>
+                  <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1 }}>{hint}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection label="Today's Focus" storageKey="gtd_settings_todays_focus">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
+            Choose which sections are expanded by default when you open Today's Focus.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              { key: 'dueToday',    label: '📅 Due Today' },
+              { key: 'overdue',     label: '⚠ Overdue' },
+              { key: 'dueThisWeek', label: '📆 Due This Week (>1 hr)' },
+              { key: 'noCalEvent',  label: '📆 Due · No Calendar Event' },
+            ].map(({ key, label }) => (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: COLORS.text, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={!!(focusExpandedDefaults || {})[key]}
+                  onChange={e => onSetFocusExpandedDefaults(prev => ({ ...prev, [key]: e.target.checked }))}
+                  style={{ accentColor: COLORS.next, width: 14, height: 14 }}
+                />
+                {label}
+                <span style={{ fontSize: 10, color: COLORS.muted }}>(expanded by default)</span>
+              </label>
+            ))}
+          </div>
+        </SettingsSection>
+
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
           <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
         </SettingsSection>
@@ -388,6 +443,10 @@ SettingsPanel.propTypes = {
   onClearCalibrationOverride: PropTypes.func.isRequired,
   tagDisplay:                 PropTypes.string.isRequired,
   onSetTagDisplay:            PropTypes.func.isRequired,
+  focusExpandedDefaults:      PropTypes.object.isRequired,
+  onSetFocusExpandedDefaults: PropTypes.func.isRequired,
+  shortcutModifier:           PropTypes.string.isRequired,
+  onSetShortcutModifier:      PropTypes.func.isRequired,
   nextActionsViewMode:        PropTypes.string.isRequired,
   onSetNextActionsViewMode:   PropTypes.func.isRequired,
   onExport:                   PropTypes.func.isRequired,
