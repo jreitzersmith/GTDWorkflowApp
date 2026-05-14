@@ -178,7 +178,7 @@ function SearchModal({ tasks, onSelect, onClose, shortcutModifier = 'ctrl+alt' }
       {/* Modal */}
       <div
         onClick={e => e.stopPropagation()}
-        style={{ width: 560, maxWidth: "calc(100vw - 32px)", background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 10, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden" }}
+        style={{ width: 720, maxWidth: "calc(100vw - 32px)", background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 10, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden" }}
       >
         {/* Search input */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: `1px solid ${COLORS.border}` }}>
@@ -196,13 +196,13 @@ function SearchModal({ tasks, onSelect, onClose, shortcutModifier = 'ctrl+alt' }
 
         {/* Shortcut map — shown when no query is typed */}
         {query.trim().length === 0 && (
-          <div style={{ borderBottom: `1px solid ${COLORS.border}`, maxHeight: 360, overflowY: 'auto' }}>
+          <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
             <ShortcutMap shortcutModifier={shortcutModifier} />
           </div>
         )}
 
         {/* Results */}
-        <div ref={listRef} style={{ maxHeight: 360, overflowY: "auto" }}>
+        <div ref={listRef} style={{ maxHeight: 480, overflowY: "auto" }}>
           {query.trim().length === 0 ? (
             <div style={{ padding: "20px 20px", fontSize: 12, color: COLORS.muted, textAlign: "center" }}>
               Type to search across all tasks

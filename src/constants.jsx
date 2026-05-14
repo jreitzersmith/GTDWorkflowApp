@@ -25,7 +25,7 @@ export const BUCKETS = {
   waiting:      { label: "⏳ Waiting For",     desc: "Delegated — ball in someone else's court",     color: COLORS.waiting },
   someday:      { label: "💭 Someday / Maybe", desc: "Ideas and aspirations, not commitments",       color: COLORS.someday },
   deferred:     { label: "⏰ Deferred",          desc: "Deferred tasks waiting for their wake date",  color: COLORS.deferred },
-  done:         { label: "🗄  Archived",          desc: "Completed tasks — archived for reference",   color: COLORS.done },
+  done:         { label: "📦 Archived",          desc: "Completed tasks — archived for reference",   color: COLORS.done },
   inboxHistory: { label: "📋 Inbox History",   desc: "Processed inbox items — archived for reference", color: COLORS.muted },
 };
 
