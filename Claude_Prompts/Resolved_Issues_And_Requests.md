@@ -104,3 +104,4 @@ When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and 
 | 2026-05-13 | Feature      | FR#88b  | GH#93  | Sidebar: Projects moved before Next Actions; coach mode dropdown; Today's Focus collapsible tiers + tag display; effort group dedup | ec0cd31 |
 | 2026-05-13 | Feature      | FR#77   | GH#78  | Process mode: editable metadata panel in pending action bar | 73e77fb           |
 | 2026-05-14 | Feature      | FR#86   | GH#91  | Keyboard navigation: ↑↓/jk focus, Enter opens detail, ←→ collapse/expand, Escape clears | 568db30 |
+| 2026-05-14 | Feature      | FR#89   | GH#94  | Global keyboard shortcuts (17 shortcuts, configurable modifier, shortcut map, Archived rename, emoji alignment) | 9fdf9fd |
