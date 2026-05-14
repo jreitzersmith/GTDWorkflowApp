@@ -488,13 +488,17 @@ export default function GTDManager() {
     const prompt = [
       `Please review this email and handle it completely using this workflow:`,
       ``,
-      `**Tasks:** Identify all action items and offer to create them. When creating a task, ALWAYS emit →ACTION:link_email|<exact task title>|${email.id}|${email.subject} immediately after the task creation action so the email is attached to the task.`,
+      `**Tasks:** Identify all action items. Before creating each task, ask me:`,
+      `  - Which project or parent it belongs under (suggest the most relevant existing project based on the content — don't default to Uncategorized)`,
+      `  - What category it belongs to`,
+      `  - Effort estimate and any relevant location`,
+      `Once confirmed, create the task with full metadata (category, effort, location, project). The email will be automatically linked.`,
       ``,
-      `**Similar emails:** After tasks are confirmed, search Gmail for other emails from this sender or with a similar subject — report findings briefly (or confirm nothing similar found).`,
+      `**Similar emails:** After tasks are confirmed, search Gmail for other emails from this sender or with a similar subject — report briefly.`,
       ``,
-      `**Filter / label:** Ask whether I'd like a Gmail filter + label for future emails like this. If yes, create the label then the filter using the available Gmail tools.`,
+      `**Filter / label:** Ask whether I'd like a Gmail filter + label for future emails like this. If yes, create the label then the filter.`,
       ``,
-      `**Archive:** Once ALL other steps are complete, archive this email by calling gmail_batch_label with message_ids: ["${email.id}"] and remove_label_ids: ["INBOX"]. Confirm when done.`,
+      `**Archive:** Once ALL other steps are complete, archive this email via gmail_batch_label with message_ids: ["${email.id}"] and remove_label_ids: ["INBOX"]. Confirm when done.`,
       ``,
       `Email:`,
       `From: ${email.from}`,
@@ -507,7 +511,7 @@ export default function GTDManager() {
     setCoachMode("chat");
     setChatInput("");
     setMessages(prev => [...prev, { role: "user", text: prompt }]);
-    callAI(prompt, "chat", chatHistory);
+    callAI(prompt, "chat", chatHistory, { emailContext: { id: email.id, subject: email.subject } });
   }, [setCoachMode, setChatInput, setMessages, callAI, chatHistory]);
 
   // Attach an email as a driveAttachments entry on a task (FR#40)
