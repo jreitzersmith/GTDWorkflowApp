@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { SYSTEM_PROMPTS, OPENWEBUI_URL } from '../../constants.jsx';
 import { TOOLS, doWebSearch } from './webSearch.js';
 import { GMAIL_SEARCH_TOOL, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL,
