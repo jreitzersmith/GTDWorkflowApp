@@ -95,7 +95,7 @@ function TaskBucketView({
   focusedTaskId,
   setFocusedTaskId,
 }) {
-  const { efforts } = useContext(TaskRowContext);
+  const { efforts, collapsedNodes } = useContext(TaskRowContext);
   const [filterText, setFilterText] = useState("");
   const [projPickerOpen, setProjPickerOpen] = useState(false);
   const [quickSortOpen, setQuickSortOpen] = useState(false);
@@ -166,10 +166,15 @@ function TaskBucketView({
         container.querySelector(`[data-task-id="${focusedTaskId}"] span[title="Open detail panel"]`)?.click();
       } else if (e.key === 'ArrowRight' && focusedTaskId && currentBucket === 'project') {
         e.preventDefault();
-        container.querySelector(`[data-task-id="${focusedTaskId}"] button[title="Expand"]`)?.click();
+        // Expand: remove from collapsedNodes if present
+        setCollapsedNodes(prev => { const next = new Set(prev); next.delete(focusedTaskId); return next; });
       } else if (e.key === 'ArrowLeft' && focusedTaskId && currentBucket === 'project') {
         e.preventDefault();
-        container.querySelector(`[data-task-id="${focusedTaskId}"] button[title="Collapse"]`)?.click();
+        // Collapse: add to collapsedNodes (only meaningful if task has children)
+        const focused = tasks.find(t => t.id === focusedTaskId);
+        if (focused && (focused.childIds || []).length > 0) {
+          setCollapsedNodes(prev => { const next = new Set(prev); next.add(focusedTaskId); return next; });
+        }
       } else if (e.key === 'Escape') {
         setFocusedTaskId(null);
       }
@@ -177,7 +182,7 @@ function TaskBucketView({
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [focusedTaskId, setFocusedTaskId, currentBucket]);
+  }, [focusedTaskId, setFocusedTaskId, currentBucket, collapsedNodes, setCollapsedNodes, tasks]);
 
   const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
   const allProjectTasks = tasks.filter(t => t.bucket === "project" && !t.done);
