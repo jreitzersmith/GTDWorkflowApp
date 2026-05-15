@@ -4,40 +4,29 @@
 
 A personal GTD task manager built as a React SPA with an AI coach powered by the Anthropic Claude API. Integrates with Google services (Gmail, Google Calendar, Drive, Docs, Sheets, Slides) for email management, calendar sync, and file attachments. Primary persistence via Supabase (tasks + user_settings + gmail_queue tables); localStorage fallback for unauthenticated sessions. Real-time cross-device sync via Supabase subscription channel.
 
-## User context
-
-Knowledge worker / desk job. Has tried GTD before but fades after ~1 week. Wants the AI to actively maintain the GTD system, not just answer questions. Is a capable sysadmin (Linux/macOS/Windows/AWS) but new to React/Node and to AI-assisted pair programming.
-
 ---
 
 ## Tech stack
 
-- React (functional components + hooks), inline styles only, shared tokens in `COLORS`, styles in `s`
+- React (functional components + hooks only — no class components), inline styles throughout (no CSS files), shared design tokens in `COLORS`
 - Anthropic Claude API (`claude-sonnet-4-6`); local Ollama support for coach panel
 - Supabase: `tasks` + `user_settings` + `gmail_queue` tables; `useSupabaseAuth.js`, `src/api/supabase.js` (field mappers: `taskToDb`/`dbToTask`, `queueEntryToRow`/`rowToQueueEntry`); tasks table includes `drive_attachments` JSONB column
 - Google OAuth 2.0 (PKCE flow) via `useGoogleAuth.js`; unified scope management for Gmail, Calendar, Drive, Docs, Sheets, Slides
 - Google API modules: `src/api/driveApi.js`, `docsApi.js`, `sheetsApi.js`, `slidesApi.js` (typed wrappers with 401 retry)
 - Vite for local dev
 
-## Coding standards
+---
 
-See `Claude_Prompts/Cycle_Programming_Code_Standards.md`. Read it before writing or reviewing any code.
+## References
 
-## Pairing workflow
-
-See `Claude_Prompts/Cycle_Programming_Workflow.md`. Read it at session start and follow it for every change.
-
-## Known issues and roadmap
-
-See `Claude_Prompts/Known_Issues_And_Requests.md`. Read when planning or triaging.
-
-## Resolved issues
-
-See `Claude_Prompts/Resolved_Issues_And_Requests.md`. Append after every resolving commit.
-
-## Project documentation
-
-See `Claude_Prompts/Project_Summary.md` before updating HTML docs in `Product_Summary/`.
+| Trigger | File |
+|---|---|
+| Every session | `Claude_Prompts/Cycle_Programming_Workflow.md` |
+| Writing or reviewing any code | `Claude_Prompts/Cycle_Programming_Code_Standards.md` |
+| Planning or triaging | `Claude_Prompts/Known_Issues_And_Requests.md` |
+| After resolving items | `Claude_Prompts/Resolved_Issues_And_Requests.md` |
+| Updating HTML docs | `Claude_Prompts/Project_Summary.md` |
+| Inspecting live schema | `scripts/README.md` |
 
 ---
 
@@ -61,6 +50,9 @@ GTDWorkflowApp/
 │   ├── Known_Issues_And_Requests.md
 │   ├── Resolved_Issues_And_Requests.md
 │   └── Project_Summary.md
+├── scripts/                   ← dev-session tools (not part of app bundle)
+│   ├── get_schema.py          ← fetch live Supabase schema
+│   └── README.md
 ├── src/
 │   ├── App.jsx
 │   ├── constants.jsx          ← COLORS, BUCKETS, COACH_MODES, SYSTEM_PROMPTS
@@ -79,8 +71,8 @@ GTDWorkflowApp/
 │   │   └── useSupabaseSync.js
 │   ├── prompts/               ← exported copies of all AI system prompts
 │   ├── shared/
-│   └── SQL/
-│   └── Visual_Mockups/		   ← exported copies of all mockups produced
+│   ├── SQL/
+│   └── Visual_Mockups/        ← exported copies of all mockups produced
 └── README.md
 ```
 
@@ -106,9 +98,9 @@ File placement:
 
 Add/edit/delete/move across buckets. Priority tags, location tags, due dates, effort estimates, defer-until. Task Detail Panel (360px side panel). Project hierarchy with drag-and-drop. Collapsible project tree. Descendant count badge. Cumulative effort totals. Waterfall filtering. Completed view hierarchy. In-bucket text filter (bypasses tree/grouping; resets on bucket change). Global search modal (Cmd+K / Ctrl+K) across all non-archive buckets with keyboard nav and match highlighting. Drive file attachments on tasks via Google Picker (stored as `driveAttachments[]`).
 
-### AI Coach (5 modes)
+### AI Coach (6 modes)
 
-Chat · Process · Weekly Review · Brain Dump · Project Review. Action lines: `→ACTION:update`, `→ACTION:add`, `→ACTION:create`.
+Chat · Process · Weekly Review · Brain Dump · Project Review · Daily Review. Action lines: `→ACTION:update`, `→ACTION:add`, `→ACTION:create`.
 
 - **Chat** — lazy task context: compact bucket-count summary + `get_task_context` tool on demand; other modes receive full task list
 - **Process** — `→ACTION:add|<title>|parent:<id>` places tasks under existing projects; code-level question guard prevents auto-confirm when AI response contains a clarifying question; duplicate detection via expanded context (Next Actions + Waiting For visible to AI)
@@ -133,7 +125,7 @@ Chat · Process · Weekly Review · Brain Dump · Project Review. Action lines: 
 
 ## Ongoing maintenance
 
-**Vite timestamp cleanup:** At session start, check for `vite.config.js.timestamp-*.mjs` in the project root. If 5 or more exist, delete them:
+**Vite timestamp cleanup:** At session start, check for `vite.config.js.timestamp-*.mjs` in the project root. If 5 or more exist, delete them via desktop-commander:
 
 ```
 Remove-Item "C:\Programming_Projects\GTDWorkflowApp\vite.config.js.timestamp-*.mjs" -Force
@@ -141,14 +133,7 @@ Remove-Item "C:\Programming_Projects\GTDWorkflowApp\vite.config.js.timestamp-*.m
 
 ---
 
-## Response format and behavior preferences
-
-These preferences apply to all sessions and both workflow variants. They exist to minimize unnecessary token usage and round-trips.
-
-**Verbosity**
-- Do not summarize what you just did after completing a task. The user can read the output.
-- Do not add preamble before files or explanations before tool calls.
-- Inline notes are preferred over full paragraphs when a decision has an obvious rationale.
+## Session behavior
 
 **Approval gates**
 - Do not ask for confirmation on individual steps that were already covered in an approved plan.
@@ -161,7 +146,6 @@ These preferences apply to all sessions and both workflow variants. They exist t
 - See Cycle_Programming_Workflow.md Phase 5 for full spec.
 
 **Clarifying questions**
-- Ask one clarifying question when category is ambiguous, not a list.
 - If you can proceed confidently with a reasonable assumption, state the assumption and proceed rather than asking.
 
 **Planning sessions (both variants)**
@@ -220,6 +204,5 @@ Update the Last used numbers line at the top of the file.
 - Run commands directly — do not hand copy-paste steps
 - No emoji in responses unless asked
 - Use `mcp__git__git_commit` for commits, not bash git (avoids HEAD.lock on Windows mount)
-- Use `git -C "path" push origin main` for push, not `cd && git push` (PowerShell `&&` is invalid)
-- Claude Desktop on this mac
+- Use `git -C "path" push origin develop` for push, not `cd && git push` (PowerShell `&&` is invalid)
 - Supabase migrations: confirm John is ready, then run using the Management API directly (project ref `tudmteqljgpocffalssz`, token in `.env` as `SUPABASE_MANAGEMENT_TOKEN`). Verify with an `information_schema.columns` query before proceeding to testing. Never hand copy-paste SQL steps to John.
