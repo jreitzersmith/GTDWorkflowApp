@@ -293,16 +293,16 @@ A work order is valid for worker execution only if:
 
 ---
 
-## File edit rules for App.jsx
+## File edit rules
 
-- Use `mcp__workspace__bash` with a Python script for all changes — never the Edit tool directly
-- **Read source via `git show`:** use `subprocess.run(['git','show','HEAD:path'])` to get file content, never `open(path,'r')` directly from the mount. The virtiofs FUSE page cache does not invalidate on Windows-side writes (git commit/checkout, rebase, PowerShell), so direct reads can return stale/truncated content. `git show` reads from the ext4 object store and is always fresh.
-- **Write with `open(path,'w')` mode** — `O_TRUNC` bypasses the stale cache. Safe regardless of what Windows did to the file.
-- **Never use `open(path,'a')` (append mode)** — seeks to the cached (possibly stale) EOF, writes at the wrong offset.
-- Multiple Python writes in separate calls are fine as long as each uses `'w'` mode and content comes from `git show`.
+See `Claude_Prompts/File_Editing_Rules.md` for the full protocol. Summary:
+
+- Never use the Edit tool — corrupts files on this Windows FUSE mount
+- **Preferred:** `mcp__desktop-commander__read_file` / `write_file` — host-side, bypasses FUSE entirely
+- **Fallback:** read via `git show HEAD:path` (never `open(path,'r')`), write via `open(path,'w')`
 - Use `str.replace(old, new)` — never regex on JSX
-- Verify each replacement succeeded before writing (check for `✗` in output)
-- After write, confirm size with `wc -c` and that it matches expected byte count
+- Verify each replacement succeeded before writing
+- After write, confirm size with `wc -c`
 - In a work order, capture the exact old string during the planning turn while the file is loaded
 
 ---
