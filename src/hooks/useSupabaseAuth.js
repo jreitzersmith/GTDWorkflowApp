@@ -34,6 +34,17 @@ function useSupabaseAuth() {
       supabase.auth.exchangeCodeForSession(_code)
         .then(({ error }) => { if (error) console.error('Supabase code exchange:', error); });
     }
+    // Handle magic-link hash callback (#access_token=...)
+    const _hash = new URLSearchParams(window.location.hash.substring(1));
+    const _accessToken = _hash.get('access_token');
+    const _refreshToken = _hash.get('refresh_token');
+    if (_accessToken && _refreshToken) {
+      supabase.auth.setSession({ access_token: _accessToken, refresh_token: _refreshToken })
+        .then(({ error }) => {
+          if (error) console.error('Supabase hash session:', error);
+          else window.history.replaceState(null, '', window.location.pathname);
+        });
+    }
     return () => subscription.unsubscribe();
   }, []);
 
