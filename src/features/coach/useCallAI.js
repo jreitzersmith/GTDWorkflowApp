@@ -421,7 +421,7 @@ function useCallAI({
                 const newTask = {
                   id: newId, text: title, bucket: addBucketFinal, done: false, created: Date.now(),
                   parentId: parent.id, priority: [], location, dueDate, effort: normalizeEffort(effort, efforts),
-                  actualEffort: null, deferUntil, notes: null, recurrence,
+                  actualEffort: null, deferUntil, notes: add.notes || null, recurrence,
                   category: category || parent.category || null,
                   ...(addIsNext ? { isNextAction: true } : {}),
                 };
@@ -450,7 +450,7 @@ function useCallAI({
               const newTask = {
                 id: newId, text: title, bucket, done: false, created: Date.now(),
                 priority: [], location, dueDate, dueTime, effort: normalizeEffort(effort, efforts), actualEffort: null,
-                deferUntil, notes: null, recurrence,
+                deferUntil, notes: create.notes || null, recurrence,
                 ...(createIsNext ? { isNextAction: true } : {}),
                 ...(parentId ? { parentId } : {}),
               };

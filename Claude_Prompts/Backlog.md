@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#89**
+> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#90**
 
 ---
 
@@ -23,6 +23,8 @@
 #### UI polish / quick wins
 
 #### Daily workflow / GTD core
+
+- [ ] FR#90 [GH#95] (2026-05-15) — Notes field append vs replace — add `notes_append:<text>` action field so AI can append to existing notes rather than always replacing; implement in extractUpdateAction + useCallAI.js
 
 #### Inbox / processing improvements
 

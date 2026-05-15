@@ -78,6 +78,7 @@ function extractAction(text) {
   const categoryMatch = extras.match(/\|category:([^|]+)/);
   const priorityMatch = extras.match(/\|priority:([^|]+)/);
   const locationMatch = extras.match(/\|location:([^|]+)/);
+  const notesMatch    = extras.match(/\|notes:(.+)/s);
   const somedayMatch    = extras.match(/\|someday:(true|false)/);
   const waitingForMatch = extras.match(/\|waitingFor:(true|false)/);
   return {
@@ -94,6 +95,7 @@ function extractAction(text) {
     location:   locationMatch ? locationMatch[1].split(',').map(s => s.trim()).filter(Boolean) : [],
     isSomeday:    somedayMatch    ? somedayMatch[1] === 'true'    : false,
     isWaitingFor: waitingForMatch ? waitingForMatch[1] === 'true' : false,
+    notes:      notesMatch    ? notesMatch[1].trim()                      : null,
   };
 }
 
@@ -152,6 +154,7 @@ function extractAddAction(text) {
     if (key === 'defer')    fields.deferUntil = val;
     if (key === 'effort')   fields.effort     = val;
     if (key === 'category') fields.category   = val;
+    if (key === 'notes')    fields.notes      = val;
     if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
     if (key === 'dueTime') fields.dueTime = val;
@@ -178,6 +181,7 @@ function extractCreateAction(text) {
     if (key === 'defer')    fields.deferUntil = val;
     if (key === 'effort')   fields.effort     = val;
     if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'notes')    fields.notes      = val;
     if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
     if (key === 'dueTime') fields.dueTime = val;
   });

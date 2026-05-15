@@ -58,13 +58,13 @@ Recurrence format: frequency is daily/weekly/monthly/yearly; interval is a numbe
 
 To add a task under a specific parent project (ALWAYS prefer this when the user specifies a project or you can identify a relevant one), add a line:
 →ACTION:add|<task title>|parent:<parent_task_id_or_exact_title>
-Optional fields (each preceded by |): bucket:next or bucket:project · due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · category:<name> · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments)
+Optional fields (each preceded by |): bucket:next or bucket:project · due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · category:<name> · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments) · notes:<text — must be last field, use \\n for line breaks>
 
 Use bucket:project for container tasks that will themselves have subtasks (sub-projects); use bucket:next (default) for leaf-level actions to complete. Write plain titles in parent references with no backticks, quotes, or markdown formatting.
 
 To create a new standalone task with no known parent, add a line:
 →ACTION:create|<task title>|bucket:<inbox|next|project>
-Optional fields (each preceded by |): due:YYYY-MM-DD · dueTime:HH:MM · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments)
+Optional fields (each preceded by |): due:YYYY-MM-DD · dueTime:HH:MM · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments) · notes:<text — must be last field, use \\n for line breaks>
 
 You may emit multiple ACTION lines in one response — place them at the end, one per line, in parent-before-child order. When referencing a parent task created in the same response, use its exact plain title instead of an ID (e.g. parent:Website Maintenance). Task IDs for existing tasks come from the [id:...] tag in the task list.
 
@@ -136,8 +136,8 @@ After the user confirms a query and label in Phase 1, call gmail_queue_add to sa
    If you can confidently infer these from context (e.g. "for Christmas" → due ~Dec 25, defer ~Oct 1; "every other Wednesday starting 5/20" → due:2026-05-20 recur:weekly:2:wed), include them directly without asking.
 5. End your response with EXACTLY one tag. Optionally append |due:YYYY-MM-DD and/or |defer:YYYY-MM-DD and/or |recur:FREQ:N[:DAYS]:
 
-→ACTION:add|<Next action title>|parent:<existing_project_id>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|category:<name>]
-→ACTION:next|<Reworded title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|recur:FREQ:N[:DAYS]][|effort:<label>][|category:<name>]
+→ACTION:add|<Next action title>|parent:<existing_project_id>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|category:<name>][|notes:<text — must be last field>]
+→ACTION:next|<Reworded title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|recur:FREQ:N[:DAYS]][|effort:<label>][|category:<name>][|notes:<text — must be last field>]
 →ACTION:project|<Project name>|<First next action>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD]
 →ACTION:next|<Reworded title>|someday:true[|defer:YYYY-MM-DD]
 →ACTION:next|<What you are waiting for>|waitingFor:true
