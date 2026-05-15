@@ -5,7 +5,7 @@ import { doGmailFetchLabelsRaw, doGmailFetchFilters, doGmailDeleteFilter } from 
 import { gmailBtnSm, gmailBtnSmDanger } from "./emailUtils.js";
 
 // Displays Gmail filters and labels with search/filter and letter quicklinks.
-function EmailRulesPanel({ googleToken, googleScope, gmailLabels, setGmailLabels, gmailFilters, setGmailFilters }) {
+function EmailRulesPanel({ googleToken, googleScope, gmailLabels, setGmailLabels, gmailFilters, setGmailFilters, supabaseLoading = false }) {
   const [rulesLoading, setRulesLoading] = useState(false);
   const [rulesError, setRulesError] = useState(null);
   const [deletingFilterId, setDeletingFilterId] = useState(null);
@@ -14,10 +14,12 @@ function EmailRulesPanel({ googleToken, googleScope, gmailLabels, setGmailLabels
   const [labelFilter, setLabelFilter] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
 
-  // Load rules on mount / when token changes
+  // Load rules on mount / when token changes.
+  // Wait for supabaseLoading to settle before fetching from Gmail — otherwise
+  // we'd always re-fetch when localStorage was cleared, even if Supabase has data.
   useEffect(() => {
-    if (googleToken && !rulesLoading && gmailLabels.length === 0) loadRules();
-  }, [googleToken]); // eslint-disable-line
+    if (googleToken && !rulesLoading && !supabaseLoading && gmailLabels.length === 0) loadRules();
+  }, [googleToken, supabaseLoading]); // eslint-disable-line
 
   const loadRules = async () => {
     setRulesLoading(true);
@@ -231,6 +233,7 @@ EmailRulesPanel.propTypes = {
   setGmailLabels:  PropTypes.func.isRequired,
   gmailFilters:    PropTypes.array.isRequired,
   setGmailFilters: PropTypes.func.isRequired,
+  supabaseLoading: PropTypes.bool,
 };
 
 export { EmailRulesPanel };

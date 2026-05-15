@@ -27,6 +27,10 @@ function useGmailRulesCache({ authUser } = {}) {
   // Gates the Supabase write — only write after the initial server read completes,
   // so we don't overwrite Supabase with stale localStorage before reading.
   const serverDataLoaded = useRef(false);
+  // True while we're waiting for the first Supabase read to settle.
+  // Lets the Rules panel skip the Gmail API fetch until we know whether
+  // Supabase has cached data to provide.
+  const [supabaseLoading, setSupabaseLoading] = useState(() => !!authUser);
   const debounceRef = useRef(null);
 
   useEffect(() => {
@@ -39,7 +43,7 @@ function useGmailRulesCache({ authUser } = {}) {
 
   // On auth: read from Supabase once; server wins over localStorage
   useEffect(() => {
-    if (!authUser) return;
+    if (!authUser) { setSupabaseLoading(false); return; }
     supabase
       .from('user_settings')
       .select('gmail_rules')
@@ -56,6 +60,7 @@ function useGmailRulesCache({ authUser } = {}) {
           }
         }
         serverDataLoaded.current = true;
+        setSupabaseLoading(false);
       });
   }, [authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -89,7 +94,7 @@ function useGmailRulesCache({ authUser } = {}) {
     localStorage.setItem(LS_FETCHED_AT_KEY, now);
   };
 
-  return { gmailLabels, setGmailLabels, gmailFilters, setGmailFilters, fetchedAt };
+  return { gmailLabels, setGmailLabels, gmailFilters, setGmailFilters, fetchedAt, supabaseLoading };
 }
 
 export { useGmailRulesCache, LS_LABELS_KEY, LS_FILTERS_KEY, LS_FETCHED_AT_KEY, readJson };
