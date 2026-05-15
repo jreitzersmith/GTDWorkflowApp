@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#90**
+> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#91**
 
 ---
 
@@ -54,6 +54,8 @@
 - FR#16 [GH#17] — Shopping list manager (new bucket/sidebar section)
 
 #### Platform / reach
+
+- [ ] FR#91 [GH#96] (2026-05-15) — Replace magic link auth with Google OAuth (Supabase Google provider) — eliminates OTP rate limits and expiry issues; one-click login for all users; evaluate unifying with existing Google API scope grant
 
 - FR#9 [GH#18] — Todoist export / two-way sync (previously Issue#4 / GH#3)
 - FR#20 [GH#19] — Mobile layout (significant; requires media queries throughout)
