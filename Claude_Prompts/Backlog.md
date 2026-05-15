@@ -16,10 +16,6 @@
 
 ### Feature requests
 
-- [ ] FR#88 [GH#93] (2026-05-13) — Email processing improvements
-  - `gmail.settings.basic` is already present in all scope strings in `useGoogleAuth.js` — remaining work is live verification that the scope is granted on existing connected accounts and flows correctly to filter-creation calls
-  - Notes consistency gap: `→ACTION:update` supports `notes:<text>` but `→ACTION:add`, `→ACTION:next`, and `→ACTION:project` all set `notes: null` in `useCallAI.js`. Fix is to parse `notes:` field in the add/next action extractors and pass it through to `addTask`
-
 #### UI polish / quick wins
 
 #### Daily workflow / GTD core
