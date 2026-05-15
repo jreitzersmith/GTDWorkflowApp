@@ -177,8 +177,9 @@ Use `fix:` for bug fixes, `docs:` for documentation-only commits. One commit per
 After committing:
 1. Delete the resolved item from `Backlog.md`.
 2. Append a row to `Changelog.md` (date · type · # · GH# · name · commit hash).
-3. Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
-4. Confirm the Last used numbers line at the top of `Backlog.md` is current.
+3. Post the test results to the GitHub issue via `mcp__github__add_issue_comment` before closing — copy the full checklist results from the submit output (one result per line).
+4. Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
+5. Confirm the Last used numbers line at the top of `Backlog.md` is current.
 
 Push: `git -C "C:\Programming_Projects\GTDWorkflowApp" push origin main`
 

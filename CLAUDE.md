@@ -195,7 +195,7 @@ Update the Last used numbers line at the top of the file.
 
 **On root cause identified:** When the cause of an issue or the approach to a feature is determined — even before any code is written — update the corresponding GitHub issue with that reasoning. Include what the root cause is, what files/functions are involved, and the proposed fix. This keeps the issue self-documenting and avoids re-deriving the analysis if a session is interrupted.
 
-**On resolution:** Delete the line from `Backlog.md`. Append a row to `Changelog.md` (date · type · # · GH# · name · commit hash). Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
+**On resolution:** Delete the line from `Backlog.md`. Append a row to `Changelog.md` (date · type · # · GH# · name · commit hash). Post test results to the GitHub issue via `mcp__github__add_issue_comment` (one result per line). Then close via `mcp__github__update_issue` with `state: closed`.
 
 **Triage on report:** Categorize immediately when John reports an issue or request. Ask one clarifying question if category is ambiguous. Do not begin investigation until the item is logged.
 
