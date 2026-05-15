@@ -7,6 +7,8 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
+| 2026-05-15 | Bug Fix | — | — | Magic link hash (#access_token) not processed in useSupabaseAuth — session silently dropped on redirect | c703b1f |
+| 2026-05-15 | Bug Fix | — | — | Gmail rules race condition — Rules panel fetched from Gmail before Supabase read settled | c8e49051 |
 | 2026-05-15 | Feature | FR#25 | GH#11 | Gmail rules persistence — user_settings.gmail_rules JSONB, Supabase read/write in useGmailRulesCache | 7bde4dc |
 | 2026-05-15 | Feature | FR#88 | GH#93 | Notes field propagated through all action parsers (add/create/next/process) | 846f1c4 |
 | 2026-05-15 | Feature | FR#10 | GH#16 | Recurring tasks — direct UI (RecurrenceEditor in TaskDetailPanel) | already implemented, verified live |
