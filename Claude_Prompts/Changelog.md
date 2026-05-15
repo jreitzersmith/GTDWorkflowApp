@@ -3,7 +3,7 @@
 Log every resolved known issue or completed feature request here immediately after committing.
 One row per item: date · type · # · GH# · name · commit hash(es).
 
-When an item is resolved, **remove** it from `Known_Issues_And_Requests.md` and add a full row here. Close the corresponding GitHub issue via the GitHub MCP.
+When an item is resolved, **remove** it from `Backlog.md` and add a full row here. Close the corresponding GitHub issue via the GitHub MCP.
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|

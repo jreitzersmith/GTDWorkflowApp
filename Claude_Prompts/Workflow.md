@@ -2,7 +2,7 @@
 
 **Project:** `C:\Programming_Projects\GTDWorkflowApp`
 
-Read `CLAUDE.md` at session start. Read `Claude_Prompts/Cycle_Programming_Code_Standards.md` before writing or reviewing any code.
+Read `CLAUDE.md` at session start. Read `Claude_Prompts/Code_Standards.md` before writing or reviewing any code.
 
 Also read the memory index at `...\memory\MEMORY.md` and any `feedback_*.md` files listed there before starting any session.
 
@@ -15,7 +15,7 @@ This file covers two operating modes. The steps are the same in structure; what 
 - **Without Worker (Sonnet Only):** Sonnet plans and executes within the session. Use for smaller scopes, debugging, ambiguous problems, or any work that requires real-time judgment.
 - **With Worker (Sonnet + Qwen):** Sonnet plans and produces a work order. A local Qwen model (122B recommended) executes implementation turns overnight. Sonnet reviews the diff in a morning session. Use for batches of well-defined, independent changes.
 
-The decision guide is in `Claude_Prompts/Cycle_Programming_UserProcess.md`.
+The decision guide is in `Claude_Prompts/User_Process.md`.
 
 ---
 
@@ -24,8 +24,8 @@ The decision guide is in `Claude_Prompts/Cycle_Programming_UserProcess.md`.
 At the start of every session, before any planning or execution:
 
 1. Check for `vite.config.js.timestamp-*.mjs` in the project root. If 5 or more exist, delete them.
-2. Read `Claude_Prompts/Known_Issues_And_Requests.md`.
-3. Read `Claude_Prompts/Resolved_Issues_And_Requests.md` (tail is sufficient if file is long).
+2. Read `Claude_Prompts/Backlog.md`.
+3. Read `Claude_Prompts/Changelog.md` (tail is sufficient if file is long).
 4. Read `CLAUDE.md`.
 5. Read any `feedback_*.md` files listed in the memory index.
 
@@ -38,7 +38,7 @@ Do not read source files yet. Source files are read during the planning turn, no
 When John presents a list of items to work on:
 
 1. Categorize each item immediately (see Backlog management in `CLAUDE.md`).
-2. File any new items as GitHub issues before planning begins. Record GH# and date in `Known_Issues_And_Requests.md`.
+2. File any new items as GitHub issues before planning begins. Record GH# and date in `Backlog.md`.
 3. Identify dependencies between items: does any item require another to land first?
 4. Identify risk level for each item:
    - **Low risk:** markdown edits, GitHub operations, documentation updates, isolated utility functions with test coverage
@@ -175,10 +175,10 @@ feat: short description
 Use `fix:` for bug fixes, `docs:` for documentation-only commits. One commit per logical item unless items are tightly coupled.
 
 After committing:
-1. Delete the resolved item from `Known_Issues_And_Requests.md`.
-2. Append a row to `Resolved_Issues_And_Requests.md` (date · type · # · GH# · name · commit hash).
+1. Delete the resolved item from `Backlog.md`.
+2. Append a row to `Changelog.md` (date · type · # · GH# · name · commit hash).
 3. Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
-4. Confirm the Last used numbers line at the top of `Known_Issues_And_Requests.md` is current.
+4. Confirm the Last used numbers line at the top of `Backlog.md` is current.
 
 Push: `git -C "C:\Programming_Projects\GTDWorkflowApp" push origin main`
 
@@ -311,7 +311,7 @@ See `Claude_Prompts/File_Editing_Rules.md` for the full protocol. Summary:
 
 ### Without Worker (Sonnet Only)
 
-If a new issue arrives during Phases 5–6: log it immediately in `Known_Issues_And_Requests.md` with a GitHub issue filed. Acknowledge to John. Do not investigate or propose changes. Resume the current cycle. Surface it after the current cycle is confirmed and committed.
+If a new issue arrives during Phases 5–6: log it immediately in `Backlog.md` with a GitHub issue filed. Acknowledge to John. Do not investigate or propose changes. Resume the current cycle. Surface it after the current cycle is confirmed and committed.
 
 ### With Worker (Sonnet + Qwen)
 

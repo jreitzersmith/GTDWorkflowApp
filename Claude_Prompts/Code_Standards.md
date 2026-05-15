@@ -99,7 +99,7 @@ Before delivering or committing any code:
 - [ ] No console.logs left in the code
 - [ ] New pure functions and hooks have test candidates identified and proposed
 - [ ] Approved tests are written, passing, and co-located in the feature folder
-- [ ] If this resolves a tracked issue or FR, it will be logged in Resolved_Issues_And_Requests.md after commit
+- [ ] If this resolves a tracked issue or FR, it will be logged in Changelog.md after commit
 
 ---
 
@@ -130,7 +130,7 @@ Apply these criteria in morning review sessions and whenever reviewing any chang
 
 ### Without Worker (Sonnet Only)
 
-There are no overnight runs on the Sonnet-only path. All execution is interactive. If a session hits the Pro allotment mid-task, stop cleanly: commit whatever is in a working state, log remaining items in `Known_Issues_And_Requests.md`, and resume in the next session.
+There are no overnight runs on the Sonnet-only path. All execution is interactive. If a session hits the Pro allotment mid-task, stop cleanly: commit whatever is in a working state, log remaining items in `Backlog.md`, and resume in the next session.
 
 Clean stopping criteria for Sonnet-only mid-session:
 - Build is green

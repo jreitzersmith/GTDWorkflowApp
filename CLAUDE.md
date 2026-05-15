@@ -21,10 +21,10 @@ A personal GTD task manager built as a React SPA with an AI coach powered by the
 
 | Trigger | File |
 |---|---|
-| Every session | `Claude_Prompts/Cycle_Programming_Workflow.md` |
-| Writing or reviewing any code | `Claude_Prompts/Cycle_Programming_Code_Standards.md` |
-| Planning or triaging | `Claude_Prompts/Known_Issues_And_Requests.md` |
-| After resolving items | `Claude_Prompts/Resolved_Issues_And_Requests.md` |
+| Every session | `Claude_Prompts/Workflow.md` |
+| Writing or reviewing any code | `Claude_Prompts/Code_Standards.md` |
+| Planning or triaging | `Claude_Prompts/Backlog.md` |
+| After resolving items | `Claude_Prompts/Changelog.md` |
 | Updating HTML docs | `Claude_Prompts/Project_Summary.md` |
 | Inspecting live schema | `scripts/get_schema.md` |
 | Editing any file | `Claude_Prompts/File_Editing_Rules.md` |
@@ -44,12 +44,12 @@ GTDWorkflowApp/
 │   ├── project-commits.html
 │   └── project-snippets.html
 ├── Claude_Prompts/
-│   ├── Cycle_Programming_Claude.md   ← this file
-│   ├── Cycle_Programming_Workflow.md
-│   ├── Cycle_Programming_Code_Standards.md
-│   ├── Cycle_Programming_UserProcess.md
-│   ├── Known_Issues_And_Requests.md
-│   ├── Resolved_Issues_And_Requests.md
+│   ├── Claude.md.backup   ← this file
+│   ├── Workflow.md
+│   ├── Code_Standards.md
+│   ├── User_Process.md
+│   ├── Backlog.md
+│   ├── Changelog.md
 │   └── Project_Summary.md
 ├── scripts/                   ← dev-session tools (not part of app bundle)
 │   ├── get_schema.py          ← fetch live Supabase schema
@@ -145,7 +145,7 @@ Remove-Item "C:\Programming_Projects\GTDWorkflowApp\vite.config.js.timestamp-*.m
 **Testing checklists**
 - Always present as an interactive widget (mcp__visualize__show_widget): state button cycles Pass → Fail → Skip → Note per item, per-item notes text field, Submit button calling sendPrompt() with full summary.
 - Render the widget in TWO situations: (1) at the end of a cycle when presenting the checklist for the first time, and (2) whenever John asks which tests are outstanding or remaining — never answer that question in plain text.
-- See Cycle_Programming_Workflow.md Phase 5 for full spec.
+- See Workflow.md Phase 5 for full spec.
 
 **Clarifying questions**
 - If you can proceed confidently with a reasonable assumption, state the assumption and proceed rather than asking.
@@ -183,7 +183,7 @@ Remove-Item "C:\Programming_Projects\GTDWorkflowApp\vite.config.js.timestamp-*.m
 | Data model expansions | `FR#x` | New fields, buckets, task properties |
 | Platform / reach | `FR#x` | Mobile, export, third-party sync |
 
-**On new entry:** File a GitHub issue immediately via `mcp__github__create_issue` using the repo's label set. Record the GH# and creation date in `Known_Issues_And_Requests.md`:
+**On new entry:** File a GitHub issue immediately via `mcp__github__create_issue` using the repo's label set. Record the GH# and creation date in `Backlog.md`:
 
 ```
 - [ ] Issue#12 [GH#31] (2026-05-09) — description
@@ -193,7 +193,7 @@ Update the Last used numbers line at the top of the file.
 
 **On root cause identified:** When the cause of an issue or the approach to a feature is determined — even before any code is written — update the corresponding GitHub issue with that reasoning. Include what the root cause is, what files/functions are involved, and the proposed fix. This keeps the issue self-documenting and avoids re-deriving the analysis if a session is interrupted.
 
-**On resolution:** Delete the line from `Known_Issues_And_Requests.md`. Append a row to `Resolved_Issues_And_Requests.md` (date · type · # · GH# · name · commit hash). Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
+**On resolution:** Delete the line from `Backlog.md`. Append a row to `Changelog.md` (date · type · # · GH# · name · commit hash). Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
 
 **Triage on report:** Categorize immediately when John reports an issue or request. Ask one clarifying question if category is ambiguous. Do not begin investigation until the item is logged.
 
