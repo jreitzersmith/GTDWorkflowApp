@@ -6,11 +6,9 @@
 
 ## Known issues / remaining work
 
-
 ---
 
 ## Code quality
-
 
 ---
 
@@ -26,17 +24,10 @@
 
 #### Daily workflow / GTD core
 
-
 #### Inbox / processing improvements
-
 
 #### Integrations / data
 
-
-- FR#18 [GH#13] (2026-05-08) — Gmail rate limiting / backoff — exponential backoff for 429 errors in Gmail API calls
-  - **Likely already implemented.** `gmailTools.js` contains `fetchWithBackoff` (handles 429/500/503 with Retry-After header and exponential backoff) and `batchedAll` (chunks concurrent requests). Verify live and close GH#13 if confirmed.
-- FR#22 [GH#14] (2026-05-08) — Show linked tasks in Calendar event detail — display tasks with matching calendarEventId in the event panel
-  - **Likely already implemented.** `CalendarManagementSections.jsx` computes `linkedTasks` via `getLinkedTasks()` and passes it to all three views (month/week/day); `CalendarEventDisplay.jsx` has a full `LinkedTasksSection` component that renders them. Verify live and close GH#14 if confirmed.
 - FR#25 [GH#11] (2026-05-08) — Email rules persistence — persist Gmail cleanup rules to Supabase with localStorage optimistic cache
   - `useGmailRulesCache.js` is currently localStorage-only (labels + filters + fetchedAt timestamp). Fix: add a `gmail_rules` JSONB column to `user_settings` (or a separate table); on mount, read from Supabase and hydrate localStorage; on write, update Supabase in the background. The hook is well-isolated — changes are contained to `useGmailRulesCache.js` and a Supabase migration.
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
@@ -63,8 +54,7 @@
 
 - FR#23 [GH#15] (2026-05-08) — Project categories (user-defined) — user-defined categories with filtering/grouping
   - Task `category` field exists, Settings UI for managing category list exists, and `TaskDetailPanel` has the category selector dropdown. What is missing: a cross-bucket filter/group view that surfaces tasks by category across Next Actions, Projects, etc. Likely implemented as a waterfall filter addition or a new sidebar filter control.
-- FR#10 [GH#16] — Recurring tasks
-  - **Likely already implemented.** `TaskDetailPanel.jsx` contains a full `RecurrenceEditor` component (frequency, interval, weekday picker, until date, rescheduleFrom, sendToInbox). Verify live that it is visible and functional for tasks in the detail panel, then close GH#16 if confirmed.
+
 - FR#16 [GH#17] — Shopping list manager (new bucket/sidebar section)
 
 #### Platform / reach
