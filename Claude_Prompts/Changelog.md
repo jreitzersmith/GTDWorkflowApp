@@ -7,6 +7,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
+| 2026-05-15 | Feature | FR#25 | GH#11 | Gmail rules persistence — user_settings.gmail_rules JSONB, Supabase read/write in useGmailRulesCache | 7bde4dc |
 | 2026-05-15 | Feature | FR#88 | GH#93 | Notes field propagated through all action parsers (add/create/next/process) | 846f1c4 |
 | 2026-05-15 | Feature | FR#10 | GH#16 | Recurring tasks — direct UI (RecurrenceEditor in TaskDetailPanel) | already implemented, verified live |
 | 2026-05-15 | Feature | FR#18 | GH#13 | Gmail rate limiting / backoff (fetchWithBackoff + batchedAll in gmailTools.js) | already implemented, verified in code |

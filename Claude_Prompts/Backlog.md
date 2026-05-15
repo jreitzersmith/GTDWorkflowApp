@@ -26,8 +26,6 @@
 
 #### Integrations / data
 
-- FR#25 [GH#11] (2026-05-08) — Email rules persistence — persist Gmail cleanup rules to Supabase with localStorage optimistic cache
-  - `useGmailRulesCache.js` is currently localStorage-only (labels + filters + fetchedAt timestamp). Fix: add a `gmail_rules` JSONB column to `user_settings` (or a separate table); on mount, read from Supabase and hydrate localStorage; on write, update Supabase in the background. The hook is well-isolated — changes are contained to `useGmailRulesCache.js` and a Supabase migration.
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
   - `sheetsApi.js` API wrapper exists. Missing: (1) Settings UI to configure target Sheet ID, (2) a `→ACTION:append_sheet` coach action line handler in `useCallAI.js`, (3) coach prompt instruction to identify financial emails and emit the action. Pattern matches FR#46 (receipt pipeline) — these two could be implemented together.
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
