@@ -8,7 +8,7 @@ import { useGmailRulesCache } from "./useGmailRulesCache.js";
 // Tab container for the Email Management view — renders one of three panels
 // (Inbox, Cleanup, Rules) based on the active emailTab prop.
 function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, processEmailWithAI, attachEmailToTask, tasks, openCoachChat, authUser }) {
-  const { gmailLabels, setGmailLabels, gmailFilters, setGmailFilters } = useGmailRulesCache();
+  const { gmailLabels, setGmailLabels, gmailFilters, setGmailFilters } = useGmailRulesCache({ authUser });
 
   const tabStyle = (t) => ({
     padding: '9px 14px', fontSize: 13, cursor: 'pointer',
