@@ -28,6 +28,8 @@ A personal GTD task manager built as a React SPA with an AI coach powered by the
 | Updating HTML docs | `Claude_Prompts/Project_Summary.md` |
 | Inspecting live schema | `scripts/get_schema.md` |
 | Editing any file | `Claude_Prompts/File_Editing_Rules.md` |
+| Understanding data model / architecture | `Claude_Prompts/Architecture_Notes.md` |
+| With Worker path (work orders, morning review) | `Claude_Prompts/Work_Order.md` |
 
 ---
 

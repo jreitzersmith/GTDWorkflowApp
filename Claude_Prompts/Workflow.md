@@ -209,89 +209,12 @@ Documentation updates happen in the morning review session, not during overnight
 
 ---
 
-## Morning Review Session (With Worker only)
+## Morning Review Session + Work Order Format (With Worker only)
 
-This session starts cold — no conversation history from the planning session is assumed. John provides:
-- `git diff HEAD~N HEAD` for the batch (the actual diff, not a summary)
-- The worker's execution log (`Claude_Prompts/WorkLog_YYYY-MM-DD.md`)
-- `npx vitest run` output
-- `npx vite build` output
-
-Sonnet produces a structured report:
-
-1. **Applied cleanly** — list of changes confirmed correct in the diff
-2. **Needs manual testing** — specific checklist items for John to check (use `- [ ]` format)
-3. **Flagged for attention** — changes that look wrong, incomplete, or inconsistent with the work order; exact reason for each flag
-4. **Housekeeping required** — Known_Issues lines to delete, Resolved_Issues rows to add, GitHub issues to close
-
-Token cost for a typical 3–5 item morning review: ~$0.15–$0.25.
+See `Claude_Prompts/Work_Order.md` for the full morning review protocol and work order template.
 
 ---
 
-## Work Order Format (With Worker only)
-
-Saved as `Claude_Prompts/WorkOrder_YYYY-MM-DD.md`. The worker reads this file and executes it without interaction.
-
-````markdown
-# Work Order — YYYY-MM-DD
-
-## Items
-
-### Item 1: [FR/Issue#] — Short title
-**Risk:** Low / Medium / High
-**Dependencies:** None / Item 2 must land first
-**Files:** src/features/calendar/CalendarApi.js
-
-**Change:**
-File: src/features/calendar/CalendarApi.js
-Old:
-```
-exact string to replace (verbatim, with surrounding context lines)
-```
-New:
-```
-exact replacement string
-```
-
-**Verification:**
-- Build must pass after this change
-- Run: `npx vite build`
-- HALT if build fails
-
-**Commit message:**
-```
-fix: calendar event creation uses task due date
-
-- Pass task.dueDate as event start/end instead of today's date
-- Closes Issue#11 [GH#22]
-```
-
-**Post-commit:** Delete Issue#11 from Known_Issues; append row to Resolved_Issues; close GH#22
-
----
-
-### Item 2: ...
-
-## HALT Conditions (global)
-- Any str.replace that finds no match: log and skip remaining edits in that file; continue to next independent item
-- Any build failure: log and skip remaining items in the same dependency group; continue to independent items
-- Any test regression (tests that were passing before this batch now fail): halt entire batch, log, do not commit
-
-## Execution Log
-Worker writes to `Claude_Prompts/WorkLog_YYYY-MM-DD.md` with:
-- Each item: applied / skipped / halted + reason
-- Build results per item
-- Final test results
-- List of commits made (hash + message)
-````
-
-A work order is valid for worker execution only if:
-- Every App.jsx edit includes the exact surrounding context lines (not just the changed lines)
-- Every item has an explicit HALT condition
-- The execution log location is specified
-- No item says "implement X" without specifying exact file, function, and replacement strings
-
----
 
 ## File edit rules
 
@@ -321,34 +244,7 @@ If the worker encountered unexpected scope (e.g., a dependent file changed and t
 
 ---
 
-## Virtual / flag-based bucket architecture (added 2026-05-13)
+## Architecture reference
 
-Four buckets are now virtual filter views driven by boolean flags on tasks, not by `task.bucket`:
-
-| View | Flag | Default |
-|---|---|---|
-| Next Actions | `isNextAction` | false |
-| Waiting For | `isWaitingFor` | false |
-| Someday/Maybe | `isSomeday` | false |
-| Deferred | `deferUntil > today` | — |
-
-All flagged tasks have `bucket: 'project'` — they live in the Projects tree and are surfaced in their respective views by filter. The `bucket` field no longer uses `'next'`, `'waiting'`, or `'someday'` as values.
-
-**Creating next actions:** always `bucket: 'project', isNextAction: true, parentId: uncategorizedProjectId` (or an explicit parent). Never `bucket: 'next'`.
-
-**Supabase columns:** `is_next_action`, `is_waiting_for`, `is_someday`, `defer_until` on the `tasks` table.
-
-**uncategorizedProjectId:** stored in `user_settings.uncategorized_project_id`. The live project ID is `mp1esqmp51mo`. If this ever gets stale, query `tasks WHERE lower(text) LIKE '%uncategorized%'` to find the real ID and update `user_settings`.
-
----
-
-## Email processing architecture (added 2026-05-13)
-
-`processEmailWithAI` (App.jsx) sends the email body to the AI in chat mode with a structured prompt covering: task identification → project/metadata clarification → similar-email search → filter/label offer → archive.
-
-**Auto-link mechanism:** `pendingEmailContext` state + `preEmailTaskIdsRef` (App.jsx). When `processEmailWithAI` is called, a snapshot of current task IDs is taken. A `useEffect` watches `tasks` and attaches the email to any newly created task. Clears when `switchCoachMode` is called.
-
-**→ACTION:link_email** is also supported as an explicit AI-emitted directive: `→ACTION:link_email|<task_title_or_id>|<gmail_message_id>[|<subject>]`. Handled in the `taskActionLines` loop in `useCallAI.js`.
-
-**Duplicate-task guard:** `→ACTION:add` was removed from `extractAction`'s regex pattern — it is handled only by `taskActionLines` (auto-processed), not by `setPendingAction` (which would show a confirm bar and cause a second creation).
+For data model conventions (virtual bucket flags, email processing, uncategorizedProjectId) see `Claude_Prompts/Architecture_Notes.md`.
 
