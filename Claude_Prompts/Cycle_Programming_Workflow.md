@@ -190,6 +190,13 @@ Commits are made by the worker during overnight execution using the commit messa
 
 ## Phase 8 — Documentation
 
+**CLAUDE.md review (do this first)**
+Before updating Product_Summary/, check whether this cycle changed anything CLAUDE.md describes:
+- Did `package.json` change? → Review and update the Tech stack section.
+- Did a new coach mode, bucket, major feature, or API integration land? → Review and update the Current app state section.
+
+This is a lightweight check — most cycles won't require changes. If nothing relevant changed, proceed to HTML docs.
+
 Update `Product_Summary/project-summary.html`, `project-snippets.html`, and `project-commits.html` only after John has confirmed the feature works in Phase 6. Do not update docs speculatively.
 
 When ready: read the tail of each HTML file to find the last documented state, then append new content. Never rewrite existing sections. Update all three files in one Python pass.
