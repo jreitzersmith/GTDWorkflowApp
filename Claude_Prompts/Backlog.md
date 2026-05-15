@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#91**
+> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#94**
 
 ---
 
@@ -56,6 +56,9 @@
 #### Platform / reach
 
 - [ ] FR#91 [GH#96] (2026-05-15) — Replace magic link auth with Google OAuth (Supabase Google provider) — eliminates OTP rate limits and expiry issues; one-click login for all users; evaluate unifying with existing Google API scope grant
+- [ ] FR#92 [GH#97] (2026-05-15) — 🌤 Self-service account management — delete account + export data in Settings; GDPR/CCPA compliance prerequisite; depends on FR#91
+- [ ] FR#93 [GH#98] (2026-05-15) — 🌤 Admin panel for user management — list/ban/delete users, usage metrics, impersonation; Supabase Dashboard is sufficient until user count demands it
+- [ ] FR#94 [GH#99] (2026-05-15) — 🌤 Organisation support and team management — shared workspaces, roles (Owner/Admin/Member/Viewer), invite flow, billing hooks; major architectural change, post-single-user-validation only
 
 - FR#9 [GH#18] — Todoist export / two-way sync (previously Issue#4 / GH#3)
 - FR#20 [GH#19] — Mobile layout (significant; requires media queries throughout)
