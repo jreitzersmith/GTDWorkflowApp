@@ -139,6 +139,7 @@ Remove-Item "C:\Programming_Projects\GTDWorkflowApp\vite.config.js.timestamp-*.m
 - Do not ask for confirmation on individual steps that were already covered in an approved plan.
 - If the plan says "commit each item separately," commit — do not ask before each commit.
 - Ask for explicit go-ahead only when: scope has changed unexpectedly, a HALT condition was triggered, or a decision requires user judgment that wasn't anticipated in the plan.
+- Exception: trivial single-line fixes where the change is self-evident from the diagnosis may be executed without a separate plan step.
 
 **Testing checklists**
 - Always present as an interactive widget (mcp__visualize__show_widget): state button cycles Pass → Fail → Skip → Note per item, per-item notes text field, Submit button calling sendPrompt() with full summary.
@@ -206,3 +207,4 @@ Update the Last used numbers line at the top of the file.
 - Use `mcp__git__git_commit` for commits, not bash git (avoids HEAD.lock on Windows mount)
 - Use `git -C "path" push origin develop` for push, not `cd && git push` (PowerShell `&&` is invalid)
 - Supabase migrations: confirm John is ready, then run using the Management API directly (project ref `tudmteqljgpocffalssz`, token in `.env` as `SUPABASE_MANAGEMENT_TOKEN`). Verify with an `information_schema.columns` query before proceeding to testing. Never hand copy-paste SQL steps to John.
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
