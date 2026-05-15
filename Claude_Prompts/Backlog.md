@@ -31,6 +31,9 @@
 #### Integrations / data
 
 
+- FR#18 [GH#13] (2026-05-08) — Gmail rate limiting / backoff — exponential backoff for 429 errors in Gmail API calls
+- FR#22 [GH#14] (2026-05-08) — Show linked tasks in Calendar event detail — display tasks with matching calendarEventId in the event panel
+- FR#25 [GH#11] (2026-05-08) — Email rules persistence — persist Gmail cleanup rules to Supabase with localStorage optimistic cache
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
 - FR#41 [GH#37] (2026-05-09) — Doc capture from coach — coach action `→ACTION:create-doc` creates a Google Doc from coach output and links it back to a task or project
@@ -44,6 +47,7 @@
 
 #### Data model expansions
 
+- FR#23 [GH#15] (2026-05-08) — Project categories (user-defined) — user-defined categories with filtering/grouping; requires Settings UI
 - FR#10 [GH#16] — Recurring tasks (partial — AI coach supports recurrence read/write via `→ACTION:update recur:` and `→ACTION:create recur:`; no direct UI for creating or editing recurrences)
 - FR#16 [GH#17] — Shopping list manager (new bucket/sidebar section)
 
