@@ -464,20 +464,15 @@ DriveAttachments.propTypes = {
 function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
   const [briefingLoading, setBriefingLoading] = useState(false);
   const [briefingUrl, setBriefingUrl] = useState(null);
+  const [briefingErr, setBriefingErr] = useState(null);
 
   async function handleGenerateBriefing() {
     setBriefingLoading(true);
+    setBriefingErr(null);
     try {
       const presentation = await slidesCreatePresentation({ token: googleAccessToken, title: task.text });
-      const subtasks = allTasks.filter(t => (task.childIds || []).includes(t.id) && !t.done);
-      for (const subtask of subtasks) {
-        await slidesAddTextSlide({
-          token: googleAccessToken,
-          presentationId: presentation.presentationId,
-          title: subtask.text,
-          body: subtask.notes || '',
-        });
-      }
+
+      // Attach to task and expose link immediately — the presentation exists even if slide writes fail
       const att = {
         id: presentation.presentationId,
         name: task.text,
@@ -489,8 +484,29 @@ function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
         onUpdate(task.id, { driveAttachments: [...existing, att] });
       }
       setBriefingUrl(presentation.presentationUrl);
+
+      // Add content slides — failures are reported but don't suppress the link
+      const subtasks = allTasks.filter(t => (task.childIds || []).includes(t.id) && !t.done);
+      const slideErrors = [];
+      for (const subtask of subtasks) {
+        try {
+          await slidesAddTextSlide({
+            token: googleAccessToken,
+            presentationId: presentation.presentationId,
+            title: subtask.text,
+            body: subtask.notes || '',
+          });
+        } catch (err) {
+          console.error('slidesAddTextSlide error', err);
+          slideErrors.push(subtask.text);
+        }
+      }
+      if (slideErrors.length > 0) {
+        setBriefingErr(`Slides created but content failed for: ${slideErrors.join(', ')}`);
+      }
     } catch (err) {
       console.error('generateBriefing error', err);
+      setBriefingErr(err.message || 'Failed to create presentation');
     } finally {
       setBriefingLoading(false);
     }
@@ -506,6 +522,9 @@ function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
       >{briefingLoading ? 'Generating…' : '🎞️ Generate Slides Briefing'}</button>
       {briefingUrl && (
         <a href={briefingUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: COLORS.next, textDecoration: 'none', marginTop: 4, display: 'block' }}>View presentation ↗</a>
+      )}
+      {briefingErr && (
+        <div style={{ fontSize: 11, color: COLORS.danger || '#c0392b', marginTop: 4 }}>{briefingErr}</div>
       )}
     </div>
   );

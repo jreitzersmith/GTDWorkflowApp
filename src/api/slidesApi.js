@@ -49,9 +49,10 @@ async function slidesCreatePresentation({ token, title = 'Untitled Presentation'
 
 // -- Modify -------------------------------------------------------------------
 
-// Add a new "Title and Body" slide with text content.
-// Uses TITLE_AND_BODY layout: creates the slide, fetches the presentation to
-// resolve Google-assigned placeholder IDs, then inserts text into them.
+// Add a new slide with title and body text using TEXT_BOX shapes.
+// Uses pre-generated objectIds — no GET needed to resolve placeholder IDs.
+// createShape and insertText for each shape are in a single batchUpdate call;
+// the API processes requests in order so the shape exists before text is inserted.
 // Appends to the end of the presentation.
 async function slidesAddTextSlide({
   token,
@@ -60,41 +61,70 @@ async function slidesAddTextSlide({
   body  = '',
   onTokenRefresh,
 } = {}) {
-  const rnd = () => Math.random().toString(36).slice(2, 9);
-  const slideId = `s${rnd()}${rnd()}`; // 14 alphanumeric chars, valid object ID
+  const rnd = () => Math.random().toString(36).slice(2, 10);
+  const slideId = `sl${rnd()}`;
 
-  // Step 1: create slide with TITLE_AND_BODY layout so Google provisions named placeholders
+  // Step 1: create a blank slide
   const r1 = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
     token, method: 'POST',
-    body: { requests: [{ createSlide: { objectId: slideId, insertionIndex: 9999, slideLayoutReference: { predefinedLayout: 'TITLE_AND_BODY' } } }] },
+    body: { requests: [{ createSlide: { objectId: slideId, insertionIndex: 9999 } }] },
   }, onTokenRefresh);
-  if (!r1.ok) throw new Error(`Slides addTextSlide (create) failed: ${r1.status}`);
+  if (!r1.ok) {
+    const errText = await r1.text().catch(() => '(no body)');
+    throw new Error(`Slides addTextSlide (createSlide) ${r1.status}: ${errText}`);
+  }
 
-  // Step 2: fetch the presentation to resolve the placeholder object IDs Google assigned
-  const r2 = await slidesRequest(`${SLIDES_BASE}/${presentationId}`, { token }, onTokenRefresh);
-  if (!r2.ok) throw new Error(`Slides addTextSlide (get) failed: ${r2.status}`);
-  const pres = await r2.json();
-  const slide = (pres.slides || []).find(s => s.objectId === slideId);
-  if (!slide) throw new Error('Slides addTextSlide: slide not found after creation');
+  // Step 2: create TEXT_BOX shapes and insert text in a single batchUpdate.
+  // Slide dimensions: 9144000 x 6858000 EMU (10" x 7.5").
+  // Title box: full width at top. Body box: full width below title.
+  const requests = [];
+  if (title) {
+    const titleId = `ti${rnd()}`;
+    requests.push({
+      createShape: {
+        objectId: titleId,
+        shapeType: 'TEXT_BOX',
+        elementProperties: {
+          pageObjectId: slideId,
+          size: {
+            width:  { magnitude: 8229600, unit: 'EMU' },
+            height: { magnitude: 1143000, unit: 'EMU' },
+          },
+          transform: { scaleX: 1, scaleY: 1, translateX: 457200, translateY: 457200, unit: 'EMU' },
+        },
+      },
+    });
+    requests.push({ insertText: { objectId: titleId, insertionIndex: 0, text: title } });
+  }
+  if (body) {
+    const bodyId = `bo${rnd()}`;
+    requests.push({
+      createShape: {
+        objectId: bodyId,
+        shapeType: 'TEXT_BOX',
+        elementProperties: {
+          pageObjectId: slideId,
+          size: {
+            width:  { magnitude: 8229600, unit: 'EMU' },
+            height: { magnitude: 4114800, unit: 'EMU' },
+          },
+          transform: { scaleX: 1, scaleY: 1, translateX: 457200, translateY: 1828800, unit: 'EMU' },
+        },
+      },
+    });
+    requests.push({ insertText: { objectId: bodyId, insertionIndex: 0, text: body } });
+  }
 
-  const ph = (...types) => (slide.pageElements || []).find(
-    e => e.shape && e.shape.placeholder && types.includes(e.shape.placeholder.type)
-  );
-  const titleEl = ph('TITLE', 'CENTERED_TITLE');
-  const bodyEl  = ph('BODY', 'SUBTITLE');
+  if (requests.length === 0) return;
 
-  // Step 3: insert text into the layout placeholders
-  const textReqs = [
-    ...(title && titleEl ? [{ insertText: { objectId: titleEl.objectId, insertionIndex: 0, text: title } }] : []),
-    ...(body  && bodyEl  ? [{ insertText: { objectId: bodyEl.objectId,  insertionIndex: 0, text: body  } }] : []),
-  ];
-  if (textReqs.length === 0) return;
-
-  const r3 = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
-    token, method: 'POST', body: { requests: textReqs },
+  const r2 = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
+    token, method: 'POST', body: { requests },
   }, onTokenRefresh);
-  if (!r3.ok) throw new Error(`Slides addTextSlide (text) failed: ${r3.status}`);
-  return r3.json();
+  if (!r2.ok) {
+    const errText = await r2.text().catch(() => '(no body)');
+    throw new Error(`Slides addTextSlide (shapes+text) ${r2.status}: ${errText}`);
+  }
+  return r2.json();
 }
 
 // Send an arbitrary batchUpdate requests array for advanced modifications.

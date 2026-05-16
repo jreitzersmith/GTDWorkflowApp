@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#95**
+> **Last used numbers:** Known Issues — **Issue#21** · Code Quality — **CQ#11** · Feature Requests — **FR#96**
 
 ---
 
@@ -27,6 +27,7 @@
 #### Integrations / data
 
 - [ ] FR#95 [GH#100] (2026-05-16) — create-sheet: allow AI to specify columns via ACTION line (`→ACTION:create-sheet|<title>|columns:<col1,...>`); fixed default set as fallback
+- [ ] FR#96 [GH#101] (2026-05-16) — Drive target folder settings per action type — settings UI to configure destination Drive folder for each action (create-doc, create-sheet, create-slides, save-review-to-doc); uses existing `reviewDriveFolderId` pattern generalised to all Drive-creating actions
 
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
   - `sheetsApi.js` API wrapper exists. Missing: (1) Settings UI to configure target Sheet ID, (2) a `→ACTION:append_sheet` coach action line handler in `useCallAI.js`, (3) coach prompt instruction to identify financial emails and emit the action. Pattern matches FR#46 (receipt pipeline) — these two could be implemented together.
