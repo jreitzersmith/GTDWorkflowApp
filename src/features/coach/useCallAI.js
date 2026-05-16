@@ -604,19 +604,19 @@ function useCallAI({
             const sheetTitle = sheetLine.slice('\u2192ACTION:create-sheet|'.length).trim() || 'Coach Spreadsheet';
             const sheet = await sheetsCreateSpreadsheet({ token: googleToken, title: sheetTitle });
             const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/edit`;
-            const nextActions = tasks.filter(t => t.bucket === 'next' && !t.done);
-            if (nextActions.length > 0) {
-              const headers = [['Task', 'Priority', 'Location', 'Due Date', 'Effort', 'Notes']];
-              const rows = nextActions.map(t => [
-                t.text,
-                (t.priority || []).join(', '),
-                (t.location || []).join(', '),
-                t.dueDate || '',
-                t.effort || '',
-                t.notes || '',
-              ]);
-              await sheetsAppendRows({ token: googleToken, spreadsheetId: sheet.spreadsheetId, range: 'Sheet1', values: [...headers, ...rows] });
-            }
+            const BUCKET_LABELS = { next: 'Next Actions', waiting: 'Waiting For', project: 'Projects', someday: 'Someday/Maybe', inbox: 'Inbox', deferred: 'Deferred' };
+            const activeTasks = tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
+            const headers = [['Task', 'Bucket', 'Priority', 'Location', 'Due Date', 'Effort', 'Notes']];
+            const rows = activeTasks.map(t => [
+              t.text,
+              BUCKET_LABELS[t.bucket] || t.bucket || '',
+              (t.priority || []).join(', '),
+              (t.location || []).join(', '),
+              t.dueDate || '',
+              t.effort || '',
+              t.notes || '',
+            ]);
+            await sheetsAppendRows({ token: googleToken, spreadsheetId: sheet.spreadsheetId, range: 'Sheet1', values: [...headers, ...rows] });
             updateChip = { taskName: sheetTitle, fields: ['Google Sheet created'], url: sheetUrl };
           } catch (e) { actionError = `\u26a0 Sheet creation failed: ${e.message}`; }
         }
