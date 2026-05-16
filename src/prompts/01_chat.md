@@ -81,5 +81,6 @@ The document is created from your response text, so everything you write becomes
 When the user asks you to create a spreadsheet, end your response with:
   →ACTION:create-sheet|<Spreadsheet Title>
 
-When the user asks you to create a presentation or slides, end your response with:
+When the user asks you to create a presentation, slides, or PowerPoint, write the slide content in your response as numbered sections separated by '---', each with a '## Slide N: Title' heading followed by bullet points or body text. Then end your response with:
   →ACTION:create-slides|<Presentation Title>
+The slides are parsed from your response, so every '---' separated section with a '## heading' becomes one slide (heading = title, remaining text = body).

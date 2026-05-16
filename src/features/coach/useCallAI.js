@@ -16,7 +16,7 @@ import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateA
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
 import { docsCreateDocument, docsAppendText, docsMoveToFolder } from '../../api/docsApi.js';
 import { sheetsCreateSpreadsheet, sheetsAppendRows } from '../../api/sheetsApi.js';
-import { slidesCreatePresentation, slidesAddTextSlide } from '../../api/slidesApi.js';
+import { createAndUploadPptx, PPTX_MIME } from '../../api/pptxApi.js';
 
 // Lazy task-retrieval tool — used in chat mode so the full task list isn't
 // sent on every message. The AI calls this when it needs task details.
@@ -635,49 +635,32 @@ function useCallAI({
         }
       }
 
-      // →ACTION:create-slides|<title> — create Google Slides from coach
+      // →ACTION:create-slides|<title> — create PowerPoint (.pptx) via pptxgenjs + Drive upload
       if (googleToken && slidesEnabled) {
         const slidesLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-slides|'));
         if (slidesLine) {
           try {
             const slidesTitle = slidesLine.slice('\u2192ACTION:create-slides|'.length).trim() || 'Coach Presentation';
-            const pres = await slidesCreatePresentation({ token: googleToken, title: slidesTitle });
-            // Parse slide sections from the reply: split on --- dividers, ## heading = title, rest = body
+            // Parse slide sections: split on --- dividers, ## heading = title, rest = body
             const parsedSlides = reply.split(/\n?---\n?/)
               .map(function(section) {
                 const lines = section.trim().split('\n');
                 const titleLine = lines.find(function(l) { return /^#+\s/.test(l); });
                 if (!titleLine) return null;
-                const title = titleLine.replace(/^#+\s*/, '').replace(/^\s*Slide\s+\d+[:.:]\s*/i, '').trim();
+                const title = titleLine.replace(/^#+\s*/, '').replace(/^\s*Slide\s+\d+[:.\s]\s*/i, '').trim();
                 const body = lines.filter(function(l) { return l !== titleLine; }).join('\n').trim();
                 return title ? { title: title, body: body } : null;
               })
               .filter(Boolean);
-            const slideErrMsgs = [];
-            for (const slide of parsedSlides) {
-              try {
-                await slidesAddTextSlide({
-                  token: googleToken,
-                  presentationId: pres.presentationId,
-                  title: slide.title,
-                  body: slide.body,
-                });
-              } catch (slideErr) {
-                console.error('slide write error:', slideErr);
-                slideErrMsgs.push(slideErr.message || 'unknown error');
-              }
-            }
             const slideCount = parsedSlides.length;
-            const slideErrors = slideErrMsgs.length;
-            const written = slideCount - slideErrors;
-            const fieldLabel = slideCount > 0
-              ? (slideErrors > 0 ? written + '/' + slideCount + ' slides written' : slideCount + ' slides')
-              : 'Google Slides created';
-            updateChip = { taskName: slidesTitle, fields: [fieldLabel], url: pres.presentationUrl };
-            if (slideErrMsgs.length > 0) {
-              actionError = '⚠ ' + slideErrors + '/' + slideCount + ' slides failed: ' + slideErrMsgs[0];
-            }
-          } catch (e) { actionError = `\u26a0 Slides creation failed: ${e.message}`; }
+            const result = await createAndUploadPptx({
+              token: googleToken,
+              title: slidesTitle,
+              slides: parsedSlides,
+            });
+            const fieldLabel = slideCount > 0 ? slideCount + ' slides' : 'PowerPoint created';
+            updateChip = { taskName: result.fileName, fields: [fieldLabel], url: result.webViewLink };
+          } catch (e) { actionError = `⚠ Presentation creation failed: ${e.message}`; }
         }
       }
 

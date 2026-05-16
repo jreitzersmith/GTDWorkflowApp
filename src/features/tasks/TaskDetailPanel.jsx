@@ -7,7 +7,7 @@ import { collectDescendantIds, effortAccuracyColor, effortToMinutes } from "./ta
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
 import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
 import { driveListFiles } from "../../api/driveApi.js";
-import { slidesCreatePresentation, slidesAddTextSlide } from "../../api/slidesApi.js";
+import { createAndUploadPptx, PPTX_MIME } from '../../api/pptxApi.js';
 
 // Shared style tokens used across the sub-components below.
 const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
@@ -470,40 +470,30 @@ function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
     setBriefingLoading(true);
     setBriefingErr(null);
     try {
-      const presentation = await slidesCreatePresentation({ token: googleAccessToken, title: task.text });
+      // One slide per non-done subtask (title + notes); preceded by a cover slide
+      const subtasks = allTasks.filter(t => (task.childIds || []).includes(t.id) && !t.done);
+      const slides = [
+        { title: task.text, body: task.notes || '' },
+        ...subtasks.map(t => ({ title: t.text, body: t.notes || '' })),
+      ];
 
-      // Attach to task and expose link immediately — the presentation exists even if slide writes fail
+      const result = await createAndUploadPptx({
+        token: googleAccessToken,
+        title: task.text,
+        slides,
+      });
+
       const att = {
-        id: presentation.presentationId,
-        name: task.text,
-        mimeType: 'application/vnd.google-apps.presentation',
-        url: presentation.presentationUrl,
+        id: result.fileId,
+        name: result.fileName,
+        mimeType: PPTX_MIME,
+        url: result.webViewLink,
       };
       const existing = task.driveAttachments || [];
       if (!existing.find(a => a.id === att.id)) {
         onUpdate(task.id, { driveAttachments: [...existing, att] });
       }
-      setBriefingUrl(presentation.presentationUrl);
-
-      // Add content slides — failures are reported but don't suppress the link
-      const subtasks = allTasks.filter(t => (task.childIds || []).includes(t.id) && !t.done);
-      const slideErrors = [];
-      for (const subtask of subtasks) {
-        try {
-          await slidesAddTextSlide({
-            token: googleAccessToken,
-            presentationId: presentation.presentationId,
-            title: subtask.text,
-            body: subtask.notes || '',
-          });
-        } catch (err) {
-          console.error('slidesAddTextSlide error', err);
-          slideErrors.push(subtask.text + ': ' + (err.message || 'unknown error'));
-        }
-      }
-      if (slideErrors.length > 0) {
-        setBriefingErr(`Slides created but content failed for: ${slideErrors.join(', ')}`);
-      }
+      setBriefingUrl(result.webViewLink);
     } catch (err) {
       console.error('generateBriefing error', err);
       setBriefingErr(err.message || 'Failed to create presentation');
@@ -514,12 +504,12 @@ function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
 
   return (
     <div>
-      <div style={fieldLabel}>Slides Briefing</div>
+      <div style={fieldLabel}>PPT Briefing</div>
       <button
         onClick={handleGenerateBriefing}
         disabled={briefingLoading}
         style={{ padding: '4px 12px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 12, cursor: briefingLoading ? 'not-allowed' : 'pointer' }}
-      >{briefingLoading ? 'Generating…' : '🎞️ Generate Slides Briefing'}</button>
+      >{briefingLoading ? 'Generating…' : '📊 Generate PPT Briefing'}</button>
       {briefingUrl && (
         <a href={briefingUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: COLORS.next, textDecoration: 'none', marginTop: 4, display: 'block' }}>View presentation ↗</a>
       )}
