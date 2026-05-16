@@ -112,3 +112,8 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-13 | Feature      | FR#77   | GH#78  | Process mode: editable metadata panel in pending action bar | 73e77fb           |
 | 2026-05-14 | Feature      | FR#86   | GH#91  | Keyboard navigation: ↑↓/jk focus, Enter opens detail, ←→ collapse/expand, Escape clears | 568db30 |
 | 2026-05-14 | Feature      | FR#89   | GH#94  | Global keyboard shortcuts (17 shortcuts, configurable modifier, shortcut map, Archived rename, emoji alignment) | 9fdf9fd |
+| 2026-05-16 | Feature      | FR#45   | GH#41  | Drive full-text search bar in TaskDetailPanel DriveAttachments section | ec3c80a |
+| 2026-05-16 | Feature      | FR#42   | GH#38  | Weekly Review Save to Drive button; reviewDriveFolderId setting in SettingsPanel + useAppSettings | ec3c80a |
+| 2026-05-16 | Feature      | FR#41   | GH#37  | →ACTION:create-doc handler in useCallAI; creates Google Doc from coach output, links to task | ec3c80a |
+| 2026-05-16 | Feature      | FR#43   | GH#39  | →ACTION:create-sheet and →ACTION:create-slides handlers in useCallAI; coach prompt updated | ec3c80a |
+| 2026-05-16 | Feature      | FR#44   | GH#40  | SlidesGenerator component in TaskDetailPanel: slides briefing button on project tasks | ec3c80a |
