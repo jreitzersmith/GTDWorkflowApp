@@ -16,7 +16,7 @@ import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateA
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
 import { docsCreateDocument, docsAppendText, docsMoveToFolder } from '../../api/docsApi.js';
 import { sheetsCreateSpreadsheet, sheetsAppendRows } from '../../api/sheetsApi.js';
-import { slidesCreatePresentation } from '../../api/slidesApi.js';
+import { slidesCreatePresentation, slidesAddTextSlide } from '../../api/slidesApi.js';
 
 // Lazy task-retrieval tool — used in chat mode so the full task list isn't
 // sent on every message. The AI calls this when it needs task details.
@@ -642,7 +642,37 @@ function useCallAI({
           try {
             const slidesTitle = slidesLine.slice('\u2192ACTION:create-slides|'.length).trim() || 'Coach Presentation';
             const pres = await slidesCreatePresentation({ token: googleToken, title: slidesTitle });
-            updateChip = { taskName: slidesTitle, fields: ['Google Slides created'], url: pres.presentationUrl };
+            // Parse slide sections from the reply: split on --- dividers, ## heading = title, rest = body
+            const parsedSlides = reply.split(/\n?---\n?/)
+              .map(function(section) {
+                const lines = section.trim().split('\n');
+                const titleLine = lines.find(function(l) { return /^#+\s/.test(l); });
+                if (!titleLine) return null;
+                const title = titleLine.replace(/^#+\s*/, '').replace(/^\s*Slide\s+\d+[:.:]\s*/i, '').trim();
+                const body = lines.filter(function(l) { return l !== titleLine; }).join('\n').trim();
+                return title ? { title: title, body: body } : null;
+              })
+              .filter(Boolean);
+            let slideErrors = 0;
+            for (const slide of parsedSlides) {
+              try {
+                await slidesAddTextSlide({
+                  token: googleToken,
+                  presentationId: pres.presentationId,
+                  title: slide.title,
+                  body: slide.body,
+                });
+              } catch (slideErr) {
+                console.error('slide write error:', slideErr);
+                slideErrors++;
+              }
+            }
+            const slideCount = parsedSlides.length;
+            const written = slideCount - slideErrors;
+            const fieldLabel = slideCount > 0
+              ? (slideErrors > 0 ? written + '/' + slideCount + ' slides written' : slideCount + ' slides')
+              : 'Google Slides created';
+            updateChip = { taskName: slidesTitle, fields: [fieldLabel], url: pres.presentationUrl };
           } catch (e) { actionError = `\u26a0 Slides creation failed: ${e.message}`; }
         }
       }

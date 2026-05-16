@@ -498,7 +498,7 @@ function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
           });
         } catch (err) {
           console.error('slidesAddTextSlide error', err);
-          slideErrors.push(subtask.text);
+          slideErrors.push(subtask.text + ': ' + (err.message || 'unknown error'));
         }
       }
       if (slideErrors.length > 0) {

@@ -22,7 +22,6 @@ async function slidesRequest(url, { token, method = 'GET', body } = {}, onTokenR
 
 // -- Read ---------------------------------------------------------------------
 
-// Get a presentation's full resource (title, slides, page elements).
 async function slidesGetPresentation({ token, presentationId, onTokenRefresh } = {}) {
   const res = await slidesRequest(`${SLIDES_BASE}/${presentationId}`, { token }, onTokenRefresh);
   if (!res.ok) throw new Error(`Slides get failed: ${res.status}`);
@@ -31,9 +30,6 @@ async function slidesGetPresentation({ token, presentationId, onTokenRefresh } =
 
 // -- Create -------------------------------------------------------------------
 
-// Create a new presentation with the given title.
-// Google automatically adds one blank title slide.
-// Returns the full presentation resource; a convenience presentationUrl is added.
 async function slidesCreatePresentation({ token, title = 'Untitled Presentation', onTokenRefresh } = {}) {
   const res = await slidesRequest(SLIDES_BASE, {
     token, method: 'POST',
@@ -50,10 +46,10 @@ async function slidesCreatePresentation({ token, title = 'Untitled Presentation'
 // -- Modify -------------------------------------------------------------------
 
 // Add a new slide with title and body text using TEXT_BOX shapes.
-// Uses pre-generated objectIds — no GET needed to resolve placeholder IDs.
-// createShape and insertText for each shape are in a single batchUpdate call;
-// the API processes requests in order so the shape exists before text is inserted.
-// Appends to the end of the presentation.
+// createShape and insertText are in SEPARATE batchUpdate calls — the Slides API
+// requires the shape to be fully committed before text can be inserted.
+// AffineTransform requires all 7 fields including shearX/shearY.
+// Slide dimensions: 9144000 x 6858000 EMU (10" x 7.5").
 async function slidesAddTextSlide({
   token,
   presentationId,
@@ -63,6 +59,8 @@ async function slidesAddTextSlide({
 } = {}) {
   const rnd = () => Math.random().toString(36).slice(2, 10);
   const slideId = `sl${rnd()}`;
+  const titleId = title ? `ti${rnd()}` : null;
+  const bodyId  = body  ? `bo${rnd()}` : null;
 
   // Step 1: create a blank slide
   const r1 = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
@@ -70,65 +68,67 @@ async function slidesAddTextSlide({
     body: { requests: [{ createSlide: { objectId: slideId, insertionIndex: 9999 } }] },
   }, onTokenRefresh);
   if (!r1.ok) {
-    const errText = await r1.text().catch(() => '(no body)');
-    throw new Error(`Slides addTextSlide (createSlide) ${r1.status}: ${errText}`);
+    const t = await r1.text().catch(() => '(no body)');
+    throw new Error(`Slides addTextSlide (createSlide) ${r1.status}: ${t}`);
   }
 
-  // Step 2: create TEXT_BOX shapes and insert text in a single batchUpdate.
-  // Slide dimensions: 9144000 x 6858000 EMU (10" x 7.5").
-  // Title box: full width at top. Body box: full width below title.
-  const requests = [];
-  if (title) {
-    const titleId = `ti${rnd()}`;
-    requests.push({
+  // Step 2: create TEXT_BOX shapes — separate call from text insertion
+  const shapeRequests = [];
+  if (titleId) {
+    shapeRequests.push({
       createShape: {
         objectId: titleId,
         shapeType: 'TEXT_BOX',
         elementProperties: {
           pageObjectId: slideId,
-          size: {
-            width:  { magnitude: 8229600, unit: 'EMU' },
-            height: { magnitude: 1143000, unit: 'EMU' },
-          },
-          transform: { scaleX: 1, scaleY: 1, translateX: 457200, translateY: 457200, unit: 'EMU' },
+          size: { width: { magnitude: 8229600, unit: 'EMU' }, height: { magnitude: 1143000, unit: 'EMU' } },
+          transform: { scaleX: 1, scaleY: 1, shearX: 0, shearY: 0, translateX: 457200, translateY: 457200, unit: 'EMU' },
         },
       },
     });
-    requests.push({ insertText: { objectId: titleId, insertionIndex: 0, text: title } });
   }
-  if (body) {
-    const bodyId = `bo${rnd()}`;
-    requests.push({
+  if (bodyId) {
+    shapeRequests.push({
       createShape: {
         objectId: bodyId,
         shapeType: 'TEXT_BOX',
         elementProperties: {
           pageObjectId: slideId,
-          size: {
-            width:  { magnitude: 8229600, unit: 'EMU' },
-            height: { magnitude: 4114800, unit: 'EMU' },
-          },
-          transform: { scaleX: 1, scaleY: 1, translateX: 457200, translateY: 1828800, unit: 'EMU' },
+          size: { width: { magnitude: 8229600, unit: 'EMU' }, height: { magnitude: 4114800, unit: 'EMU' } },
+          transform: { scaleX: 1, scaleY: 1, shearX: 0, shearY: 0, translateX: 457200, translateY: 1828800, unit: 'EMU' },
         },
       },
     });
-    requests.push({ insertText: { objectId: bodyId, insertionIndex: 0, text: body } });
   }
 
-  if (requests.length === 0) return;
+  if (shapeRequests.length === 0) return;
 
   const r2 = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
-    token, method: 'POST', body: { requests },
+    token, method: 'POST', body: { requests: shapeRequests },
   }, onTokenRefresh);
   if (!r2.ok) {
-    const errText = await r2.text().catch(() => '(no body)');
-    throw new Error(`Slides addTextSlide (shapes+text) ${r2.status}: ${errText}`);
+    const t = await r2.text().catch(() => '(no body)');
+    throw new Error(`Slides addTextSlide (createShapes) ${r2.status}: ${t}`);
   }
-  return r2.json();
+
+  // Step 3: insert text into the committed shapes — separate batchUpdate
+  const textRequests = [];
+  if (titleId) textRequests.push({ insertText: { objectId: titleId, insertionIndex: 0, text: title } });
+  if (bodyId)  textRequests.push({ insertText: { objectId: bodyId,  insertionIndex: 0, text: body  } });
+
+  if (textRequests.length === 0) return;
+
+  const r3 = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
+    token, method: 'POST', body: { requests: textRequests },
+  }, onTokenRefresh);
+  if (!r3.ok) {
+    const t = await r3.text().catch(() => '(no body)');
+    throw new Error(`Slides addTextSlide (insertText) ${r3.status}: ${t}`);
+  }
+  return r3.json();
 }
 
 // Send an arbitrary batchUpdate requests array for advanced modifications.
-// See: https://developers.google.com/slides/api/reference/rest/v1/presentations/batchUpdate
 async function slidesBatchUpdate({ token, presentationId, requests, onTokenRefresh } = {}) {
   const res = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
     token, method: 'POST',
@@ -140,7 +140,6 @@ async function slidesBatchUpdate({ token, presentationId, requests, onTokenRefre
 
 // -- Move ---------------------------------------------------------------------
 
-// Move a presentation to a different Drive folder (uses Drive API).
 async function slidesMoveToFolder({ token, presentationId, newParentId, oldParentId, onTokenRefresh } = {}) {
   let url = `https://www.googleapis.com/drive/v3/files/${presentationId}?addParents=${newParentId}&fields=id,parents`;
   if (oldParentId) url += `&removeParents=${oldParentId}`;
