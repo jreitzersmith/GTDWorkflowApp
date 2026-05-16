@@ -6,6 +6,8 @@ import { taskShape } from "../../contexts.js";
 import { collectDescendantIds, effortAccuracyColor, effortToMinutes } from "./taskUtils.jsx";
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
 import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
+import { driveListFiles } from "../../api/driveApi.js";
+import { slidesCreatePresentation, slidesAddTextSlide } from "../../api/slidesApi.js";
 
 // Shared style tokens used across the sub-components below.
 const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
@@ -330,6 +332,38 @@ function DriveAttachments({ taskId, attachments, driveEnabled, googleAccessToken
     onUpdate(taskId, { driveAttachments: (attachments || []).filter(a => a.id !== fileId) });
   }
 
+  const [driveSearchQuery, setDriveSearchQuery] = useState('');
+  const [driveSearchResults, setDriveSearchResults] = useState([]);
+  const [driveSearchLoading, setDriveSearchLoading] = useState(false);
+
+  async function handleDriveSearch(e) {
+    e.preventDefault();
+    const q = driveSearchQuery.trim();
+    if (!q || !googleAccessToken) return;
+    setDriveSearchLoading(true);
+    try {
+      const res = await driveListFiles({
+        token: googleAccessToken,
+        q: `fullText contains '${q.replace(/'/g, "\\\'")}' and trashed=false`,
+        pageSize: 8,
+      });
+      setDriveSearchResults(res.files || []);
+    } catch (err) {
+      console.error('Drive search error', err);
+    } finally {
+      setDriveSearchLoading(false);
+    }
+  }
+
+  function attachSearchResult(file) {
+    const att = { id: file.id, name: file.name, mimeType: file.mimeType, url: file.webViewLink };
+    const existing = attachments || [];
+    if (existing.find(a => a.id === att.id)) return;
+    onUpdate(taskId, { driveAttachments: [...existing, att] });
+    setDriveSearchResults([]);
+    setDriveSearchQuery('');
+  }
+
   if (!driveEnabled) return null;
 
   // Deduplicate by id before rendering — guards against duplicate entries in driveAttachments
@@ -387,6 +421,30 @@ function DriveAttachments({ taskId, attachments, driveEnabled, googleAccessToken
             onClick={openPicker}
             style={{ alignSelf: 'flex-start', padding: '3px 10px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
           >+ Attach Drive file</button>
+          <form onSubmit={handleDriveSearch} style={{ display: 'flex', gap: 5, marginTop: 4 }}>
+            <input
+              value={driveSearchQuery}
+              onChange={e => setDriveSearchQuery(e.target.value)}
+              placeholder="Search Drive…"
+              style={{ flex: 1, padding: '3px 8px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: COLORS.surface2, color: COLORS.text, fontFamily: 'inherit', fontSize: 11, outline: 'none' }}
+            />
+            <button type="submit" disabled={driveSearchLoading} style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+              {driveSearchLoading ? '…' : 'Search'}
+            </button>
+          </form>
+          {driveSearchResults.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4, padding: '6px 8px', background: COLORS.surface3, borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+              {driveSearchResults.map(file => (
+                <div key={file.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ flex: 1, fontSize: 11, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.name}>{file.name}</span>
+                  <button
+                    onClick={() => attachSearchResult(file)}
+                    style={{ padding: '2px 7px', borderRadius: 4, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 10, cursor: 'pointer', flexShrink: 0 }}
+                  >+ Attach</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -396,13 +454,68 @@ DriveAttachments.propTypes = {
   taskId:            PropTypes.string.isRequired,
   attachments:       PropTypes.array,
   driveEnabled:      PropTypes.bool,
+  slidesEnabled:     PropTypes.bool,
   googleAccessToken: PropTypes.string,
+  onUpdate:          PropTypes.func.isRequired,
+};
+
+// Generates a Google Slides briefing deck from a project task and its subtasks.
+// Shown in TaskDetailPanel only when Slides is connected and the task has children.
+function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
+  const [briefingLoading, setBriefingLoading] = useState(false);
+
+  async function handleGenerateBriefing() {
+    setBriefingLoading(true);
+    try {
+      const presentation = await slidesCreatePresentation({ token: googleAccessToken, title: task.text });
+      const subtasks = allTasks.filter(t => (task.childIds || []).includes(t.id) && !t.done);
+      for (const subtask of subtasks) {
+        await slidesAddTextSlide({
+          token: googleAccessToken,
+          presentationId: presentation.presentationId,
+          title: subtask.text,
+          body: subtask.notes || '',
+        });
+      }
+      const att = {
+        id: presentation.presentationId,
+        name: task.text,
+        mimeType: 'application/vnd.google-apps.presentation',
+        url: presentation.presentationUrl,
+      };
+      const existing = task.driveAttachments || [];
+      if (!existing.find(a => a.id === att.id)) {
+        onUpdate(task.id, { driveAttachments: [...existing, att] });
+      }
+      window.open(presentation.presentationUrl, '_blank');
+    } catch (err) {
+      console.error('generateBriefing error', err);
+    } finally {
+      setBriefingLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div style={fieldLabel}>Slides Briefing</div>
+      <button
+        onClick={handleGenerateBriefing}
+        disabled={briefingLoading}
+        style={{ padding: '4px 12px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 12, cursor: briefingLoading ? 'not-allowed' : 'pointer' }}
+      >{briefingLoading ? 'Generating…' : '🎞️ Generate Slides Briefing'}</button>
+    </div>
+  );
+}
+SlidesGenerator.propTypes = {
+  task:              taskShape.isRequired,
+  allTasks:          PropTypes.arrayOf(taskShape).isRequired,
+  googleAccessToken: PropTypes.string.isRequired,
   onUpdate:          PropTypes.func.isRequired,
 };
 
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
-function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, slidesEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
   const {
     titleDraft, setTitleDraft, saveTitle,
     notesDraft, setNotesDraft, saveNotes,
@@ -468,6 +581,16 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
           googleAccessToken={googleAccessToken}
           onUpdate={onUpdate}
         />
+
+        {/* Slides briefing — shown for project tasks when Slides is connected */}
+        {slidesEnabled && googleAccessToken && (task.bucket === 'project' || (task.childIds && task.childIds.length > 0)) && (
+          <SlidesGenerator
+            task={task}
+            allTasks={allTasks}
+            googleAccessToken={googleAccessToken}
+            onUpdate={onUpdate}
+          />
+        )}
 
         {/* Metadata */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

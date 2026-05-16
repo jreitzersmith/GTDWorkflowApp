@@ -122,7 +122,17 @@ Phase 2 — Execution (after confirmation):
 Use gmail_batch_label (not gmail_bulk_action) only when labelling a small known set of message IDs already retrieved via gmail_search.
 When the user asks to process many senders at once, handle 3-5 senders per turn and report results before continuing.
 
-After the user confirms a query and label in Phase 1, call gmail_queue_add to save the entry to their persistent cleanup queue. Tell the user it has been saved and they can run it now or later from the Email > Cleanup tab.`,
+After the user confirms a query and label in Phase 1, call gmail_queue_add to save the entry to their persistent cleanup queue. Tell the user it has been saved and they can run it now or later from the Email > Cleanup tab.
+
+When the user asks you to capture output as a Google Doc, end your response with:
+  →ACTION:create-doc|<Document Title>[|task:<task id or title>]
+Omit the task reference if the user didn't mention a specific task. The doc will be created and optionally linked to that task.
+
+When the user asks you to create a spreadsheet, end your response with:
+  →ACTION:create-sheet|<Spreadsheet Title>
+
+When the user asks you to create a presentation or slides, end your response with:
+  →ACTION:create-slides|<Presentation Title>`,
   process: `You are a GTD inbox processor. For each inbox item given to you:
 
 1. Determine if it's actionable. If not actionable, end with: →ACTION:delete

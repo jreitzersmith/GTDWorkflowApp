@@ -34,6 +34,7 @@ import { useCallAI } from "./features/coach/useCallAI.js";
 import { useInboxProcessing } from "./features/tasks/useInboxProcessing.js";
 import { useTaskCrud } from "./features/tasks/useTaskCrud.js";
 import { useSettings } from "./features/settings/useSettings.js";
+import { docsCreateDocument, docsAppendText, docsMoveToFolder } from "./api/docsApi.js";
 
 
 
@@ -59,7 +60,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier } = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId } = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
@@ -406,6 +407,7 @@ export default function GTDManager() {
     provider, localModel,
     googleToken, googleScope, calendarEnabled,
     authUser,
+    docsEnabled, sheetsEnabled, slidesEnabled,
     coachMode, chatInput, chatHistory, loading,
     getTaskContext, recordUsage,
     setTasks, setCalendarEvents, setGmailQueue,
@@ -467,6 +469,24 @@ export default function GTDManager() {
     setRecurringAcknowledgedMap,
     askAIAboutTask,
   });
+
+  const saveReviewToDoc = useCallback(async () => {
+    if (!googleToken || !docsEnabled) return;
+    const today = todayStr();
+    const title = `Weekly Review — ${today}`;
+    const body = messages
+      .filter(m => m.role === 'assistant' || m.role === 'user')
+      .map(m => `${m.role === 'user' ? 'You' : 'Coach'}: ${m.text || ''}`.trim())
+      .join('\n\n');
+    try {
+      const doc = await docsCreateDocument(googleToken, title);
+      if (body) await docsAppendText(googleToken, doc.documentId, body);
+      if (reviewDriveFolderId) await docsMoveToFolder(googleToken, doc.documentId, reviewDriveFolderId);
+      window.open(`https://docs.google.com/document/d/${doc.documentId}/edit`, '_blank');
+    } catch (err) {
+      console.error('saveReviewToDoc failed:', err);
+    }
+  }, [googleToken, docsEnabled, messages, reviewDriveFolderId]);
 
   const startWeeklyReview = () => {
     const total = tasks.filter(t => t.bucket !== "done").length;
@@ -1264,6 +1284,8 @@ export default function GTDManager() {
                           onSetRecurringReviewDays={setRecurringReviewDays}
                           calendarReminderMinutes={calendarReminderMinutes}
                           onSetCalendarReminderMinutes={setCalendarReminderMinutes}
+                          reviewDriveFolderId={reviewDriveFolderId}
+                          onSetReviewDriveFolderId={setReviewDriveFolderId}
                         />
                       ) : showUsage ? (
                         <UsagePanel
@@ -1443,6 +1465,8 @@ export default function GTDManager() {
                 onStartProjectReview={startProjectReview}
                 onSwitchToChat={() => switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.")}
                 onMITSubmit={handleMITSubmit}
+                docsEnabled={docsEnabled}
+                onSaveReviewToDoc={saveReviewToDoc}
               />
             </ErrorBoundary>
           </div>
@@ -1461,6 +1485,7 @@ export default function GTDManager() {
                     efforts={efforts}
                     categories={categories}
                     driveEnabled={driveEnabled}
+                    slidesEnabled={slidesEnabled}
                     googleAccessToken={googleToken}
                     onUpdate={updateTask}
                     onComplete={(id) => { archiveTask(id); setSelectedTaskId(null); }}

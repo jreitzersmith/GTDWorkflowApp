@@ -58,7 +58,12 @@ function useAppSettings() {
   );
   useEffect(() => { localStorage.setItem('gtd_shortcut_modifier', shortcutModifier); }, [shortcutModifier]);
 
-  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier };
+  const [reviewDriveFolderId, setReviewDriveFolderId] = useState(() =>
+    localStorage.getItem('gtd_review_drive_folder_id') || ''
+  );
+  useEffect(() => { localStorage.setItem('gtd_review_drive_folder_id', reviewDriveFolderId); }, [reviewDriveFolderId]);
+
+  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId };
 }
 
 

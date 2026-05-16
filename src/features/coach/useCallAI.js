@@ -14,6 +14,9 @@ import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateA
   extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction,
   extractCalendarDeleteAction } from '../tasks/taskUtils.jsx';
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
+import { docsCreateDocument, docsAppendText, docsMoveToFolder } from '../../api/docsApi.js';
+import { sheetsCreateSpreadsheet } from '../../api/sheetsApi.js';
+import { slidesCreatePresentation } from '../../api/slidesApi.js';
 
 // Lazy task-retrieval tool — used in chat mode so the full task list isn't
 // sent on every message. The AI calls this when it needs task details.
@@ -50,6 +53,7 @@ const MODE_CONTEXT_BUCKETS = {
  *   provider: string, localModel: string,
  *   googleToken: string|null, googleScope: string|null, calendarEnabled: boolean,
  *   authUser: object|null,
+ *   docsEnabled: boolean, sheetsEnabled: boolean, slidesEnabled: boolean,
  *   coachMode: string, chatInput: string, chatHistory: Array, loading: boolean,
  *   getTaskContext: Function, recordUsage: Function,
  *   setTasks: Function, setCalendarEvents: Function, setGmailQueue: Function,
@@ -63,6 +67,7 @@ function useCallAI({
   provider, localModel,
   googleToken, googleScope, calendarEnabled,
   authUser,
+  docsEnabled, sheetsEnabled, slidesEnabled,
   coachMode, chatInput, chatHistory, loading,
   getTaskContext, recordUsage,
   setTasks, setCalendarEvents, setGmailQueue,
@@ -565,6 +570,60 @@ function useCallAI({
         }
       }
 
+      // →ACTION:create-doc|<title>[|task:<id>] — create Google Doc from coach
+      if (googleToken && docsEnabled) {
+        const docLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-doc|'));
+        if (docLine) {
+          try {
+            const parts = docLine.slice('\u2192ACTION:create-doc|'.length).split('|');
+            const docTitle = (parts[0] || 'Coach Output').trim();
+            const taskRef = (parts.find(p => p.startsWith('task:')) || '').replace('task:', '').trim();
+            const doc = await docsCreateDocument({ token: googleToken, title: docTitle });
+            const bodyText = reply.replace(/\u2192ACTION:[^\n]*/g, '').trim();
+            if (bodyText) await docsAppendText({ token: googleToken, documentId: doc.documentId, text: bodyText });
+            const docUrl = `https://docs.google.com/document/d/${doc.documentId}/edit`;
+            if (taskRef) {
+              const target = tasks.find(t => t.id === taskRef || t.text.toLowerCase() === taskRef.toLowerCase());
+              if (target) {
+                const existing = target.driveAttachments || [];
+                setTasks(prev => prev.map(t => t.id === target.id
+                  ? { ...t, driveAttachments: [...existing, { id: doc.documentId, name: docTitle, mimeType: 'application/vnd.google-apps.document', url: docUrl }] }
+                  : t));
+              }
+            }
+            updateChip = { taskName: docTitle, fields: ['Google Doc created'] };
+            window.open(docUrl, '_blank');
+          } catch (e) { actionError = `\u26a0 Doc creation failed: ${e.message}`; }
+        }
+      }
+
+      // →ACTION:create-sheet|<title> — create Google Sheet from coach
+      if (googleToken && sheetsEnabled) {
+        const sheetLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-sheet|'));
+        if (sheetLine) {
+          try {
+            const sheetTitle = sheetLine.slice('\u2192ACTION:create-sheet|'.length).trim() || 'Coach Spreadsheet';
+            const sheet = await sheetsCreateSpreadsheet({ token: googleToken, title: sheetTitle });
+            const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/edit`;
+            updateChip = { taskName: sheetTitle, fields: ['Google Sheet created'] };
+            window.open(sheetUrl, '_blank');
+          } catch (e) { actionError = `\u26a0 Sheet creation failed: ${e.message}`; }
+        }
+      }
+
+      // →ACTION:create-slides|<title> — create Google Slides from coach
+      if (googleToken && slidesEnabled) {
+        const slidesLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-slides|'));
+        if (slidesLine) {
+          try {
+            const slidesTitle = slidesLine.slice('\u2192ACTION:create-slides|'.length).trim() || 'Coach Presentation';
+            const pres = await slidesCreatePresentation({ token: googleToken, title: slidesTitle });
+            updateChip = { taskName: slidesTitle, fields: ['Google Slides created'] };
+            window.open(pres.presentationUrl, '_blank');
+          } catch (e) { actionError = `\u26a0 Slides creation failed: ${e.message}`; }
+        }
+      }
+
       // →ACTION:set-focus|<id1>,<id2>,... — daily mode focus selection
       if (mode === 'daily') {
         const focusLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('→ACTION:set-focus|'));
@@ -633,9 +692,9 @@ function useCallAI({
       setLoading(false);
     }
   }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel,
-      googleToken, googleScope, calendarEnabled, setCalendarEvents,
-      recordUsage, setLastInputLog, setTasks, setGmailQueue, setMessages, setChatHistory,
-      setLoading, setPendingAction, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+      googleToken, googleScope, calendarEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
+      setCalendarEvents, recordUsage, setLastInputLog, setTasks, setGmailQueue,
+      setMessages, setChatHistory, setLoading, setPendingAction, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();

@@ -90,6 +90,7 @@ function SettingsPanel({
   onReauthorizeGoogle, onDisconnectCalendar, onDisconnectAll,
   // Other
   recurringReviewDays, onSetRecurringReviewDays,
+  reviewDriveFolderId, onSetReviewDriveFolderId,
   calendarReminderMinutes, onSetCalendarReminderMinutes,
 }) {
   const fileInputRef = useRef(null);
@@ -301,6 +302,20 @@ function SettingsPanel({
             />
             <span style={{ fontSize: 12, color: COLORS.text2 }}>days</span>
           </div>
+          {docsEnabled && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 6 }}>Save review transcripts to Drive</div>
+              <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 6, lineHeight: 1.4 }}>
+                Paste a Google Drive folder ID to save Weekly Review transcripts there. Leave blank to save to My Drive root.
+              </div>
+              <input
+                value={reviewDriveFolderId || ''}
+                onChange={e => onSetReviewDriveFolderId(e.target.value.trim())}
+                placeholder="Drive folder ID (optional)"
+                style={{ width: '100%', padding: '4px 8px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text, fontFamily: 'inherit', fontSize: 12, boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+          )}
         </SettingsSection>
 
         {/* ── Next Actions ──────────────────────────────────────────────────── */}
@@ -473,6 +488,8 @@ SettingsPanel.propTypes = {
   onSetCalendarReminderMinutes: PropTypes.func.isRequired,
   reviewNodeTypes:            PropTypes.arrayOf(PropTypes.string).isRequired,
   onSetReviewNodeTypes:       PropTypes.func.isRequired,
+  reviewDriveFolderId:        PropTypes.string,
+  onSetReviewDriveFolderId:   PropTypes.func.isRequired,
 };
 
 export { SettingsPanel };
