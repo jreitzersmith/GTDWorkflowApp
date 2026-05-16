@@ -111,13 +111,15 @@ After all changes for a cycle are complete, provide a specific manual testing ch
 2. Whenever John asks which tests are outstanding, remaining, or not yet passed — render only the unresolved items as a fresh widget, never answer in plain text
 
 **Format:** Always present the checklist as an interactive widget using `mcp__visualize__show_widget`. Each item must:
-- Have a state button that cycles through **unchecked → Pass → Fail → Skip → Note** on click
-  - Pass = green · Fail = red · Skip = grey · Note = amber
-- Have a per-item text input field for optional notes/observations
-- Pre-populate state if the user has already reported results in chat before the widget is rendered
-- Include a **Submit** button that calls `sendPrompt()` with a compact summary including all states and any notes
-  - Format: `FR#XX test results — [Item label]: Pass · [Item label]: Fail (note text) · ...`
+- Have a state button that cycles through **— → Pass → Fail → Skip → Note** on click
+  - Pass = green · Fail = red · Skip = blue · Note = amber
+  - Apply button colors as **inline styles** using CSS variables (e.g. `--color-background-success`), not CSS classes — class-based colors are overridden by the pre-styled button defaults
+- Show a per-item `<textarea>` notes field **only for Fail, Skip, and Note** states — hidden for — and Pass
+- Include an **overall notes** `<textarea>` below all items (before Submit)
+- Include a right-aligned **Submit** button that calls `sendPrompt()` with all states and any notes
 - Use `Note` state (amber) for items that partially passed or have a known caveat
+- Build the UI with `document.createElement` (not innerHTML) to avoid textarea value loss on state cycle
+- See `memory/feedback_testing_checklist_widget.md` for the full working template
 
 Each checklist item: specific action + specific expected result. Group by feature area if multiple items were implemented.
 

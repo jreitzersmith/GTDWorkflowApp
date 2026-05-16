@@ -145,9 +145,11 @@ Remove-Item "C:\Programming_Projects\GTDWorkflowApp\vite.config.js.timestamp-*.m
 - Exception: trivial single-line fixes where the change is self-evident from the diagnosis may be executed without a separate plan step.
 
 **Testing checklists**
-- Always present as an interactive widget (mcp__visualize__show_widget): state button cycles Pass → Fail → Skip → Note per item, per-item notes text field, Submit button calling sendPrompt() with full summary.
+- Always present as an interactive widget (mcp__visualize__show_widget): state button cycles — → Pass → Fail → Skip → Note per item; notes textarea shown only for Fail/Skip/Note (not Pass); overall notes textarea at the bottom; right-aligned Submit calling sendPrompt() with full summary.
+- Button colors applied as inline styles using CSS variables (--color-background-success etc.) — not CSS classes, which are overridden by the pre-styled button defaults.
+- Build UI with document.createElement (not innerHTML) to avoid textarea value loss on state cycle.
 - Render the widget in TWO situations: (1) at the end of a cycle when presenting the checklist for the first time, and (2) whenever John asks which tests are outstanding or remaining — never answer that question in plain text.
-- See Workflow.md Phase 5 for full spec.
+- See Workflow.md Phase 5 and memory/feedback_testing_checklist_widget.md for the full template.
 
 **Clarifying questions**
 - If you can proceed confidently with a reasonable assumption, state the assumption and proceed rather than asking.
