@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#22** · Code Quality — **CQ#11** · Feature Requests — **FR#99**
+> **Last used numbers:** Known Issues — **Issue#22** · Code Quality — **CQ#11** · Feature Requests — **FR#100**
 
 ---
 
@@ -19,6 +19,8 @@
 ### Feature requests
 
 #### UI polish / quick wins
+
+- [ ] FR#100 [GH#107] (2026-05-16) — Task analytics charts — completion rate, actual vs estimated effort accuracy, task volume by bucket; new view/panel, data from existing task model fields (completedDate, effort, actualEffort)
 
 #### Daily workflow / GTD core
 

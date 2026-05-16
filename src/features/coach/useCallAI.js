@@ -653,7 +653,7 @@ function useCallAI({
                 return title ? { title: title, body: body } : null;
               })
               .filter(Boolean);
-            let slideErrors = 0;
+            const slideErrMsgs = [];
             for (const slide of parsedSlides) {
               try {
                 await slidesAddTextSlide({
@@ -664,15 +664,19 @@ function useCallAI({
                 });
               } catch (slideErr) {
                 console.error('slide write error:', slideErr);
-                slideErrors++;
+                slideErrMsgs.push(slideErr.message || 'unknown error');
               }
             }
             const slideCount = parsedSlides.length;
+            const slideErrors = slideErrMsgs.length;
             const written = slideCount - slideErrors;
             const fieldLabel = slideCount > 0
               ? (slideErrors > 0 ? written + '/' + slideCount + ' slides written' : slideCount + ' slides')
               : 'Google Slides created';
             updateChip = { taskName: slidesTitle, fields: [fieldLabel], url: pres.presentationUrl };
+            if (slideErrMsgs.length > 0) {
+              actionError = '⚠ ' + slideErrors + '/' + slideCount + ' slides failed: ' + slideErrMsgs[0];
+            }
           } catch (e) { actionError = `\u26a0 Slides creation failed: ${e.message}`; }
         }
       }
