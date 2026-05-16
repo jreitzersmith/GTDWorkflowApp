@@ -2,7 +2,7 @@
 // All functions accept { token, onTokenRefresh? } and throw on non-OK responses.
 //
 // Note: The Slides API batchUpdate uses EMU (English Metric Units) for sizes.
-// 1 inch = 914400 EMU. A standard 10" × 7.5" slide = 9144000 × 6858000 EMU.
+// 1 inch = 914400 EMU. A standard 10" x 7.5" slide = 9144000 x 6858000 EMU.
 
 const SLIDES_BASE = 'https://slides.googleapis.com/v1/presentations';
 
@@ -20,7 +20,7 @@ async function slidesRequest(url, { token, method = 'GET', body } = {}, onTokenR
   return res;
 }
 
-// ── Read ──────────────────────────────────────────────────────────────────────
+// -- Read ---------------------------------------------------------------------
 
 // Get a presentation's full resource (title, slides, page elements).
 async function slidesGetPresentation({ token, presentationId, onTokenRefresh } = {}) {
@@ -29,7 +29,7 @@ async function slidesGetPresentation({ token, presentationId, onTokenRefresh } =
   return res.json();
 }
 
-// ── Create ────────────────────────────────────────────────────────────────────
+// -- Create -------------------------------------------------------------------
 
 // Create a new presentation with the given title.
 // Google automatically adds one blank title slide.
@@ -47,11 +47,12 @@ async function slidesCreatePresentation({ token, title = 'Untitled Presentation'
   };
 }
 
-// ── Modify ────────────────────────────────────────────────────────────────────
+// -- Modify -------------------------------------------------------------------
 
 // Add a new "Title and Body" slide with text content.
+// Uses TITLE_AND_BODY layout: creates the slide, fetches the presentation to
+// resolve Google-assigned placeholder IDs, then inserts text into them.
 // Appends to the end of the presentation.
-// Returns the batchUpdate response (includes updatedObjectIds).
 async function slidesAddTextSlide({
   token,
   presentationId,
@@ -59,70 +60,41 @@ async function slidesAddTextSlide({
   body  = '',
   onTokenRefresh,
 } = {}) {
-  const rnd = () => Math.random().toString(36).slice(2, 8);
-  const slideId = `s_${Date.now()}_${rnd()}`;
-  const titleId = `t_${Date.now()}_${rnd()}`;
-  const bodyId  = `b_${Date.now()}_${rnd()}`;
+  const rnd = () => Math.random().toString(36).slice(2, 9);
+  const slideId = `s${rnd()}${rnd()}`; // 14 alphanumeric chars, valid object ID
 
-  const EMU = (inches) => Math.round(inches * 914400);
-
-  // Step 1: create the slide (BLANK — avoid placeholder conflicts with shape creation)
-  const createRes = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
+  // Step 1: create slide with TITLE_AND_BODY layout so Google provisions named placeholders
+  const r1 = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
     token, method: 'POST',
-    body: {
-      requests: [
-        {
-          createSlide: {
-            objectId: slideId,
-            insertionIndex: 9999,
-            slideLayoutReference: { predefinedLayout: 'BLANK' },
-          },
-        },
-      ],
-    },
+    body: { requests: [{ createSlide: { objectId: slideId, insertionIndex: 9999, slideLayoutReference: { predefinedLayout: 'TITLE_AND_BODY' } } }] },
   }, onTokenRefresh);
-  if (!createRes.ok) throw new Error(`Slides addTextSlide (create) failed: ${createRes.status}`);
+  if (!r1.ok) throw new Error(`Slides addTextSlide (create) failed: ${r1.status}`);
 
-  // Step 2: add text boxes with content in a separate batchUpdate
-  const textRequests = [
-    {
-      createShape: {
-        objectId: titleId,
-        shapeType: 'TEXT_BOX',
-        elementProperties: {
-          pageObjectId: slideId,
-          size: {
-            width:  { magnitude: EMU(9), unit: 'EMU' },
-            height: { magnitude: EMU(1), unit: 'EMU' },
-          },
-          transform: { scaleX: 1, scaleY: 1, translateX: EMU(0.5), translateY: EMU(0.3), unit: 'EMU' },
-        },
-      },
-    },
-    ...(title ? [{ insertText: { objectId: titleId, text: title } }] : []),
-    {
-      createShape: {
-        objectId: bodyId,
-        shapeType: 'TEXT_BOX',
-        elementProperties: {
-          pageObjectId: slideId,
-          size: {
-            width:  { magnitude: EMU(9),   unit: 'EMU' },
-            height: { magnitude: EMU(5.5), unit: 'EMU' },
-          },
-          transform: { scaleX: 1, scaleY: 1, translateX: EMU(0.5), translateY: EMU(1.5), unit: 'EMU' },
-        },
-      },
-    },
-    ...(body ? [{ insertText: { objectId: bodyId, text: body } }] : []),
+  // Step 2: fetch the presentation to resolve the placeholder object IDs Google assigned
+  const r2 = await slidesRequest(`${SLIDES_BASE}/${presentationId}`, { token }, onTokenRefresh);
+  if (!r2.ok) throw new Error(`Slides addTextSlide (get) failed: ${r2.status}`);
+  const pres = await r2.json();
+  const slide = (pres.slides || []).find(s => s.objectId === slideId);
+  if (!slide) throw new Error('Slides addTextSlide: slide not found after creation');
+
+  const ph = (...types) => (slide.pageElements || []).find(
+    e => e.shape && e.shape.placeholder && types.includes(e.shape.placeholder.type)
+  );
+  const titleEl = ph('TITLE', 'CENTERED_TITLE');
+  const bodyEl  = ph('BODY', 'SUBTITLE');
+
+  // Step 3: insert text into the layout placeholders
+  const textReqs = [
+    ...(title && titleEl ? [{ insertText: { objectId: titleEl.objectId, insertionIndex: 0, text: title } }] : []),
+    ...(body  && bodyEl  ? [{ insertText: { objectId: bodyEl.objectId,  insertionIndex: 0, text: body  } }] : []),
   ];
+  if (textReqs.length === 0) return;
 
-  const textRes = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
-    token, method: 'POST',
-    body: { requests: textRequests },
+  const r3 = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
+    token, method: 'POST', body: { requests: textReqs },
   }, onTokenRefresh);
-  if (!textRes.ok) throw new Error(`Slides addTextSlide (text) failed: ${textRes.status}`);
-  return textRes.json();
+  if (!r3.ok) throw new Error(`Slides addTextSlide (text) failed: ${r3.status}`);
+  return r3.json();
 }
 
 // Send an arbitrary batchUpdate requests array for advanced modifications.
@@ -136,7 +108,7 @@ async function slidesBatchUpdate({ token, presentationId, requests, onTokenRefre
   return res.json();
 }
 
-// ── Move ──────────────────────────────────────────────────────────────────────
+// -- Move ---------------------------------------------------------------------
 
 // Move a presentation to a different Drive folder (uses Drive API).
 async function slidesMoveToFolder({ token, presentationId, newParentId, oldParentId, onTokenRefresh } = {}) {

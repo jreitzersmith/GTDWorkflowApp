@@ -463,6 +463,7 @@ DriveAttachments.propTypes = {
 // Shown in TaskDetailPanel only when Slides is connected and the task has children.
 function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
   const [briefingLoading, setBriefingLoading] = useState(false);
+  const [briefingUrl, setBriefingUrl] = useState(null);
 
   async function handleGenerateBriefing() {
     setBriefingLoading(true);
@@ -487,7 +488,7 @@ function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
       if (!existing.find(a => a.id === att.id)) {
         onUpdate(task.id, { driveAttachments: [...existing, att] });
       }
-      window.open(presentation.presentationUrl, '_blank');
+      setBriefingUrl(presentation.presentationUrl);
     } catch (err) {
       console.error('generateBriefing error', err);
     } finally {
@@ -503,6 +504,9 @@ function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
         disabled={briefingLoading}
         style={{ padding: '4px 12px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 12, cursor: briefingLoading ? 'not-allowed' : 'pointer' }}
       >{briefingLoading ? 'Generating…' : '🎞️ Generate Slides Briefing'}</button>
+      {briefingUrl && (
+        <a href={briefingUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: COLORS.next, textDecoration: 'none', marginTop: 4, display: 'block' }}>View presentation ↗</a>
+      )}
     </div>
   );
 }
