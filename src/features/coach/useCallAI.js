@@ -15,7 +15,7 @@ import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateA
   extractCalendarDeleteAction } from '../tasks/taskUtils.jsx';
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
 import { docsCreateDocument, docsAppendText, docsMoveToFolder } from '../../api/docsApi.js';
-import { sheetsCreateSpreadsheet } from '../../api/sheetsApi.js';
+import { sheetsCreateSpreadsheet, sheetsAppendRows } from '../../api/sheetsApi.js';
 import { slidesCreatePresentation } from '../../api/slidesApi.js';
 
 // Lazy task-retrieval tool — used in chat mode so the full task list isn't
@@ -591,8 +591,7 @@ function useCallAI({
                   : t));
               }
             }
-            updateChip = { taskName: docTitle, fields: ['Google Doc created'] };
-            window.open(docUrl, '_blank');
+            updateChip = { taskName: docTitle, fields: ['Google Doc created'], url: docUrl };
           } catch (e) { actionError = `\u26a0 Doc creation failed: ${e.message}`; }
         }
       }
@@ -605,8 +604,20 @@ function useCallAI({
             const sheetTitle = sheetLine.slice('\u2192ACTION:create-sheet|'.length).trim() || 'Coach Spreadsheet';
             const sheet = await sheetsCreateSpreadsheet({ token: googleToken, title: sheetTitle });
             const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/edit`;
-            updateChip = { taskName: sheetTitle, fields: ['Google Sheet created'] };
-            window.open(sheetUrl, '_blank');
+            const nextActions = tasks.filter(t => t.bucket === 'next' && !t.done);
+            if (nextActions.length > 0) {
+              const headers = [['Task', 'Priority', 'Location', 'Due Date', 'Effort', 'Notes']];
+              const rows = nextActions.map(t => [
+                t.text,
+                (t.priority || []).join(', '),
+                (t.location || []).join(', '),
+                t.dueDate || '',
+                t.effort || '',
+                t.notes || '',
+              ]);
+              await sheetsAppendRows({ token: googleToken, spreadsheetId: sheet.spreadsheetId, range: 'Sheet1', values: [...headers, ...rows] });
+            }
+            updateChip = { taskName: sheetTitle, fields: ['Google Sheet created'], url: sheetUrl };
           } catch (e) { actionError = `\u26a0 Sheet creation failed: ${e.message}`; }
         }
       }
@@ -618,8 +629,7 @@ function useCallAI({
           try {
             const slidesTitle = slidesLine.slice('\u2192ACTION:create-slides|'.length).trim() || 'Coach Presentation';
             const pres = await slidesCreatePresentation({ token: googleToken, title: slidesTitle });
-            updateChip = { taskName: slidesTitle, fields: ['Google Slides created'] };
-            window.open(pres.presentationUrl, '_blank');
+            updateChip = { taskName: slidesTitle, fields: ['Google Slides created'], url: pres.presentationUrl };
           } catch (e) { actionError = `\u26a0 Slides creation failed: ${e.message}`; }
         }
       }

@@ -59,13 +59,15 @@ async function slidesAddTextSlide({
   body  = '',
   onTokenRefresh,
 } = {}) {
-  const slideId = `s_${Date.now()}`;
-  const titleId = `t_${Date.now()}`;
-  const bodyId  = `b_${Date.now() + 1}`;
+  const rnd = () => Math.random().toString(36).slice(2, 8);
+  const slideId = `s_${Date.now()}_${rnd()}`;
+  const titleId = `t_${Date.now()}_${rnd()}`;
+  const bodyId  = `b_${Date.now()}_${rnd()}`;
 
   const EMU = (inches) => Math.round(inches * 914400);
 
-  const res = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
+  // Step 1: create the slide (BLANK — avoid placeholder conflicts with shape creation)
+  const createRes = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
     token, method: 'POST',
     body: {
       requests: [
@@ -73,44 +75,54 @@ async function slidesAddTextSlide({
           createSlide: {
             objectId: slideId,
             insertionIndex: 9999,
-            slideLayoutReference: { predefinedLayout: 'TITLE_AND_BODY' },
+            slideLayoutReference: { predefinedLayout: 'BLANK' },
           },
         },
-        {
-          createShape: {
-            objectId: titleId,
-            shapeType: 'TEXT_BOX',
-            elementProperties: {
-              pageObjectId: slideId,
-              size: {
-                width:  { magnitude: EMU(9), unit: 'EMU' },
-                height: { magnitude: EMU(1), unit: 'EMU' },
-              },
-              transform: { scaleX: 1, scaleY: 1, translateX: EMU(0.5), translateY: EMU(0.3), unit: 'EMU' },
-            },
-          },
-        },
-        ...(title ? [{ insertText: { objectId: titleId, text: title } }] : []),
-        {
-          createShape: {
-            objectId: bodyId,
-            shapeType: 'TEXT_BOX',
-            elementProperties: {
-              pageObjectId: slideId,
-              size: {
-                width:  { magnitude: EMU(9),   unit: 'EMU' },
-                height: { magnitude: EMU(5.5),  unit: 'EMU' },
-              },
-              transform: { scaleX: 1, scaleY: 1, translateX: EMU(0.5), translateY: EMU(1.5), unit: 'EMU' },
-            },
-          },
-        },
-        ...(body ? [{ insertText: { objectId: bodyId, text: body } }] : []),
       ],
     },
   }, onTokenRefresh);
-  if (!res.ok) throw new Error(`Slides addTextSlide failed: ${res.status}`);
-  return res.json();
+  if (!createRes.ok) throw new Error(`Slides addTextSlide (create) failed: ${createRes.status}`);
+
+  // Step 2: add text boxes with content in a separate batchUpdate
+  const textRequests = [
+    {
+      createShape: {
+        objectId: titleId,
+        shapeType: 'TEXT_BOX',
+        elementProperties: {
+          pageObjectId: slideId,
+          size: {
+            width:  { magnitude: EMU(9), unit: 'EMU' },
+            height: { magnitude: EMU(1), unit: 'EMU' },
+          },
+          transform: { scaleX: 1, scaleY: 1, translateX: EMU(0.5), translateY: EMU(0.3), unit: 'EMU' },
+        },
+      },
+    },
+    ...(title ? [{ insertText: { objectId: titleId, text: title } }] : []),
+    {
+      createShape: {
+        objectId: bodyId,
+        shapeType: 'TEXT_BOX',
+        elementProperties: {
+          pageObjectId: slideId,
+          size: {
+            width:  { magnitude: EMU(9),   unit: 'EMU' },
+            height: { magnitude: EMU(5.5), unit: 'EMU' },
+          },
+          transform: { scaleX: 1, scaleY: 1, translateX: EMU(0.5), translateY: EMU(1.5), unit: 'EMU' },
+        },
+      },
+    },
+    ...(body ? [{ insertText: { objectId: bodyId, text: body } }] : []),
+  ];
+
+  const textRes = await slidesRequest(`${SLIDES_BASE}/${presentationId}:batchUpdate`, {
+    token, method: 'POST',
+    body: { requests: textRequests },
+  }, onTokenRefresh);
+  if (!textRes.ok) throw new Error(`Slides addTextSlide (text) failed: ${textRes.status}`);
+  return textRes.json();
 }
 
 // Send an arbitrary batchUpdate requests array for advanced modifications.

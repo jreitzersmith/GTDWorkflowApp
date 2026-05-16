@@ -73,6 +73,9 @@ function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubm
           <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 20, background: COLORS.surface3, border: `1px solid ${COLORS.border}`, fontSize: 11, color: COLORS.text2, alignSelf: "flex-start" }}>
             <span>✏️</span>
             <span>Updated <strong style={{ color: COLORS.text }}>{msg.updateChip.taskName}</strong> — {msg.updateChip.fields.join(" · ")}</span>
+            {msg.updateChip.url && (
+              <a href={msg.updateChip.url} target="_blank" rel="noreferrer" style={{ color: COLORS.next, textDecoration: 'none', marginLeft: 4 }}>Open ↗</a>
+            )}
           </div>
         )}
       </div>

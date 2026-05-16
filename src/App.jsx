@@ -62,6 +62,7 @@ export default function GTDManager() {
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
   const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId } = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
+  const [reviewDocUrl, setReviewDocUrl] = useState(null);
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
   const { googleToken, googleScope, calendarEnabled, driveEnabled, docsEnabled,
@@ -479,10 +480,10 @@ export default function GTDManager() {
       .map(m => `${m.role === 'user' ? 'You' : 'Coach'}: ${m.text || ''}`.trim())
       .join('\n\n');
     try {
-      const doc = await docsCreateDocument(googleToken, title);
-      if (body) await docsAppendText(googleToken, doc.documentId, body);
-      if (reviewDriveFolderId) await docsMoveToFolder(googleToken, doc.documentId, reviewDriveFolderId);
-      window.open(`https://docs.google.com/document/d/${doc.documentId}/edit`, '_blank');
+      const doc = await docsCreateDocument({ token: googleToken, title });
+      if (body) await docsAppendText({ token: googleToken, documentId: doc.documentId, text: body });
+      if (reviewDriveFolderId) await docsMoveToFolder({ token: googleToken, documentId: doc.documentId, newParentId: reviewDriveFolderId });
+      setReviewDocUrl(`https://docs.google.com/document/d/${doc.documentId}/edit`);
     } catch (err) {
       console.error('saveReviewToDoc failed:', err);
     }
@@ -1466,6 +1467,7 @@ export default function GTDManager() {
                 onSwitchToChat={() => switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.")}
                 onMITSubmit={handleMITSubmit}
                 docsEnabled={docsEnabled}
+                reviewDocUrl={reviewDocUrl}
                 onSaveReviewToDoc={saveReviewToDoc}
               />
             </ErrorBoundary>

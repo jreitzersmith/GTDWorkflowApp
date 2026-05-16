@@ -72,6 +72,7 @@ function CoachPanel({
   categories,
   onUpdatePendingAction,
   docsEnabled,
+  reviewDocUrl,
   onSaveReviewToDoc,
 }) {
   return (
@@ -131,13 +132,16 @@ function CoachPanel({
       </div>
 
       {coachMode === 'review' && docsEnabled && messages.length > 1 && (
-        <div style={{ padding: '5px 14px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+        <div style={{ padding: '5px 14px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <button
             onClick={onSaveReviewToDoc}
             style={{ fontSize: 12, padding: '4px 10px', cursor: 'pointer', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 4, color: COLORS.text }}
           >
             📄 Save to Drive
           </button>
+          {reviewDocUrl && (
+            <a href={reviewDocUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: COLORS.next, textDecoration: 'none' }}>View doc ↗</a>
+          )}
         </div>
       )}
 
@@ -290,6 +294,7 @@ CoachPanel.propTypes = {
   categories:             PropTypes.array,
   onUpdatePendingAction:  PropTypes.func,
   docsEnabled:            PropTypes.bool,
+  reviewDocUrl:           PropTypes.string,
   onSaveReviewToDoc:      PropTypes.func,
 };
 
