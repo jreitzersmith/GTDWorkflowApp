@@ -605,17 +605,30 @@ function useCallAI({
             const sheet = await sheetsCreateSpreadsheet({ token: googleToken, title: sheetTitle });
             const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/edit`;
             const BUCKET_LABELS = { next: 'Next Actions', waiting: 'Waiting For', project: 'Projects', someday: 'Someday/Maybe', inbox: 'Inbox', deferred: 'Deferred' };
+            const NODE_TYPE_LABELS = { category: 'Category', subcategory: 'Subcategory', project: 'Project', subproject: 'Subproject' };
+            const taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
             const activeTasks = tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
-            const headers = [['Task', 'Bucket', 'Priority', 'Location', 'Due Date', 'Effort', 'Notes']];
-            const rows = activeTasks.map(t => [
-              t.text,
-              BUCKET_LABELS[t.bucket] || t.bucket || '',
-              (t.priority || []).join(', '),
-              (t.location || []).join(', '),
-              t.dueDate || '',
-              t.effort || '',
-              t.notes || '',
-            ]);
+            const headers = [['Task', 'Bucket', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Due Date', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes']];
+            const rows = activeTasks.map(t => {
+              const flags = [t.isWaitingFor && 'Waiting For', t.isSomeday && 'Someday'].filter(Boolean).join(', ');
+              const parentName = t.parentId && taskById[t.parentId] ? taskById[t.parentId].text : '';
+              const repeat = t.recurrence ? (typeof t.recurrence === 'string' ? t.recurrence : JSON.stringify(t.recurrence)) : '';
+              return [
+                t.text,
+                BUCKET_LABELS[t.bucket] || t.bucket || '',
+                t.category || '',
+                flags,
+                NODE_TYPE_LABELS[t.nodeType] || t.nodeType || '',
+                parentName,
+                (t.priority || []).join(', '),
+                (t.location || []).join(', '),
+                t.dueDate || '',
+                t.effort || '',
+                t.actualEffort || '',
+                repeat,
+                t.notes || '',
+              ];
+            });
             await sheetsAppendRows({ token: googleToken, spreadsheetId: sheet.spreadsheetId, range: 'Sheet1', values: [...headers, ...rows] });
             updateChip = { taskName: sheetTitle, fields: ['Google Sheet created'], url: sheetUrl };
           } catch (e) { actionError = `\u26a0 Sheet creation failed: ${e.message}`; }
