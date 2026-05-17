@@ -126,20 +126,31 @@ After the user confirms a query and label in Phase 1, call gmail_queue_add to sa
 
 When the user asks you to create or save content as a Google Doc, write the COMPLETE document content in your response (full text, no summaries, no 'see below' shortcuts — write it out in full), then add this line at the very end:
   →ACTION:create-doc|<Document Title>[|task:<task id or title>]
-The document is created from your response text, so everything you write becomes the doc body. Omit the task reference if the user didn't mention a specific task.
+The document is created from your response text, so everything you write becomes the doc body. Omit the task reference if the user didn't mention a specific task. You may also use the filter params listed under create-sheet below (e.g. category:, bucket:) as content-scope hints when the user asks for a doc about a subset of their tasks.
 
 When the user asks you to create a spreadsheet or export their tasks, you MUST end your response with:
-  →ACTION:create-sheet|<Spreadsheet Title>[|after:YYYY-MM-DD][|before:YYYY-MM-DD][|status:done|status:active]
+  →ACTION:create-sheet|<Spreadsheet Title>[|<param>...]
 The spreadsheet is built automatically from the live task list in the app — you do NOT need to list or produce the task data yourself.
-- |after: and |before: filter by task creation date (ISO dates, inclusive). Infer the year from today's date in your task context (e.g. "from Mar-Jun" → after:2026-03-01|before:2026-06-30).
-- |status:done exports only completed tasks. Use this when the user says "completed", "done", or "finished" tasks.
-- |status:active exports only open/active tasks. Use this when the user says "active", "open", or "current" tasks.
-- Omit |status: to include all tasks when a date range is given, or to default to active-only when no date range is given.
+Available filter params (append after the title, separated by |):
+  after:YYYY-MM-DD          — include tasks created on or after this date
+  before:YYYY-MM-DD         — include tasks created on or before this date
+  due_after:YYYY-MM-DD      — include tasks with due date on or after this date
+  due_before:YYYY-MM-DD     — include tasks with due date on or before this date
+  status:done               — completed tasks only ("done", "finished", "completed")
+  status:active             — open/active tasks only ("active", "open", "current")
+  bucket:<name>             — filter to a single bucket (next actions, projects, waiting for, someday maybe, inbox, deferred, done)
+  category:<text>           — partial match on task category (e.g. category:Homelab)
+  priority:<tag>            — partial match on priority tag (e.g. priority:high)
+  location:<tag>            — partial match on location tag (e.g. location:Office)
+  effort:<value>            — partial match on effort estimate (e.g. effort:2h)
+  project:<name or id>      — include a project and all its descendants
+  overdue                   — only tasks whose due date is in the past
+Default: active tasks only when no status or creation-date filter is given. Infer ISO dates from today's date in your task context (e.g. "from Mar-Jun" → after:2026-03-01|before:2026-06-30).
 Always emit the ACTION line for any spreadsheet or export request — never list tasks manually in place of it.
 
 When the user asks you to create a presentation, slides, or PowerPoint, write the slide content in your response as numbered sections separated by '---', each with a '## Slide N: Title' heading followed by bullet points or body text. Then end your response with:
   →ACTION:create-slides|<Presentation Title>
-The slides are parsed from your response, so every '---' separated section with a '## heading' becomes one slide (heading = title, remaining text = body).`,
+The slides are parsed from your response, so every '---' separated section with a '## heading' becomes one slide (heading = title, remaining text = body). You may use the same filter params listed above (category:, bucket:, project:, etc.) as content-scope hints when generating slide content about a subset of tasks.`,
   process: `You are a GTD inbox processor. For each inbox item given to you:
 
 1. Determine if it's actionable. If not actionable, end with: →ACTION:delete

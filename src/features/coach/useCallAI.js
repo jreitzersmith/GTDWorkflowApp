@@ -44,6 +44,91 @@ const MODE_CONTEXT_BUCKETS = {
   calendarEvent:   ['project'],
 };
 
+// Shared task filter — used by create-sheet, create-doc, and create-slides ACTION handlers.
+// parts: pipe-split ACTION parameter array (parts[0] is the title; params start from parts[1])
+// Supported params: after:YYYY-MM-DD  before:YYYY-MM-DD  due_after:YYYY-MM-DD  due_before:YYYY-MM-DD
+//   status:done|active  bucket:<name>  category:<text>  priority:<tag>  location:<tag>
+//   effort:<value>  project:<name or id>  overdue
+function applyTaskFilters(parts, tasks) {
+  var get = function(prefix) {
+    var part = parts.find(function(p) { return p.startsWith(prefix + ':'); });
+    return part ? part.slice(prefix.length + 1).trim() : null;
+  };
+  var has = function(flag) { return parts.some(function(p) { return p.trim() === flag; }); };
+  var afterDate      = get('after');
+  var beforeDate     = get('before');
+  var dueAfter       = get('due_after');
+  var dueBefore      = get('due_before');
+  var statusFilter   = get('status');
+  var categoryFilter = get('category');
+  var bucketFilter   = get('bucket');
+  var priorityFilter = get('priority');
+  var locationFilter = get('location');
+  var effortFilter   = get('effort');
+  var projectFilter  = get('project');
+  var overdueFlag    = has('overdue');
+  var today          = new Date().toISOString().slice(0, 10);
+  var BUCKET_MAP = {
+    'next actions': 'next',   'next': 'next',
+    'projects': 'project',    'project': 'project',
+    'waiting for': 'waiting', 'waiting': 'waiting',
+    'someday maybe': 'someday', 'someday': 'someday',
+    'inbox': 'inbox', 'done': 'done', 'completed': 'done', 'deferred': 'deferred',
+  };
+  var result = tasks.filter(function(t) { return t.bucket !== 'inboxHistory'; });
+  // Status: done=done only, active=active only, no status+no creation-date=active only, no status+date=all
+  if (statusFilter === 'done') {
+    result = result.filter(function(t) { return t.done || t.bucket === 'done'; });
+  } else if (statusFilter === 'active' || (!statusFilter && !afterDate && !beforeDate)) {
+    result = result.filter(function(t) { return !t.done && t.bucket !== 'done'; });
+  }
+  if (bucketFilter) {
+    var bucketKey = BUCKET_MAP[bucketFilter.toLowerCase()] || bucketFilter.toLowerCase();
+    result = result.filter(function(t) { return t.bucket === bucketKey; });
+  }
+  if (afterDate)  result = result.filter(function(t) { return t.created && new Date(t.created).toISOString().slice(0, 10) >= afterDate; });
+  if (beforeDate) result = result.filter(function(t) { return t.created && new Date(t.created).toISOString().slice(0, 10) <= beforeDate; });
+  if (dueAfter)   result = result.filter(function(t) { return t.dueDate && t.dueDate >= dueAfter; });
+  if (dueBefore)  result = result.filter(function(t) { return t.dueDate && t.dueDate <= dueBefore; });
+  if (overdueFlag) result = result.filter(function(t) { return t.dueDate && t.dueDate < today; });
+  if (categoryFilter) {
+    var cat = categoryFilter.toLowerCase();
+    result = result.filter(function(t) { return t.category && t.category.toLowerCase().includes(cat); });
+  }
+  if (priorityFilter) {
+    var pri = priorityFilter.toLowerCase();
+    result = result.filter(function(t) { return (t.priority || []).some(function(p) { return p.toLowerCase().includes(pri); }); });
+  }
+  if (locationFilter) {
+    var loc = locationFilter.toLowerCase();
+    result = result.filter(function(t) { return (t.location || []).some(function(l) { return l.toLowerCase().includes(loc); }); });
+  }
+  if (effortFilter) {
+    var eff = effortFilter.toLowerCase();
+    result = result.filter(function(t) { return t.effort && t.effort.toLowerCase().includes(eff); });
+  }
+  if (projectFilter) {
+    var pf = projectFilter.toLowerCase();
+    var taskById = Object.fromEntries(tasks.map(function(t) { return [t.id, t]; }));
+    var root = tasks.find(function(t) {
+      return t.id === projectFilter ||
+        (t.text && t.text.toLowerCase().includes(pf) && t.childIds && t.childIds.length > 0);
+    });
+    if (root) {
+      var subtreeIds = new Set();
+      var queue = [root.id];
+      while (queue.length) {
+        var qid = queue.shift();
+        subtreeIds.add(qid);
+        var task = taskById[qid];
+        if (task && task.childIds) task.childIds.forEach(function(cid) { queue.push(cid); });
+      }
+      result = result.filter(function(t) { return subtreeIds.has(t.id); });
+    }
+  }
+  return result;
+}
+
 /**
  * Owns the AI fetch loop, all tool-dispatch branches, action-line parsing,
  * the Ollama model list fetcher, and the sendChat convenience wrapper.
@@ -604,27 +689,12 @@ function useCallAI({
           try {
             const sheetParts = sheetLine.slice('\u2192ACTION:create-sheet|'.length).split('|');
             const sheetTitle = (sheetParts[0] || 'Coach Spreadsheet').trim();
-            const afterDate    = (sheetParts.find(p => p.startsWith('after:'))   || '').replace('after:', '').trim()   || null;
-            const beforeDate   = (sheetParts.find(p => p.startsWith('before:'))  || '').replace('before:', '').trim()  || null;
-            const statusFilter = (sheetParts.find(p => p.startsWith('status:'))  || '').replace('status:', '').trim()  || null;
+            const activeTasks = applyTaskFilters(sheetParts, tasks);
             const sheet = await sheetsCreateSpreadsheet({ token: googleToken, title: sheetTitle });
             const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/edit`;
             const BUCKET_LABELS = { next: 'Next Actions', waiting: 'Waiting For', project: 'Projects', someday: 'Someday/Maybe', inbox: 'Inbox', deferred: 'Deferred' };
             const NODE_TYPE_LABELS = { category: 'Category', subcategory: 'Subcategory', project: 'Project', subproject: 'Subproject' };
             const taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
-            // Start with everything except inbox history
-            let activeTasks = tasks.filter(t => t.bucket !== 'inboxHistory');
-            // Apply status filter: done = completed only, active = open only, default = active only (unless date filter widens scope)
-            if (statusFilter === 'done') {
-              activeTasks = activeTasks.filter(t => t.done || t.bucket === 'done');
-            } else if (statusFilter === 'active') {
-              activeTasks = activeTasks.filter(t => !t.done && t.bucket !== 'done');
-            } else if (!afterDate && !beforeDate) {
-              activeTasks = activeTasks.filter(t => !t.done && t.bucket !== 'done');
-            }
-            // else: date filter present with no status filter → include all statuses
-            if (afterDate)  activeTasks = activeTasks.filter(t => t.created && new Date(t.created).toISOString().slice(0, 10) >= afterDate);
-            if (beforeDate) activeTasks = activeTasks.filter(t => t.created && new Date(t.created).toISOString().slice(0, 10) <= beforeDate);
             const headers = [['Task', 'Bucket', 'Status', 'Created Date', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Due Date', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes']];
             const rows = activeTasks.map(t => {
               const flags = [t.isWaitingFor && 'Waiting For', t.isSomeday && 'Someday'].filter(Boolean).join(', ');
