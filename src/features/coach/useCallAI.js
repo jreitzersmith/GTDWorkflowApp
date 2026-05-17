@@ -111,7 +111,7 @@ function useCallAI({
           const counts = Object.entries(BUCKET_LABELS)
             .map(([k, label]) => { const n = tasks.filter(t => t.bucket === k && !t.done).length; return n ? `${label}: ${n}` : null; })
             .filter(Boolean).join(' · ');
-          return `\n\n[Task Overview — ${counts}]\nCall get_task_context to retrieve full task details when needed.`;
+          return `\n\n[Task Overview — Today: ${new Date().toISOString().slice(0, 10)} | ${counts}]\nCall get_task_context to retrieve full task details when needed.`;
         })()
       : `\n\n[Current Task List]\n${getTaskContext(MODE_CONTEXT_BUCKETS[mode] ?? null)}`;
     const systemPrompt = SYSTEM_PROMPTS[mode] + calibCtx + taskContextPart;
@@ -611,10 +611,13 @@ function useCallAI({
             const BUCKET_LABELS = { next: 'Next Actions', waiting: 'Waiting For', project: 'Projects', someday: 'Someday/Maybe', inbox: 'Inbox', deferred: 'Deferred' };
             const NODE_TYPE_LABELS = { category: 'Category', subcategory: 'Subcategory', project: 'Project', subproject: 'Subproject' };
             const taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
-            let activeTasks = tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
-            if (afterDate)  activeTasks = activeTasks.filter(t => t.created && t.created >= afterDate);
+            // When date filters are present, include completed tasks for historical view
+            let activeTasks = (afterDate || beforeDate)
+              ? tasks.filter(t => t.bucket !== 'inboxHistory')
+              : tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
+            if (afterDate)  activeTasks = activeTasks.filter(t => t.created && t.created.slice(0, 10) >= afterDate);
             if (beforeDate) activeTasks = activeTasks.filter(t => t.created && t.created.slice(0, 10) <= beforeDate);
-            const headers = [['Task', 'Bucket', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Due Date', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes']];
+            const headers = [['Task', 'Bucket', 'Status', 'Created Date', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Due Date', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes']];
             const rows = activeTasks.map(t => {
               const flags = [t.isWaitingFor && 'Waiting For', t.isSomeday && 'Someday'].filter(Boolean).join(', ');
               const parentName = t.parentId && taskById[t.parentId] ? taskById[t.parentId].text : '';
@@ -622,6 +625,8 @@ function useCallAI({
               return [
                 t.text,
                 BUCKET_LABELS[t.bucket] || t.bucket || '',
+                t.done ? 'Done' : 'Active',
+                t.created ? t.created.slice(0, 10) : '',
                 t.category || '',
                 flags,
                 NODE_TYPE_LABELS[t.nodeType] || t.nodeType || '',
