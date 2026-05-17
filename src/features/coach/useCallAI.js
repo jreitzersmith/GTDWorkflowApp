@@ -14,7 +14,7 @@ import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateA
   extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction,
   extractCalendarDeleteAction } from '../tasks/taskUtils.jsx';
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
-import { docsCreateDocument, docsAppendText, docsMoveToFolder } from '../../api/docsApi.js';
+import { docsCreateDocument, docsAppendText, docsAppendMarkdown, docsMoveToFolder } from '../../api/docsApi.js';
 import { sheetsCreateSpreadsheet, sheetsAppendRows } from '../../api/sheetsApi.js';
 import { createAndUploadPptx, PPTX_MIME } from '../../api/pptxApi.js';
 
@@ -580,7 +580,8 @@ function useCallAI({
             const taskRef = (parts.find(p => p.startsWith('task:')) || '').replace('task:', '').trim();
             const doc = await docsCreateDocument({ token: googleToken, title: docTitle });
             const bodyText = reply.replace(/\u2192ACTION:[^\n]*/g, '').trim();
-            if (bodyText) await docsAppendText({ token: googleToken, documentId: doc.documentId, text: bodyText });
+            // markdownText kept in scope for future Obsidian export path; Docs receives native formatting
+            if (bodyText) await docsAppendMarkdown({ token: googleToken, documentId: doc.documentId, markdownText: bodyText, onTokenRefresh: refreshGoogleToken });
             const docUrl = `https://docs.google.com/document/d/${doc.documentId}/edit`;
             if (taskRef) {
               const target = tasks.find(t => t.id === taskRef || t.text.toLowerCase() === taskRef.toLowerCase());
