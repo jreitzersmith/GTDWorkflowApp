@@ -615,8 +615,8 @@ function useCallAI({
             let activeTasks = (afterDate || beforeDate)
               ? tasks.filter(t => t.bucket !== 'inboxHistory')
               : tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
-            if (afterDate)  activeTasks = activeTasks.filter(t => t.created && t.created.slice(0, 10) >= afterDate);
-            if (beforeDate) activeTasks = activeTasks.filter(t => t.created && t.created.slice(0, 10) <= beforeDate);
+            if (afterDate)  activeTasks = activeTasks.filter(t => t.created && new Date(t.created).toISOString().slice(0, 10) >= afterDate);
+            if (beforeDate) activeTasks = activeTasks.filter(t => t.created && new Date(t.created).toISOString().slice(0, 10) <= beforeDate);
             const headers = [['Task', 'Bucket', 'Status', 'Created Date', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Due Date', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes']];
             const rows = activeTasks.map(t => {
               const flags = [t.isWaitingFor && 'Waiting For', t.isSomeday && 'Someday'].filter(Boolean).join(', ');
@@ -626,7 +626,7 @@ function useCallAI({
                 t.text,
                 BUCKET_LABELS[t.bucket] || t.bucket || '',
                 t.done ? 'Done' : 'Active',
-                t.created ? t.created.slice(0, 10) : '',
+                t.created ? new Date(t.created).toISOString().slice(0, 10) : '',
                 t.category || '',
                 flags,
                 NODE_TYPE_LABELS[t.nodeType] || t.nodeType || '',
