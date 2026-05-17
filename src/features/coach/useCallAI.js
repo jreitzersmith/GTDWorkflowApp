@@ -597,18 +597,23 @@ function useCallAI({
         }
       }
 
-      // →ACTION:create-sheet|<title> — create Google Sheet from coach
+      // →ACTION:create-sheet|<title>[|after:YYYY-MM-DD][|before:YYYY-MM-DD] — create Google Sheet from coach
       if (googleToken && sheetsEnabled) {
         const sheetLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-sheet|'));
         if (sheetLine) {
           try {
-            const sheetTitle = sheetLine.slice('\u2192ACTION:create-sheet|'.length).trim() || 'Coach Spreadsheet';
+            const sheetParts = sheetLine.slice('\u2192ACTION:create-sheet|'.length).split('|');
+            const sheetTitle = (sheetParts[0] || 'Coach Spreadsheet').trim();
+            const afterDate  = (sheetParts.find(p => p.startsWith('after:'))  || '').replace('after:', '').trim()  || null;
+            const beforeDate = (sheetParts.find(p => p.startsWith('before:')) || '').replace('before:', '').trim() || null;
             const sheet = await sheetsCreateSpreadsheet({ token: googleToken, title: sheetTitle });
             const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/edit`;
             const BUCKET_LABELS = { next: 'Next Actions', waiting: 'Waiting For', project: 'Projects', someday: 'Someday/Maybe', inbox: 'Inbox', deferred: 'Deferred' };
             const NODE_TYPE_LABELS = { category: 'Category', subcategory: 'Subcategory', project: 'Project', subproject: 'Subproject' };
             const taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
-            const activeTasks = tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
+            let activeTasks = tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
+            if (afterDate)  activeTasks = activeTasks.filter(t => t.created && t.created >= afterDate);
+            if (beforeDate) activeTasks = activeTasks.filter(t => t.created && t.created.slice(0, 10) <= beforeDate);
             const headers = [['Task', 'Bucket', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Due Date', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes']];
             const rows = activeTasks.map(t => {
               const flags = [t.isWaitingFor && 'Waiting For', t.isSomeday && 'Someday'].filter(Boolean).join(', ');
