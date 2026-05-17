@@ -15,7 +15,7 @@ import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateA
   extractCalendarDeleteAction } from '../tasks/taskUtils.jsx';
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
 import { docsCreateDocument, docsAppendText, docsAppendMarkdown, docsMoveToFolder } from '../../api/docsApi.js';
-import { sheetsCreateSpreadsheet, sheetsAppendRows } from '../../api/sheetsApi.js';
+import { sheetsCreateSpreadsheet, sheetsAppendRows, sheetsBatchUpdate } from '../../api/sheetsApi.js';
 import { createAndUploadPptx, PPTX_MIME } from '../../api/pptxApi.js';
 
 // Lazy task-retrieval tool — used in chat mode so the full task list isn't
@@ -43,6 +43,60 @@ const MODE_CONTEXT_BUCKETS = {
   projectMetadata: ['project'],
   calendarEvent:   ['project'],
 };
+
+// Parse |tab:<Name>[|params...]|tab:<Name>[|params...] sections from a create-sheet ACTION line.
+// parts[0] = spreadsheet title; remaining parts are tab: separators and filter params.
+// Returns [{ name: string, params: string[] }, ...] — one entry per tab.
+// Falls back to a single Sheet1 tab containing all parts when no tab: markers are present.
+function parseSheetTabs(parts) {
+  var tabs = [];
+  var current = null;
+  for (var i = 1; i < parts.length; i++) {
+    var p = parts[i].trim();
+    if (p.startsWith('tab:')) {
+      if (current) tabs.push(current);
+      current = { name: p.slice(4).trim() || 'Sheet', params: [] };
+    } else if (current) {
+      current.params.push(p);
+    }
+  }
+  if (current) tabs.push(current);
+  if (tabs.length === 0) {
+    tabs.push({ name: 'Sheet1', params: parts.slice(1) });
+  }
+  return tabs;
+}
+
+// Build headers + data rows for a single sheet tab from a filtered task list.
+function buildSheetData(filteredTasks, taskById) {
+  var BUCKET_LABELS = { next: 'Next Actions', waiting: 'Waiting For', project: 'Projects', someday: 'Someday/Maybe', inbox: 'Inbox', deferred: 'Deferred' };
+  var NODE_TYPE_LABELS = { category: 'Category', subcategory: 'Subcategory', project: 'Project', subproject: 'Subproject' };
+  var headers = [['Task', 'Bucket', 'Status', 'Created Date', 'Completed Date', 'Due Date', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes']];
+  var rows = filteredTasks.map(function(t) {
+    var flags = [t.isWaitingFor && 'Waiting For', t.isSomeday && 'Someday'].filter(Boolean).join(', ');
+    var parentName = t.parentId && taskById[t.parentId] ? taskById[t.parentId].text : '';
+    var repeat = t.recurrence ? (typeof t.recurrence === 'string' ? t.recurrence : JSON.stringify(t.recurrence)) : '';
+    return [
+      t.text,
+      BUCKET_LABELS[t.bucket] || t.bucket || '',
+      t.done ? 'Done' : 'Active',
+      t.created ? new Date(t.created).toISOString().slice(0, 10) : '',
+      t.completedDate || '',
+      t.dueDate || '',
+      t.category || '',
+      flags,
+      NODE_TYPE_LABELS[t.nodeType] || t.nodeType || '',
+      parentName,
+      (t.priority || []).join(', '),
+      (t.location || []).join(', '),
+      t.effort || '',
+      t.actualEffort || '',
+      repeat,
+      t.notes || '',
+    ];
+  });
+  return headers.concat(rows);
+}
 
 // Shared task filter — used by create-sheet, create-doc, and create-slides ACTION handlers.
 // parts: pipe-split ACTION parameter array (parts[0] is the title; params start from parts[1])
@@ -689,37 +743,28 @@ function useCallAI({
           try {
             const sheetParts = sheetLine.slice('\u2192ACTION:create-sheet|'.length).split('|');
             const sheetTitle = (sheetParts[0] || 'Coach Spreadsheet').trim();
-            const activeTasks = applyTaskFilters(sheetParts, tasks);
+            const sheetTabs = parseSheetTabs(sheetParts);
             const sheet = await sheetsCreateSpreadsheet({ token: googleToken, title: sheetTitle });
-            const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/edit`;
-            const BUCKET_LABELS = { next: 'Next Actions', waiting: 'Waiting For', project: 'Projects', someday: 'Someday/Maybe', inbox: 'Inbox', deferred: 'Deferred' };
-            const NODE_TYPE_LABELS = { category: 'Category', subcategory: 'Subcategory', project: 'Project', subproject: 'Subproject' };
+            const sheetId = sheet.spreadsheetId;
+            const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
             const taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
-            const headers = [['Task', 'Bucket', 'Status', 'Created Date', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Due Date', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes']];
-            const rows = activeTasks.map(t => {
-              const flags = [t.isWaitingFor && 'Waiting For', t.isSomeday && 'Someday'].filter(Boolean).join(', ');
-              const parentName = t.parentId && taskById[t.parentId] ? taskById[t.parentId].text : '';
-              const repeat = t.recurrence ? (typeof t.recurrence === 'string' ? t.recurrence : JSON.stringify(t.recurrence)) : '';
-              return [
-                t.text,
-                BUCKET_LABELS[t.bucket] || t.bucket || '',
-                t.done ? 'Done' : 'Active',
-                t.created ? new Date(t.created).toISOString().slice(0, 10) : '',
-                t.category || '',
-                flags,
-                NODE_TYPE_LABELS[t.nodeType] || t.nodeType || '',
-                parentName,
-                (t.priority || []).join(', '),
-                (t.location || []).join(', '),
-                t.dueDate || '',
-                t.effort || '',
-                t.actualEffort || '',
-                repeat,
-                t.notes || '',
-              ];
-            });
-            await sheetsAppendRows({ token: googleToken, spreadsheetId: sheet.spreadsheetId, range: 'Sheet1', values: [...headers, ...rows] });
-            updateChip = { taskName: sheetTitle, fields: ['Google Sheet created'], url: sheetUrl };
+            // Rename default Sheet1 tab and create additional tabs in one batchUpdate
+            const batchReqs = [{ updateSheetProperties: { properties: { sheetId: 0, title: sheetTabs[0].name }, fields: 'title' } }];
+            for (var ti = 1; ti < sheetTabs.length; ti++) {
+              batchReqs.push({ addSheet: { properties: { title: sheetTabs[ti].name } } });
+            }
+            await sheetsBatchUpdate({ token: googleToken, spreadsheetId: sheetId, requests: batchReqs });
+            // Populate each tab with filtered task data
+            var totalRows = 0;
+            for (var ti = 0; ti < sheetTabs.length; ti++) {
+              var tab = sheetTabs[ti];
+              var tabTasks = applyTaskFilters(tab.params, tasks);
+              totalRows += tabTasks.length;
+              var tabValues = buildSheetData(tabTasks, taskById);
+              await sheetsAppendRows({ token: googleToken, spreadsheetId: sheetId, range: tab.name, values: tabValues });
+            }
+            var tabsLabel = sheetTabs.length > 1 ? sheetTabs.length + ' tabs, ' + totalRows + ' tasks' : totalRows + ' tasks';
+            updateChip = { taskName: sheetTitle, fields: ['Google Sheet created — ' + tabsLabel], url: sheetUrl };
           } catch (e) { actionError = `\u26a0 Sheet creation failed: ${e.message}`; }
         }
       }

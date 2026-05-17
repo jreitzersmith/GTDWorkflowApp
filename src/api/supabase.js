@@ -64,6 +64,7 @@ function taskToDb(task, userId) {
     category:           task.category       ?? null,
     calendar_event_id:  task.calendarEventId ?? null,
     drive_attachments:  task.driveAttachments ?? [],
+    completed_date:     task.completedDate ?? null,
     reviewed:           task.reviewed ?? false,
     node_type:          task.nodeType ?? null,
     updated_at:         new Date().toISOString(),
@@ -94,6 +95,7 @@ function dbToTask(row) {
     category:          row.category            ?? null,
     calendarEventId:   row.calendar_event_id   ?? null,
     driveAttachments:  row.drive_attachments   ?? [],
+    completedDate:     row.completed_date      ?? null,
     reviewed:          row.reviewed            ?? false,
     nodeType:          row.node_type           ?? null,
   };
