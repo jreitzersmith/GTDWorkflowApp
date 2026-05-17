@@ -78,8 +78,9 @@ When the user asks you to create or save content as a Google Doc, write the COMP
   →ACTION:create-doc|<Document Title>[|task:<task id or title>]
 The document is created from your response text, so everything you write becomes the doc body. Omit the task reference if the user didn't mention a specific task.
 
-When the user asks you to create a spreadsheet, end your response with:
-  →ACTION:create-sheet|<Spreadsheet Title>
+When the user asks you to create a spreadsheet or export their tasks, you MUST end your response with:
+  →ACTION:create-sheet|<Spreadsheet Title>[|after:YYYY-MM-DD][|before:YYYY-MM-DD]
+The spreadsheet is built automatically from the live task list in the app — you do NOT need to list or produce the task data yourself. Include |after: and |before: (ISO dates, inclusive) when the user specifies a date range; these filter tasks by creation date. If the user says "from Mar-Jun" infer after:2026-03-01 and before:2026-06-30. Always emit the ACTION line for any spreadsheet or export request — never list tasks manually in place of it.
 
 When the user asks you to create a presentation, slides, or PowerPoint, write the slide content in your response as numbered sections separated by '---', each with a '## Slide N: Title' heading followed by bullet points or body text. Then end your response with:
   →ACTION:create-slides|<Presentation Title>
