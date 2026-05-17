@@ -117,3 +117,6 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-16 | Feature      | FR#41   | GH#37  | →ACTION:create-doc handler in useCallAI; creates Google Doc from coach output, links to task | ec3c80a |
 | 2026-05-16 | Feature      | FR#43   | GH#39  | →ACTION:create-sheet and →ACTION:create-slides handlers in useCallAI; coach prompt updated | ec3c80a |
 | 2026-05-16 | Feature      | FR#44   | GH#40  | SlidesGenerator component in TaskDetailPanel: slides briefing button on project tasks | ec3c80a |
+| 2026-05-17 | Feature      | —       | —      | pptxApi.js: dark slate theme (DARK_BG/TITLE_BAR palette, cover + content slide builders) | 5b74ede |
+| 2026-05-17 | Feature      | —       | —      | docsApi.js: docsAppendMarkdown — native Docs formatting (headings, bullets, bold/italic via batchUpdate) | 5b74ede |
+| 2026-05-17 | Bug Fix      | Issue#23| GH#108 | create-sheet: AI listed tasks instead of emitting ACTION when date range specified; add applyTaskFilters shared utility with 11 filter params | 14b2a01 |

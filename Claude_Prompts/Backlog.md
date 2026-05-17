@@ -7,7 +7,6 @@
 ## Known issues / remaining work
 
 - [ ] Issue#22 [GH#102] (2026-05-16) — Weekly Review coach ignores "no" response and moves tasks anyway — question guard (currently Process mode only) must be extended to Weekly Review; reinforce in Weekly Review system prompt
-- [ ] Issue#23 [GH#108] (2026-05-17) — Coach lists tasks manually instead of emitting →ACTION:create-sheet when user specifies a date range (e.g. "tasks from Mar-Jun") — fix: add |after:|before: filter syntax to create-sheet ACTION; update system prompt to clarify handler owns the data and MUST always emit the ACTION line
 
 ---
 
