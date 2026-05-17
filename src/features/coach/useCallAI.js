@@ -604,17 +604,25 @@ function useCallAI({
           try {
             const sheetParts = sheetLine.slice('\u2192ACTION:create-sheet|'.length).split('|');
             const sheetTitle = (sheetParts[0] || 'Coach Spreadsheet').trim();
-            const afterDate  = (sheetParts.find(p => p.startsWith('after:'))  || '').replace('after:', '').trim()  || null;
-            const beforeDate = (sheetParts.find(p => p.startsWith('before:')) || '').replace('before:', '').trim() || null;
+            const afterDate    = (sheetParts.find(p => p.startsWith('after:'))   || '').replace('after:', '').trim()   || null;
+            const beforeDate   = (sheetParts.find(p => p.startsWith('before:'))  || '').replace('before:', '').trim()  || null;
+            const statusFilter = (sheetParts.find(p => p.startsWith('status:'))  || '').replace('status:', '').trim()  || null;
             const sheet = await sheetsCreateSpreadsheet({ token: googleToken, title: sheetTitle });
             const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/edit`;
             const BUCKET_LABELS = { next: 'Next Actions', waiting: 'Waiting For', project: 'Projects', someday: 'Someday/Maybe', inbox: 'Inbox', deferred: 'Deferred' };
             const NODE_TYPE_LABELS = { category: 'Category', subcategory: 'Subcategory', project: 'Project', subproject: 'Subproject' };
             const taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
-            // When date filters are present, include completed tasks for historical view
-            let activeTasks = (afterDate || beforeDate)
-              ? tasks.filter(t => t.bucket !== 'inboxHistory')
-              : tasks.filter(t => !t.done && t.bucket !== 'done' && t.bucket !== 'inboxHistory');
+            // Start with everything except inbox history
+            let activeTasks = tasks.filter(t => t.bucket !== 'inboxHistory');
+            // Apply status filter: done = completed only, active = open only, default = active only (unless date filter widens scope)
+            if (statusFilter === 'done') {
+              activeTasks = activeTasks.filter(t => t.done || t.bucket === 'done');
+            } else if (statusFilter === 'active') {
+              activeTasks = activeTasks.filter(t => !t.done && t.bucket !== 'done');
+            } else if (!afterDate && !beforeDate) {
+              activeTasks = activeTasks.filter(t => !t.done && t.bucket !== 'done');
+            }
+            // else: date filter present with no status filter → include all statuses
             if (afterDate)  activeTasks = activeTasks.filter(t => t.created && new Date(t.created).toISOString().slice(0, 10) >= afterDate);
             if (beforeDate) activeTasks = activeTasks.filter(t => t.created && new Date(t.created).toISOString().slice(0, 10) <= beforeDate);
             const headers = [['Task', 'Bucket', 'Status', 'Created Date', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Due Date', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes']];
