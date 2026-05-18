@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { SYSTEM_PROMPTS, OPENWEBUI_URL } from '../../constants.jsx';
-import { TOOLS, doWebSearch, doFetchUrl } from './webSearch.js';
+import { TOOLS, doWebSearch } from './webSearch.js';
 import { GMAIL_SEARCH_TOOL, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL,
   GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL,
   GMAIL_LIST_FILTERS_TOOL, GMAIL_CREATE_FILTER_TOOL, GMAIL_DELETE_FILTER_TOOL,
@@ -351,15 +351,6 @@ function useCallAI({
                 }]);
                 try {
                   const result = await doWebSearch(query);
-                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: result });
-                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
-              } else if (toolUse.name === 'fetch_url') {
-                const url = toolUse.input.url;
-                setMessages(prev => [...prev, {
-                  role: 'assistant', text: `Reading ${url}…`, isSearchChip: true,
-                }]);
-                try {
-                  const result = await doFetchUrl(url);
                   toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: result });
                 } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === 'gmail_search') {
