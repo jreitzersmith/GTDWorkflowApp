@@ -6,6 +6,7 @@ One row per item: date · type · # · GH# · name · commit hash(es).
 When an item is resolved, **remove** it from `Backlog.md` and add a full row here. Close the corresponding GitHub issue via the GitHub MCP.
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
+|------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-18 | Feature | FR#23 | GH#15 | Categories filter dropdown on all main views — shared select in TaskBucketView; replaces Projects-only control; includes "No category assigned" option | ae1d47a8 |
 | 2026-05-18 | Feature | FR#106 | GH#114 | Location filter dropdown on all main views — alongside Categories; filter logic task.location?.includes(); includes "No location assigned" option | ae1d47a8 |
 | 2026-05-18 | Feature | FR#107 | GH#115 | Next Actions groupBy condensed to single select dropdown — replaces ToolbarBtn row; no logic change | ae1d47a8 |
@@ -17,7 +18,6 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-18 | Feature | FR#110 | GH#118 | deferCount field — tracks times deferred; badge in TaskDetailPanel; Deferral frequency chart in Analytics; Supabase migration applied | 551f4c4d |
 | 2026-05-18 | Feature | FR#100 | GH#107 | Task analytics charts — bucket bar chart, 12-week completions, effort accuracy (under/on/over) | c340b001 |
 | 2026-05-18 | Feature | FR#102 | GH#109 | Raw API tool call export as JSON — rawApiThread state, buildJsonExport, 2×2 format grid in ExportPopover | c84a80377 |
-|------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-17 | Feature | FR#90 | GH#95 | Notes field append — notes_append: action field in extractUpdateAction + useCallAI.js | d056665f |
 | 2026-05-17 | Feature | FR#95 | GH#100 | create-sheet column selector — columns: param in parseSheetTabs + buildSheetData | d056665f |
 | 2026-05-15 | Bug Fix | — | — | Magic link hash (#access_token) not processed in useSupabaseAuth — session silently dropped on redirect | c703b1f |
@@ -105,7 +105,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-12 | Bug fix      | Issue#12| GH#32  | Process mode: swap defer→due when user overrides AI deferral assumption                          | a0a3a13           |
 | 2026-05-12 | Bug fix      | Issue#13| GH#33  | Clear stale deferUntil in buildNextOccurrence; prompt omits defer for recurring tasks             | a0a3a13           |
 | 2026-05-12 | Feature      | FR#8    | GH#9   | Inbox group suggestion: fire suggestProjectGroup after session creates 2+ action tasks            | 6a227d3           |
-| 2026-05-12 | Feature      | FR#40   | GH#36  | Gmail email → task linking: attach
+| 2026-05-12 | Feature      | FR#40   | GH#36  | Gmail email → task linking: attach email to task via link-to-task picker | ec0cd31 |
 | 2026-05-13 | Feature      | FR#78   | GH#79  | Link to Task picker uses ProjectTreePicker collapsible tree (EmailInboxPanel)    | 55a7b1a           |
 | 2026-05-13 | Bug Fix      | Issue#18| GH#80  | Remove stale setTaskFilter call in handleLinkToTask; bump confirm timeout 4000ms | b135446           |
 | 2026-05-13 | Feature      | FR#79   | GH#81  | Link to Task picker: Waiting For and Someday/Maybe as collapsible sections       | b135446           |
@@ -134,5 +134,5 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-17 | Feature      | —       | —      | docsApi.js: docsAppendMarkdown — native Docs formatting (headings, bullets, bold/italic via batchUpdate) | 5b74ede |
 | 2026-05-17 | Bug Fix      | Issue#23| GH#108 | create-sheet: AI listed tasks instead of emitting ACTION when date range specified; add applyTaskFilters shared utility with 11 filter params | 14b2a01 |
 | 2026-05-18 | Feature | FR#103 | GH#111 | ExportPopover inline format selector; 'User messages' label unification | 6083b8c9 |
-| 2026-05-| 2026-05-18 | Feature      | FR#98   | GH#104 | Configurable AI coach name and user display name — threaded into all system prompts | 4588ad5 |
+| 2026-05-18 | Feature      | FR#98   | GH#104 | Configurable AI coach name and user display name — threaded into all system prompts | 4588ad5 |
 | 2026-05-18 | Feature      | FR#105  | GH#113 | AI coach get_weather tool (OpenWeatherMap) — current + forecast, userCity default   | f0ec825 |
