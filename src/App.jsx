@@ -59,7 +59,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId, exportSettings, setExportSettings} = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress} = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
@@ -417,6 +417,9 @@ export default function GTDManager() {
     calendarReminderMinutes,
     uncategorizedProjectId,
     exportFormat: exportSettings.format,
+    userCity,
+    userHomeAddress,
+    userWorkAddress,
   });
 
   const switchCoachMode = useCallback((mode, introMsg) => {
@@ -1277,6 +1280,12 @@ export default function GTDManager() {
                           onSetReviewDriveFolderId={setReviewDriveFolderId}
                           exportSettings={exportSettings}
                           onExportSettingsChange={setExportSettings}
+                          userCity={userCity}
+                          onSetUserCity={setUserCity}
+                          userHomeAddress={userHomeAddress}
+                          onSetUserHomeAddress={setUserHomeAddress}
+                          userWorkAddress={userWorkAddress}
+                          onSetUserWorkAddress={setUserWorkAddress}
                         />
                       ) : showUsage ? (
                         <UsagePanel

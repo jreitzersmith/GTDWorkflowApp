@@ -73,7 +73,15 @@ function useAppSettings() {
   });
   useEffect(() => { localStorage.setItem('gtd_export_settings', JSON.stringify(exportSettings)); }, [exportSettings]);
 
-  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId, exportSettings, setExportSettings };
+  // FR#104: user location settings — threaded into AI system prompts
+  const [userCity, setUserCity] = useState(() => localStorage.getItem('gtd_user_city') || '');
+  const [userHomeAddress, setUserHomeAddress] = useState(() => localStorage.getItem('gtd_user_home_address') || '');
+  const [userWorkAddress, setUserWorkAddress] = useState(() => localStorage.getItem('gtd_user_work_address') || '');
+  useEffect(() => { localStorage.setItem('gtd_user_city', userCity); }, [userCity]);
+  useEffect(() => { localStorage.setItem('gtd_user_home_address', userHomeAddress); }, [userHomeAddress]);
+  useEffect(() => { localStorage.setItem('gtd_user_work_address', userWorkAddress); }, [userWorkAddress]);
+
+  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress };
 }
 
 

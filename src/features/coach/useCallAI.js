@@ -229,6 +229,9 @@ function useCallAI({
   calendarReminderMinutes,
   uncategorizedProjectId,
   exportFormat,
+  userCity,
+  userHomeAddress,
+  userWorkAddress,
 }) {
   const fetchModels = useCallback(async () => {
     try {
@@ -268,7 +271,13 @@ function useCallAI({
           return `\n\n[Task Overview — Today: ${new Date().toISOString().slice(0, 10)} | ${counts}]\nCall get_task_context to retrieve full task details when needed.`;
         })()
       : `\n\n[Current Task List]\n${getTaskContext(MODE_CONTEXT_BUCKETS[mode] ?? null)}`;
-    const systemPrompt = SYSTEM_PROMPTS[mode] + calibCtx + taskContextPart;
+    const _locParts = [
+      userCity ? 'City: ' + userCity : null,
+      userHomeAddress ? 'Home address: ' + userHomeAddress : null,
+      userWorkAddress ? 'Work address: ' + userWorkAddress : null,
+    ].filter(Boolean);
+    const locationCtx = _locParts.length ? '\n\n[User Location]\n' + _locParts.join('\n') : '';
+    const systemPrompt = SYSTEM_PROMPTS[mode] + calibCtx + locationCtx + taskContextPart;
     let inputLogSet = false;
     const newHistory = [...history, { role: 'user', content: userMsg }];
 
@@ -922,7 +931,7 @@ function useCallAI({
   }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel,
       googleToken, googleScope, calendarEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
       setCalendarEvents, recordUsage, setLastInputLog, setTasks, setGmailQueue,
-      setMessages, setChatHistory, setLoading, setPendingAction, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+      setMessages, setChatHistory, setLoading, setPendingAction, authUser, userCity, userHomeAddress, userWorkAddress]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();

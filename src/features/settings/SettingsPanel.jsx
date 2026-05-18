@@ -92,6 +92,9 @@ function SettingsPanel({
   recurringReviewDays, onSetRecurringReviewDays,
   reviewDriveFolderId, onSetReviewDriveFolderId,
   calendarReminderMinutes, onSetCalendarReminderMinutes,
+  userCity, onSetUserCity,
+  userHomeAddress, onSetUserHomeAddress,
+  userWorkAddress, onSetUserWorkAddress,
   exportSettings, onExportSettingsChange,
 }) {
   const fileInputRef = useRef(null);
@@ -472,6 +475,27 @@ function SettingsPanel({
           )}
         </SettingsSection>
 
+        <SettingsSection label="Your location" storageKey="gtd_settings_location">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12, lineHeight: 1.5 }}>
+            Used by the AI coach for location-aware suggestions. Leave blank to omit location context.
+          </div>
+          {[
+            { label: 'City', value: userCity, setter: onSetUserCity, placeholder: 'e.g. Boston' },
+            { label: 'Home address', value: userHomeAddress, setter: onSetUserHomeAddress, placeholder: 'e.g. 123 Main St, Boston MA' },
+            { label: 'Work address', value: userWorkAddress, setter: onSetUserWorkAddress, placeholder: 'e.g. 456 Office Park, Cambridge MA' },
+          ].map(({ label, value, setter, placeholder }) => (
+            <div key={label} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 5 }}>{label}</div>
+              <input
+                value={value || ''}
+                onChange={e => setter(e.target.value)}
+                placeholder={placeholder}
+                style={{ width: '100%', padding: '4px 8px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text, fontFamily: 'inherit', fontSize: 12, boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+          ))}
+        </SettingsSection>
+
         <SettingsSection label="Backup & Restore" storageKey="gtd_settings_backup">
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 14, lineHeight: 1.5 }}>
             Export all tasks, locations, and effort labels to a JSON file.{" "}
@@ -543,6 +567,12 @@ SettingsPanel.propTypes = {
   onSetReviewDriveFolderId:   PropTypes.func.isRequired,
   exportSettings:             PropTypes.object,
   onExportSettingsChange:     PropTypes.func,
+  userCity:                   PropTypes.string,
+  onSetUserCity:              PropTypes.func.isRequired,
+  userHomeAddress:            PropTypes.string,
+  onSetUserHomeAddress:       PropTypes.func.isRequired,
+  userWorkAddress:            PropTypes.string,
+  onSetUserWorkAddress:       PropTypes.func.isRequired,
 };
 
 export { SettingsPanel };
