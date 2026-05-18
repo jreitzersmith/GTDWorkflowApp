@@ -14,6 +14,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-18 | Feature | FR#59 | GH#58 | AI coach drive_search tool — DRIVE_SEARCH_TOOL in useCallAI.js; plain-text query normalisation | 91a61fbf |
 | 2026-05-18 | Feature | FR#99 | GH#105 | AI coach get_drive_file tool — GET_DRIVE_FILE_TOOL; exports Docs/Sheets/Slides content as text for chat context | 91a61fbf |
 | 2026-05-18 | Feature | FR#104 | GH#112 | User location settings — city/home/work in Settings; [User Location] injected into all AI system prompts | 131675e3 |
+| 2026-05-18 | Feature | FR#110 | GH#118 | deferCount field — tracks times deferred; badge in TaskDetailPanel; Deferral frequency chart in Analytics; Supabase migration applied | 551f4c4d |
 | 2026-05-18 | Feature | FR#100 | GH#107 | Task analytics charts — bucket bar chart, 12-week completions, effort accuracy (under/on/over) | c340b001 |
 | 2026-05-18 | Feature | FR#102 | GH#109 | Raw API tool call export as JSON — rawApiThread state, buildJsonExport, 2×2 format grid in ExportPopover | c84a80377 |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
