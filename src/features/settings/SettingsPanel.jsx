@@ -92,6 +92,7 @@ function SettingsPanel({
   recurringReviewDays, onSetRecurringReviewDays,
   reviewDriveFolderId, onSetReviewDriveFolderId,
   calendarReminderMinutes, onSetCalendarReminderMinutes,
+  exportSettings, onExportSettingsChange,
 }) {
   const fileInputRef = useRef(null);
   const [importMode, setImportMode] = useState("replace");
@@ -421,6 +422,55 @@ function SettingsPanel({
             onClearOverride={onClearCalibrationOverride}
           />
         </SettingsSection>
+        <SettingsSection label="Conversation Export" storageKey="gtd_settings_export">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12, lineHeight: 1.5 }}>
+            Default settings for the coach conversation export. Use the Export button in the AI Coach header to export at any time.
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 6 }}>Default format</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[
+                { value: 'docs',     label: 'Google Docs' },
+                { value: 'markdown', label: 'Markdown' },
+                { value: 'text',     label: 'Plain text' },
+              ].map(({ value, label }) => {
+                const active = (exportSettings || {}).format === value;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => onExportSettingsChange(prev => ({ ...prev, format: value }))}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid ' + (active ? COLORS.next : COLORS.border), background: active ? COLORS.next + '22' : 'transparent', color: active ? COLORS.next : COLORS.text2, fontFamily: 'inherit', fontSize: 12, cursor: 'pointer' }}
+                  >{label}</button>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 6 }}>Default content</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                { key: 'userMessages', label: 'Your messages' },
+                { key: 'aiResponses',  label: 'AI responses' },
+                { key: 'toolChips',    label: 'Tool & search activity' },
+                { key: 'metadata',     label: 'Session metadata' },
+              ].map(({ key, label }) => (
+                <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: COLORS.text, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!((exportSettings || {}).include || {})[key]}
+                    onChange={e => onExportSettingsChange(prev => ({
+                      ...prev,
+                      include: { ...(prev.include || {}), [key]: e.target.checked },
+                    }))}
+                    style={{ accentColor: COLORS.next, width: 14, height: 14 }}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+        </SettingsSection>
+
         <SettingsSection label="Backup & Restore" storageKey="gtd_settings_backup">
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 14, lineHeight: 1.5 }}>
             Export all tasks, locations, and effort labels to a JSON file.{" "}
@@ -490,6 +540,8 @@ SettingsPanel.propTypes = {
   onSetReviewNodeTypes:       PropTypes.func.isRequired,
   reviewDriveFolderId:        PropTypes.string,
   onSetReviewDriveFolderId:   PropTypes.func.isRequired,
+  exportSettings:             PropTypes.object,
+  onExportSettingsChange:     PropTypes.func,
 };
 
 export { SettingsPanel };

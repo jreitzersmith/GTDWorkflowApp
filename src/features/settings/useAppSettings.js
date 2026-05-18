@@ -63,7 +63,17 @@ function useAppSettings() {
   );
   useEffect(() => { localStorage.setItem('gtd_review_drive_folder_id', reviewDriveFolderId); }, [reviewDriveFolderId]);
 
-  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId };
+  const [exportSettings, setExportSettings] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('gtd_export_settings') || 'null') || {
+        format: 'docs',
+        include: { userMessages: true, aiResponses: true, toolChips: true, metadata: true },
+      };
+    } catch { return { format: 'docs', include: { userMessages: true, aiResponses: true, toolChips: true, metadata: true } }; }
+  });
+  useEffect(() => { localStorage.setItem('gtd_export_settings', JSON.stringify(exportSettings)); }, [exportSettings]);
+
+  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId, exportSettings, setExportSettings };
 }
 
 

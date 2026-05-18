@@ -11,6 +11,7 @@ import { ProjectGroupSuggestionBar } from "../tasks/InboxBars.jsx";
 import { ResizeHandle } from "../../shared/ResizeHandle.jsx";
 import { ToolbarBtn } from "../../shared/SidebarComponents.jsx";
 import { fmtTokens, fmtCost } from "../settings/useAIUsageTracking.js";
+import { ExportPopover } from "./ExportPopover.jsx";
 
 function CoachPanel({
   coachHeight,
@@ -74,6 +75,9 @@ function CoachPanel({
   docsEnabled,
   reviewDocUrl,
   onSaveReviewToDoc,
+  exportSettings,
+  onExportSettingsChange,
+  googleToken,
 }) {
   return (
     <div style={{ height: coachHeight, display: "flex", flexDirection: "column", flexShrink: 0 }}>
@@ -129,6 +133,19 @@ function CoachPanel({
             </div>
           );
         })()}
+        {messages.length > 1 && exportSettings && (
+          <div style={{ marginLeft: 'auto' }}>
+            <ExportPopover
+              messages={messages}
+              coachMode={coachMode}
+              tasks={tasks}
+              exportSettings={exportSettings}
+              onExportSettingsChange={onExportSettingsChange}
+              googleToken={googleToken}
+              docsEnabled={docsEnabled}
+            />
+          </div>
+        )}
       </div>
 
       {coachMode === 'review' && docsEnabled && messages.length > 1 && (
@@ -296,6 +313,9 @@ CoachPanel.propTypes = {
   docsEnabled:            PropTypes.bool,
   reviewDocUrl:           PropTypes.string,
   onSaveReviewToDoc:      PropTypes.func,
+  exportSettings:         PropTypes.object,
+  onExportSettingsChange: PropTypes.func,
+  googleToken:            PropTypes.string,
 };
 
 export { CoachPanel };

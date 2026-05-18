@@ -60,7 +60,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId } = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId, exportSettings, setExportSettings } = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const [reviewDocUrl, setReviewDocUrl] = useState(null);
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
@@ -1287,6 +1287,8 @@ export default function GTDManager() {
                           onSetCalendarReminderMinutes={setCalendarReminderMinutes}
                           reviewDriveFolderId={reviewDriveFolderId}
                           onSetReviewDriveFolderId={setReviewDriveFolderId}
+                          exportSettings={exportSettings}
+                          onExportSettingsChange={setExportSettings}
                         />
                       ) : showUsage ? (
                         <UsagePanel
@@ -1469,6 +1471,9 @@ export default function GTDManager() {
                 docsEnabled={docsEnabled}
                 reviewDocUrl={reviewDocUrl}
                 onSaveReviewToDoc={saveReviewToDoc}
+                exportSettings={exportSettings}
+                onExportSettingsChange={setExportSettings}
+                googleToken={googleToken}
               />
             </ErrorBoundary>
           </div>
