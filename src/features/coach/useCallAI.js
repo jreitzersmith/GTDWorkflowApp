@@ -774,7 +774,9 @@ function useCallAI({
         const slidesLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-slides|'));
         if (slidesLine) {
           try {
-            const slidesTitle = slidesLine.slice('\u2192ACTION:create-slides|'.length).trim() || 'Coach Presentation';
+            const slidesParts = slidesLine.slice('\u2192ACTION:create-slides|'.length).split('|');
+            const slidesTitle = (slidesParts[0] || 'Coach Presentation').trim();
+            const slidesTheme = (slidesParts.find(function(p) { return p.startsWith('template:'); }) || '').replace('template:', '').trim() || 'dark-slate';
             // Parse slide sections: split on --- dividers, ## heading = title, rest = body
             const parsedSlides = reply.split(/\n?---\n?/)
               .map(function(section) {
@@ -791,6 +793,7 @@ function useCallAI({
               token: googleToken,
               title: slidesTitle,
               slides: parsedSlides,
+              theme: slidesTheme,
             });
             const fieldLabel = slideCount > 0 ? slideCount + ' slides' : 'PowerPoint created';
             updateChip = { taskName: result.fileName, fields: [fieldLabel], url: result.webViewLink };

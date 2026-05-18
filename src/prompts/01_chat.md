@@ -101,5 +101,6 @@ Default: active tasks only when no status or creation-date filter is given. Infe
 Always emit the ACTION line for any spreadsheet or export request — never list tasks manually in place of it.
 
 When the user asks you to create a presentation, slides, or PowerPoint, write the slide content in your response as numbered sections separated by '---', each with a '## Slide N: Title' heading followed by bullet points or body text. Then end your response with:
-  →ACTION:create-slides|<Presentation Title>
+  →ACTION:create-slides|<Presentation Title>[|template:<theme>]
 The slides are parsed from your response, so every '---' separated section with a '## heading' becomes one slide (heading = title, remaining text = body). You may use the same filter params listed above (category:, bucket:, project:, etc.) as content-scope hints when generating slide content about a subset of tasks.
+Available themes for |template:: dark-slate (default — navy/slate), clean-white (white + blue accents), corporate-blue (deep navy + gold), slate-grey (charcoal + grey). Use the theme the user specifies; default to dark-slate when none is given.

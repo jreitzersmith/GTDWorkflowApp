@@ -7,95 +7,251 @@ import { driveUploadFile } from './driveApi.js';
 
 export const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
-// ── Dark slate palette ────────────────────────────────────────────────────────
-const DARK_BG    = '1E2235';  // cover slide background (dark navy)
-const TITLE_BAR  = '2D3142';  // content slide title bar
-const WHITE      = 'FFFFFF';  // text on dark backgrounds
-const LIGHT_TEXT = 'B8C1CC';  // secondary text on cover
-const BODY_BG    = 'F4F5F7';  // content slide background (near-white)
-const BODY_TEXT  = '2D3142';  // body text on light background
-const FONT       = 'Calibri';
+// ── Template registry ─────────────────────────────────────────────────────────
+//
+// Each template exposes two functions:
+//   addCover(pptx, title, subtitle) — cover/title slide (slides[0])
+//   addContent(pptx, title, body)  — content slides (slides[1..n])
+//
+// Available templates: dark-slate (default), clean-white, corporate-blue, slate-grey
+//
+// Slide canvas: LAYOUT_WIDE = 10" × 5.625" (16:9)
 
-// ── Slide builders ────────────────────────────────────────────────────────────
+const TEMPLATES = {
 
-// First slide: full dark background, large centered title, optional subtitle.
-function addCoverSlide(pptx, title, subtitle) {
-  const s = pptx.addSlide();
-  s.background = { color: DARK_BG };
+  // ── Dark Slate ──────────────────────────────────────────────────────────────
+  // Navy cover with blue accent rule; near-white content slides with dark title bar.
+  'dark-slate': {
+    addCover(pptx, title, subtitle) {
+      const s = pptx.addSlide();
+      s.background = { color: '1E2235' };
+      s.addText(title || '', {
+        x: 0.6, y: 1.1, w: 8.8, h: 1.8,
+        fontSize: 34, bold: true, color: 'FFFFFF',
+        fontFace: 'Calibri', wrap: true, valign: 'bottom', align: 'left',
+      });
+      // Accent rule
+      s.addText('', {
+        x: 0.6, y: 3.05, w: 8.8, h: 0.06,
+        fill: { color: '4A6FA5' }, line: { color: '4A6FA5', width: 0 },
+      });
+      if (subtitle) {
+        s.addText(subtitle, {
+          x: 0.6, y: 3.2, w: 8.8, h: 2.0,
+          fontSize: 14, color: 'B8C1CC',
+          fontFace: 'Calibri', wrap: true, valign: 'top', align: 'left',
+        });
+      }
+    },
+    addContent(pptx, title, body) {
+      const s = pptx.addSlide();
+      s.background = { color: 'F4F5F7' };
+      s.addText(title || '', {
+        x: 0, y: 0, w: 10, h: 1.25,
+        fill: { color: '2D3142' }, line: { color: '2D3142', width: 0 },
+        fontSize: 22, bold: true, color: 'FFFFFF',
+        fontFace: 'Calibri', wrap: true, valign: 'middle', margin: 0.3, align: 'left',
+      });
+      if (body) {
+        s.addText(body, {
+          x: 0.5, y: 1.45, w: 9.0, h: 3.8,
+          fontSize: 13, color: '2D3142',
+          fontFace: 'Calibri', wrap: true, valign: 'top', align: 'left',
+        });
+      }
+    },
+  },
 
-  s.addText(title || '', {
-    x: 0.6, y: 1.1, w: 8.8, h: 1.6,
-    fontSize: 34, bold: true, color: WHITE,
-    fontFace: FONT, wrap: true, valign: 'bottom',
-    align: 'left',
-  });
+  // ── Clean White ─────────────────────────────────────────────────────────────
+  // All-white slides with a bright-blue top strip and minimal accent lines.
+  // Professional and modern; works well for data-heavy or text-light decks.
+  'clean-white': {
+    addCover(pptx, title, subtitle) {
+      const s = pptx.addSlide();
+      s.background = { color: 'FFFFFF' };
+      // Blue top strip
+      s.addText('', {
+        x: 0, y: 0, w: 10, h: 0.18,
+        fill: { color: '2563EB' }, line: { color: '2563EB', width: 0 },
+      });
+      s.addText(title || '', {
+        x: 0.7, y: 1.1, w: 8.6, h: 1.8,
+        fontSize: 36, bold: true, color: '111827',
+        fontFace: 'Calibri', wrap: true, valign: 'bottom', align: 'left',
+      });
+      // Short accent rule under title
+      s.addText('', {
+        x: 0.7, y: 3.05, w: 2.8, h: 0.06,
+        fill: { color: '2563EB' }, line: { color: '2563EB', width: 0 },
+      });
+      if (subtitle) {
+        s.addText(subtitle, {
+          x: 0.7, y: 3.25, w: 8.6, h: 2.0,
+          fontSize: 14, color: '6B7280',
+          fontFace: 'Calibri', wrap: true, valign: 'top', align: 'left',
+        });
+      }
+    },
+    addContent(pptx, title, body) {
+      const s = pptx.addSlide();
+      s.background = { color: 'FFFFFF' };
+      // Blue top strip
+      s.addText('', {
+        x: 0, y: 0, w: 10, h: 0.12,
+        fill: { color: '2563EB' }, line: { color: '2563EB', width: 0 },
+      });
+      s.addText(title || '', {
+        x: 0.5, y: 0.22, w: 9.0, h: 0.85,
+        fontSize: 24, bold: true, color: '111827',
+        fontFace: 'Calibri', wrap: true, valign: 'middle', align: 'left',
+      });
+      // Hairline divider under title
+      s.addText('', {
+        x: 0.5, y: 1.12, w: 9.0, h: 0.04,
+        fill: { color: 'E5E7EB' }, line: { color: 'E5E7EB', width: 0 },
+      });
+      if (body) {
+        s.addText(body, {
+          x: 0.5, y: 1.28, w: 9.0, h: 4.0,
+          fontSize: 13, color: '374151',
+          fontFace: 'Calibri', wrap: true, valign: 'top', align: 'left',
+        });
+      }
+    },
+  },
 
-  // Thin accent rule
-  s.addText('', {
-    x: 0.6, y: 2.85, w: 8.8, h: 0.05,
-    fill: { color: '4A6FA5' },
-    line: { color: '4A6FA5', width: 0 },
-  });
+  // ── Corporate Blue ──────────────────────────────────────────────────────────
+  // Deep navy cover with a gold accent; white content slides with navy title bar
+  // and a gold accent stripe beneath it. Classic enterprise look.
+  'corporate-blue': {
+    addCover(pptx, title, subtitle) {
+      const s = pptx.addSlide();
+      s.background = { color: '0A2D6E' };
+      // Gold top stripe
+      s.addText('', {
+        x: 0, y: 0, w: 10, h: 0.14,
+        fill: { color: 'C9A84C' }, line: { color: 'C9A84C', width: 0 },
+      });
+      s.addText(title || '', {
+        x: 0.7, y: 1.1, w: 8.6, h: 1.8,
+        fontSize: 34, bold: true, color: 'FFFFFF',
+        fontFace: 'Calibri', wrap: true, valign: 'bottom', align: 'left',
+      });
+      // Gold accent rule under title
+      s.addText('', {
+        x: 0.7, y: 3.05, w: 3.2, h: 0.06,
+        fill: { color: 'C9A84C' }, line: { color: 'C9A84C', width: 0 },
+      });
+      if (subtitle) {
+        s.addText(subtitle, {
+          x: 0.7, y: 3.25, w: 8.6, h: 2.0,
+          fontSize: 14, color: 'B8CCE4',
+          fontFace: 'Calibri', wrap: true, valign: 'top', align: 'left',
+        });
+      }
+    },
+    addContent(pptx, title, body) {
+      const s = pptx.addSlide();
+      s.background = { color: 'FFFFFF' };
+      // Navy title bar
+      s.addText(title || '', {
+        x: 0, y: 0, w: 10, h: 1.2,
+        fill: { color: '0A2D6E' }, line: { color: '0A2D6E', width: 0 },
+        fontSize: 22, bold: true, color: 'FFFFFF',
+        fontFace: 'Calibri', wrap: true, valign: 'middle', margin: 0.35, align: 'left',
+      });
+      // Gold accent stripe beneath title bar
+      s.addText('', {
+        x: 0, y: 1.2, w: 10, h: 0.07,
+        fill: { color: 'C9A84C' }, line: { color: 'C9A84C', width: 0 },
+      });
+      if (body) {
+        s.addText(body, {
+          x: 0.5, y: 1.42, w: 9.0, h: 3.85,
+          fontSize: 13, color: '1F2937',
+          fontFace: 'Calibri', wrap: true, valign: 'top', align: 'left',
+        });
+      }
+    },
+  },
 
-  if (subtitle) {
-    s.addText(subtitle, {
-      x: 0.6, y: 3.0, w: 8.8, h: 2.0,
-      fontSize: 14, color: LIGHT_TEXT,
-      fontFace: FONT, wrap: true, valign: 'top',
-      align: 'left',
-    });
-  }
-}
-
-// Subsequent slides: light background, dark title bar at top, body text below.
-function addContentSlide(pptx, title, body) {
-  const s = pptx.addSlide();
-  s.background = { color: BODY_BG };
-
-  // Title bar — filled text box spanning full width
-  s.addText(title || '', {
-    x: 0, y: 0, w: 10, h: 1.25,
-    fill: { color: TITLE_BAR },
-    line: { color: TITLE_BAR, width: 0 },
-    fontSize: 22, bold: true, color: WHITE,
-    fontFace: FONT, wrap: true, valign: 'middle',
-    margin: 0.3, align: 'left',
-  });
-
-  if (body) {
-    s.addText(body, {
-      x: 0.5, y: 1.45, w: 9.0, h: 3.8,
-      fontSize: 13, color: BODY_TEXT,
-      fontFace: FONT, wrap: true, valign: 'top',
-      align: 'left',
-    });
-  }
-}
+  // ── Slate Grey ──────────────────────────────────────────────────────────────
+  // Charcoal cover with a cool-grey accent; very light grey content slides with
+  // a mid-grey title bar. Neutral and clean; suits internal or technical decks.
+  'slate-grey': {
+    addCover(pptx, title, subtitle) {
+      const s = pptx.addSlide();
+      s.background = { color: '2C2C2C' };
+      // Grey top strip
+      s.addText('', {
+        x: 0, y: 0, w: 10, h: 0.14,
+        fill: { color: '9CA3AF' }, line: { color: '9CA3AF', width: 0 },
+      });
+      s.addText(title || '', {
+        x: 0.7, y: 1.1, w: 8.6, h: 1.8,
+        fontSize: 34, bold: true, color: 'FFFFFF',
+        fontFace: 'Calibri', wrap: true, valign: 'bottom', align: 'left',
+      });
+      // Mid-grey accent rule
+      s.addText('', {
+        x: 0.7, y: 3.05, w: 8.6, h: 0.05,
+        fill: { color: '6B7280' }, line: { color: '6B7280', width: 0 },
+      });
+      if (subtitle) {
+        s.addText(subtitle, {
+          x: 0.7, y: 3.25, w: 8.6, h: 2.0,
+          fontSize: 14, color: 'D1D5DB',
+          fontFace: 'Calibri', wrap: true, valign: 'top', align: 'left',
+        });
+      }
+    },
+    addContent(pptx, title, body) {
+      const s = pptx.addSlide();
+      s.background = { color: 'F3F4F6' };
+      s.addText(title || '', {
+        x: 0, y: 0, w: 10, h: 1.25,
+        fill: { color: '374151' }, line: { color: '374151', width: 0 },
+        fontSize: 22, bold: true, color: 'FFFFFF',
+        fontFace: 'Calibri', wrap: true, valign: 'middle', margin: 0.3, align: 'left',
+      });
+      if (body) {
+        s.addText(body, {
+          x: 0.5, y: 1.45, w: 9.0, h: 3.8,
+          fontSize: 13, color: '1F2937',
+          fontFace: 'Calibri', wrap: true, valign: 'top', align: 'left',
+        });
+      }
+    },
+  },
+};
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 // Build and upload a PowerPoint presentation to Google Drive.
 //
 // slides: Array<{ title: string, body?: string }>
-//   slides[0] is rendered as the cover slide (dark full-bleed background).
-//   slides[1..n] are content slides (light background + dark title bar).
+//   slides[0] is rendered as the cover slide.
+//   slides[1..n] are content slides.
+// theme: one of 'dark-slate' (default), 'clean-white', 'corporate-blue', 'slate-grey'
 // Returns { fileId, fileName, webViewLink, mimeType }
 export async function createAndUploadPptx({
   token,
   title = 'Presentation',
   slides = [],
   folderId,
+  theme = 'dark-slate',
   onTokenRefresh,
 } = {}) {
+  const tmpl = TEMPLATES[theme] || TEMPLATES['dark-slate'];
   const pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE'; // 16:9, 10" x 5.625"
 
   for (let i = 0; i < slides.length; i++) {
     const slide = slides[i];
     if (i === 0) {
-      addCoverSlide(pptx, slide.title || title, slide.body || '');
+      tmpl.addCover(pptx, slide.title || title, slide.body || '');
     } else {
-      addContentSlide(pptx, slide.title, slide.body);
+      tmpl.addContent(pptx, slide.title, slide.body);
     }
   }
 
