@@ -24,13 +24,11 @@
 
 #### Daily workflow / GTD core
 
-- [ ] FR#90 [GH#95] (2026-05-15) — Notes field append vs replace — add `notes_append:<text>` action field so AI can append to existing notes rather than always replacing; implement in extractUpdateAction + useCallAI.js
 
 #### Inbox / processing improvements
 
 #### Integrations / data
 
-- [ ] FR#95 [GH#100] (2026-05-16) — create-sheet: allow AI to specify columns via ACTION line (`→ACTION:create-sheet|<title>|columns:<col1,...>`); fixed default set as fallback
 - [ ] FR#96 [GH#101] (2026-05-16) — Drive target folder settings per action type — settings UI to configure destination Drive folder for each action (create-doc, create-sheet, create-slides, save-review-to-doc); uses existing `reviewDriveFolderId` pattern generalised to all Drive-creating actions
 - [ ] FR#97 [GH#103] (2026-05-16) — Save-to-Drive: output format selector (prose/JSON/markdown) + timestamp + mode in filename — settings option; applies to Weekly Review saves and coach create-doc handler
 - [ ] FR#98 [GH#104] (2026-05-16) — Settings: configurable AI Coach name and user display name — defaults to "Coach" and Google account name; threaded into all system prompts

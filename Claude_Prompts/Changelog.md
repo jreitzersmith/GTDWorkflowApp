@@ -7,6 +7,8 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
+| 2026-05-17 | Feature | FR#90 | GH#95 | Notes field append — notes_append: action field in extractUpdateAction + useCallAI.js | d056665f |
+| 2026-05-17 | Feature | FR#95 | GH#100 | create-sheet column selector — columns: param in parseSheetTabs + buildSheetData | d056665f |
 | 2026-05-15 | Bug Fix | — | — | Magic link hash (#access_token) not processed in useSupabaseAuth — session silently dropped on redirect | c703b1f |
 | 2026-05-15 | Bug Fix | — | — | Gmail rules race condition — Rules panel fetched from Gmail before Supabase read settled | c8e49051 |
 | 2026-05-15 | Feature | FR#25 | GH#11 | Gmail rules persistence — user_settings.gmail_rules JSONB, Supabase read/write in useGmailRulesCache | 7bde4dc |
