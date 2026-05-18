@@ -6,6 +6,9 @@ One row per item: date · type · # · GH# · name · commit hash(es).
 When an item is resolved, **remove** it from `Backlog.md` and add a full row here. Close the corresponding GitHub issue via the GitHub MCP.
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
+| 2026-05-18 | Feature | FR#96 | GH#101 | Drive folder settings per action type — DriveFolderPicker (custom modal browser, path labels, backup folder), Backup to Drive button, Conversation Export destination display | 91a61fbf |
+| 2026-05-18 | Feature | FR#59 | GH#58 | AI coach drive_search tool — DRIVE_SEARCH_TOOL in useCallAI.js; plain-text query normalisation | 91a61fbf |
+| 2026-05-18 | Feature | FR#99 | GH#105 | AI coach get_drive_file tool — GET_DRIVE_FILE_TOOL; exports Docs/Sheets/Slides content as text for chat context | 91a61fbf |
 | 2026-05-18 | Feature | FR#104 | GH#112 | User location settings — city/home/work in Settings; [User Location] injected into all AI system prompts | 131675e3 |
 | 2026-05-18 | Feature | FR#102 | GH#109 | Raw API tool call export as JSON — rawApiThread state, buildJsonExport, 2×2 format grid in ExportPopover | c84a80377 |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
