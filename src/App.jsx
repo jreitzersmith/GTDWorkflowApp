@@ -1416,6 +1416,7 @@ export default function GTDManager() {
                           onStartProjectReview={startProjectReview}
                           onBulkAssign={bulkAssignToProject}
                           categories={categories}
+                          locations={locations}
                           projectCategoryFilter={projectCategoryFilter}
                           setProjectCategoryFilter={setProjectCategoryFilter}
                           showCompletedInProjects={showCompletedInProjects}

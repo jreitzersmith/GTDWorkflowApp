@@ -92,6 +92,7 @@ function TaskBucketView({
   setShowWaitingInProjects,
   showSomeDayInProjects,
   setShowSomeDayInProjects,
+  locations,
   focusedTaskId,
   setFocusedTaskId,
 }) {
@@ -104,9 +105,11 @@ function TaskBucketView({
   const quickSortRef = useRef(null);
   const displayRef = useRef(null);
   const taskListRef = useRef(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
 
   // Reset filter when switching buckets
-  useEffect(() => { setFilterText(""); setFocusedTaskId?.(null); }, [currentBucket]);
+  useEffect(() => { setFilterText(""); setSelectedCategory(null); setSelectedLocation(null); setFocusedTaskId?.(null); }, [currentBucket]);
 
   // Close project picker on outside click
   useEffect(() => {
@@ -189,11 +192,15 @@ function TaskBucketView({
   const selectedProjectNode = allProjectTasks.find(t => t.id === projectParentId);
 
   // Flat filtered list used when filterText is active (bypasses all grouping/tree logic)
-  const filterActive = filterText.trim().length > 0;
+  const filterTextActive = filterText.trim().length > 0;
+  const filterActive = filterTextActive || selectedCategory != null || selectedLocation != null;
   const filteredTasks = filterActive
     ? bucketTasks.filter(t => {
-        const q = filterText.toLowerCase();
-        return (t.text || "").toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q);
+        const q = filterText.toLowerCase().trim();
+        const textMatch = !q || (t.text || "").toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q);
+        const catMatch  = selectedCategory == null || (selectedCategory === '__unassigned__' ? !t.category : t.category === selectedCategory);
+        const locMatch  = selectedLocation == null || (selectedLocation === '__unassigned__' ? !(t.location?.length) : (t.location || []).includes(selectedLocation));
+        return textMatch && catMatch && locMatch;
       })
     : null;
 
@@ -207,18 +214,45 @@ function TaskBucketView({
         </div>
 
         {/* In-bucket search filter */}
-        {bucketTasks.length > 0 && (
+        {(bucketTasks.length > 0 || ["next", "project", "waiting", "someday", "deferred", "done"].includes(currentBucket)) && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <input
               value={filterText}
               onChange={e => setFilterText(e.target.value)}
               placeholder="Filter…"
-              style={{ width: filterActive ? 160 : 90, background: COLORS.surface2, border: `1px solid ${filterActive ? COLORS.inbox + "88" : COLORS.border}`, borderRadius: 6, padding: "4px 9px", fontFamily: "inherit", fontSize: 12, color: COLORS.text, outline: "none", transition: "width 0.15s, border-color 0.15s" }}
+              style={{ width: filterTextActive ? 160 : 90, background: COLORS.surface2, border: `1px solid ${filterTextActive ? COLORS.inbox + "88" : COLORS.border}`, borderRadius: 6, padding: "4px 9px", fontFamily: "inherit", fontSize: 12, color: COLORS.text, outline: "none", transition: "width 0.15s, border-color 0.15s" }}
             />
             {filterActive && (
               <span style={{ fontSize: 11, color: COLORS.muted, whiteSpace: "nowrap" }}>
                 {filteredTasks.length} / {bucketTasks.length}
               </span>
+            )}
+          </div>
+        )}
+
+        {["next", "project", "waiting", "someday", "deferred", "done"].includes(currentBucket) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            {categories?.length > 0 && (
+              <select
+                value={selectedCategory || ''}
+                onChange={e => setSelectedCategory(e.target.value || null)}
+                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: selectedCategory ? '#d4a844' : COLORS.text2, colorScheme: 'dark', cursor: 'pointer', outline: 'none' }}
+              >
+                <option value=''>All categories</option>
+                <option value='__unassigned__'>— No category assigned</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+            {locations?.length > 0 && (
+              <select
+                value={selectedLocation || ''}
+                onChange={e => setSelectedLocation(e.target.value || null)}
+                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: selectedLocation ? '#4a9fd4' : COLORS.text2, colorScheme: 'dark', cursor: 'pointer', outline: 'none' }}
+              >
+                <option value=''>All locations</option>
+                <option value='__unassigned__'>— No location assigned</option>
+                {locations.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
             )}
           </div>
         )}
@@ -289,32 +323,19 @@ function TaskBucketView({
               );
             })()}
 
-            {categories && categories.length > 0 && (
-              <select
-                value={projectCategoryFilter || ''}
-                onChange={e => setProjectCategoryFilter(e.target.value || null)}
-                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: projectCategoryFilter ? '#d4a844' : COLORS.text2, colorScheme: 'dark', cursor: 'pointer', outline: 'none' }}
-              >
-                <option value=''>All categories</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            )}
           </div>
         )}
 
         {currentBucket === "next" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
-            <span style={{ fontSize: 11, color: COLORS.muted, marginRight: 2 }}>Group:</span>
-            {GROUP_OPTS.map(opt => (
-              <ToolbarBtn
-                key={opt.key}
-                onClick={() => setNextGroupBy(opt.key)}
-                active={nextGroupBy === opt.key}
-                style={{ padding: '3px 9px', borderRadius: 6 }}
-              >
-                {opt.label}
-              </ToolbarBtn>
-            ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: COLORS.muted }}>Group:</span>
+            <select
+              value={nextGroupBy}
+              onChange={e => setNextGroupBy(e.target.value)}
+              style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: nextGroupBy !== 'none' ? '#d4a844' : COLORS.text2, colorScheme: 'dark', cursor: 'pointer', outline: 'none' }}
+            >
+              {GROUP_OPTS.map(opt => <option key={opt.key} value={opt.key}>{opt.label}</option>)}
+            </select>
           </div>
         )}
       </div>
@@ -557,6 +578,7 @@ TaskBucketView.propTypes = {
   deferredDupeWarning: PropTypes.object,
   onViewDeferred:    PropTypes.func.isRequired,
   onBulkAssign:      PropTypes.func.isRequired,
+  locations:             PropTypes.array,
   uncategorizedProjectId: PropTypes.string,
   showCompletedInProjects:   PropTypes.bool,
   showWaitingInProjects:   PropTypes.bool,
