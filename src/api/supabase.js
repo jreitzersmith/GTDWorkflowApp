@@ -71,6 +71,7 @@ function taskToDb(task, userId) {
     is_waiting_for:     task.isWaitingFor  ?? false,
     is_someday:         task.isSomeday     ?? false,
     is_next_action:     task.isNextAction  ?? false,
+    defer_count:        task.deferCount    ?? 0,
   };
 }
 
@@ -103,6 +104,7 @@ function dbToTask(row) {
   if (row.is_waiting_for) t.isWaitingFor  = true;
   if (row.is_someday)     t.isSomeday     = true;
   if (row.is_next_action) t.isNextAction  = true;
+  if (row.defer_count)   t.deferCount = row.defer_count;
   return t;
 }
 

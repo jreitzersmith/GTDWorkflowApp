@@ -728,6 +728,16 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             />
           </div>
 
+          {/* Deferred count badge — shown when task has been deferred at least once */}
+          {!!task.deferCount && task.deferCount > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+              <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}></span>
+              <span style={{ fontSize: 11, color: COLORS.deferred, background: COLORS.deferredBg, border: `1px solid ${COLORS.deferred}44`, borderRadius: 10, padding: "1px 8px" }}>
+                ⏰ Deferred {task.deferCount} time{task.deferCount !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
+
           {/* Completed date — read-only */}
           {task.completedDate && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>

@@ -981,7 +981,10 @@ export default function GTDManager() {
       if ("isWaitingFor" in ch) descendantChanges._isWaitingFor = ch.isWaitingFor;
       if ("isSomeday" in ch) descendantChanges._isSomeday = ch.isSomeday;
       return prev.map(t => {
-        if (t.id === id) return { ...t, ...ch };
+        if (t.id === id) {
+          const inc = 'deferUntil' in ch && ch.deferUntil != null ? 1 : 0;
+          return inc ? { ...t, ...ch, deferCount: (t.deferCount || 0) + 1 } : { ...t, ...ch };
+        }
         if (!descendants.has(t.id)) return t;
         const dc = {};
         if (descendantChanges._deferUntil !== undefined) {
