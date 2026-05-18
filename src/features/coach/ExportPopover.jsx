@@ -4,13 +4,13 @@ import { COLORS } from '../../constants.jsx';
 import { buildExportContent, exportToGoogleDocs, downloadText, buildExportTitle } from './exportUtils.js';
 
 const FORMAT_OPTIONS = [
-  { value: 'docs',     label: 'Google Docs' },
-  { value: 'markdown', label: 'Markdown (.md)' },
-  { value: 'text',     label: 'Plain text (.txt)' },
+  { value: 'docs',     label: 'Google Docs',      shortLabel: 'Google Docs' },
+  { value: 'markdown', label: 'Markdown (.md)',    shortLabel: 'Markdown' },
+  { value: 'text',     label: 'Plain text (.txt)', shortLabel: 'Plain text' },
 ];
 
 const INCLUDE_OPTIONS = [
-  { key: 'userMessages', label: 'Your messages' },
+  { key: 'userMessages', label: 'User messages' },
   { key: 'aiResponses',  label: 'AI responses' },
   { key: 'toolChips',    label: 'Tool & search activity' },
   { key: 'metadata',     label: 'Session metadata' },
@@ -21,10 +21,14 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, googleToken
   const [status, setStatus]           = useState('idle'); // 'idle' | 'loading' | 'done' | 'error'
   const [docUrl, setDocUrl]           = useState(null);
   const [errMsg, setErrMsg]           = useState(null);
+  const [localFormat, setLocalFormat]   = useState(exportSettings.format);
   const [localInclude, setLocalInclude] = useState(exportSettings.include);
   const ref = useRef(null);
 
-  // Sync local checkboxes when exportSettings.include changes externally (Settings panel update).
+  // Sync local state when exportSettings changes externally (Settings panel update).
+  useEffect(() => {
+    setLocalFormat(exportSettings.format);
+  }, [exportSettings.format]);
   useEffect(() => {
     setLocalInclude(exportSettings.include);
   }, [exportSettings.include]);
@@ -56,7 +60,7 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, googleToken
     setErrMsg(null);
     const markdownText = buildExportContent(messages, localInclude, coachMode, tasks);
     const title = buildExportTitle(coachMode);
-    const format = exportSettings.format;
+    const format = localFormat;
     try {
       if (format === 'docs') {
         if (!googleToken || !docsEnabled) {
@@ -80,9 +84,7 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, googleToken
       setErrMsg(err.message || 'Export failed');
       setStatus('error');
     }
-  }, [messages, localInclude, coachMode, tasks, exportSettings.format, googleToken, docsEnabled]);
-
-  const formatLabel = (FORMAT_OPTIONS.find(f => f.value === exportSettings.format) || FORMAT_OPTIONS[0]).label;
+  }, [messages, localInclude, coachMode, tasks, localFormat, googleToken, docsEnabled]);
 
   return (
     <div ref={ref} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -120,18 +122,27 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, googleToken
         }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 10 }}>Export conversation</div>
 
-          {/* Format (read-only — configured in Settings) */}
-          <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 4 }}>Format</div>
-          <div style={{
-            fontSize: 11,
-            color: COLORS.text,
-            background: COLORS.surface3,
-            borderRadius: 5,
-            padding: '4px 8px',
-            marginBottom: 10,
-          }}>
-            {formatLabel}
-            <span style={{ color: COLORS.muted, fontSize: 10, marginLeft: 6 }}>(change in Settings)</span>
+          {/* Format selector */}
+          <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 6 }}>Format</div>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+            {FORMAT_OPTIONS.map(({ value, shortLabel }) => (
+              <button
+                key={value}
+                onClick={() => setLocalFormat(value)}
+                style={{
+                  flex: 1,
+                  padding: '4px 0',
+                  borderRadius: 5,
+                  border: '0.5px solid ' + (localFormat === value ? COLORS.next : COLORS.border2),
+                  background: localFormat === value ? COLORS.next + '22' : 'transparent',
+                  color: localFormat === value ? COLORS.next : COLORS.text2,
+                  fontFamily: 'inherit',
+                  fontSize: 10,
+                  fontWeight: localFormat === value ? 600 : 400,
+                  cursor: 'pointer',
+                }}
+              >{shortLabel}</button>
+            ))}
           </div>
 
           {/* Content checkboxes */}

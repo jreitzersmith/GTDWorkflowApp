@@ -449,7 +449,7 @@ function SettingsPanel({
             <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 6 }}>Default content</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
-                { key: 'userMessages', label: 'Your messages' },
+                { key: 'userMessages', label: 'User messages' },
                 { key: 'aiResponses',  label: 'AI responses' },
                 { key: 'toolChips',    label: 'Tool & search activity' },
                 { key: 'metadata',     label: 'Session metadata' },
