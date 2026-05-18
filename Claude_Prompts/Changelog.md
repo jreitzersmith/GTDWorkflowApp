@@ -6,6 +6,10 @@ One row per item: date · type · # · GH# · name · commit hash(es).
 When an item is resolved, **remove** it from `Backlog.md` and add a full row here. Close the corresponding GitHub issue via the GitHub MCP.
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
+| 2026-05-18 | Feature | FR#23 | GH#15 | Categories filter dropdown on all main views — shared select in TaskBucketView; replaces Projects-only control; includes "No category assigned" option | ae1d47a8 |
+| 2026-05-18 | Feature | FR#106 | GH#114 | Location filter dropdown on all main views — alongside Categories; filter logic task.location?.includes(); includes "No location assigned" option | ae1d47a8 |
+| 2026-05-18 | Feature | FR#107 | GH#115 | Next Actions groupBy condensed to single select dropdown — replaces ToolbarBtn row; no logic change | ae1d47a8 |
+| 2026-05-18 | Feature | FR#108 | GH#116 | Waiting For filter controls — text search always visible on main views; Category + Location dropdowns added | ae1d47a8 |
 | 2026-05-18 | Feature | FR#96 | GH#101 | Drive folder settings per action type — DriveFolderPicker (custom modal browser, path labels, backup folder), Backup to Drive button, Conversation Export destination display | 91a61fbf |
 | 2026-05-18 | Feature | FR#59 | GH#58 | AI coach drive_search tool — DRIVE_SEARCH_TOOL in useCallAI.js; plain-text query normalisation | 91a61fbf |
 | 2026-05-18 | Feature | FR#99 | GH#105 | AI coach get_drive_file tool — GET_DRIVE_FILE_TOOL; exports Docs/Sheets/Slides content as text for chat context | 91a61fbf |
