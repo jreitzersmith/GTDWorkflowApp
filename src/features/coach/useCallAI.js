@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { SYSTEM_PROMPTS, OPENWEBUI_URL } from '../../constants.jsx';
+import { SYSTEM_PROMPTS, OPENWEBUI_URL, COACH_MODES } from '../../constants.jsx';
 import { TOOLS, doWebSearch } from './webSearch.js';
 import { GMAIL_SEARCH_TOOL, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL,
   GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL,
@@ -227,6 +227,7 @@ function useCallAI({
   setLoading, setAvailableModels, setPendingAction,
   calendarReminderMinutes,
   uncategorizedProjectId,
+  exportFormat,
 }) {
   const fetchModels = useCallback(async () => {
     try {
@@ -743,7 +744,7 @@ function useCallAI({
             const doc = await docsCreateDocument({ token: googleToken, title: docTitle });
             const bodyText = reply.replace(/\u2192ACTION:[^\n]*/g, '').trim();
             if (bodyText) {
-              const fmt = driveDocFormat || 'rtf';
+              const fmt = exportFormat || 'rtf';
               if (fmt === 'markdown') {
                 await docsAppendText({ token: googleToken, documentId: doc.documentId, text: bodyText, onTokenRefresh: refreshGoogleToken });
               } else if (fmt === 'text') {
