@@ -225,6 +225,7 @@ function useCallAI({
   setTasks, setCalendarEvents, setGmailQueue,
   setMessages, setChatHistory, setChatInput,
   setLoading, setAvailableModels, setPendingAction,
+  setRawApiThread,
   calendarReminderMinutes,
   uncategorizedProjectId,
   exportFormat,
@@ -488,6 +489,23 @@ function useCallAI({
             ];
           } else {
             reply = data.content?.find(b => b.type === 'text')?.text || 'Sorry, something went wrong.';
+            // FR#102: capture tool rounds from this turn
+            if (setRawApiThread) {
+              const toolRoundsRaw = apiMessages.slice(newHistory.length);
+              if (toolRoundsRaw.length > 0) {
+                const toolRoundsForTurn = [];
+                for (let i = 0; i < toolRoundsRaw.length; i += 2) {
+                  const asst = toolRoundsRaw[i]; const usr = toolRoundsRaw[i + 1];
+                  if (asst && usr) toolRoundsForTurn.push({
+                    toolCalls: asst.content.filter(b => b.type === 'tool_use'),
+                    toolResults: usr.content.filter(b => b.type === 'tool_result'),
+                  });
+                }
+                if (toolRoundsForTurn.length > 0) {
+                  setRawApiThread(prev => [...prev, { userMessage: userMsg, toolRounds: toolRoundsForTurn, finalReply: reply }]);
+                }
+              }
+            }
             break;
           }
         }

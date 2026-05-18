@@ -77,6 +77,7 @@ function CoachPanel({
   exportSettings,
   onExportSettingsChange,
   googleToken,
+  rawApiThread,
 }) {
   return (
     <div style={{ height: coachHeight, display: "flex", flexDirection: "column", flexShrink: 0 }}>
@@ -143,6 +144,7 @@ function CoachPanel({
               reviewDriveFolderId={reviewDriveFolderId}
               googleToken={googleToken}
               docsEnabled={docsEnabled}
+              rawApiThread={rawApiThread}
             />
           </div>
         )}
@@ -303,6 +305,7 @@ CoachPanel.propTypes = {
   exportSettings:         PropTypes.object,
   onExportSettingsChange: PropTypes.func,
   googleToken:            PropTypes.string,
+  rawApiThread:           PropTypes.array,
 };
 
 export { CoachPanel };

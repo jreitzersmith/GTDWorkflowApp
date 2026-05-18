@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { COLORS } from '../../constants.jsx';
-import { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle } from './exportUtils.js';
+import { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport } from './exportUtils.js';
 
 // Format options: Rich Text | Markdown | Plain text
 // Download delivers the native file type; Save to Drive always creates a Google Doc.
@@ -9,6 +9,7 @@ const FORMAT_OPTIONS = [
   { value: 'rtf',      label: 'Rich Text (.rtf)',    shortLabel: 'Rich text' },
   { value: 'markdown', label: 'Markdown (.md)',       shortLabel: 'Markdown' },
   { value: 'text',     label: 'Plain text (.txt)',    shortLabel: 'Plain text' },
+  { value: 'json',     label: 'JSON (.json)',         shortLabel: 'JSON' },
 ];
 
 const INCLUDE_OPTIONS = [
@@ -17,13 +18,15 @@ const INCLUDE_OPTIONS = [
   { key: 'toolChips',    label: 'Tool & search activity' },
   { key: 'metadata',     label: 'Session metadata' },
 ];
+// apiThread option only shown when format === 'json'
+const API_THREAD_OPTION = { key: 'apiThread', label: 'Raw API tool calls' };
 
 // Migrate a stored format value of 'docs' (old default) to 'rtf'.
 function resolveFormat(fmt) {
   return (!fmt || fmt === 'docs') ? 'rtf' : fmt;
 }
 
-function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSettingsChange, googleToken, docsEnabled, reviewDriveFolderId }) {
+function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSettingsChange, googleToken, docsEnabled, reviewDriveFolderId, rawApiThread }) {
   const [open, setOpen]               = useState(false);
   // status: 'idle' | 'downloading' | 'saving' | 'downloaded' | 'saved' | 'error'
   const [status, setStatus]           = useState('idle');
@@ -67,21 +70,26 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSet
     setDriveUrl(null);
     setErrMsg(null);
     try {
-      const markdownText = buildExportContent(messages, localInclude, coachMode, tasks);
       const title = buildExportTitle(coachMode);
-      if (localFormat === 'rtf') {
-        downloadText(buildRtfContent(markdownText), title + '.rtf', 'application/rtf');
-      } else if (localFormat === 'markdown') {
-        downloadText(markdownText, title + '.md', 'text/markdown');
+      if (localFormat === 'json') {
+        const jsonText = buildJsonExport({ rawApiThread: rawApiThread || [], messages, include: localInclude, coachMode, tasks });
+        downloadText(jsonText, title + '.json', 'application/json');
       } else {
-        downloadText(stripMarkdown(markdownText), title + '.txt', 'text/plain');
+        const markdownText = buildExportContent(messages, localInclude, coachMode, tasks);
+        if (localFormat === 'rtf') {
+          downloadText(buildRtfContent(markdownText), title + '.rtf', 'application/rtf');
+        } else if (localFormat === 'markdown') {
+          downloadText(markdownText, title + '.md', 'text/markdown');
+        } else {
+          downloadText(stripMarkdown(markdownText), title + '.txt', 'text/plain');
+        }
       }
       setStatus('downloaded');
     } catch (err) {
       setErrMsg(err.message || 'Download failed');
       setStatus('error');
     }
-  }, [messages, localInclude, coachMode, tasks, localFormat]);
+  }, [messages, localInclude, coachMode, tasks, localFormat, rawApiThread]);
 
   const handleSaveToDrive = useCallback(async () => {
     if (!googleToken || !docsEnabled) {
@@ -93,16 +101,18 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSet
     setDriveUrl(null);
     setErrMsg(null);
     try {
-      const markdownText = buildExportContent(messages, localInclude, coachMode, tasks);
       const title = buildExportTitle(coachMode);
-      const url = await saveToDrive({ markdownText, googleToken, title, format: localFormat, reviewDriveFolderId });
+      const exportText = localFormat === 'json'
+        ? buildJsonExport({ rawApiThread: rawApiThread || [], messages, include: localInclude, coachMode, tasks })
+        : buildExportContent(messages, localInclude, coachMode, tasks);
+      const url = await saveToDrive({ markdownText: exportText, googleToken, title, format: localFormat === 'json' ? 'text' : localFormat, reviewDriveFolderId });
       setDriveUrl(url);
       setStatus('saved');
     } catch (err) {
       setErrMsg(err.message || 'Save to Drive failed');
       setStatus('error');
     }
-  }, [messages, localInclude, coachMode, tasks, localFormat, googleToken, docsEnabled, reviewDriveFolderId]);
+  }, [messages, localInclude, coachMode, tasks, localFormat, googleToken, docsEnabled, reviewDriveFolderId, rawApiThread]);
 
   const busy = status === 'downloading' || status === 'saving';
 
@@ -144,13 +154,12 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSet
 
           {/* Format selector */}
           <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 6 }}>Format</div>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 12 }}>
             {FORMAT_OPTIONS.map(({ value, shortLabel }) => (
               <button
                 key={value}
                 onClick={() => setLocalFormat(value)}
                 style={{
-                  flex: 1,
                   padding: '4px 0',
                   borderRadius: 5,
                   border: '0.5px solid ' + (localFormat === value ? COLORS.next : COLORS.border2),
@@ -179,6 +188,17 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSet
                 {label}
               </label>
             ))}
+            {localFormat === 'json' && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: (rawApiThread && rawApiThread.length > 0) ? COLORS.text : COLORS.muted, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={!!localInclude[API_THREAD_OPTION.key]}
+                  onChange={() => handleToggle(API_THREAD_OPTION.key)}
+                  style={{ accentColor: COLORS.next, width: 13, height: 13, flexShrink: 0 }}
+                />
+                {API_THREAD_OPTION.label}{rawApiThread && rawApiThread.length === 0 ? ' (none this session)' : ''}
+              </label>
+            )}
           </div>
 
           {/* Status feedback */}
@@ -253,6 +273,7 @@ ExportPopover.propTypes = {
   googleToken:            PropTypes.string,
   docsEnabled:            PropTypes.bool,
   reviewDriveFolderId:    PropTypes.string,
+  rawApiThread:           PropTypes.array,
 };
 
 export { ExportPopover };

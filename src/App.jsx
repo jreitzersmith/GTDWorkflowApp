@@ -74,6 +74,7 @@ export default function GTDManager() {
   const [pendingEmailContext, setPendingEmailContext] = useState(null); // { id, subject } — set while processing an email
   const preEmailTaskIdsRef = useRef(null); // snapshot of task IDs at email processing start
   const [searchOpen, setSearchOpen] = useState(false);
+  const [rawApiThread, setRawApiThread] = useState([]);
   // Compute Today's Focus count from localStorage for sidebar badge
   const focusCount = (() => {
     try {
@@ -412,6 +413,7 @@ export default function GTDManager() {
     setTasks, setCalendarEvents, setGmailQueue,
     setMessages, setChatHistory, setChatInput,
     setLoading, setAvailableModels, setPendingAction,
+    setRawApiThread,
     calendarReminderMinutes,
     uncategorizedProjectId,
     exportFormat: exportSettings.format,
@@ -423,6 +425,7 @@ export default function GTDManager() {
     preEmailTaskIdsRef.current = null;
     setCoachMode(mode);
     setChatHistory([]);
+    setRawApiThread([]);
     setPendingAction(null);
     setMessages([{ role: "assistant", text: introMsg }]);
   }, []);
@@ -489,6 +492,7 @@ export default function GTDManager() {
     }
     setCoachMode("review");
     setChatHistory([]);
+    setRawApiThread([]);
     setPendingAction(null);
     setMessages(msgs);
   };
@@ -539,6 +543,7 @@ export default function GTDManager() {
       const urgencyNote = overdue.length > 0 ? ` You have ${overdue.length} overdue item${overdue.length !== 1 ? 's' : ''} that need attention.` : '';
       setCoachMode('daily');
       setChatHistory([]);
+      setRawApiThread([]);
       setPendingAction(null);
       setMessages([]);
       callAI(`Good morning! Let's start my day.${urgencyNote}\n\n${lines}`, 'daily', []);
@@ -567,6 +572,7 @@ export default function GTDManager() {
 
       setCoachMode('daily');
       setChatHistory([]);
+      setRawApiThread([]);
       setPendingAction(null);
       setMessages([]);
       callAI(`Let's close out my day.\n\n${lines}`, 'daily', []);
@@ -1054,6 +1060,7 @@ export default function GTDManager() {
     }
     setCoachMode("projectReview");
     setChatHistory([]);
+    setRawApiThread([]);
     setPendingAction(null);
     setReviewProjectIdx(0);
     setReviewSuggestions([]);
@@ -1454,6 +1461,7 @@ export default function GTDManager() {
                 exportSettings={exportSettings}
                 onExportSettingsChange={setExportSettings}
                 googleToken={googleToken}
+                rawApiThread={rawApiThread}
               />
             </ErrorBoundary>
           </div>

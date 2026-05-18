@@ -128,4 +128,30 @@ function buildExportTitle(coachMode) {
   return 'GTD Coach \u2014 ' + modeLabel + ' \u2014 ' + today;
 }
 
-export { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle };
+// Build a JSON export containing conversation text and optional raw API tool call data.
+// include: { userMessages, aiResponses, toolChips, metadata, apiThread }
+// rawApiThread: accumulated tool-round data from useCallAI (FR#102)
+function buildJsonExport({ rawApiThread, messages, include, coachMode, tasks }) {
+  const modeLabel = (COACH_MODES[coachMode] || {}).label || coachMode;
+  const now = new Date();
+  const output = { exportedAt: now.toISOString(), coachMode: modeLabel };
+  if (include.metadata) output.tasksCount = Array.isArray(tasks) ? tasks.length : 0;
+  if (include.userMessages || include.aiResponses || include.toolChips) {
+    output.conversation = messages
+      .filter(msg => {
+        if (msg.isSearchChip) return !!include.toolChips;
+        if (msg.role === 'user') return !!include.userMessages;
+        if (msg.role === 'assistant') return !!include.aiResponses;
+        return false;
+      })
+      .map(msg => ({
+        role: msg.role,
+        text: msg.text || '',
+        ...(msg.isSearchChip ? { isSearchChip: true } : {}),
+      }));
+  }
+  if (include.apiThread) output.rawApiThread = rawApiThread || [];
+  return JSON.stringify(output, null, 2);
+}
+
+export { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport };

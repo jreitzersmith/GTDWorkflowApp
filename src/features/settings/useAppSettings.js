@@ -67,9 +67,9 @@ function useAppSettings() {
     try {
       return JSON.parse(localStorage.getItem('gtd_export_settings') || 'null') || {
         format: 'rtf',
-        include: { userMessages: true, aiResponses: true, toolChips: true, metadata: true },
+        include: { userMessages: true, aiResponses: true, toolChips: true, metadata: true, apiThread: false },
       };
-    } catch { return { format: 'docs', include: { userMessages: true, aiResponses: true, toolChips: true, metadata: true } }; }
+    } catch { return { format: 'docs', include: { userMessages: true, aiResponses: true, toolChips: true, metadata: true, apiThread: false } }; }
   });
   useEffect(() => { localStorage.setItem('gtd_export_settings', JSON.stringify(exportSettings)); }, [exportSettings]);
 
