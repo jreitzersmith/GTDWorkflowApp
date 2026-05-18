@@ -78,12 +78,13 @@ function CoachPanel({
   onExportSettingsChange,
   googleToken,
   rawApiThread,
+  coachName,
 }) {
   return (
     <div style={{ height: coachHeight, display: "flex", flexDirection: "column", flexShrink: 0 }}>
       {/* Header: label + provider selector + mode tabs */}
       <div style={{ padding: "8px 14px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.06em", textTransform: "uppercase" }}>🤖 AI Coach</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.06em", textTransform: "uppercase" }}>🤖 {coachName || 'AI Coach'}</span>
         <ProviderSelector
           provider={provider} setProvider={setProvider}
           localModel={localModel} setLocalModel={setLocalModel}
@@ -306,6 +307,7 @@ CoachPanel.propTypes = {
   onExportSettingsChange: PropTypes.func,
   googleToken:            PropTypes.string,
   rawApiThread:           PropTypes.array,
+  coachName:              PropTypes.string,
 };
 
 export { CoachPanel };

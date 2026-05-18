@@ -108,6 +108,8 @@ function SettingsPanel({
   userCity, onSetUserCity,
   userHomeAddress, onSetUserHomeAddress,
   userWorkAddress, onSetUserWorkAddress,
+  coachName, onSetCoachName,
+  userName, onSetUserName,
   exportSettings, onExportSettingsChange,
 }) {
   const fileInputRef = useRef(null);
@@ -536,6 +538,26 @@ function SettingsPanel({
 
         </SettingsSection>
 
+        <SettingsSection label="Coach & identity" storageKey="gtd_settings_identity">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12, lineHeight: 1.5 }}>
+            Personalise the AI coach. Leave blank to use defaults.
+          </div>
+          {[
+            { label: 'Coach name', value: coachName, setter: onSetCoachName, placeholder: 'e.g. Aria (default: AI Coach)' },
+            { label: 'Your name', value: userName, setter: onSetUserName, placeholder: 'e.g. John (default: your account name)' },
+          ].map(({ label, value, setter, placeholder }) => (
+            <div key={label} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 5 }}>{label}</div>
+              <input
+                value={value || ''}
+                onChange={e => setter(e.target.value)}
+                placeholder={placeholder}
+                style={{ width: '100%', padding: '4px 8px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text, fontFamily: 'inherit', fontSize: 12, boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+          ))}
+        </SettingsSection>
+
         <SettingsSection label="Your location" storageKey="gtd_settings_location">
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12, lineHeight: 1.5 }}>
             Used by the AI coach for location-aware suggestions. Leave blank to omit location context.
@@ -682,6 +704,10 @@ SettingsPanel.propTypes = {
   onSetUserHomeAddress:       PropTypes.func.isRequired,
   userWorkAddress:            PropTypes.string,
   onSetUserWorkAddress:       PropTypes.func.isRequired,
+  coachName:                  PropTypes.string,
+  onSetCoachName:             PropTypes.func,
+  userName:                   PropTypes.string,
+  onSetUserName:              PropTypes.func,
 };
 
 export { SettingsPanel };

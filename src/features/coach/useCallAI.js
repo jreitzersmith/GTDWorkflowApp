@@ -75,6 +75,19 @@ const GET_DRIVE_FILE_TOOL = {
   },
 };
 
+// Weather tool -- available in chat mode when VITE_OPENWEATHERMAP_API_KEY is set (FR#105)
+const GET_WEATHER_TOOL = {
+  name: 'get_weather',
+  description: 'Get current weather conditions and a 24-hour forecast for a city. Use when the user asks about weather, plans outdoor activities, or needs weather context for scheduling.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      city: { type: 'string', description: "City name. Omit to use the user's configured default city." },
+      units: { type: 'string', enum: ['imperial', 'metric'], description: 'Temperature units: imperial = °F, metric = °C. Defaults to imperial.' },
+    },
+  },
+};
+
 // Buckets to include in the task context for each coach mode.
 // Modes not listed here receive all buckets (null = no filter).
 const MODE_CONTEXT_BUCKETS = {
@@ -272,6 +285,8 @@ function useCallAI({
   userCity,
   userHomeAddress,
   userWorkAddress,
+  coachName,
+  userName,
   driveEnabled,
   driveDocumentFolderId,
   driveSpreadsheetFolderId,
@@ -322,7 +337,11 @@ function useCallAI({
       userWorkAddress ? 'Work address: ' + userWorkAddress : null,
     ].filter(Boolean);
     const locationCtx = _locParts.length ? '\n\n[User Location]\n' + _locParts.join('\n') : '';
-    const systemPrompt = SYSTEM_PROMPTS[mode] + calibCtx + locationCtx + taskContextPart;
+    const personalizationCtx = [
+      coachName ? 'Your name is ' + coachName + '.' : null,
+      userName ? "The user's name is " + userName + "." : null,
+    ].filter(Boolean).join(' ');
+    const systemPrompt = (personalizationCtx ? personalizationCtx + '\n\n' : '') + SYSTEM_PROMPTS[mode] + calibCtx + locationCtx + taskContextPart;
     let inputLogSet = false;
     const newHistory = [...history, { role: 'user', content: userMsg }];
 
@@ -366,6 +385,7 @@ function useCallAI({
               availableTools.push(DRIVE_SEARCH_TOOL);
               availableTools.push(GET_DRIVE_FILE_TOOL);
             }
+            if (import.meta.env.VITE_OPENWEATHERMAP_API_KEY) availableTools.push(GET_WEATHER_TOOL);
             if (availableTools.length > 0) reqBody.tools = availableTools;
           }
           if (loopCount > 1) {
@@ -571,6 +591,42 @@ function useCallAI({
                   if (fileContent.length > 50000) fileContent = fileContent.slice(0, 50000) + '\n[content truncated at 50,000 chars]';
                   toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: fileContent });
                 } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === 'get_weather') {
+                const weatherCity = toolUse.input.city || userCity;
+                const weatherUnits = toolUse.input.units || 'imperial';
+                if (!weatherCity) {
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: 'No city specified and no default city configured. Ask the user for their city.' });
+                } else {
+                  setMessages(prev => [...prev, { role: 'assistant', text: '🌤️ Fetching weather for ' + weatherCity + '…', isSearchChip: true }]);
+                  try {
+                    const owmKey = import.meta.env.VITE_OPENWEATHERMAP_API_KEY;
+                    const [curRes, fcastRes] = await Promise.all([
+                      fetch('https://api.openweathermap.org/data/2.5/weather?q=' + encodeURIComponent(weatherCity) + '&appid=' + owmKey + '&units=' + weatherUnits),
+                      fetch('https://api.openweathermap.org/data/2.5/forecast?q=' + encodeURIComponent(weatherCity) + '&appid=' + owmKey + '&units=' + weatherUnits + '&cnt=8'),
+                    ]);
+                    const curData = await curRes.json();
+                    const fcastData = await fcastRes.json();
+                    if (curData.cod !== 200) throw new Error(curData.message || 'City not found');
+                    const unitLabel = weatherUnits === 'metric' ? '°C' : '°F';
+                    const result = {
+                      city: curData.name,
+                      country: curData.sys.country,
+                      current: {
+                        temp: curData.main.temp,
+                        feels_like: curData.main.feels_like,
+                        humidity: curData.main.humidity,
+                        description: curData.weather[0].description,
+                        wind_speed: curData.wind.speed,
+                        units: unitLabel,
+                        wind_units: weatherUnits === 'metric' ? 'm/s' : 'mph',
+                      },
+                      forecast: (fcastData.list || []).map(function(f) {
+                        return { time: f.dt_txt, temp: f.main.temp, description: f.weather[0].description, pop: Math.round((f.pop || 0) * 100) };
+                      }),
+                    };
+                    toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                  } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: 'Weather fetch failed: ' + e.message }); }
+                }
               }
             }
             // Ensure every tool_use block has a result (empty content triggers Anthropic 400)
@@ -1029,7 +1085,7 @@ function useCallAI({
   }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel,
       googleToken, googleScope, calendarEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
       setCalendarEvents, recordUsage, setLastInputLog, setTasks, setGmailQueue,
-      setMessages, setChatHistory, setLoading, setPendingAction, authUser, userCity, userHomeAddress, userWorkAddress,
+      setMessages, setChatHistory, setLoading, setPendingAction, authUser, userCity, userHomeAddress, userWorkAddress, coachName, userName,
       driveEnabled, driveDocumentFolderId, driveSpreadsheetFolderId, driveSlideDeckFolderId, driveBaseFolderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendChat = useCallback(async () => {

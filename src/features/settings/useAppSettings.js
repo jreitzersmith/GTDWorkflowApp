@@ -108,6 +108,12 @@ function useAppSettings() {
   useEffect(() => { localStorage.setItem('gtd_user_home_address', userHomeAddress); }, [userHomeAddress]);
   useEffect(() => { localStorage.setItem('gtd_user_work_address', userWorkAddress); }, [userWorkAddress]);
 
+  // FR#98: configurable AI coach name and user display name
+  const [coachName, setCoachName] = useState(() => localStorage.getItem('gtd_coach_name') || '');
+  const [userName, setUserName] = useState(() => localStorage.getItem('gtd_user_name') || '');
+  useEffect(() => { localStorage.setItem('gtd_coach_name', coachName); }, [coachName]);
+  useEffect(() => { localStorage.setItem('gtd_user_name', userName); }, [userName]);
+
   return {
     locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides,
     tagDisplay, setTagDisplay, categories, setCategories,
@@ -132,6 +138,8 @@ function useAppSettings() {
     userCity, setUserCity,
     userHomeAddress, setUserHomeAddress,
     userWorkAddress, setUserWorkAddress,
+    coachName, setCoachName,
+    userName, setUserName,
   };
 }
 
