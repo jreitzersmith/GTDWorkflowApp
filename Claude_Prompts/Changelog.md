@@ -122,4 +122,6 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-17 | Feature      | —       | —      | pptxApi.js: dark slate theme (DARK_BG/TITLE_BAR palette, cover + content slide builders) | 5b74ede |
 | 2026-05-17 | Feature      | —       | —      | docsApi.js: docsAppendMarkdown — native Docs formatting (headings, bullets, bold/italic via batchUpdate) | 5b74ede |
 | 2026-05-17 | Bug Fix      | Issue#23| GH#108 | create-sheet: AI listed tasks instead of emitting ACTION when date range specified; add applyTaskFilters shared utility with 11 filter params | 14b2a01 |
+| 2026-05-18 | Feature | FR#103 | GH#111 | ExportPopover inline format selector; 'User messages' label unification | 6083b8c9 |
+| 2026-05-18 | Feature | FR#97  | GH#103 | Save to Drive in ExportPopover; RTF download format; driveDocFormat unified with exportSettings; Drive folder moved to Conversation Export section | a4cf89f9 / bcb86590 |
 | 2026-05-18 | Feature | FR#101 | GH#110 | Conversation export — export coach chat to Google Docs, Markdown, or plain text | 075ce6b4 |
