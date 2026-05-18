@@ -736,12 +736,23 @@ function useCallAI({
         if (docLine) {
           try {
             const parts = docLine.slice('\u2192ACTION:create-doc|'.length).split('|');
-            const docTitle = (parts[0] || 'Coach Output').trim();
+            const modeDocLabel = (COACH_MODES[coachMode] || {}).label || coachMode;
+            const docDateStr = new Date().toISOString().slice(0, 10);
+            const docTitle = modeDocLabel + ' — ' + (parts[0] || 'Coach Output').trim() + ' — ' + docDateStr;
             const taskRef = (parts.find(p => p.startsWith('task:')) || '').replace('task:', '').trim();
             const doc = await docsCreateDocument({ token: googleToken, title: docTitle });
             const bodyText = reply.replace(/\u2192ACTION:[^\n]*/g, '').trim();
-            // markdownText kept in scope for future Obsidian export path; Docs receives native formatting
-            if (bodyText) await docsAppendMarkdown({ token: googleToken, documentId: doc.documentId, markdownText: bodyText, onTokenRefresh: refreshGoogleToken });
+            if (bodyText) {
+              const fmt = driveDocFormat || 'rtf';
+              if (fmt === 'markdown') {
+                await docsAppendText({ token: googleToken, documentId: doc.documentId, text: bodyText, onTokenRefresh: refreshGoogleToken });
+              } else if (fmt === 'text') {
+                const plain = bodyText.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1').replace(/^#{1,6}\s+/gm, '').replace(/^>\s*/gm, '').replace(/^---$/gm, '');
+                await docsAppendText({ token: googleToken, documentId: doc.documentId, text: plain, onTokenRefresh: refreshGoogleToken });
+              } else {
+                await docsAppendMarkdown({ token: googleToken, documentId: doc.documentId, markdownText: bodyText, onTokenRefresh: refreshGoogleToken });
+              }
+            }
             const docUrl = `https://docs.google.com/document/d/${doc.documentId}/edit`;
             if (taskRef) {
               const target = tasks.find(t => t.id === taskRef || t.text.toLowerCase() === taskRef.toLowerCase());

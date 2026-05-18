@@ -91,6 +91,7 @@ function SettingsPanel({
   // Other
   recurringReviewDays, onSetRecurringReviewDays,
   reviewDriveFolderId, onSetReviewDriveFolderId,
+  driveDocFormat, onSetDriveDocFormat,
   calendarReminderMinutes, onSetCalendarReminderMinutes,
   exportSettings, onExportSettingsChange,
 }) {
@@ -315,6 +316,20 @@ function SettingsPanel({
                 placeholder="Drive folder ID (optional)"
                 style={{ width: '100%', padding: '4px 8px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text, fontFamily: 'inherit', fontSize: 12, boxSizing: 'border-box', outline: 'none' }}
               />
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 6 }}>Document format</div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {[{ value: 'rtf', label: 'Rich text' }, { value: 'markdown', label: 'Markdown' }, { value: 'text', label: 'Plain text' }].map(({ value, label }) => {
+                    const active = (driveDocFormat || 'rtf') === value;
+                    return (
+                      <button key={value} onClick={() => onSetDriveDocFormat(value)}
+                        style={{ flex: 1, padding: '4px 0', borderRadius: 5, border: '0.5px solid ' + (active ? COLORS.next : COLORS.border2), background: active ? COLORS.next + '22' : 'transparent', color: active ? COLORS.next : COLORS.text2, fontFamily: 'inherit', fontSize: 11, fontWeight: active ? 600 : 400, cursor: 'pointer' }}
+                      >{label}</button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>Controls how content is formatted when saved to Drive or via the AI create-doc action.</div>
+              </div>
             </div>
           )}
         </SettingsSection>
@@ -430,7 +445,7 @@ function SettingsPanel({
             <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 6 }}>Default format</div>
             <div style={{ display: 'flex', gap: 6 }}>
               {[
-                { value: 'docs',     label: 'Google Docs' },
+                { value: 'rtf',      label: 'Rich text' },
                 { value: 'markdown', label: 'Markdown' },
                 { value: 'text',     label: 'Plain text' },
               ].map(({ value, label }) => {
@@ -540,6 +555,8 @@ SettingsPanel.propTypes = {
   onSetReviewNodeTypes:       PropTypes.func.isRequired,
   reviewDriveFolderId:        PropTypes.string,
   onSetReviewDriveFolderId:   PropTypes.func.isRequired,
+  driveDocFormat:             PropTypes.string,
+  onSetDriveDocFormat:        PropTypes.func.isRequired,
   exportSettings:             PropTypes.object,
   onExportSettingsChange:     PropTypes.func,
 };

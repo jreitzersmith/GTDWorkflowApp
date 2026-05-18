@@ -1,12 +1,14 @@
 import PropTypes from 'prop-types';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { COLORS } from '../../constants.jsx';
-import { buildExportContent, exportToGoogleDocs, downloadText, buildExportTitle } from './exportUtils.js';
+import { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle } from './exportUtils.js';
 
+// Format options: Rich Text | Markdown | Plain text
+// Download delivers the native file type; Save to Drive always creates a Google Doc.
 const FORMAT_OPTIONS = [
-  { value: 'docs',     label: 'Google Docs',      shortLabel: 'Google Docs' },
-  { value: 'markdown', label: 'Markdown (.md)',    shortLabel: 'Markdown' },
-  { value: 'text',     label: 'Plain text (.txt)', shortLabel: 'Plain text' },
+  { value: 'rtf',      label: 'Rich Text (.rtf)',    shortLabel: 'Rich text' },
+  { value: 'markdown', label: 'Markdown (.md)',       shortLabel: 'Markdown' },
+  { value: 'text',     label: 'Plain text (.txt)',    shortLabel: 'Plain text' },
 ];
 
 const INCLUDE_OPTIONS = [
@@ -16,18 +18,24 @@ const INCLUDE_OPTIONS = [
   { key: 'metadata',     label: 'Session metadata' },
 ];
 
-function ExportPopover({ messages, coachMode, tasks, exportSettings, googleToken, docsEnabled }) {
+// Migrate a stored format value of 'docs' (old default) to 'rtf'.
+function resolveFormat(fmt) {
+  return (!fmt || fmt === 'docs') ? 'rtf' : fmt;
+}
+
+function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSettingsChange, googleToken, docsEnabled, reviewDriveFolderId }) {
   const [open, setOpen]               = useState(false);
-  const [status, setStatus]           = useState('idle'); // 'idle' | 'loading' | 'done' | 'error'
-  const [docUrl, setDocUrl]           = useState(null);
+  // status: 'idle' | 'downloading' | 'saving' | 'downloaded' | 'saved' | 'error'
+  const [status, setStatus]           = useState('idle');
+  const [driveUrl, setDriveUrl]       = useState(null);
   const [errMsg, setErrMsg]           = useState(null);
-  const [localFormat, setLocalFormat]   = useState(exportSettings.format);
+  const [localFormat, setLocalFormat] = useState(() => resolveFormat(exportSettings.format));
   const [localInclude, setLocalInclude] = useState(exportSettings.include);
   const ref = useRef(null);
 
   // Sync local state when exportSettings changes externally (Settings panel update).
   useEffect(() => {
-    setLocalFormat(exportSettings.format);
+    setLocalFormat(resolveFormat(exportSettings.format));
   }, [exportSettings.format]);
   useEffect(() => {
     setLocalInclude(exportSettings.include);
@@ -50,41 +58,53 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, googleToken
   const handleOpen = () => {
     setOpen(o => !o);
     setStatus('idle');
-    setDocUrl(null);
+    setDriveUrl(null);
     setErrMsg(null);
   };
 
-  const handleExport = useCallback(async () => {
-    setStatus('loading');
-    setDocUrl(null);
+  const handleDownload = useCallback(() => {
+    setStatus('downloading');
+    setDriveUrl(null);
     setErrMsg(null);
-    const markdownText = buildExportContent(messages, localInclude, coachMode, tasks);
-    const title = buildExportTitle(coachMode);
-    const format = localFormat;
     try {
-      if (format === 'docs') {
-        if (!googleToken || !docsEnabled) {
-          throw new Error('Google Docs is not connected. Connect Docs in Settings > Google Services.');
-        }
-        const url = await exportToGoogleDocs({ markdownText, googleToken, title });
-        setDocUrl(url);
-      } else if (format === 'markdown') {
+      const markdownText = buildExportContent(messages, localInclude, coachMode, tasks);
+      const title = buildExportTitle(coachMode);
+      if (localFormat === 'rtf') {
+        downloadText(buildRtfContent(markdownText), title + '.rtf', 'application/rtf');
+      } else if (localFormat === 'markdown') {
         downloadText(markdownText, title + '.md', 'text/markdown');
       } else {
-        const plain = markdownText
-          .replace(/\*\*([^*]+)\*\*/g, '$1')
-          .replace(/\*([^*]+)\*/g, '$1')
-          .replace(/^#{1,6}\s+/gm, '')
-          .replace(/^>\s*/gm, '')
-          .replace(/^---$/gm, '');
-        downloadText(plain, title + '.txt', 'text/plain');
+        downloadText(stripMarkdown(markdownText), title + '.txt', 'text/plain');
       }
-      setStatus('done');
+      setStatus('downloaded');
     } catch (err) {
-      setErrMsg(err.message || 'Export failed');
+      setErrMsg(err.message || 'Download failed');
       setStatus('error');
     }
-  }, [messages, localInclude, coachMode, tasks, localFormat, googleToken, docsEnabled]);
+  }, [messages, localInclude, coachMode, tasks, localFormat]);
+
+  const handleSaveToDrive = useCallback(async () => {
+    if (!googleToken || !docsEnabled) {
+      setErrMsg('Google Docs is not connected. Connect Docs in Settings › Google Services.');
+      setStatus('error');
+      return;
+    }
+    setStatus('saving');
+    setDriveUrl(null);
+    setErrMsg(null);
+    try {
+      const markdownText = buildExportContent(messages, localInclude, coachMode, tasks);
+      const title = buildExportTitle(coachMode);
+      const url = await saveToDrive({ markdownText, googleToken, title, format: localFormat, reviewDriveFolderId });
+      setDriveUrl(url);
+      setStatus('saved');
+    } catch (err) {
+      setErrMsg(err.message || 'Save to Drive failed');
+      setStatus('error');
+    }
+  }, [messages, localInclude, coachMode, tasks, localFormat, googleToken, docsEnabled, reviewDriveFolderId]);
+
+  const busy = status === 'downloading' || status === 'saving';
 
   return (
     <div ref={ref} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -117,7 +137,7 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, googleToken
           borderRadius: 8,
           padding: 14,
           zIndex: 60,
-          width: 230,
+          width: 240,
           boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
         }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 10 }}>Export conversation</div>
@@ -162,13 +182,13 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, googleToken
           </div>
 
           {/* Status feedback */}
-          {status === 'done' && !docUrl && (
+          {status === 'downloaded' && (
             <div style={{ fontSize: 11, color: COLORS.next, marginBottom: 8 }}>Downloaded successfully.</div>
           )}
-          {status === 'done' && docUrl && (
+          {status === 'saved' && driveUrl && (
             <div style={{ fontSize: 11, marginBottom: 8 }}>
-              <a href={docUrl} target="_blank" rel="noreferrer" style={{ color: COLORS.next, textDecoration: 'none' }}>
-                View in Google Docs &uarr;
+              <a href={driveUrl} target="_blank" rel="noreferrer" style={{ color: COLORS.next, textDecoration: 'none' }}>
+                View in Google Docs &#x2197;
               </a>
             </div>
           )}
@@ -176,25 +196,48 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, googleToken
             <div style={{ fontSize: 11, color: COLORS.waiting, marginBottom: 8, lineHeight: 1.4 }}>{errMsg}</div>
           )}
 
-          {/* Export button */}
+          {/* Download button */}
           <button
-            onClick={handleExport}
-            disabled={status === 'loading'}
+            onClick={handleDownload}
+            disabled={busy}
             style={{
               width: '100%',
               padding: '6px 0',
               borderRadius: 6,
               border: 'none',
-              background: status === 'loading' ? COLORS.surface3 : COLORS.next,
-              color: status === 'loading' ? COLORS.muted : '#111',
+              background: busy ? COLORS.surface3 : COLORS.next,
+              color: busy ? COLORS.muted : '#111',
               fontFamily: 'inherit',
               fontSize: 12,
               fontWeight: 600,
-              cursor: status === 'loading' ? 'not-allowed' : 'pointer',
+              cursor: busy ? 'not-allowed' : 'pointer',
+              marginBottom: docsEnabled ? 6 : 0,
             }}
           >
-            {status === 'loading' ? 'Exporting…' : 'Export'}
+            {status === 'downloading' ? 'Downloading…' : 'Download'}
           </button>
+
+          {/* Save to Drive button — only shown when Docs is connected */}
+          {docsEnabled && (
+            <button
+              onClick={handleSaveToDrive}
+              disabled={busy}
+              style={{
+                width: '100%',
+                padding: '6px 0',
+                borderRadius: 6,
+                border: '0.5px solid ' + COLORS.border2,
+                background: 'transparent',
+                color: busy ? COLORS.muted : COLORS.text2,
+                fontFamily: 'inherit',
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: busy ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {status === 'saving' ? 'Saving…' : 'Save to Drive'}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -206,8 +249,10 @@ ExportPopover.propTypes = {
   coachMode:              PropTypes.string.isRequired,
   tasks:                  PropTypes.array.isRequired,
   exportSettings:         PropTypes.object.isRequired,
+  onExportSettingsChange: PropTypes.func,
   googleToken:            PropTypes.string,
   docsEnabled:            PropTypes.bool,
+  reviewDriveFolderId:    PropTypes.string,
 };
 
 export { ExportPopover };
