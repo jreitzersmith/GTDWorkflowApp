@@ -125,6 +125,8 @@ Each checklist item: specific action + specific expected result. Group by featur
 
 John clicks items to mark state, then submits. Do not ask for a general "did it work" — wait for the widget submission. On receipt, treat pass = confirmed, fail = needs fix (diagnose), note = log as new FR if not already tracked.
 
+**Skip items (condition not met):** Any item submitted as Skip means the test condition was unavailable (no live email, requires a second device, specific data state not present, etc.). At the end of the cycle, before committing, move each skipped item to the **Deferred Testing Scenarios** section of `Backlog.md` with a one-line note explaining what condition is needed.
+
 ---
 
 ## Supabase migrations
@@ -182,6 +184,7 @@ After committing:
 3. Post the test results to the GitHub issue via `mcp__github__add_issue_comment` before closing — copy the full checklist results from the submit output (one result per line).
 4. Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
 5. Confirm the Last used numbers line at the top of `Backlog.md` is current.
+6. If any checklist items were submitted as Skip, move them to the **Deferred Testing Scenarios** section of `Backlog.md` now (if not already done in Phase 5). Format: `- [FR# or Issue#] <item description> — needs: <condition>`.
 
 Push: `git -C "C:\Programming_Projects\GTDWorkflowApp" push origin main`
 
