@@ -106,10 +106,21 @@ function extractUpdateAction(text) {
   const taskId = m[1].trim();
   const fieldStr = m[2];
 
-  // notes must be last — everything after 'notes:' is its value (may contain |)
-  const notesIdx = fieldStr.search(/(^|\|)notes:/);
-  const pureFields = notesIdx !== -1 ? fieldStr.slice(0, notesIdx).replace(/\|$/, '') : fieldStr;
-  const notesRaw   = notesIdx !== -1 ? fieldStr.slice(fieldStr.indexOf('notes:', notesIdx) + 6) : null;
+  // notes / notes_append must be last — everything after the key is its value (may contain |)
+  const notesAppendIdx  = fieldStr.search(/(^|\|)notes_append:/);
+  const notesReplaceIdx = fieldStr.search(/(^|\|)notes:/);
+  let notesRaw = null;
+  let notesIsAppend = false;
+  let lastFieldIdx = -1;
+  if (notesAppendIdx !== -1 && (notesReplaceIdx === -1 || notesAppendIdx <= notesReplaceIdx)) {
+    lastFieldIdx = notesAppendIdx;
+    notesRaw = fieldStr.slice(fieldStr.indexOf('notes_append:', notesAppendIdx) + 13);
+    notesIsAppend = true;
+  } else if (notesReplaceIdx !== -1) {
+    lastFieldIdx = notesReplaceIdx;
+    notesRaw = fieldStr.slice(fieldStr.indexOf('notes:', notesReplaceIdx) + 6);
+  }
+  const pureFields = lastFieldIdx !== -1 ? fieldStr.slice(0, lastFieldIdx).replace(/\|$/, '') : fieldStr;
 
   const changes = {};
   pureFields.split('|').filter(Boolean).forEach(pair => {
@@ -131,7 +142,13 @@ function extractUpdateAction(text) {
     if (key === 'someday')    changes.isSomeday    = val === 'true';
     if (key === 'nextAction') changes.isNextAction = val === 'true';
   });
-  if (notesRaw !== null) changes.notes = notesRaw.replace(/\\n/g, '\n');
+  if (notesRaw !== null) {
+    if (notesIsAppend) {
+      changes.notesAppend = notesRaw.replace(/\\n/g, '\n');
+    } else {
+      changes.notes = notesRaw.replace(/\\n/g, '\n');
+    }
+  }
 
   return Object.keys(changes).length ? { taskId, changes } : null;
 }

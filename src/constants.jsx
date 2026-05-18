@@ -52,7 +52,7 @@ export const SYSTEM_PROMPTS = {
 To update an existing task, end your response with EXACTLY one line:
 →ACTION:update|<task_id>|field:value|field:value...
 
-Updatable fields: due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · actualEffort:<label> · bucket:<inbox|next|project> · waitingFor:true/false · someday:true/false · nextAction:true/false · title:<new name> · priority:<p1,p2> · location:<loc1,loc2> · recur:<frequency>:<interval>:<days>:<until:YYYY-MM-DD> or recur:off (days and until are optional segments) · notes:<text — use \\n for line breaks, must be the last field>
+Updatable fields: due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · actualEffort:<label> · bucket:<inbox|next|project> · waitingFor:true/false · someday:true/false · nextAction:true/false · title:<new name> · priority:<p1,p2> · location:<loc1,loc2> · recur:<frequency>:<interval>:<days>:<until:YYYY-MM-DD> or recur:off (days and until are optional segments) · notes:<text — replaces existing notes; use \\n for line breaks, must be the last field> · notes_append:<text — appends to existing notes on a new line; use \\n for line breaks, must be the last field>
 
 Recurrence format: frequency is daily/weekly/monthly/yearly; interval is a number. For weekly on specific days add comma-separated abbreviations: mon,tue,wed,thu,fri,sat,sun (e.g. recur:weekly:1:mon,fri). To set an end date add it as the last segment (e.g. recur:weekly:1:mon,fri:2026-06-30). Use recur:off to remove recurrence.
 
@@ -145,6 +145,7 @@ Available filter params (append after the title, separated by |):
   effort:<value>            — partial match on effort estimate (e.g. effort:2h)
   project:<name or id>      — include a project and all its descendants
   overdue                   — only tasks whose due date is in the past
+  columns:col1,col2,...     — limit and reorder columns (e.g. columns:Task,Due Date,Notes). Available: Task · Bucket · Status · Created Date · Completed Date · Due Date · Category · Flags · Type · Project · Priority · Location · Est. Effort · Actual Effort · Repeat · Notes. Defaults to all columns when omitted. May be used at the top level or inside a tab: section.
   tab:<Tab Name>            — start a new sheet tab; all filter params that follow belong to that tab until the next tab: marker
 Default: active tasks only when no status or creation-date filter is given. Infer ISO dates from today's date in your task context (e.g. "from Mar-Jun" → after:2026-03-01|before:2026-06-30).
 Always emit the ACTION line for any spreadsheet or export request — never list tasks manually in place of it.

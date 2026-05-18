@@ -276,6 +276,16 @@ describe('extractUpdateAction', () => {
   it('returns null when no recognised fields are present', () => {
     expect(extractUpdateAction('→ACTION:update|task-1|unknown:value')).toBeNull();
   });
+
+  it('parses notes_append and returns a notesAppend change', () => {
+    const result = extractUpdateAction('→ACTION:update|task-1|notes_append:New context');
+    expect(result).toEqual({ taskId: 'task-1', changes: { notesAppend: 'New context' } });
+  });
+
+  it('notes_append converts escaped newlines', () => {
+    const result = extractUpdateAction('→ACTION:update|task-1|notes_append:Line A\\nLine B');
+    expect(result).toEqual({ taskId: 'task-1', changes: { notesAppend: 'Line A\nLine B' } });
+  });
 });
 
 // ---------------------------------------------------------------------------

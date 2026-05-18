@@ -55,45 +55,58 @@ function parseSheetTabs(parts) {
     var p = parts[i].trim();
     if (p.startsWith('tab:')) {
       if (current) tabs.push(current);
-      current = { name: p.slice(4).trim() || 'Sheet', params: [] };
+      current = { name: p.slice(4).trim() || 'Sheet', params: [], columns: null };
     } else if (current) {
-      current.params.push(p);
+      if (p.startsWith('columns:')) {
+        current.columns = p.slice(8).split(',').map(function(c) { return c.trim(); }).filter(Boolean);
+      } else {
+        current.params.push(p);
+      }
     }
   }
   if (current) tabs.push(current);
   if (tabs.length === 0) {
-    tabs.push({ name: 'Sheet1', params: parts.slice(1) });
+    var colPart = parts.slice(1).find(function(p) { return p.trim().startsWith('columns:'); });
+    var columns = colPart ? colPart.slice(colPart.indexOf(':') + 1).split(',').map(function(c) { return c.trim(); }).filter(Boolean) : null;
+    var params = parts.slice(1).filter(function(p) { return !p.trim().startsWith('columns:'); });
+    tabs.push({ name: 'Sheet1', params: params, columns: columns });
   }
   return tabs;
 }
 
 // Build headers + data rows for a single sheet tab from a filtered task list.
-function buildSheetData(filteredTasks, taskById) {
+function buildSheetData(filteredTasks, taskById, columns) {
   var BUCKET_LABELS = { next: 'Next Actions', waiting: 'Waiting For', project: 'Projects', someday: 'Someday/Maybe', inbox: 'Inbox', deferred: 'Deferred' };
   var NODE_TYPE_LABELS = { category: 'Category', subcategory: 'Subcategory', project: 'Project', subproject: 'Subproject' };
-  var headers = [['Task', 'Bucket', 'Status', 'Created Date', 'Completed Date', 'Due Date', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes']];
+  var COLUMN_EXTRACTORS = {
+    'task':           function(t) { return t.text; },
+    'bucket':         function(t) { return BUCKET_LABELS[t.bucket] || t.bucket || ''; },
+    'status':         function(t) { return t.done ? 'Done' : 'Active'; },
+    'created date':   function(t) { return t.created ? new Date(t.created).toISOString().slice(0, 10) : ''; },
+    'completed date': function(t) { return t.completedDate || ''; },
+    'due date':       function(t) { return t.dueDate || ''; },
+    'category':       function(t) { return t.category || ''; },
+    'flags':          function(t) { return [t.isWaitingFor && 'Waiting For', t.isSomeday && 'Someday'].filter(Boolean).join(', '); },
+    'type':           function(t) { return NODE_TYPE_LABELS[t.nodeType] || t.nodeType || ''; },
+    'project':        function(t) { return t.parentId && taskById[t.parentId] ? taskById[t.parentId].text : ''; },
+    'priority':       function(t) { return (t.priority || []).join(', '); },
+    'location':       function(t) { return (t.location || []).join(', '); },
+    'est. effort':    function(t) { return t.effort || ''; },
+    'actual effort':  function(t) { return t.actualEffort || ''; },
+    'repeat':         function(t) { return t.recurrence ? (typeof t.recurrence === 'string' ? t.recurrence : JSON.stringify(t.recurrence)) : ''; },
+    'notes':          function(t) { return t.notes || ''; },
+  };
+  var DEFAULT_COLUMNS = ['Task', 'Bucket', 'Status', 'Created Date', 'Completed Date', 'Due Date', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes'];
+  var activeColumns = (columns && columns.length)
+    ? columns.filter(function(c) { return COLUMN_EXTRACTORS[c.toLowerCase()]; })
+    : DEFAULT_COLUMNS;
+  if (!activeColumns.length) activeColumns = DEFAULT_COLUMNS;
+  var headers = [activeColumns];
   var rows = filteredTasks.map(function(t) {
-    var flags = [t.isWaitingFor && 'Waiting For', t.isSomeday && 'Someday'].filter(Boolean).join(', ');
-    var parentName = t.parentId && taskById[t.parentId] ? taskById[t.parentId].text : '';
-    var repeat = t.recurrence ? (typeof t.recurrence === 'string' ? t.recurrence : JSON.stringify(t.recurrence)) : '';
-    return [
-      t.text,
-      BUCKET_LABELS[t.bucket] || t.bucket || '',
-      t.done ? 'Done' : 'Active',
-      t.created ? new Date(t.created).toISOString().slice(0, 10) : '',
-      t.completedDate || '',
-      t.dueDate || '',
-      t.category || '',
-      flags,
-      NODE_TYPE_LABELS[t.nodeType] || t.nodeType || '',
-      parentName,
-      (t.priority || []).join(', '),
-      (t.location || []).join(', '),
-      t.effort || '',
-      t.actualEffort || '',
-      repeat,
-      t.notes || '',
-    ];
+    return activeColumns.map(function(col) {
+      var fn = COLUMN_EXTRACTORS[col.toLowerCase()];
+      return fn ? fn(t) : '';
+    });
   });
   return headers.concat(rows);
 }
@@ -536,10 +549,18 @@ function useCallAI({
             if (upd) {
               const target = workingTasks.find(t => t.id === upd.taskId);
               if (target) {
+                const resolvedChanges = { ...upd.changes };
+                if (resolvedChanges.notesAppend !== undefined) {
+                  const existing = target.notes || '';
+                  resolvedChanges.notes = existing
+                    ? existing + '\n' + resolvedChanges.notesAppend
+                    : resolvedChanges.notesAppend;
+                  delete resolvedChanges.notesAppend;
+                }
                 workingTasks = workingTasks.map(t =>
-                  t.id === upd.taskId ? { ...t, ...upd.changes } : t
+                  t.id === upd.taskId ? { ...t, ...resolvedChanges } : t
                 );
-                const fieldLabels = Object.keys(upd.changes).map(k => ({
+                const fieldLabels = Object.keys(resolvedChanges).map(k => ({
                   notes: 'notes', dueDate: 'due date', deferUntil: 'defer date',
                   effort: 'effort', actualEffort: 'actual effort', text: 'title', bucket: 'bucket',
                   priority: 'priority', location: 'location', recurrence: 'recurrence',
@@ -760,7 +781,7 @@ function useCallAI({
               var tab = sheetTabs[ti];
               var tabTasks = applyTaskFilters(tab.params, tasks);
               totalRows += tabTasks.length;
-              var tabValues = buildSheetData(tabTasks, taskById);
+              var tabValues = buildSheetData(tabTasks, taskById, tab.columns);
               await sheetsAppendRows({ token: googleToken, spreadsheetId: sheetId, range: tab.name, values: tabValues });
             }
             var tabsLabel = sheetTabs.length > 1 ? sheetTabs.length + ' tabs, ' + totalRows + ' tasks' : totalRows + ' tasks';
