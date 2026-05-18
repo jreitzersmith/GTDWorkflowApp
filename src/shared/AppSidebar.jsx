@@ -16,6 +16,7 @@ function AppSidebar({
   focusCount,
   onSelectEmail,
   onSelectCalendar,
+  onSelectAnalytics,
   onToggleSettings,
   onToggleUsage,
   onDailyReview,
@@ -106,6 +107,20 @@ function AppSidebar({
         </div>
 
         <div
+          onClick={onSelectAnalytics}
+          accessKey="a"
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "analytics" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "analytics" ? COLORS.accent : "transparent"}`, transition: "background 0.1s" }}
+          onMouseEnter={e => { if (currentView !== "analytics") { e.currentTarget.style.background = COLORS.surface2; } }}
+          onMouseLeave={e => { if (currentView !== "analytics") { e.currentTarget.style.background = "transparent"; } }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.accent, flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "analytics" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>📊</span>
+            Analytics
+          </span>
+        </div>
+
+        <div
           onClick={onOpenSearch}
           accessKey="k"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: "transparent", borderLeft: "3px solid transparent", transition: "background 0.1s" }}
@@ -149,6 +164,7 @@ AppSidebar.propTypes = {
   focusCount:      PropTypes.number,
   onSelectEmail:   PropTypes.func.isRequired,
   onSelectCalendar: PropTypes.func.isRequired,
+  onSelectAnalytics: PropTypes.func.isRequired,
   onToggleSettings: PropTypes.func.isRequired,
   onToggleUsage:   PropTypes.func.isRequired,
   onDailyReview:   PropTypes.func.isRequired,

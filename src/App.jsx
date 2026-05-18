@@ -14,6 +14,7 @@ import { AuthGate } from "./shared/AuthGate.jsx";
 import { AppSidebar } from "./shared/AppSidebar.jsx";
 import { SearchModal } from "./shared/SearchModal.jsx";
 import { TaskBucketView } from "./features/tasks/TaskBucketView.jsx";
+import { TaskAnalyticsView } from "./features/tasks/TaskAnalyticsView.jsx";
 import { CoachPanel } from "./features/coach/CoachPanel.jsx";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth.js";
 import { useGoogleAuth } from "./hooks/useGoogleAuth.js";
@@ -1223,6 +1224,7 @@ export default function GTDManager() {
           focusCount={focusCount}
           onSelectEmail={() => { setCurrentView("email"); setShowSettings(false); setSelectedTaskId(null); }}
           onSelectCalendar={() => { setCurrentView("calendar"); setShowSettings(false); setSelectedTaskId(null); }}
+          onSelectAnalytics={() => { setCurrentView("analytics"); setShowSettings(false); setSelectedTaskId(null); }}
           onToggleSettings={() => { setShowSettings(v => !v); setShowUsage(false); }}
           onToggleUsage={() => { setShowUsage(v => !v); setShowSettings(false); }}
           onDailyReview={startDailyReview}
@@ -1391,6 +1393,11 @@ export default function GTDManager() {
                           onSetFocusExpandedDefaults={setFocusExpandedDefaults}
                           shortcutModifier={shortcutModifier}
                           onSetShortcutModifier={setShortcutModifier}
+                        />
+                      ) : currentView === "analytics" ? (
+                        <TaskAnalyticsView
+                          tasks={tasks}
+                          efforts={efforts}
                         />
                       ) : (
                         <TaskBucketView
