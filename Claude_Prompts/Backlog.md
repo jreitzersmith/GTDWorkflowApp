@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#23** · Code Quality — **CQ#11** · Feature Requests — **FR#101**
+> **Last used numbers:** Known Issues — **Issue#23** · Code Quality — **CQ#11** · Feature Requests — **FR#103**
 
 ---
 
@@ -32,6 +32,7 @@
 - [ ] FR#96 [GH#101] (2026-05-16) — Drive target folder settings per action type — settings UI to configure destination Drive folder for each action (create-doc, create-sheet, create-slides, save-review-to-doc); uses existing `reviewDriveFolderId` pattern generalised to all Drive-creating actions
 - [ ] FR#97 [GH#103] (2026-05-16) — Save-to-Drive: output format selector (prose/JSON/markdown) + timestamp + mode in filename — settings option; applies to Weekly Review saves and coach create-doc handler
 - [ ] FR#98 [GH#104] (2026-05-16) — Settings: configurable AI Coach name and user display name — defaults to "Coach" and Google account name; threaded into all system prompts
+- [ ] FR#103 [GH#111] (2026-05-18) — Export popover: inline format selector (localFormat state, segmented button group) + checkbox label language cleanup; ExportPopover.jsx only
 - [ ] FR#101 [GH#110] (2026-05-18) — Conversation export — export coach chat to Google Docs, Markdown, or plain text; export button in coach panel header, settings for default format + content; chip messages used for tool activity (see FR#102 for raw payload export)
 - [ ] FR#102 [GH#109] (2026-05-18) — Full conversation export: raw API tool call inputs and outputs — IMPORTANT: review FR#101 implementation before extending; raw API payloads not currently stored in messages state
 - [ ] FR#99 [GH#105] (2026-05-16) — Chat mode: Drive file read tool — `search_drive` + `get_drive_file` tools in useCallAI.js so coach can retrieve doc content by name; extends FR#59
@@ -63,3 +64,10 @@
 - FR#9 [GH#18] — Todoist export / two-way sync (previously Issue#4 / GH#3)
 - FR#20 [GH#19] — Mobile layout (significant; requires media queries throughout)
 
+---
+
+## Testing backlog
+
+Items deferred during active testing — check these when the relevant condition is next available.
+
+- [ ] FR#101 [GH#110] — Export with Docs disconnected shows correct error message in popover (test next time Google Docs is disconnected/scope not granted)
