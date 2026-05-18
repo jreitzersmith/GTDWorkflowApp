@@ -14,6 +14,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-18 | Feature | FR#59 | GH#58 | AI coach drive_search tool — DRIVE_SEARCH_TOOL in useCallAI.js; plain-text query normalisation | 91a61fbf |
 | 2026-05-18 | Feature | FR#99 | GH#105 | AI coach get_drive_file tool — GET_DRIVE_FILE_TOOL; exports Docs/Sheets/Slides content as text for chat context | 91a61fbf |
 | 2026-05-18 | Feature | FR#104 | GH#112 | User location settings — city/home/work in Settings; [User Location] injected into all AI system prompts | 131675e3 |
+| 2026-05-18 | Feature | FR#100 | GH#107 | Task analytics charts — bucket bar chart, 12-week completions, effort accuracy (under/on/over) | c340b001 |
 | 2026-05-18 | Feature | FR#102 | GH#109 | Raw API tool call export as JSON — rawApiThread state, buildJsonExport, 2×2 format grid in ExportPopover | c84a80377 |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-17 | Feature | FR#90 | GH#95 | Notes field append — notes_append: action field in extractUpdateAction + useCallAI.js | d056665f |
@@ -132,4 +133,5 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-17 | Feature      | —       | —      | docsApi.js: docsAppendMarkdown — native Docs formatting (headings, bullets, bold/italic via batchUpdate) | 5b74ede |
 | 2026-05-17 | Bug Fix      | Issue#23| GH#108 | create-sheet: AI listed tasks instead of emitting ACTION when date range specified; add applyTaskFilters shared utility with 11 filter params | 14b2a01 |
 | 2026-05-18 | Feature | FR#103 | GH#111 | ExportPopover inline format selector; 'User messages' label unification | 6083b8c9 |
-| 2026-05-
+| 2026-05-| 2026-05-18 | Feature      | FR#98   | GH#104 | Configurable AI coach name and user display name — threaded into all system prompts | 4588ad5 |
+| 2026-05-18 | Feature      | FR#105  | GH#113 | AI coach get_weather tool (OpenWeatherMap) — current + forecast, userCity default   | f0ec825 |
