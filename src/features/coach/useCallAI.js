@@ -15,7 +15,8 @@ import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateA
   extractCalendarDeleteAction } from '../tasks/taskUtils.jsx';
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
 import { docsCreateDocument, docsAppendText, docsAppendMarkdown, docsMoveToFolder } from '../../api/docsApi.js';
-import { sheetsCreateSpreadsheet, sheetsAppendRows, sheetsBatchUpdate } from '../../api/sheetsApi.js';
+import { driveListFiles, driveGetFile, driveDownloadFile, driveExportFile } from '../../api/driveApi.js';
+import { sheetsCreateSpreadsheet, sheetsAppendRows, sheetsBatchUpdate, sheetsMoveToFolder } from '../../api/sheetsApi.js';
 import { createAndUploadPptx, PPTX_MIME } from '../../api/pptxApi.js';
 
 // Lazy task-retrieval tool — used in chat mode so the full task list isn't
@@ -32,6 +33,45 @@ const GET_TASK_CONTEXT_TOOL = {
         description: 'Buckets to include. Omit or pass null for all buckets.',
       },
     },
+  },
+};
+
+// Drive search tool — available in chat mode when Drive is connected (FR#59/FR#99)
+const DRIVE_SEARCH_TOOL = {
+  name: 'drive_search',
+  description: "Search Google Drive for files by name or content. Returns matching files with IDs, names, MIME types, and view links. Use before get_drive_file to find the file_id. IMPORTANT: query must use Drive query syntax — e.g. \"name contains 'LeanIX'\" or \"fullText contains 'LeanIX'\" or \"'root' in parents and trashed=false\". Plain text keywords without an operator will be rejected by the API.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: "Drive query syntax string. Examples: \"name contains 'report'\", \"fullText contains 'budget'\", \"name contains 'LeanIX' or fullText contains 'LeanIX'\", \"'root' in parents and trashed=false\". Do NOT pass plain keywords — they cause a 400 error.",
+      },
+      max_results: {
+        type: 'number',
+        description: 'Maximum number of files to return (default 10, max 50).',
+      },
+    },
+    required: ['query'],
+  },
+};
+
+const GET_DRIVE_FILE_TOOL = {
+  name: 'get_drive_file',
+  description: 'Read the text content of a Google Drive file (Google Doc, Sheet, or other text-based file). Use drive_search first to get the file_id.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      file_id: {
+        type: 'string',
+        description: 'The Google Drive file ID from drive_search results.',
+      },
+      mime_type: {
+        type: 'string',
+        description: 'Export format. Defaults to text/plain for Docs, text/csv for Sheets. Leave blank for auto-detect.',
+      },
+    },
+    required: ['file_id'],
   },
 };
 
@@ -232,6 +272,11 @@ function useCallAI({
   userCity,
   userHomeAddress,
   userWorkAddress,
+  driveEnabled,
+  driveDocumentFolderId,
+  driveSpreadsheetFolderId,
+  driveSlideDeckFolderId,
+  driveBaseFolderId,
 }) {
   const fetchModels = useCallback(async () => {
     try {
@@ -316,6 +361,10 @@ function useCallAI({
                 availableTools.push(GMAIL_COMPOSE_TOOL);
               if (googleScope === 'send')
                 availableTools.push(GMAIL_SEND_TOOL);
+            }
+            if (googleToken && driveEnabled) {
+              availableTools.push(DRIVE_SEARCH_TOOL);
+              availableTools.push(GET_DRIVE_FILE_TOOL);
             }
             if (availableTools.length > 0) reqBody.tools = availableTools;
           }
@@ -482,6 +531,45 @@ function useCallAI({
                     toolUse.input.thread_id, googleToken
                   );
                   toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === 'drive_search') {
+                const driveQuery = toolUse.input.query;
+                const driveMax = Math.min(toolUse.input.max_results || 10, 50);
+                // Normalize plain-text keywords to valid Drive query syntax.
+                // The Drive API rejects bare keywords (e.g. "LeanIX") with 400 Invalid Value;
+                // they must be wrapped in a contains operator.
+                let normalizedQuery = driveQuery;
+                if (!/(contains|!=|=|in\s|has\s|>\s|<\s|\s+and\s+|\s+or\s+|\s+not\s+)/i.test(driveQuery)) {
+                  const escaped = driveQuery.replace(/'/g, "\\'");
+                  normalizedQuery = "name contains '" + escaped + "' or fullText contains '" + escaped + "'";
+                }
+                setMessages(prev => [...prev, {
+                  role: 'assistant', text: '🔍 Searching Drive: "' + driveQuery + '"', isSearchChip: true,
+                }]);
+                try {
+                  const result = await driveListFiles({ token: googleToken, q: normalizedQuery, pageSize: driveMax });
+                  const files = (result.files || []).map(function(f) {
+                    return { id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, webViewLink: f.webViewLink };
+                  });
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(files) });
+                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === 'get_drive_file') {
+                const driveFileId = toolUse.input.file_id;
+                setMessages(prev => [...prev, {
+                  role: 'assistant', text: '📄 Reading Drive file…', isSearchChip: true,
+                }]);
+                try {
+                  const meta = await driveGetFile({ token: googleToken, fileId: driveFileId });
+                  const fileMime = meta.mimeType || '';
+                  let fileContent;
+                  if (fileMime.startsWith('application/vnd.google-apps.')) {
+                    const exportMime = toolUse.input.mime_type || (fileMime.includes('spreadsheet') ? 'text/csv' : 'text/plain');
+                    fileContent = await driveExportFile({ token: googleToken, fileId: driveFileId, mimeType: exportMime });
+                  } else {
+                    fileContent = await driveDownloadFile({ token: googleToken, fileId: driveFileId });
+                  }
+                  if (fileContent.length > 50000) fileContent = fileContent.slice(0, 50000) + '\n[content truncated at 50,000 chars]';
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: fileContent });
                 } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               }
             }
@@ -791,6 +879,10 @@ function useCallAI({
                   : t));
               }
             }
+            const docTargetFolder = driveDocumentFolderId || driveBaseFolderId || null;
+            if (docTargetFolder) {
+              await docsMoveToFolder({ token: googleToken, documentId: doc.documentId, newParentId: docTargetFolder, onTokenRefresh: refreshGoogleToken });
+            }
             updateChip = { taskName: docTitle, fields: ['Google Doc created'], url: docUrl };
           } catch (e) { actionError = `\u26a0 Doc creation failed: ${e.message}`; }
         }
@@ -824,6 +916,10 @@ function useCallAI({
               await sheetsAppendRows({ token: googleToken, spreadsheetId: sheetId, range: tab.name, values: tabValues });
             }
             var tabsLabel = sheetTabs.length > 1 ? sheetTabs.length + ' tabs, ' + totalRows + ' tasks' : totalRows + ' tasks';
+            const sheetTargetFolder = driveSpreadsheetFolderId || driveBaseFolderId || null;
+            if (sheetTargetFolder) {
+              await sheetsMoveToFolder({ token: googleToken, spreadsheetId: sheetId, newParentId: sheetTargetFolder, onTokenRefresh: refreshGoogleToken });
+            }
             updateChip = { taskName: sheetTitle, fields: ['Google Sheet created — ' + tabsLabel], url: sheetUrl };
           } catch (e) { actionError = `\u26a0 Sheet creation failed: ${e.message}`; }
         }
@@ -849,11 +945,13 @@ function useCallAI({
               })
               .filter(Boolean);
             const slideCount = parsedSlides.length;
+            const slidesTargetFolder = driveSlideDeckFolderId || driveBaseFolderId || undefined;
             const result = await createAndUploadPptx({
               token: googleToken,
               title: slidesTitle,
               slides: parsedSlides,
               theme: slidesTheme,
+              folderId: slidesTargetFolder,
             });
             const fieldLabel = slideCount > 0 ? slideCount + ' slides' : 'PowerPoint created';
             updateChip = { taskName: result.fileName, fields: [fieldLabel], url: result.webViewLink };
@@ -931,7 +1029,8 @@ function useCallAI({
   }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel,
       googleToken, googleScope, calendarEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
       setCalendarEvents, recordUsage, setLastInputLog, setTasks, setGmailQueue,
-      setMessages, setChatHistory, setLoading, setPendingAction, authUser, userCity, userHomeAddress, userWorkAddress]); // eslint-disable-line react-hooks/exhaustive-deps
+      setMessages, setChatHistory, setLoading, setPendingAction, authUser, userCity, userHomeAddress, userWorkAddress,
+      driveEnabled, driveDocumentFolderId, driveSpreadsheetFolderId, driveSlideDeckFolderId, driveBaseFolderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();

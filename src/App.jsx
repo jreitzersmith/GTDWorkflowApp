@@ -27,6 +27,7 @@ import { useTaskUIState } from "./features/tasks/useTaskUIState.js";
 import { createEmptyUsageStats } from "./features/settings/useAIUsageTracking.js";
 
 import { parseRRULE, calEventStart, isAllDayEvent, genId } from "./features/calendar/calendarApi.js";
+import { driveUploadFile } from "./api/driveApi.js";
 import { todayStr, isDeferred, buildNextOccurrence, extractSuggestions, extractMetadata, getOrderedChildren, useResizer, effortToMinutes } from "./features/tasks/taskUtils.jsx";
 import { useDragDrop } from "./features/tasks/useDragDrop.js";
 import { useSupabaseSync } from "./hooks/useSupabaseSync.js";
@@ -59,7 +60,7 @@ export default function GTDManager() {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress} = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress} = useAppSettings();
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
@@ -420,6 +421,11 @@ export default function GTDManager() {
     userCity,
     userHomeAddress,
     userWorkAddress,
+    driveEnabled,
+    driveDocumentFolderId,
+    driveSpreadsheetFolderId,
+    driveSlideDeckFolderId,
+    driveBaseFolderId,
   });
 
   const switchCoachMode = useCallback((mode, introMsg) => {
@@ -1102,6 +1108,19 @@ export default function GTDManager() {
     categories, setCategories,
   });
 
+  const handleDriveBackup = useCallback(async () => {
+    if (!googleToken) throw new Error('Google Drive is not connected.');
+    const data = { version: 1, exportedAt: new Date().toISOString(), tasks, locations, efforts, categories };
+    const filename = `gtd-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    await driveUploadFile({
+      token: googleToken,
+      name: filename,
+      mimeType: 'application/json',
+      content: JSON.stringify(data, null, 2),
+      parents: driveBackupFolderId ? [driveBackupFolderId] : [],
+    });
+  }, [googleToken, tasks, locations, efforts, categories, driveBackupFolderId]);
+
   // "deferred" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
   const bucketTasks = currentBucket === "deferred"
     ? tasks.filter(t => isDeferred(t) && !t.done).sort((a, b) => (a.deferUntil > b.deferUntil ? 1 : -1))
@@ -1276,8 +1295,31 @@ export default function GTDManager() {
                           onSetRecurringReviewDays={setRecurringReviewDays}
                           calendarReminderMinutes={calendarReminderMinutes}
                           onSetCalendarReminderMinutes={setCalendarReminderMinutes}
-                          reviewDriveFolderId={reviewDriveFolderId}
-                          onSetReviewDriveFolderId={setReviewDriveFolderId}
+                          driveBaseFolderId={driveBaseFolderId}
+                          onSetDriveBaseFolderId={setDriveBaseFolderId}
+                          driveConversationExportFolderId={driveConversationExportFolderId}
+                          onSetDriveConversationExportFolderId={setDriveConversationExportFolderId}
+                          driveSlideDeckFolderId={driveSlideDeckFolderId}
+                          onSetDriveSlideDeckFolderId={setDriveSlideDeckFolderId}
+                          driveSpreadsheetFolderId={driveSpreadsheetFolderId}
+                          onSetDriveSpreadsheetFolderId={setDriveSpreadsheetFolderId}
+                          driveDocumentFolderId={driveDocumentFolderId}
+                          onSetDriveDocumentFolderId={setDriveDocumentFolderId}
+                          driveBaseFolderPath={driveBaseFolderPath}
+                          onSetDriveBaseFolderPath={setDriveBaseFolderPath}
+                          driveConversationExportFolderPath={driveConversationExportFolderPath}
+                          onSetDriveConversationExportFolderPath={setDriveConversationExportFolderPath}
+                          driveSlideDeckFolderPath={driveSlideDeckFolderPath}
+                          onSetDriveSlideDeckFolderPath={setDriveSlideDeckFolderPath}
+                          driveSpreadsheetFolderPath={driveSpreadsheetFolderPath}
+                          onSetDriveSpreadsheetFolderPath={setDriveSpreadsheetFolderPath}
+                          driveDocumentFolderPath={driveDocumentFolderPath}
+                          onSetDriveDocumentFolderPath={setDriveDocumentFolderPath}
+                          driveBackupFolderId={driveBackupFolderId}
+                          onSetDriveBackupFolderId={setDriveBackupFolderId}
+                          driveBackupFolderPath={driveBackupFolderPath}
+                          onSetDriveBackupFolderPath={setDriveBackupFolderPath}
+                          onBackupToDrive={handleDriveBackup}
                           exportSettings={exportSettings}
                           onExportSettingsChange={setExportSettings}
                           userCity={userCity}
@@ -1466,7 +1508,7 @@ export default function GTDManager() {
                 onSwitchToChat={() => switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.")}
                 onMITSubmit={handleMITSubmit}
                 docsEnabled={docsEnabled}
-                reviewDriveFolderId={reviewDriveFolderId}
+                driveConversationExportFolderId={driveConversationExportFolderId}
                 exportSettings={exportSettings}
                 onExportSettingsChange={setExportSettings}
                 googleToken={googleToken}

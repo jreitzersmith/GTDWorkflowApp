@@ -40,7 +40,7 @@ function useAppSettings() {
   );
   useEffect(() => { localStorage.setItem('gtd_next_actions_mode', nextActionsViewMode); }, [nextActionsViewMode]);
 
-  // focusExpandedDefaults: which Today's Focus tiers are expanded by default
+  // focusExpandedDefaults: which Today\'s Focus tiers are expanded by default
   const [focusExpandedDefaults, setFocusExpandedDefaults] = useState(() => {
     try { return JSON.parse(localStorage.getItem('gtd_focus_expanded') || 'null') || { dueToday: true, overdue: true, dueThisWeek: false, noCalEvent: false }; }
     catch { return { dueToday: true, overdue: true, dueThisWeek: false, noCalEvent: false }; }
@@ -58,10 +58,37 @@ function useAppSettings() {
   );
   useEffect(() => { localStorage.setItem('gtd_shortcut_modifier', shortcutModifier); }, [shortcutModifier]);
 
-  const [reviewDriveFolderId, setReviewDriveFolderId] = useState(() =>
+  // FR#96: per-action Drive folder destinations (fallback chain: specific → base → Drive root)
+  const [driveBaseFolderId, setDriveBaseFolderId] = useState(() => localStorage.getItem('gtd_drive_base_folder_id') || '');
+  const [driveConversationExportFolderId, setDriveConversationExportFolderId] = useState(() =>
+    localStorage.getItem('gtd_drive_conversation_export_folder_id') ||
     localStorage.getItem('gtd_review_drive_folder_id') || ''
   );
-  useEffect(() => { localStorage.setItem('gtd_review_drive_folder_id', reviewDriveFolderId); }, [reviewDriveFolderId]);
+  const [driveSlideDeckFolderId, setDriveSlideDeckFolderId] = useState(() => localStorage.getItem('gtd_drive_slide_deck_folder_id') || '');
+  const [driveSpreadsheetFolderId, setDriveSpreadsheetFolderId] = useState(() => localStorage.getItem('gtd_drive_spreadsheet_folder_id') || '');
+  const [driveDocumentFolderId, setDriveDocumentFolderId] = useState(() => localStorage.getItem('gtd_drive_document_folder_id') || '');
+  useEffect(() => { localStorage.setItem('gtd_drive_base_folder_id', driveBaseFolderId); }, [driveBaseFolderId]);
+  useEffect(() => { localStorage.setItem('gtd_drive_conversation_export_folder_id', driveConversationExportFolderId); }, [driveConversationExportFolderId]);
+  useEffect(() => { localStorage.setItem('gtd_drive_slide_deck_folder_id', driveSlideDeckFolderId); }, [driveSlideDeckFolderId]);
+  useEffect(() => { localStorage.setItem('gtd_drive_spreadsheet_folder_id', driveSpreadsheetFolderId); }, [driveSpreadsheetFolderId]);
+  useEffect(() => { localStorage.setItem('gtd_drive_document_folder_id', driveDocumentFolderId); }, [driveDocumentFolderId]);
+
+  // Display paths for Drive folders (human-readable labels stored alongside IDs)
+  const [driveBaseFolderPath, setDriveBaseFolderPath] = useState(() => localStorage.getItem('gtd_drive_base_folder_path') || '');
+  const [driveConversationExportFolderPath, setDriveConversationExportFolderPath] = useState(() => localStorage.getItem('gtd_drive_conversation_export_folder_path') || '');
+  const [driveSlideDeckFolderPath, setDriveSlideDeckFolderPath] = useState(() => localStorage.getItem('gtd_drive_slide_deck_folder_path') || '');
+  const [driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath] = useState(() => localStorage.getItem('gtd_drive_spreadsheet_folder_path') || '');
+  const [driveDocumentFolderPath, setDriveDocumentFolderPath] = useState(() => localStorage.getItem('gtd_drive_document_folder_path') || '');
+  // App data backup folder
+  const [driveBackupFolderId, setDriveBackupFolderId] = useState(() => localStorage.getItem('gtd_drive_backup_folder_id') || '');
+  const [driveBackupFolderPath, setDriveBackupFolderPath] = useState(() => localStorage.getItem('gtd_drive_backup_folder_path') || '');
+  useEffect(() => { localStorage.setItem('gtd_drive_base_folder_path', driveBaseFolderPath); }, [driveBaseFolderPath]);
+  useEffect(() => { localStorage.setItem('gtd_drive_conversation_export_folder_path', driveConversationExportFolderPath); }, [driveConversationExportFolderPath]);
+  useEffect(() => { localStorage.setItem('gtd_drive_slide_deck_folder_path', driveSlideDeckFolderPath); }, [driveSlideDeckFolderPath]);
+  useEffect(() => { localStorage.setItem('gtd_drive_spreadsheet_folder_path', driveSpreadsheetFolderPath); }, [driveSpreadsheetFolderPath]);
+  useEffect(() => { localStorage.setItem('gtd_drive_document_folder_path', driveDocumentFolderPath); }, [driveDocumentFolderPath]);
+  useEffect(() => { localStorage.setItem('gtd_drive_backup_folder_id', driveBackupFolderId); }, [driveBackupFolderId]);
+  useEffect(() => { localStorage.setItem('gtd_drive_backup_folder_path', driveBackupFolderPath); }, [driveBackupFolderPath]);
 
   const [exportSettings, setExportSettings] = useState(() => {
     try {
@@ -81,7 +108,31 @@ function useAppSettings() {
   useEffect(() => { localStorage.setItem('gtd_user_home_address', userHomeAddress); }, [userHomeAddress]);
   useEffect(() => { localStorage.setItem('gtd_user_work_address', userWorkAddress); }, [userWorkAddress]);
 
-  return { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, reviewDriveFolderId, setReviewDriveFolderId, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress };
+  return {
+    locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides,
+    tagDisplay, setTagDisplay, categories, setCategories,
+    calendarReminderMinutes, setCalendarReminderMinutes,
+    nextActionsViewMode, setNextActionsViewMode,
+    reviewNodeTypes, setReviewNodeTypes,
+    focusExpandedDefaults, setFocusExpandedDefaults,
+    shortcutModifier, setShortcutModifier,
+    driveBaseFolderId, setDriveBaseFolderId,
+    driveConversationExportFolderId, setDriveConversationExportFolderId,
+    driveSlideDeckFolderId, setDriveSlideDeckFolderId,
+    driveSpreadsheetFolderId, setDriveSpreadsheetFolderId,
+    driveDocumentFolderId, setDriveDocumentFolderId,
+    driveBaseFolderPath, setDriveBaseFolderPath,
+    driveConversationExportFolderPath, setDriveConversationExportFolderPath,
+    driveSlideDeckFolderPath, setDriveSlideDeckFolderPath,
+    driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath,
+    driveDocumentFolderPath, setDriveDocumentFolderPath,
+    driveBackupFolderId, setDriveBackupFolderId,
+    driveBackupFolderPath, setDriveBackupFolderPath,
+    exportSettings, setExportSettings,
+    userCity, setUserCity,
+    userHomeAddress, setUserHomeAddress,
+    userWorkAddress, setUserWorkAddress,
+  };
 }
 
 

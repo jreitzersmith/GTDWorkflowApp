@@ -73,7 +73,7 @@ function CoachPanel({
   categories,
   onUpdatePendingAction,
   docsEnabled,
-  reviewDriveFolderId,
+  driveConversationExportFolderId,
   exportSettings,
   onExportSettingsChange,
   googleToken,
@@ -141,7 +141,7 @@ function CoachPanel({
               tasks={tasks}
               exportSettings={exportSettings}
               onExportSettingsChange={onExportSettingsChange}
-              reviewDriveFolderId={reviewDriveFolderId}
+              driveConversationExportFolderId={driveConversationExportFolderId}
               googleToken={googleToken}
               docsEnabled={docsEnabled}
               rawApiThread={rawApiThread}
@@ -301,7 +301,7 @@ CoachPanel.propTypes = {
   categories:             PropTypes.array,
   onUpdatePendingAction:  PropTypes.func,
   docsEnabled:            PropTypes.bool,
-  reviewDriveFolderId:    PropTypes.string,
+  driveConversationExportFolderId: PropTypes.string,
   exportSettings:         PropTypes.object,
   onExportSettingsChange: PropTypes.func,
   googleToken:            PropTypes.string,

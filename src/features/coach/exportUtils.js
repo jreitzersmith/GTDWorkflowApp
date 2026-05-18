@@ -91,7 +91,7 @@ function stripMarkdown(markdownText) {
 //         'markdown' -> raw markdown text (docsAppendText)
 //         'text' -> stripped plain text (docsAppendText)
 // Returns the doc URL on success.
-async function saveToDrive({ markdownText, googleToken, title, format, reviewDriveFolderId }) {
+async function saveToDrive({ markdownText, googleToken, title, format, driveConversationExportFolderId }) {
   const doc = await docsCreateDocument({ token: googleToken, title });
   if (markdownText.trim()) {
     if (format === 'rtf') {
@@ -102,8 +102,8 @@ async function saveToDrive({ markdownText, googleToken, title, format, reviewDri
       await docsAppendText({ token: googleToken, documentId: doc.documentId, text: stripMarkdown(markdownText) });
     }
   }
-  if (reviewDriveFolderId) {
-    await docsMoveToFolder({ token: googleToken, documentId: doc.documentId, newParentId: reviewDriveFolderId });
+  if (driveConversationExportFolderId) {
+    await docsMoveToFolder({ token: googleToken, documentId: doc.documentId, newParentId: driveConversationExportFolderId });
   }
   return 'https://docs.google.com/document/d/' + doc.documentId + '/edit';
 }

@@ -4,6 +4,7 @@ import { COLORS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { SettingsSection } from "./SettingsSection.jsx";
 import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager } from "./SettingsManagerComponents.jsx";
+import { DriveFolderPicker } from "./DriveFolderPicker.jsx";
 
 // ── Google Services section config ────────────────────────────────────────────
 const GOOGLE_SERVICES = [
@@ -90,7 +91,19 @@ function SettingsPanel({
   onReauthorizeGoogle, onDisconnectCalendar, onDisconnectAll,
   // Other
   recurringReviewDays, onSetRecurringReviewDays,
-  reviewDriveFolderId, onSetReviewDriveFolderId,
+  driveBaseFolderId, onSetDriveBaseFolderId,
+  driveConversationExportFolderId, onSetDriveConversationExportFolderId,
+  driveSlideDeckFolderId, onSetDriveSlideDeckFolderId,
+  driveSpreadsheetFolderId, onSetDriveSpreadsheetFolderId,
+  driveDocumentFolderId, onSetDriveDocumentFolderId,
+  driveBaseFolderPath, onSetDriveBaseFolderPath,
+  driveConversationExportFolderPath, onSetDriveConversationExportFolderPath,
+  driveSlideDeckFolderPath, onSetDriveSlideDeckFolderPath,
+  driveSpreadsheetFolderPath, onSetDriveSpreadsheetFolderPath,
+  driveDocumentFolderPath, onSetDriveDocumentFolderPath,
+  driveBackupFolderId, onSetDriveBackupFolderId,
+  driveBackupFolderPath, onSetDriveBackupFolderPath,
+  onBackupToDrive,
   calendarReminderMinutes, onSetCalendarReminderMinutes,
   userCity, onSetUserCity,
   userHomeAddress, onSetUserHomeAddress,
@@ -103,6 +116,21 @@ function SettingsPanel({
   // Tracks whether any scope pref has changed since the last re-auth.
   // Reset to false on mount (fresh after OAuth redirect) and on Re-authorize click.
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupMsg, setBackupMsg] = useState('');
+
+  async function handleDriveBackup() {
+    setBackupBusy(true);
+    setBackupMsg('');
+    try {
+      await onBackupToDrive();
+      setBackupMsg('✓ Backed up to Drive');
+    } catch (e) {
+      setBackupMsg('✗ ' + e.message);
+    } finally {
+      setBackupBusy(false);
+    }
+  }
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -291,6 +319,38 @@ function SettingsPanel({
           </div>
         </SettingsSection>
 
+        {/* ── Google Drive Configuration ───────────────────────────────────── */}
+        <SettingsSection label="Google Drive Configuration" storageKey="gtd_settings_drive_config">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12, lineHeight: 1.5 }}>
+            Configure default folders for Drive-based actions. Each action type has its own target folder.
+            When a specific folder is blank, the Base Folder is used as a fallback. Leave all blank to save to My Drive root.
+          </div>
+          {[
+            { label: 'Base Folder (fallback default)', value: driveBaseFolderId, displayPath: driveBaseFolderPath,
+              onChange: (id, p) => { onSetDriveBaseFolderId(id); onSetDriveBaseFolderPath(p || ''); } },
+            { label: 'Conversation Export Folder', value: driveConversationExportFolderId, displayPath: driveConversationExportFolderPath,
+              onChange: (id, p) => { onSetDriveConversationExportFolderId(id); onSetDriveConversationExportFolderPath(p || ''); } },
+            { label: 'Document Export Folder', value: driveDocumentFolderId, displayPath: driveDocumentFolderPath,
+              onChange: (id, p) => { onSetDriveDocumentFolderId(id); onSetDriveDocumentFolderPath(p || ''); } },
+            { label: 'Spreadsheet Export Folder', value: driveSpreadsheetFolderId, displayPath: driveSpreadsheetFolderPath,
+              onChange: (id, p) => { onSetDriveSpreadsheetFolderId(id); onSetDriveSpreadsheetFolderPath(p || ''); } },
+            { label: 'Slide Deck Export Folder', value: driveSlideDeckFolderId, displayPath: driveSlideDeckFolderPath,
+              onChange: (id, p) => { onSetDriveSlideDeckFolderId(id); onSetDriveSlideDeckFolderPath(p || ''); } },
+            { label: 'App Data Backup Folder', value: driveBackupFolderId, displayPath: driveBackupFolderPath,
+              onChange: (id, p) => { onSetDriveBackupFolderId(id); onSetDriveBackupFolderPath(p || ''); } },
+          ].map(({ label, value, displayPath, onChange }) => (
+            <div key={label} style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 5 }}>{label}</div>
+              <DriveFolderPicker value={value} displayPath={displayPath} onChange={onChange} disabled={!googleToken} googleToken={googleToken} />
+            </div>
+          ))}
+          {!googleToken && (
+            <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4, lineHeight: 1.4 }}>
+              Connect Google Drive above to configure folder destinations.
+            </div>
+          )}
+        </SettingsSection>
+
         {/* ── Weekly Review ────────────────────────────────────────────────── */}
         <SettingsSection label="Weekly Review" storageKey="gtd_settings_weekly_review">
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
@@ -416,6 +476,20 @@ function SettingsPanel({
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12, lineHeight: 1.5 }}>
             Default settings for the coach conversation export. Use the Export button in the AI Coach header to export at any time.
           </div>
+          <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 12, lineHeight: 1.6, padding: '6px 10px', background: COLORS.surface2, borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+            Drive destination:{' '}
+            <span style={{ color: COLORS.text2 }}>
+              {driveConversationExportFolderPath
+                ? `Google Drive > ${driveConversationExportFolderPath}`
+                : driveConversationExportFolderId
+                  ? `Google Drive > (ID: ${driveConversationExportFolderId})`
+                  : driveBaseFolderPath
+                    ? `Google Drive > ${driveBaseFolderPath}`
+                    : driveBaseFolderId
+                      ? `Google Drive > (ID: ${driveBaseFolderId})`
+                      : 'Google Drive Root'}
+            </span>
+          </div>
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 6 }}>Default format</div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -459,20 +533,7 @@ function SettingsPanel({
               ))}
             </div>
           </div>
-          {docsEnabled && (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 6 }}>Drive folder for saves</div>
-              <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 6, lineHeight: 1.4 }}>
-                Paste a Google Drive folder ID to save exported conversations and AI-created docs there. Leave blank to save to My Drive root.
-              </div>
-              <input
-                value={reviewDriveFolderId || ''}
-                onChange={e => onSetReviewDriveFolderId(e.target.value.trim())}
-                placeholder="Drive folder ID (optional)"
-                style={{ width: '100%', padding: '4px 8px', borderRadius: 6, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text, fontFamily: 'inherit', fontSize: 12, boxSizing: 'border-box', outline: 'none' }}
-              />
-            </div>
-          )}
+
         </SettingsSection>
 
         <SettingsSection label="Your location" storageKey="gtd_settings_location">
@@ -508,6 +569,31 @@ function SettingsPanel({
             <button onClick={() => { setImportMode("merge"); fileInputRef.current?.click(); }} style={{ padding: "7px 14px", borderRadius: 7, border: `1px solid ${COLORS.border2}`, background: COLORS.surface3, color: COLORS.text2, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>⬆ Import (Merge)</button>
             <input ref={fileInputRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={handleFileChange} />
           </div>
+          {googleToken && onBackupToDrive && (
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${COLORS.border}` }}>
+              <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 8, lineHeight: 1.5 }}>
+                Drive backup destination:{' '}
+                <span style={{ color: COLORS.text2 }}>
+                  {driveBackupFolderPath
+                    ? `Google Drive > ${driveBackupFolderPath}`
+                    : driveBackupFolderId
+                      ? `Google Drive > (ID: ${driveBackupFolderId})`
+                      : 'Google Drive Root'}
+                </span>
+                {' — '}configure under <em>Google Drive Configuration</em> above.
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  onClick={handleDriveBackup}
+                  disabled={backupBusy}
+                  style={{ padding: '7px 14px', borderRadius: 7, border: `1px solid ${COLORS.accent}`, background: 'transparent', color: backupBusy ? COLORS.muted : COLORS.accent, fontFamily: 'inherit', fontSize: 12, cursor: backupBusy ? 'not-allowed' : 'pointer', opacity: backupBusy ? 0.6 : 1 }}
+                >{backupBusy ? '⏳ Backing up…' : '☁ Backup to Drive'}</button>
+                {backupMsg && (
+                  <span style={{ fontSize: 11, color: backupMsg.startsWith('✓') ? COLORS.next : COLORS.waiting }}>{backupMsg}</span>
+                )}
+              </div>
+            </div>
+          )}
         </SettingsSection>
       </div>
     </div>
@@ -563,8 +649,31 @@ SettingsPanel.propTypes = {
   onSetCalendarReminderMinutes: PropTypes.func.isRequired,
   reviewNodeTypes:            PropTypes.arrayOf(PropTypes.string).isRequired,
   onSetReviewNodeTypes:       PropTypes.func.isRequired,
-  reviewDriveFolderId:        PropTypes.string,
-  onSetReviewDriveFolderId:   PropTypes.func.isRequired,
+  driveBaseFolderId:                  PropTypes.string,
+  onSetDriveBaseFolderId:             PropTypes.func.isRequired,
+  driveConversationExportFolderId:    PropTypes.string,
+  onSetDriveConversationExportFolderId: PropTypes.func.isRequired,
+  driveSlideDeckFolderId:             PropTypes.string,
+  onSetDriveSlideDeckFolderId:        PropTypes.func.isRequired,
+  driveSpreadsheetFolderId:           PropTypes.string,
+  onSetDriveSpreadsheetFolderId:      PropTypes.func.isRequired,
+  driveDocumentFolderId:              PropTypes.string,
+  onSetDriveDocumentFolderId:         PropTypes.func.isRequired,
+  driveBaseFolderPath:                PropTypes.string,
+  onSetDriveBaseFolderPath:           PropTypes.func.isRequired,
+  driveConversationExportFolderPath:  PropTypes.string,
+  onSetDriveConversationExportFolderPath: PropTypes.func.isRequired,
+  driveSlideDeckFolderPath:           PropTypes.string,
+  onSetDriveSlideDeckFolderPath:      PropTypes.func.isRequired,
+  driveSpreadsheetFolderPath:         PropTypes.string,
+  onSetDriveSpreadsheetFolderPath:    PropTypes.func.isRequired,
+  driveDocumentFolderPath:            PropTypes.string,
+  onSetDriveDocumentFolderPath:       PropTypes.func.isRequired,
+  driveBackupFolderId:                PropTypes.string,
+  onSetDriveBackupFolderId:           PropTypes.func.isRequired,
+  driveBackupFolderPath:              PropTypes.string,
+  onSetDriveBackupFolderPath:         PropTypes.func.isRequired,
+  onBackupToDrive:                    PropTypes.func,
   exportSettings:             PropTypes.object,
   onExportSettingsChange:     PropTypes.func,
   userCity:                   PropTypes.string,

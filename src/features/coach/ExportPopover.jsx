@@ -26,7 +26,7 @@ function resolveFormat(fmt) {
   return (!fmt || fmt === 'docs') ? 'rtf' : fmt;
 }
 
-function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSettingsChange, googleToken, docsEnabled, reviewDriveFolderId, rawApiThread }) {
+function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSettingsChange, googleToken, docsEnabled, driveConversationExportFolderId, rawApiThread }) {
   const [open, setOpen]               = useState(false);
   // status: 'idle' | 'downloading' | 'saving' | 'downloaded' | 'saved' | 'error'
   const [status, setStatus]           = useState('idle');
@@ -105,14 +105,14 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSet
       const exportText = localFormat === 'json'
         ? buildJsonExport({ rawApiThread: rawApiThread || [], messages, include: localInclude, coachMode, tasks })
         : buildExportContent(messages, localInclude, coachMode, tasks);
-      const url = await saveToDrive({ markdownText: exportText, googleToken, title, format: localFormat === 'json' ? 'text' : localFormat, reviewDriveFolderId });
+      const url = await saveToDrive({ markdownText: exportText, googleToken, title, format: localFormat === 'json' ? 'text' : localFormat, driveConversationExportFolderId });
       setDriveUrl(url);
       setStatus('saved');
     } catch (err) {
       setErrMsg(err.message || 'Save to Drive failed');
       setStatus('error');
     }
-  }, [messages, localInclude, coachMode, tasks, localFormat, googleToken, docsEnabled, reviewDriveFolderId, rawApiThread]);
+  }, [messages, localInclude, coachMode, tasks, localFormat, googleToken, docsEnabled, driveConversationExportFolderId, rawApiThread]);
 
   const busy = status === 'downloading' || status === 'saving';
 
@@ -272,7 +272,7 @@ ExportPopover.propTypes = {
   onExportSettingsChange: PropTypes.func,
   googleToken:            PropTypes.string,
   docsEnabled:            PropTypes.bool,
-  reviewDriveFolderId:    PropTypes.string,
+  driveConversationExportFolderId:    PropTypes.string,
   rawApiThread:           PropTypes.array,
 };
 
