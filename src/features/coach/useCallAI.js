@@ -1134,7 +1134,15 @@ function useCallAI({
     await callAI(text, coachMode, chatHistory, { emailContext: emailContextRef.current });
   }, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages]);
 
-  return { callAI, sendChat, fetchModels, lastInputLog, setEmailContext };
+  // Quick-reply variant: sends a fixed string without touching chatInput state.
+  // Used by CoachPanel's OK button to confirm Step 3a interpretations.
+  const sendChatWithText = useCallback(async (text) => {
+    if (!text || loading) return;
+    setMessages(prev => [...prev, { role: 'user', text }]);
+    await callAI(text, coachMode, chatHistory, { emailContext: emailContextRef.current });
+  }, [loading, coachMode, chatHistory, callAI, setMessages]);
+
+  return { callAI, sendChat, sendChatWithText, fetchModels, lastInputLog, setEmailContext };
 }
 
 export { useCallAI }

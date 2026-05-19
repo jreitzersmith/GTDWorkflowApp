@@ -290,6 +290,10 @@ export default function GTDManager() {
     const sections = Object.entries(bucketNames).filter(([k]) => !allowedBuckets || allowedBuckets.includes(k)).map(([k, label]) => {
       const items = k === 'next'
         ? tasks.filter(t => t.isNextAction && !t.isSomeday && !t.isWaitingFor && !t.done)
+        : k === 'someday'
+        ? tasks.filter(t => t.isSomeday && !t.done)
+        : k === 'waiting'
+        ? tasks.filter(t => t.isWaitingFor && !t.done)
         : tasks.filter(t => t.bucket === k && !t.done);
       if (!items.length) return `${label}: empty`;
       const cap = BUCKET_CAPS[k];
@@ -403,7 +407,7 @@ export default function GTDManager() {
     return `Today's date: ${today}\n\n${sections.join("\n\n")}${calSection}`;
   }, [tasks, calendarEnabled, calendarEvents]);
 
-  const { callAI, sendChat, fetchModels, lastInputLog, setEmailContext,
+  const { callAI, sendChat, sendChatWithText, fetchModels, lastInputLog, setEmailContext,
 } = useCallAI({
     tasks, efforts, calibrationOverrides,
     provider, localModel,
@@ -503,7 +507,13 @@ export default function GTDManager() {
       msgs.push({ role: 'system', type: 'recurringReview', events: dueForReview });
     }
     setCoachMode("review");
-    setChatHistory([]);
+    // Seed chatHistory with the intro so the API knows it already presented Step 1.
+    // Anthropic API requires conversations to start with a user message, so we
+    // prepend a synthetic trigger that stays invisible in the UI (messages state).
+    setChatHistory([
+      { role: 'user', content: '[Starting Weekly Review]' },
+      { role: 'assistant', content: introMsg },
+    ]);
     setRawApiThread([]);
     setPendingAction(null);
     setMessages(msgs);
@@ -1531,6 +1541,7 @@ export default function GTDManager() {
                 googleToken={googleToken}
                 rawApiThread={rawApiThread}
                 coachName={coachName}
+                onQuickReply={sendChatWithText}
               />
             </ErrorBoundary>
           </div>

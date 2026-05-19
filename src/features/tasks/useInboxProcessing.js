@@ -53,11 +53,15 @@ function useInboxProcessing({
     if (!pendingAction) return;
     const { type, title, nextAction, parentRef, dueDate: aiDue, deferUntil: aiDefer, recurrence: aiRecurrence, effort: aiEffort, category: aiCategory, priority: aiPriority, location: aiLocation, isSomeday: aiSomeday, isWaitingFor: aiWaitingFor, notes: aiNotes } = pendingAction;
 
-    const current = tasks.find(t => t.id === processingTaskId.current)
-      ?? tasks.filter(t => t.bucket === 'inbox')[0];
-    const nextItem = tasks.filter(t => t.bucket === 'inbox' && t.id !== current?.id && !skippedInSessionIds.current.has(t.id))[0];
+    // Only treat as inbox context when a formal processing session is active
+    // (processingTaskId is set). Falling back to the first inbox item caused review-mode
+    // confirmations to accidentally archive inbox tasks and show 'inbox cleared'.
+    const current = tasks.find(t => t.id === processingTaskId.current) ?? null;
+    const nextItem = current
+      ? tasks.filter(t => t.bucket === 'inbox' && t.id !== current.id && !skippedInSessionIds.current.has(t.id))[0]
+      : null;
 
-    // current may be null when the pending action was triggered from chat (not inbox processing).
+    // current may be null when the pending action was triggered from chat/review (not inbox processing).
     // In that case skip archiving and inbox advancement; just create the task.
     const hasInboxContext = !!current;
 
@@ -82,10 +86,14 @@ function useInboxProcessing({
     } else if (type === 'project') {
       const projectId = genId();
       const actionId = genId();
+      // Resolve optional parent (category or subcategory) by ID or exact title
+      const parentNode = parentRef
+        ? (tasks.find(t => t.id === parentRef) || tasks.find(t => t.text.toLowerCase() === (parentRef || '').toLowerCase()))
+        : null;
       setTasks(prev => [
-        { id: projectId, text: title || current?.text || '', bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || null, reviewed: true },
+        { id: projectId, text: title || current?.text || '', bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || parentNode?.category || null, reviewed: true, ...(parentNode ? { parentId: parentNode.id } : {}) },
         { id: actionId, text: nextAction || title, bucket: 'project', isNextAction: true, done: false, created: Date.now(), parentId: projectId, priority: aiPriority || [], location: aiLocation || [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: aiNotes || null, category: null, reviewed: true },
-        ...prev,
+        ...prev.map(t => t.id === parentNode?.id ? { ...t, childIds: [...(t.childIds || []), projectId] } : t),
       ]);
       // type === 'project' already has its own project structure — omit from group suggestion
     } else if (type === 'someday') {
@@ -138,6 +146,24 @@ function useInboxProcessing({
           return [fallbackTask, ...prev];
         });
       }
+    } else if (type === 'update') {
+      // Direct field update — used by review mode to mark tasks done, change bucket flags, etc.
+      const { taskId, changes } = pendingAction;
+      const today = new Date().toISOString().split('T')[0];
+      setTasks(prev => prev.map(t => {
+        if (t.id !== taskId) return t;
+        const resolved = { ...changes };
+        if (resolved.done === true) {
+          resolved.bucket = 'done';
+          resolved.completedDate = today;
+        }
+        // Activating from Someday: ensure isNextAction is set so the task
+        // appears in the Next Actions view (flag-based, not bucket-based).
+        if (resolved.isSomeday === false && !t.isNextAction) {
+          resolved.isNextAction = true;
+        }
+        return { ...t, ...resolved };
+      }));
     }
     // type === 'delete': just archive, no new task
 

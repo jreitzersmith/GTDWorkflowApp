@@ -99,7 +99,7 @@ function TypingIndicator() {
 
 function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, locations, categories, onUpdatePendingAction }) {
   if (!action) return null;
-  const { type, title, nextAction, parentName, dueDate, deferUntil, effort, category, priority = [], location = [] } = action;
+  const { type, title, nextAction, parentName, dueDate, deferUntil, effort, category, priority = [], location = [], taskId, changes } = action;
 
   const configs = {
     next:    { color: COLORS.next,    label: "Next Actions", confirmText: "Create ✓" },
@@ -108,6 +108,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
     waiting: { color: COLORS.waiting, label: "Waiting For", confirmText: "Move ✓" },
     delete:  { color: COLORS.muted,   label: "Archive (not actionable)", confirmText: "Archive ✓" },
     add:     { color: COLORS.project, label: "Add to existing project", confirmText: "Add ✓" },
+    update:  { color: COLORS.accent,  label: "Update task",              confirmText: "Apply ✓" },
   };
   const cfg = configs[type] || configs.next;
 
@@ -145,6 +146,11 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
         <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
           <div><span style={{ color: COLORS.muted }}>Under: </span><strong style={{ color: COLORS.project }}>{parentName}</strong></div>
           <div><span style={{ color: COLORS.muted }}>Action: </span><strong style={{ color: COLORS.next }}>{title}</strong></div>
+        </div>
+      ) : type === "update" ? (
+        <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
+          <div><strong style={{ color: COLORS.text }}>{title}</strong></div>
+          <div style={{ color: COLORS.muted, marginTop: 2 }}>{changes?.done ? 'Mark complete' : changes?.isSomeday === true ? 'Move to Someday/Maybe' : changes?.isSomeday === false ? 'Activate to Next Actions' : changes?.isWaitingFor ? 'Move to Waiting For' : 'Update fields'}</div>
         </div>
       ) : type !== "delete" ? (
         <div style={{ fontSize: 12, color: COLORS.text2 }}>
