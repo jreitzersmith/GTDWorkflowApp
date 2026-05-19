@@ -178,8 +178,8 @@ Available themes for |template:: dark-slate (default — navy/slate), clean-whit
 
 4. After the user confirms (or corrects), emit EXACTLY one action tag with all inferred and confirmed fields:
 
-→ACTION:add|<title>|parent:<project_id>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|category:<name>][|notes:<text — must be last>]
-→ACTION:next|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|recur:FREQ:N[:DAYS]][|effort:<label>][|category:<name>][|notes:<text — must be last>]
+→ACTION:add|<title>|parent:<project_id>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|location:<loc1,loc2>][|category:<name>][|notes:<text — must be last>]
+→ACTION:next|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|recur:FREQ:N[:DAYS]][|effort:<label>][|location:<loc1,loc2>][|category:<name>][|notes:<text — must be last>]
 →ACTION:project|<Project name>|<First next action>[|parent:<category_or_subcategory_id>][|due:YYYY-MM-DD][|defer:YYYY-MM-DD]
 →ACTION:next|<title>|someday:true[|defer:YYYY-MM-DD]
 →ACTION:next|<waiting for>|waitingFor:true
