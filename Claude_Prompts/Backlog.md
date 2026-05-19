@@ -1,12 +1,11 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#23** · Code Quality — **CQ#11** · Feature Requests — **FR#110**
+> **Last used numbers:** Known Issues — **Issue#24** · Code Quality — **CQ#11** · Feature Requests — **FR#112**
 
 ---
 
 ## Known issues / remaining work
 
-- [ ] Issue#22 [GH#102] (2026-05-16) — Weekly Review coach ignores "no" response and moves tasks anyway — question guard (currently Process mode only) must be extended to Weekly Review; reinforce in Weekly Review system prompt
 
 ---
 
@@ -19,6 +18,7 @@
 ### Feature requests
 
 #### UI polish / quick wins
+
 
 
 #### Daily workflow / GTD core

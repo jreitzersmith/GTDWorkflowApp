@@ -7,6 +7,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
+| 2026-05-18 | Bug Fix | Issue#22 | GH#102 | Weekly Review question guard + update action support — guard narrowed to last line only; extractUpdateAction wired for review mode; getTaskContext someday/waiting flag filters fixed; inbox archiving side-effect removed; chatHistory seeded on review start | 80a2abb3 |
 | 2026-05-18 | Feature | FR#23 | GH#15 | Categories filter dropdown on all main views — shared select in TaskBucketView; replaces Projects-only control; includes "No category assigned" option | ae1d47a8 |
 | 2026-05-18 | Feature | FR#106 | GH#114 | Location filter dropdown on all main views — alongside Categories; filter logic task.location?.includes(); includes "No location assigned" option | ae1d47a8 |
 | 2026-05-18 | Feature | FR#107 | GH#115 | Next Actions groupBy condensed to single select dropdown — replaces ToolbarBtn row; no logic change | ae1d47a8 |
@@ -136,3 +137,6 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-18 | Feature | FR#103 | GH#111 | ExportPopover inline format selector; 'User messages' label unification | 6083b8c9 |
 | 2026-05-18 | Feature      | FR#98   | GH#104 | Configurable AI coach name and user display name — threaded into all system prompts | 4588ad5 |
 | 2026-05-18 | Feature      | FR#105  | GH#113 | AI coach get_weather tool (OpenWeatherMap) — current + forecast, userCity default   | f0ec825 |
+| 2026-05-19 | Bug Fix      | Issue#24 | GH#119 | Process mode: add prompt rule to prevent self-duplicate false positive on inbox item | 440c6fa |
+| 2026-05-19 | Feature      | FR#111   | GH#120 | Task Detail Panel: show task ID (monospace, click-to-select) in footer            | 440c6fa |
+| 2026-05-19 | Feature      | FR#112   | GH#121 | Global search (Cmd+K): match tasks by ID prefix via startsWith                      | 440c6fa |
