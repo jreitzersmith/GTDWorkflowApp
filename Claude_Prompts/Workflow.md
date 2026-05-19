@@ -82,13 +82,19 @@ The work order format is specified in the Work Order section below.
 Execute items in dependency order. For each item:
 
 1. Apply the change.
-2. Run the build:
+2. If the change touched `src/constants.jsx`, run a syntax check before building:
    ```
-   npx vite build --outDir /sessions/.../mnt/outputs/gtd-dist-<feature> --emptyOutDir
+   node -e "require('./src/constants.jsx')" 2>&1 | grep -i "syntaxerror" && echo "SYNTAX ERROR" || echo "OK"
    ```
-3. Do not proceed to the next item until the build is green.
-4. After all items: run `npx vitest run`. Note the pass count.
-5. Do not commit until both build and tests pass.
+   If it prints `SYNTAX ERROR`, stop immediately and fix before proceeding.
+3. Run the build:
+   ```
+   npx vite build --outDir /tmp/gtd-build --emptyOutDir
+   ```
+   **Note:** Always build to `/tmp/gtd-build` (native sandbox filesystem). Building to the FUSE-mounted `mnt/` path fails with EPERM on the unlink syscall (Windows mount layer restriction — known Cowork bug [GH#55206]). The `/tmp/` path is unaffected.
+4. Do not proceed to the next item until the build is green.
+5. After all items: run `npx vitest run`. Note the pass count.
+6. Do not commit until both build and tests pass.
 
 If a build fails: diagnose, make one self-contained fix attempt, rebuild. If still failing after one attempt, stop and report — do not iterate silently.
 
