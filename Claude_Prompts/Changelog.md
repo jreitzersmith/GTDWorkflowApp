@@ -140,3 +140,4 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-19 | Bug Fix      | Issue#24 | GH#119 | Process mode: add prompt rule to prevent self-duplicate false positive on inbox item | 440c6fa |
 | 2026-05-19 | Feature      | FR#111   | GH#120 | Task Detail Panel: show task ID (monospace, click-to-select) in footer            | 440c6fa |
 | 2026-05-19 | Feature      | FR#112   | GH#121 | Global search (Cmd+K): match tasks by ID prefix via startsWith                      | 440c6fa |
+| 2026-05-19 | Bug Fix      | Issue#25 | GH#122 | Process mode →ACTION:add silently dropped — wire extractAddAction into non-streaming dispatch | 1b39540 |
