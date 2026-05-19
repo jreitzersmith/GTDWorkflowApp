@@ -120,11 +120,12 @@ function useInboxProcessing({
       });
     } else if (type === 'add') {
       // Add as child of existing project (ID or title lookup)
+      // Do NOT push to sessionCreatedTasksRef — add-type tasks already have a parent
+      // and don't need the post-session group suggestion.
       const parent = tasks.find(t => t.id === parentRef)
                   || tasks.find(t => t.text.toLowerCase() === (parentRef || '').toLowerCase());
       const childId = genId();
       const taskText = title || current.text;
-      sessionCreatedTasksRef.current.push({ id: childId, text: taskText });
       if (parent) {
         setTasks(prev => [
           ...prev.map(t => t.id === parent.id ? { ...t, childIds: [...(t.childIds || []), childId] } : t),

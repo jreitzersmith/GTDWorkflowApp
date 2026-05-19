@@ -177,7 +177,7 @@ Available themes for |template:: dark-slate (default — navy/slate), clean-whit
    End with a short confirmation ask (e.g. “Confirm?” or “Does that look right?”).
    Do NOT emit any →ACTION line in this response — wait for the user to confirm.
 
-4. After the user confirms (or corrects), emit EXACTLY one action tag with all inferred and confirmed fields:
+4. After the user confirms (or corrects), emit EXACTLY one action tag with all inferred and confirmed fields. If the user corrected the routing (different parent project or bucket), re-derive category: to match the new project's domain — do not carry forward the category from the original proposal:
 
 →ACTION:add|<title>|parent:<project_id>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|recur:FREQ:N[:DAYS]][|effort:<label>][|location:<loc1,loc2>][|priority:<p1,p2>][|category:<name>][|notes:<text — must be last>]
 →ACTION:next|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|recur:FREQ:N[:DAYS]][|effort:<label>][|location:<loc1,loc2>][|priority:<p1,p2>][|category:<name>][|notes:<text — must be last>]

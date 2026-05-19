@@ -170,16 +170,17 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
             <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${COLORS.border}` }}>
               <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: -4 }}>Category</div>
               <div>
-                <input
-                  list="pending-cats"
+                <select
                   value={category || ""}
                   onChange={e => onUpdatePendingAction("category", e.target.value || null)}
-                  placeholder="category…"
-                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: COLORS.text, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box" }}
-                />
-                <datalist id="pending-cats">
-                  {(categories || []).map(c => <option key={c} value={c} />)}
-                </datalist>
+                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: category ? COLORS.text : COLORS.muted, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box" }}
+                >
+                  <option value="">— none —</option>
+                  {category && !(categories || []).includes(category) && (
+                    <option key="__ai__" value={category}>{category}</option>
+                  )}
+                  {(categories || []).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
 
               {showEffort && (efforts || []).length > 0 && (
