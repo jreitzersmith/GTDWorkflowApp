@@ -849,6 +849,16 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
 
       </div>
 
+      {/* Task ID — for debugging coach actions */}
+      <div style={{ padding: '3px 14px 4px', borderTop: `1px solid ${COLORS.border}` }}>
+        <span
+          style={{ fontSize: 10, color: COLORS.muted, fontFamily: 'monospace', userSelect: 'all', cursor: 'text' }}
+          title="Task ID — click to select"
+        >
+          id: {task.id}
+        </span>
+      </div>
+
       {/* Footer actions */}
       <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, flexWrap: 'wrap' }}>
         <button

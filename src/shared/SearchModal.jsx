@@ -128,7 +128,7 @@ function SearchModal({ tasks, onSelect, onClose, shortcutModifier = 'ctrl+alt' }
     if (!SEARCH_BUCKETS.includes(t.bucket)) return false;
     if (t.done) return false;
     const q = query.toLowerCase();
-    return (t.text || "").toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q);
+    return (t.text || "").toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q) || t.id.startsWith(q);
   }).slice(0, 50);
 
   // Reset active index when results change
