@@ -1055,15 +1055,17 @@ function useCallAI({
       }
 
       const action = extractAction(reply);
+      // Shared question guard — check for '?' ONLY in the last non-empty line
+      // before →ACTION. Checking the full preceding text is too broad:
+      // follow-up questions like 'Anything else?' after a confirmation would incorrectly
+      // suppress the action. Only the last line matters — that's where a
+      // question about the action itself would appear.
+      const _guardIdx = reply.search(/→ACTION:/);
+      const _beforeAction = _guardIdx !== -1 ? reply.slice(0, _guardIdx) : '';
+      const _lastLine = _beforeAction.split('\n').map(l => l.trim()).filter(Boolean).pop() || '';
+      const _hasQuestion = _lastLine.replace(/\[[^\]]*\]/g, '').includes('?');
       if (action) {
-        // Guard: if the AI asked a question AND included an →ACTION tag in the same
-        // response (violating the system prompt), suppress the pending action so the
-        // user can answer the question first. Strip [bracketed] id tokens before
-        // checking for '?' so parenthetical references don't false-positive.
-        const actionLineIdx = reply.search(/→ACTION:/);
-        const textBeforeAction = actionLineIdx !== -1 ? reply.slice(0, actionLineIdx) : '';
-        const hasQuestion = textBeforeAction.replace(/\[[^\]]*\]/g, '').includes('?');
-        if (!hasQuestion) {
+        if (!_hasQuestion) {
           // Resolve parent name for →ACTION:add so PendingActionBar can display it
           if (action.type === 'add' && action.parentRef) {
             const parent = tasks.find(t => t.id === action.parentRef)
@@ -1071,6 +1073,41 @@ function useCallAI({
             action.parentName = parent?.text || action.parentRef;
           }
           setPendingAction(action);
+        }
+      } else {
+        // extractAction only handles next/project/someday/waiting/delete.
+        // For update actions (review mode marking tasks done/moved), try extractUpdateAction.
+        const updateAction = extractUpdateAction(reply);
+        if (updateAction && !_hasQuestion) {
+          const target = tasks.find(t => t.id === updateAction.taskId);
+          setPendingAction({
+            type: 'update',
+            taskId: updateAction.taskId,
+            changes: updateAction.changes,
+            title: target?.text || updateAction.taskId,
+          });
+        } else {
+          // For →ACTION:add (process mode: add child task to existing project),
+          // try extractAddAction. extractAction never returns type:'add' because its
+          // regex only matches next/project/someday/waiting/delete.
+          const addAction = extractAddAction(reply);
+          if (addAction && !_hasQuestion) {
+            const parent = tasks.find(t => t.id === addAction.parentId)
+                        || tasks.find(t => t.text.toLowerCase() === (addAction.parentId || '').toLowerCase());
+            setPendingAction({
+              type: 'add',
+              title: addAction.title,
+              parentRef: addAction.parentId,
+              parentName: parent?.text || addAction.parentId,
+              dueDate: addAction.dueDate || null,
+              deferUntil: addAction.deferUntil || null,
+              effort: addAction.effort || null,
+              location: addAction.location || [],
+              category: addAction.category || null,
+              notes: addAction.notes || null,
+              recurrence: addAction.recurrence || null,
+            });
+          }
         }
       }
 
