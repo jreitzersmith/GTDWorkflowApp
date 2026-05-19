@@ -141,6 +141,7 @@ function extractUpdateAction(text) {
     if (key === 'waitingFor') changes.isWaitingFor = val === 'true';
     if (key === 'someday')    changes.isSomeday    = val === 'true';
     if (key === 'nextAction') changes.isNextAction = val === 'true';
+    if (key === 'done')       changes.done         = val === 'true';
   });
   if (notesRaw !== null) {
     if (notesIsAppend) {
@@ -173,6 +174,7 @@ function extractAddAction(text) {
     if (key === 'category') fields.category   = val;
     if (key === 'notes')    fields.notes      = val;
     if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'priority') fields.priority  = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
     if (key === 'dueTime') fields.dueTime = val;
   });

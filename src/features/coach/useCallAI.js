@@ -1103,6 +1103,7 @@ function useCallAI({
               deferUntil: addAction.deferUntil || null,
               effort: addAction.effort || null,
               location: addAction.location || [],
+              priority: addAction.priority || [],
               category: addAction.category || null,
               notes: addAction.notes || null,
               recurrence: addAction.recurrence || null,
