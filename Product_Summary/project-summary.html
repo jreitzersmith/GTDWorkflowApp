@@ -224,7 +224,7 @@
   <a href="project-summary.html" class="active">📄 Feature Summary</a>
   <a href="project-snippets.html">🔬 Code Snippets</a>
   <a href="project-commits.html">📜 Commit Log</a>
-  <span class="updated">Last updated: May 11, 2026</span>
+  <span class="updated">Last updated: May 20, 2026</span>
 </nav>
 
 <div class="layout">
@@ -362,6 +362,23 @@
   <div class="section-label">May 9 &#8212; New</div>
   <ul>
     <li><a href="#feat-categories">Project Categories (FR#23)</a></li>
+  </ul>
+
+
+  <div class="section-label">May 9&#8211;10 &#8212; New</div>
+  <ul>
+    <li><a href="#feat-search-filter">Search &amp; Filter (FR#33/34)</a></li>
+    <li><a href="#feat-lazy-context">Lazy Task Context (FR#30)</a></li>
+    <li><a href="#feat-google-services">Google Services (FR#26/27)</a></li>
+    <li><a href="#feat-drive-picker">Drive File Picker (FR#39)</a></li>
+    <li><a href="#feat-process-bugfixes">Process Mode Fixes (May 10&#8211;11)</a></li>
+  </ul>
+
+  <div class="section-label">May 19&#8211;20 &#8212; New</div>
+  <ul>
+    <li><a href="#feat-process-overhaul">Process Inbox Overhaul</a></li>
+    <li><a href="#feat-process-bugfixes2">Process Inbox Bug Fixes</a></li>
+    <li><a href="#feat-workflow-tooling">Workflow Tooling</a></li>
   </ul>
 
 </aside>
@@ -4040,11 +4057,254 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
      <a href="project-commits.html#commit-1ef4544">1ef4544</a></p>
 </section>
 
+
+<!-- ═══════════════════ May 9–10: Search & Filter / Lazy Context / Google Services ═══════════════════ -->
+
+<section class="feat" id="feat-search-filter">
+  <div class="feat-header">
+    <span class="feat-icon">🔍</span>
+    <span class="feat-title">Search &amp; Filter (FR#33 / FR#34)</span>
+    <span class="feat-badge badge-ui">UI</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>Two complementary search tools. <strong>In-bucket filter</strong> (FR#33) adds a compact text input to each bucket header: while active it bypasses all grouping and tree logic and shows a flat list of matching tasks, resetting automatically when you switch buckets. <strong>Global search modal</strong> (FR#34) opens with Cmd+K / Ctrl+K from anywhere in the app, searches all active buckets in real time, highlights matches, and supports arrow-key navigation with Enter to jump to a task.</p>
+  </div>
+
+  <div class="box box-concept">
+    <h4>React Concept: Short-circuit rendering</h4>
+    <p>The in-bucket filter uses an early <code>return</code> inside the render function: <code>if (filterText) return &lt;FlatList /&gt;</code>. This completely replaces the normal tree/group render path when a filter is active — no extra flags woven through existing logic. It's the React equivalent of an early <code>return</code> in a shell function.</p>
+  </div>
+
+  <div class="box box-concept">
+    <h4>React Concept: Global keyboard listeners via useEffect</h4>
+    <p>The Cmd+K shortcut is registered once with <code>window.addEventListener('keydown', handler)</code> inside a <code>useEffect</code> with an empty dependency array. The cleanup function removes it on unmount. This pattern captures key events regardless of which element has focus — like a global <code>trap</code> in a shell script.</p>
+  </div>
+
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>The in-bucket filter is like <code>grep -i pattern /bucket/*</code> — it ignores subdirectory structure and gives you a flat list of matches. The global search modal is like <code>find /tasks -name "*query*"</code> across all buckets at once, with interactive navigation.</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-863847b">📜 863847b — FR#33 In-bucket filter</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-35392d4">📜 35392d4 — FR#34 Global search modal</a>
+  </div>
+</section>
+
+<!-- ═══════════════════ Lazy Task Context ═══════════════════ -->
+
+<section class="feat" id="feat-lazy-context">
+  <div class="feat-header">
+    <span class="feat-icon">⚡</span>
+    <span class="feat-title">Lazy Task Context in Chat Mode (FR#30)</span>
+    <span class="feat-badge badge-ai">AI</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>Chat mode no longer pre-loads the full task list into every AI request. Instead it sends a compact bucket summary (e.g. "Next Actions: 12 tasks") and gives the AI a <code>get_task_context</code> tool it can call on demand. A "Loading task list…" status chip appears when the tool runs. All other coach modes (Process, Weekly Review, etc.) still receive the full list because they need it upfront.</p>
+  </div>
+
+  <div class="box box-concept">
+    <h4>AI Concept: Tool use / function calling</h4>
+    <p>Instead of pre-loading all data into every prompt, you give the AI a "tool" — a named function with a description. The model decides when it needs the data, emits a tool-call request, and the app fulfils it and continues the conversation. This mirrors lazy loading in software: only fetch what's needed, when it's needed.</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-0ce7e9b">📜 0ce7e9b — FR#30 Lazy context</a>
+  </div>
+</section>
+
+<!-- ═══════════════════ Google Services ═══════════════════ -->
+
+<section class="feat" id="feat-google-services">
+  <div class="feat-header">
+    <span class="feat-icon">🌐</span>
+    <span class="feat-title">Google Services Unified Auth &amp; API Layer (FR#26/27)</span>
+    <span class="feat-badge badge-core">Core</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>Replaced separate Gmail and Calendar auth flows with a single unified Google OAuth request covering Gmail, Calendar, Drive, Docs, Sheets, and Slides. Users pick which services to enable in Settings; one "Authorize Google" button requests only the scopes for enabled services. Typed API wrapper modules (<code>driveApi.js</code>, <code>docsApi.js</code>, <code>sheetsApi.js</code>, <code>slidesApi.js</code>) centralise all Google service calls with 401-retry logic.</p>
+  </div>
+
+  <div class="box box-concept">
+    <h4>React Concept: OAuth scopes</h4>
+    <p>OAuth lets your app access a user's Google account without their password. "Scopes" are the specific permissions — like <code>gmail.readonly</code> or <code>drive.file</code>. Requesting only the scopes for enabled services means the OAuth consent screen shows the user exactly what is being requested, and a compromised token exposes less.</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-121b819">📜 121b819 — Google Services auth &amp; API</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-15e1b81">📜 15e1b81 — Drive file picker (FR#39)</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-32a8ea1">📜 32a8ea1 — googleToken type fix</a>
+  </div>
+</section>
+
+<!-- ═══════════════════ Drive File Picker ═══════════════════ -->
+
+<section class="feat" id="feat-drive-picker">
+  <div class="feat-header">
+    <span class="feat-icon">📎</span>
+    <span class="feat-title">Drive File Picker on Tasks (FR#39)</span>
+    <span class="feat-badge badge-core">Core</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>Tasks can now have Google Drive files attached from the Task Detail Panel. An "Attach from Drive" button opens the Google Picker widget; selected files are stored in a <code>driveAttachments[]</code> array on the task and rendered as clickable links with a remove button. Re-attaching the same file is a no-op (deduplicated). The Supabase <code>tasks</code> table gained a <code>drive_attachments</code> JSONB column with matching <code>taskToDb</code>/<code>dbToTask</code> mapper updates.</p>
+  </div>
+
+  <div class="box box-concept">
+    <h4>Database Concept: JSONB columns in Postgres</h4>
+    <p>JSONB is a column type that stores arbitrary JSON — objects, arrays, nested data — and indexes it for fast querying. It's useful when a field's shape isn't fully known at schema design time. Think of it like a structured blob that Postgres understands natively, similar to storing a JSON file in a filesystem but with query support.</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-15e1b81">📜 15e1b81 — FR#39 Drive file picker</a>
+  </div>
+</section>
+
+<!-- ═══════════════════ Process Mode Fixes (May 10–11) ═══════════════════ -->
+
+<section class="feat" id="feat-process-bugfixes">
+  <div class="feat-header">
+    <span class="feat-icon">🔧</span>
+    <span class="feat-title">Process Mode Bug Fixes (May 10–11)</span>
+    <span class="feat-badge badge-core">Fix</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>A batch of process-mode fixes: duplicate detection expanded to include Next Actions and Waiting For buckets so the AI can spot items already filed elsewhere (Issue#10). Email body truncation fixed by accumulating all <code>text/plain</code> MIME parts rather than returning on the first match (Issue#5).</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-4202163">📜 4202163 — Issue#10 duplicate detection</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-dd2891c">📜 dd2891c — Issue#5 email body truncation</a>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- May 19–20: Process Inbox Overhaul                          -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<section class="feat" id="feat-process-overhaul">
+  <div class="feat-header">
+    <span class="feat-icon">📥</span>
+    <span class="feat-title">Process Inbox Overhaul (May 19–20)</span>
+    <span class="feat-badge badge-ai">AI</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>The inbox processing flow was substantially redesigned to be more reliable and transparent. The new step order is:</p>
+    <ol style="margin: 8px 0 12px 20px; color: #c0c8e0; font-size: 14px;">
+      <li>Check if actionable — delete if not</li>
+      <li>Reword as a strong-verb action</li>
+      <li>Determine routing (next/project/someday/waiting) and infer metadata from context</li>
+      <li style="font-weight:600;">3a. Present the reworded title + routing + inferred metadata in one response and ask for confirmation — no <code>→ACTION</code> is emitted until the user confirms</li>
+      <li>After confirmation, emit exactly one <code>→ACTION</code> with all fields; PendingActionBar handles final review and commit</li>
+    </ol>
+    <p>The old "briefly ask about due date" step was removed — metadata is inferred from context and surfaced in Step 3a, then editable in the PendingActionBar. Routing ambiguity now always proceeds to Step 3a with a flagged best-guess rather than stalling on a pre-confirmation clarifying question.</p>
+    <p><strong>Additional improvements:</strong></p>
+    <ul style="margin: 8px 0 12px 20px; color: #c0c8e0; font-size: 14px;">
+      <li><strong>OK quick-reply button</strong> — visible in process mode when the AI has responded and no pending action is queued; sends "confirm" without the user typing</li>
+      <li><strong>extractAddAction dispatch</strong> — <code>→ACTION:add</code> was previously silently dropped in non-streaming paths; now wired as the third fallback dispatcher in <code>useCallAI</code></li>
+      <li><strong>Action format fixes</strong> — location and priority fields documented in prompt for <code>→ACTION:add</code> and <code>→ACTION:next</code>; all missing fields (recur, priority, effort, category, notes) added to all action types to match what parsers already support</li>
+      <li><strong>Task ID display (FR#111)</strong> — task ID shown in TaskDetailPanel footer in monospace, click-to-select-all, for coach action debugging</li>
+      <li><strong>Search by ID (FR#112)</strong> — global search (Cmd+K) now matches task IDs via <code>startsWith</code> so you can jump to a task by its internal ID</li>
+      <li><strong>Duplicate self-match fix</strong> — prompt rule added clarifying that the inbox item being processed is not a duplicate of itself</li>
+    </ul>
+  </div>
+
+  <div class="box box-concept">
+    <h4>React Concept: Bypassing the chat input closure with sendChatWithText()</h4>
+    <p>The OK button needs to inject a fixed string ("confirm") directly into the AI pipeline without touching the user's chat input field. <code>sendChatWithText(text)</code> is added to <code>useCallAI</code> — it bypasses the <code>chatInput</code> state closure entirely and calls the AI dispatch path directly. This avoids a stale-closure bug where reading the input's value inside a callback would capture the empty string from mount time.</p>
+  </div>
+
+  <div class="box box-concept">
+    <h4>React Concept: Multi-path dispatch with fallback chain</h4>
+    <p><code>useCallAI</code> parses the AI's response through three consecutive extractors: <code>extractAction</code> (handles next/project/someday/waiting/delete), then <code>extractUpdateAction</code>, then <code>extractAddAction</code>. Adding <code>extractAddAction</code> as a third fallback means <code>→ACTION:add</code> responses are now caught and shown in the PendingActionBar rather than silently ignored.</p>
+  </div>
+
+  <div class="box box-design">
+    <h4>Design Decision: Confirm-before-emit</h4>
+    <p>The old flow emitted <code>→ACTION</code> before confirmation, creating a race between the AI's output and the user's intent. The new flow separates "propose" (Step 3a) from "emit" (Step 4) — the user sees the full proposed routing and metadata before any action is queued. This makes errors visible and correctable before they affect tasks.</p>
+  </div>
+
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>This is like changing a deployment script from auto-apply to plan-then-confirm (Terraform style). The AI is the planner — it shows you what it intends to do. You approve, then it executes. The PendingActionBar is your "plan output" review screen before you type <code>yes</code>.</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-7878d73">📜 7878d73 — Restructure inbox flow</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-a0e9a01">📜 a0e9a01 — OK button + dispatch fixes</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-8264e48">📜 8264e48 — Routing ambiguity fix</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-346bd1a">📜 346bd1a — Location field fix</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-f0dd632">📜 f0dd632 — Action format gaps</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-1b39540">📜 1b39540 — extractAddAction dispatch</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-440c6fa">📜 440c6fa — Task ID display + search by ID</a>
+  </div>
+</section>
+
+<!-- ═══════════════════ Process Inbox Bug Fixes (May 19–20) ═══════════════════ -->
+
+<section class="feat" id="feat-process-bugfixes2">
+  <div class="feat-header">
+    <span class="feat-icon">🔧</span>
+    <span class="feat-title">Process Inbox Bug Fixes (May 19–20)</span>
+    <span class="feat-badge badge-core">Fix</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>Four bugs found during overhaul testing, fixed in order:</p>
+    <ul style="margin: 8px 0 12px 20px; color: #c0c8e0; font-size: 14px;">
+      <li><strong>Issue#26 — Category not re-derived on routing correction:</strong> When the user corrected the AI's routing choice (e.g. changed from "next" to "project"), the category field carried over from the original proposal. Now the AI is instructed in Step 4 to re-derive category to match the new project's domain.</li>
+      <li><strong>Issue#27 — Group suggestion fired for subtask adds:</strong> After a session, a post-process group suggestion would fire even for tasks added as subtasks of existing projects (which already have a parent). Fixed by only pushing to <code>sessionCreatedTasksRef</code> for standalone next/someday/waiting tasks.</li>
+      <li><strong>Issue#28 — Category select showed only AI-preset option:</strong> The old <code>&lt;input list&gt; + &lt;datalist&gt;</code> filtered on the current value, effectively hiding all other options. Replaced with a <code>&lt;select&gt;</code> that always shows all user categories, with the AI-suggested value included if not already in the list.</li>
+      <li><strong>Issue#29 — Effort hidden for project-type actions:</strong> The <code>showEffort</code> check in PendingActionBar excluded <code>'project'</code> action type. Added to the list so effort is visible when the AI emits it for project actions.</li>
+      <li><strong>FR#114 — Collapsible category dropdown:</strong> The native <code>&lt;select&gt;</code> was replaced with a custom collapsible button + floating panel matching the ProjectSelector design — same click-outside close, scrollable list, highlighted selection.</li>
+      <li><strong>Chevron alignment fix:</strong> <code>textAlign:left</code> conflicted with flexbox in Electron; switched to <code>justifyContent:space-between</code> so the chevron is always pinned to the right edge regardless of value text length.</li>
+    </ul>
+  </div>
+
+  <div class="box box-concept">
+    <h4>React Concept: useRef for click-outside detection</h4>
+    <p>The custom category dropdown uses a <code>useRef</code> attached to the panel container. A <code>useEffect</code> adds a <code>mousedown</code> listener to <code>document</code>; if the click target is outside the ref element, the panel closes. The ref never triggers re-renders (unlike state), so the panel can be an uncontrolled overlay that responds to DOM events. This is the standard React pattern for dropdowns and modals.</p>
+  </div>
+
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>Issue#27 is a classic "side effect leaking out of scope" bug — like a cron job that emails a report even when run in test mode. The fix is a guard condition at the push site: only act on tasks that are actually standalone. Issue#26 is a stale-state problem — like a variable that isn't cleared between loop iterations.</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-37017f5">📜 37017f5 — Issue#26/27/28 batch fix</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-f1c1bae">📜 f1c1bae — Issue#29 + FR#114 category dropdown</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-f6fb894">📜 f6fb894 — Chevron alignment fix</a>
+  </div>
+</section>
+
+<!-- ═══════════════════ Workflow Tooling ═══════════════════ -->
+
+<section class="feat" id="feat-workflow-tooling">
+  <div class="feat-header">
+    <span class="feat-icon">🛠️</span>
+    <span class="feat-title">Workflow Tooling Updates</span>
+    <span class="feat-badge badge-core">Docs</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>Two developer-experience improvements added to <code>Workflow.md</code>: a <strong>syntax check step</strong> (<code>node -e "require('./src/constants.jsx')"</code>) run after every edit to <code>constants.jsx</code> to catch template-literal or bracket errors before a full Vite build; and a <strong>build path workaround</strong> directing builds to <code>/tmp/gtd-build</code> (a native Linux path in the sandbox) rather than the FUSE-mounted Windows filesystem, which returns EPERM on file unlink during Vite's chunk cleanup.</p>
+  </div>
+
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>The EPERM issue is a classic cross-filesystem restriction: the Linux sandbox mounts the Windows drive via FUSE (Filesystem in Userspace), and FUSE does not support the <code>unlink</code> syscall that Vite uses to clean up old build chunks. The fix is the same as any sysadmin would apply — build to a local tmpfs first, where all syscalls work natively.</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-e041723">📜 e041723 — Workflow.md syntax check + EPERM workaround</a>
+  </div>
+</section>
+
 </body>
 </html>
-
-<!-- ═══════════════════ NEW SECTIONS (May 9–11) ═══════════════════ -->
-
-<section id="feat-search-filter">
-  <h2>Search &amp; Filter</h2>
-  <p>Two complementary search tools w
