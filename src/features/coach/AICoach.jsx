@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
-import { formatBubble } from "../tasks/taskUtils.jsx";
+import { formatBubble, normalizeEffort } from "../tasks/taskUtils.jsx";
 import { PRIORITIES } from "../tasks/TaskRow.jsx";
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
 import { ProjectTreePicker } from "../tasks/ProjectTreePicker.jsx";
@@ -133,6 +133,20 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
     return () => document.removeEventListener('mousedown', handler);
   }, [projPickerOpen]);
   const eligibleProjects = (allTasks || []).filter(t => t.bucket === 'project' && !t.done);
+
+  // Normalize AI-inferred effort string to the nearest configured effort label.
+  // The AI may return "2h" while the user's list has "2 hours" — normalizeEffort
+  // snaps by minutes. Fire a one-time update so pendingAction.effort is also correct
+  // before the user confirms without touching the field.
+  const displayEffort = (effort && efforts && efforts.length)
+    ? normalizeEffort(effort, efforts)
+    : effort;
+  useEffect(() => {
+    if (displayEffort && displayEffort !== effort) {
+      onUpdatePendingAction('effort', displayEffort);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentional: key prop resets component on new action, run once per mount
 
   const showDue      = ['next', 'project', 'add', 'waiting'].includes(type);
   const showDefer    = ['next', 'project', 'add', 'someday'].includes(type);
@@ -271,7 +285,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
                 <div>
                   <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Effort</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {(efforts || []).map(e => chip(e, effort === e, COLORS.effort, () => onUpdatePendingAction("effort", effort === e ? null : e)))}
+                    {(efforts || []).map(e => chip(e, displayEffort === e, COLORS.effort, () => onUpdatePendingAction("effort", displayEffort === e ? null : e)))}
                   </div>
                 </div>
               )}
