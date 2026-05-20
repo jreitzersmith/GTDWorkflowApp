@@ -64,7 +64,7 @@ function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubm
   return (
     <div style={{ display: "flex", gap: 7, flexDirection: isUser ? "row-reverse" : "row", maxWidth: "100%" }}>
       <div style={{ width: 22, height: 22, borderRadius: "50%", background: isUser ? COLORS.surface3 : COLORS.inbox, color: isUser ? COLORS.text2 : "#111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isUser ? 9 : 11, fontFamily: "Georgia, serif", flexShrink: 0, marginTop: 1 }}>
-        {isUser ? (userName ? userName[0].toUpperCase() : "Y") : (coachName ? coachName[0].toUpperCase() : "G")}
+        {isUser ? (userName ? userName[0].toUpperCase() : "Y") : (coachName ? coachName[0].toUpperCase() : "C")}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 5, maxWidth: "calc(100% - 70px)" }}>
         <div style={{ padding: "8px 11px", borderRadius: 11, fontSize: 13, lineHeight: 1.55, background: isUser ? COLORS.surface3 : COLORS.surface2, color: isUser ? COLORS.text2 : COLORS.text, borderTopLeftRadius: isUser ? 11 : 3, borderTopRightRadius: isUser ? 3 : 11 }}>
@@ -84,10 +84,10 @@ function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubm
   );
 }
 
-function TypingIndicator() {
+function TypingIndicator({ coachName }) {
   return (
     <div style={{ display: "flex", gap: 7 }}>
-      <div style={{ width: 22, height: 22, borderRadius: "50%", background: COLORS.inbox, color: "#111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontFamily: "Georgia, serif", flexShrink: 0 }}>G</div>
+      <div style={{ width: 22, height: 22, borderRadius: "50%", background: COLORS.inbox, color: "#111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontFamily: "Georgia, serif", flexShrink: 0 }}>{coachName ? coachName[0].toUpperCase() : "C"}</div>
       <div style={{ padding: "9px 13px", borderRadius: 11, borderTopLeftRadius: 3, background: COLORS.surface2, display: "flex", gap: 4, alignItems: "center" }}>
         {[0, 1, 2].map(i => (
           <div key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: COLORS.muted, animation: `bounce 1.2s ${i * 0.2}s infinite` }} />

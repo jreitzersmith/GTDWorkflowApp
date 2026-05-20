@@ -162,7 +162,7 @@ function CoachPanel({
         {messages.map((msg, i) => (
           <ChatBubble key={i} msg={msg} onRecurringStillFine={onRecurringStillFine} onRecurringNeedsWork={onRecurringNeedsWork} onMITSubmit={onMITSubmit} coachName={coachName} userName={userName} />
         ))}
-        {loading && <TypingIndicator />}
+        {loading && <TypingIndicator coachName={coachName} />}
         {pendingAction && (
           <PendingActionBar
             key={`${pendingAction.type}|${pendingAction.title || ""}`}
