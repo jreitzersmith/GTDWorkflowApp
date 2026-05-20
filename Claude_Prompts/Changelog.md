@@ -7,6 +7,17 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
+| 2026-05-20 | Bug Fix | Issue#29 | GH#126 | PendingActionBar missing Effort for project-type actions — added 'project' to showEffort list | f1c1baec |
+| 2026-05-20 | Feature | FR#114 | GH#127 | PendingActionBar category — collapsible dropdown matching ProjectSelector pattern | f1c1baec |
+| 2026-05-19 | Bug Fix | Issue#26 | GH#123 | Process mode category not re-derived when user corrects routing — prompt rule added to Step 4 | 37017f54 |
+| 2026-05-19 | Bug Fix | Issue#27 | GH#124 | Group suggestion fires for add-type tasks already under parent projects — removed push from add branch | 37017f54 |
+| 2026-05-19 | Bug Fix | Issue#28 | GH#125 | PendingActionBar category only showed pre-filled option — replaced input+datalist with select | 37017f54 |
+| 2026-05-19 | Feature | FR#111 | GH#119 | Task ID visible in TaskDetailPanel — monospace id: display above footer, userSelect:all | a0e9a016 |
+| 2026-05-19 | Feature | FR#112 | GH#120 | Global search by task ID — SearchModal matches t.id.startsWith(q) | a0e9a016 |
+| 2026-05-19 | Bug Fix | Issue#25 | GH#121 | →ACTION:add silently dropped in process mode — extractAddAction wired as 3rd fallback in non-streaming dispatch; priority: field parsing added | a0e9a016 |
+| 2026-05-19 | Feature | FR#113 | — | Process mode OK quick-reply button — sendChatWithText bypasses chatInput closure; OK button in CoachPanel visible when awaiting Step 3a | a0e9a016 |
+| 2026-05-19 | Bug Fix | Issue#24 | — | Process mode routing ambiguity freeze — coach now proceeds to Step 3a with best-guess; pre-3a questions only for truly uninterpretable items | a0e9a016 |
+| 2026-05-19 | Bug Fix | — | — | location: field missing from →ACTION:add and →ACTION:next format lines — parser supported it, prompt didn't document it; both lines updated | a0e9a016 |
 | 2026-05-18 | Bug Fix | Issue#22 | GH#102 | Weekly Review question guard + update action support — guard narrowed to last line only; extractUpdateAction wired for review mode; getTaskContext someday/waiting flag filters fixed; inbox archiving side-effect removed; chatHistory seeded on review start | 80a2abb3 |
 | 2026-05-18 | Feature | FR#23 | GH#15 | Categories filter dropdown on all main views — shared select in TaskBucketView; replaces Projects-only control; includes "No category assigned" option | ae1d47a8 |
 | 2026-05-18 | Feature | FR#106 | GH#114 | Location filter dropdown on all main views — alongside Categories; filter logic task.location?.includes(); includes "No location assigned" option | ae1d47a8 |
