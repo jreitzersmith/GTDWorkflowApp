@@ -704,7 +704,7 @@ function useCallAI({
         // so match each block until the first blank line (\n\n) which separates
         // action lines from the AI's subsequent prose response.
         const taskActionLines = [];
-        const actionRe = /→ACTION:(?:update|add|create|link_email)\|(?:[^\n]|\n(?!\n))+/g;
+        const actionRe = /→ACTION:(?:update|add|create|link_email)\|(?:[^\n]|\n(?!\n)(?!→ACTION:))+/g;
         for (const am of reply.matchAll(actionRe)) {
           taskActionLines.push(am[0].trimEnd());
         }
