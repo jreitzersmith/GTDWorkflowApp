@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 
-const INITIAL_COACH_MESSAGE = "Hi! I'm your GTD Coach. I can see your task list and help you stay organized.\n\nAdd tasks to your **Inbox**, then hit **Process Inbox with AI** to sort them — or just ask me anything.";
+function buildInitialMessage(coachName) {
+  const name = coachName ? `, ${coachName}` : '';
+  return `Hi! I'm your GTD Coach${name}. I can see your task list and help you stay organized.\n\nAdd tasks to your **Inbox**, then hit **Process Inbox with AI** to sort them — or just ask me anything.`;
+}
 
-function useAICoachState() {
-  const [messages, setMessages] = useState([{ role: 'assistant', text: INITIAL_COACH_MESSAGE }]);
+function useAICoachState(coachName) {
+  const [messages, setMessages] = useState(() => [{ role: 'assistant', text: buildInitialMessage(coachName) }]);
   const [chatHistory, setChatHistory] = useState([]);
   const [coachMode, setCoachMode] = useState('chat');
   const [chatInput, setChatInput] = useState('');
