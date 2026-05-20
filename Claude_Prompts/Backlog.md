@@ -1,10 +1,12 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#29** · Code Quality — **CQ#11** · Feature Requests — **FR#114**
+> **Last used numbers:** Known Issues — **Issue#30** · Code Quality — **CQ#11** · Feature Requests — **FR#114**
 
 ---
 
 ## Known issues / remaining work
+
+- [ ] Issue#30 [GH#128] (2026-05-20) — Coach/user names not reflected in chat avatars or exports — hardcoded "G"/"Y" initials in ChatBubble; hardcoded "You:"/"Coach:" speaker labels and "GTD Coach" header in exportUtils.js
 
 
 ---

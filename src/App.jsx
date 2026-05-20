@@ -1541,6 +1541,7 @@ export default function GTDManager() {
                 googleToken={googleToken}
                 rawApiThread={rawApiThread}
                 coachName={coachName}
+                userName={userName}
                 onQuickReply={sendChatWithText}
               />
             </ErrorBoundary>

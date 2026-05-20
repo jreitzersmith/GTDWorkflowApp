@@ -46,7 +46,7 @@ function RecurringReviewCard({ events, onStillFine, onNeedsWork }) {
   );
 }
 
-function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubmit }) {
+function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubmit, coachName, userName }) {
   const isUser = msg.role === "user";
   if (msg.isSearchChip) return (
     <div style={{ display: "flex", alignItems: "center", gap: 6,
@@ -64,7 +64,7 @@ function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubm
   return (
     <div style={{ display: "flex", gap: 7, flexDirection: isUser ? "row-reverse" : "row", maxWidth: "100%" }}>
       <div style={{ width: 22, height: 22, borderRadius: "50%", background: isUser ? COLORS.surface3 : COLORS.inbox, color: isUser ? COLORS.text2 : "#111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isUser ? 9 : 11, fontFamily: "Georgia, serif", flexShrink: 0, marginTop: 1 }}>
-        {isUser ? "Y" : "G"}
+        {isUser ? (userName ? userName[0].toUpperCase() : "Y") : (coachName ? coachName[0].toUpperCase() : "G")}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 5, maxWidth: "calc(100% - 70px)" }}>
         <div style={{ padding: "8px 11px", borderRadius: 11, fontSize: 13, lineHeight: 1.55, background: isUser ? COLORS.surface3 : COLORS.surface2, color: isUser ? COLORS.text2 : COLORS.text, borderTopLeftRadius: isUser ? 11 : 3, borderTopRightRadius: isUser ? 3 : 11 }}>

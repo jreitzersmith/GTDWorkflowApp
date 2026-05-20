@@ -79,6 +79,7 @@ function CoachPanel({
   googleToken,
   rawApiThread,
   coachName,
+  userName,
   onQuickReply,
 }) {
   return (
@@ -147,6 +148,8 @@ function CoachPanel({
               googleToken={googleToken}
               docsEnabled={docsEnabled}
               rawApiThread={rawApiThread}
+              coachName={coachName}
+              userName={userName}
             />
           </div>
         )}
@@ -157,7 +160,7 @@ function CoachPanel({
       {/* Message list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
         {messages.map((msg, i) => (
-          <ChatBubble key={i} msg={msg} onRecurringStillFine={onRecurringStillFine} onRecurringNeedsWork={onRecurringNeedsWork} onMITSubmit={onMITSubmit} />
+          <ChatBubble key={i} msg={msg} onRecurringStillFine={onRecurringStillFine} onRecurringNeedsWork={onRecurringNeedsWork} onMITSubmit={onMITSubmit} coachName={coachName} userName={userName} />
         ))}
         {loading && <TypingIndicator />}
         {pendingAction && (
@@ -321,6 +324,7 @@ CoachPanel.propTypes = {
   googleToken:            PropTypes.string,
   rawApiThread:           PropTypes.array,
   coachName:              PropTypes.string,
+  userName:               PropTypes.string,
   onQuickReply:           PropTypes.func,
 };
 

@@ -3,13 +3,13 @@ import { COACH_MODES } from '../../constants.jsx';
 
 // Build a human-readable markdown string from the messages array.
 // include: { userMessages, aiResponses, toolChips, metadata }
-function buildExportContent(messages, include, coachMode, tasks) {
+function buildExportContent(messages, include, coachMode, tasks, { coachName, userName } = {}) {
   const modeLabel = (COACH_MODES[coachMode] || {}).label || coachMode;
   const lines = [];
 
   if (include.metadata) {
     const now = new Date();
-    lines.push('# GTD Coach Export');
+    lines.push('# ' + (coachName || 'GTD Coach') + ' Export');
     lines.push('');
     lines.push('**Date:** ' + now.toLocaleString());
     lines.push('**Mode:** ' + modeLabel);
@@ -28,11 +28,11 @@ function buildExportContent(messages, include, coachMode, tasks) {
     }
     if (msg.role === 'user') {
       if (!include.userMessages) continue;
-      lines.push('**You:** ' + (msg.text || ''));
+      lines.push('**' + (userName || 'You') + ':** ' + (msg.text || ''));
       lines.push('');
     } else if (msg.role === 'assistant') {
       if (!include.aiResponses) continue;
-      lines.push('**Coach:** ' + (msg.text || ''));
+      lines.push('**' + (coachName || 'Coach') + ':** ' + (msg.text || ''));
       lines.push('');
     }
   }
@@ -122,16 +122,16 @@ function downloadText(text, filename, mimeType) {
 }
 
 // Build a human-readable document title from the coach mode and today's date.
-function buildExportTitle(coachMode) {
+function buildExportTitle(coachMode, coachName) {
   const modeLabel = (COACH_MODES[coachMode] || {}).label || 'Chat';
   const today = new Date().toISOString().slice(0, 10);
-  return 'GTD Coach \u2014 ' + modeLabel + ' \u2014 ' + today;
+  return (coachName || 'GTD Coach') + ' \u2014 ' + modeLabel + ' \u2014 ' + today;
 }
 
 // Build a JSON export containing conversation text and optional raw API tool call data.
 // include: { userMessages, aiResponses, toolChips, metadata, apiThread }
 // rawApiThread: accumulated tool-round data from useCallAI (FR#102)
-function buildJsonExport({ rawApiThread, messages, include, coachMode, tasks }) {
+function buildJsonExport({ rawApiThread, messages, include, coachMode, tasks, coachName, userName }) {
   const modeLabel = (COACH_MODES[coachMode] || {}).label || coachMode;
   const now = new Date();
   const output = { exportedAt: now.toISOString(), coachMode: modeLabel };
@@ -146,6 +146,7 @@ function buildJsonExport({ rawApiThread, messages, include, coachMode, tasks }) 
       })
       .map(msg => ({
         role: msg.role,
+        speaker: msg.role === 'user' ? (userName || 'You') : (coachName || 'Coach'),
         text: msg.text || '',
         ...(msg.isSearchChip ? { isSearchChip: true } : {}),
       }));

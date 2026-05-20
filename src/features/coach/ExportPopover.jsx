@@ -26,7 +26,7 @@ function resolveFormat(fmt) {
   return (!fmt || fmt === 'docs') ? 'rtf' : fmt;
 }
 
-function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSettingsChange, googleToken, docsEnabled, driveConversationExportFolderId, rawApiThread }) {
+function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSettingsChange, googleToken, docsEnabled, driveConversationExportFolderId, rawApiThread, coachName, userName }) {
   const [open, setOpen]               = useState(false);
   // status: 'idle' | 'downloading' | 'saving' | 'downloaded' | 'saved' | 'error'
   const [status, setStatus]           = useState('idle');
@@ -70,12 +70,12 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSet
     setDriveUrl(null);
     setErrMsg(null);
     try {
-      const title = buildExportTitle(coachMode);
+      const title = buildExportTitle(coachMode, coachName);
       if (localFormat === 'json') {
-        const jsonText = buildJsonExport({ rawApiThread: rawApiThread || [], messages, include: localInclude, coachMode, tasks });
+        const jsonText = buildJsonExport({ rawApiThread: rawApiThread || [], messages, include: localInclude, coachMode, tasks, coachName, userName });
         downloadText(jsonText, title + '.json', 'application/json');
       } else {
-        const markdownText = buildExportContent(messages, localInclude, coachMode, tasks);
+        const markdownText = buildExportContent(messages, localInclude, coachMode, tasks, { coachName, userName });
         if (localFormat === 'rtf') {
           downloadText(buildRtfContent(markdownText), title + '.rtf', 'application/rtf');
         } else if (localFormat === 'markdown') {
@@ -101,10 +101,10 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSet
     setDriveUrl(null);
     setErrMsg(null);
     try {
-      const title = buildExportTitle(coachMode);
+      const title = buildExportTitle(coachMode, coachName);
       const exportText = localFormat === 'json'
-        ? buildJsonExport({ rawApiThread: rawApiThread || [], messages, include: localInclude, coachMode, tasks })
-        : buildExportContent(messages, localInclude, coachMode, tasks);
+        ? buildJsonExport({ rawApiThread: rawApiThread || [], messages, include: localInclude, coachMode, tasks, coachName, userName })
+        : buildExportContent(messages, localInclude, coachMode, tasks, { coachName, userName });
       const url = await saveToDrive({ markdownText: exportText, googleToken, title, format: localFormat === 'json' ? 'text' : localFormat, driveConversationExportFolderId });
       setDriveUrl(url);
       setStatus('saved');
@@ -274,6 +274,8 @@ ExportPopover.propTypes = {
   docsEnabled:            PropTypes.bool,
   driveConversationExportFolderId:    PropTypes.string,
   rawApiThread:           PropTypes.array,
+  coachName:              PropTypes.string,
+  userName:               PropTypes.string,
 };
 
 export { ExportPopover };
