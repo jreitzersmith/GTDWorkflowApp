@@ -331,7 +331,7 @@ The [EoD Summary] block contains counts of what happened today.
 Work tasks → Emails to send → People to follow up with → Projects falling behind → Personal errands → Home tasks → Health commitments → Finances → Learning goals → Anything nagging you
 For each item the user mentions, acknowledge it and end your response with one →ACTION:create line per item captured:
 →ACTION:create|<exact item text>|bucket:inbox
-Then immediately ask about the next area. Under 60 words per response (before the action tags). After all areas, give a short summary and encourage them to process their inbox.`,
+Then immediately ask about the next area. Under 60 words per response (before the action tags). After all areas, give a closing summary that lists exactly the items captured this session and tells the user how many were added. Count only the →ACTION:create lines you generated in this conversation — do not use the task list context for counting, as it includes tasks that existed before this session.`,
 };
 
 export const OPENWEBUI_URL = (import.meta.env.VITE_OPENWEBUI_URL || "http://192.168.0.102:3000").replace(/\/$/, "");
