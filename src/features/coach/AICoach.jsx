@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { COLORS } from "../../constants.jsx";
 import { formatBubble } from "../tasks/taskUtils.jsx";
@@ -114,10 +114,18 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
 
   const hasAIValues = !!(dueDate || deferUntil || effort || category);
   const [expanded, setExpanded] = useState(hasAIValues);
+  const [catOpen, setCatOpen] = useState(false);
+  const catPickerRef = useRef(null);
+  useEffect(() => {
+    if (!catOpen) return;
+    const handler = e => { if (catPickerRef.current && !catPickerRef.current.contains(e.target)) setCatOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [catOpen]);
 
   const showDue      = ['next', 'project', 'add', 'waiting'].includes(type);
   const showDefer    = ['next', 'project', 'add', 'someday'].includes(type);
-  const showEffort   = ['next', 'add', 'someday', 'waiting'].includes(type);
+  const showEffort   = ['next', 'project', 'add', 'someday', 'waiting'].includes(type);
   const showPriority = ['next', 'add'].includes(type);
   const showLocation = ['next', 'add'].includes(type);
   const showMeta     = type !== 'delete';
@@ -169,18 +177,25 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
           {expanded && (
             <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${COLORS.border}` }}>
               <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: -4 }}>Category</div>
-              <div>
-                <select
-                  value={category || ""}
-                  onChange={e => onUpdatePendingAction("category", e.target.value || null)}
-                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: category ? COLORS.text : COLORS.muted, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box" }}
+              <div ref={catPickerRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setCatOpen(o => !o)}
+                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: category ? COLORS.text : COLORS.muted, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 4 }}
                 >
-                  <option value="">— none —</option>
-                  {category && !(categories || []).includes(category) && (
-                    <option key="__ai__" value={category}>{category}</option>
-                  )}
-                  {(categories || []).map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                  <span style={{ flex: 1 }}>{category || "— none —"}</span>
+                  <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>▾</span>
+                </button>
+                {catOpen && (
+                  <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 50, maxHeight: 200, overflowY: "auto", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}>
+                    <div onClick={() => { onUpdatePendingAction("category", null); setCatOpen(false); }} style={{ padding: "5px 8px", cursor: "pointer", fontSize: 12, borderRadius: 4, color: !category ? COLORS.text : COLORS.muted, background: !category ? COLORS.surface3 : "transparent" }}>— none —</div>
+                    {category && !(categories || []).includes(category) && (
+                      <div onClick={() => { onUpdatePendingAction("category", category); setCatOpen(false); }} style={{ padding: "5px 8px", cursor: "pointer", fontSize: 12, borderRadius: 4, color: COLORS.text, background: COLORS.surface3 }}>{category}</div>
+                    )}
+                    {(categories || []).map(c => (
+                      <div key={c} onClick={() => { onUpdatePendingAction("category", c); setCatOpen(false); }} style={{ padding: "5px 8px", cursor: "pointer", fontSize: 12, borderRadius: 4, color: category === c ? COLORS.project : COLORS.text, background: category === c ? COLORS.surface3 : "transparent" }}>{c}</div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {showEffort && (efforts || []).length > 0 && (
