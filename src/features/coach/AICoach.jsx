@@ -180,7 +180,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
               <div ref={catPickerRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => setCatOpen(o => !o)}
-                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: category ? COLORS.text : COLORS.muted, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 4 }}
+                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: category ? COLORS.text : COLORS.muted, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
                 >
                   <span style={{ flex: 1 }}>{category || "— none —"}</span>
                   <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>▾</span>
