@@ -107,7 +107,7 @@
     <span class="current">📝 Code Snippets</span>
     <a href="project-commits.html">📦 Commit Log</a>
   </div>
-  <span class="updated">Last updated: May 9, 2026</span>
+  <span class="updated">Last updated: May 20, 2026</span>
 </header>
 
 <div class="shell">
@@ -183,6 +183,10 @@
   <a href="#snip-label-filter">Label filter — controlled input</a>
   <a href="#snip-record-usage">recordUsage callback</a>
   <a href="#snip-usage-panel">UsagePanel component</a>
+  <div class="group-label">May 19-20 — Process Inbox</div>
+  <a href="#snip-send-chat-with-text">sendChatWithText (OK button)</a>
+  <a href="#snip-extract-add-action-dispatch">extractAddAction dispatch</a>
+  <a href="#snip-cat-picker-dropdown">Category picker dropdown</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -6045,3 +6049,257 @@ function EventChip({ ev, isSelected, onClick }) {
 }
   </code></pre>
 </section>
+
+<hr>
+
+<h2>May 19–20 — Process Inbox: Quick-Reply, Action Dispatch, Category Dropdown</h2>
+
+<!-- sendChatWithText -->
+<div class="snippet" id="snip-send-chat-with-text">
+  <div class="snip-header">
+    <span class="snip-title">sendChatWithText — OK quick-reply without touching input state</span>
+    <span class="snip-file">src/features/coach/useCallAI.js · CoachPanel.jsx</span>
+    <span class="snip-back"><a href="project-summary.html#feat-process-inbox">↑ Feature: Process Inbox</a></span>
+  </div>
+  <div class="hljs-wrap">
+    <pre><code class="language-javascript">// ── useCallAI.js ──────────────────────────────────────────────────────────
+
+// The regular sendChat reads from the chatInput textarea state and clears it
+// after sending. Quick-reply buttons don't use the textarea at all — they
+// have a fixed payload ('confirm', 'yes', etc.). By extracting a separate
+// function that takes the text directly, we avoid coupling the quick-reply
+// to the input field lifecycle.
+
+const sendChat = useCallback(async () => {
+  const text = chatInput.trim();       // reads from controlled input state
+  if (!text || loading) return;
+  setChatInput('');                    // clears the textarea after sending
+  setMessages(prev => [...prev, { role: 'user', text }]);
+  await callAI(text, coachMode, chatHistory, { emailContext: emailContextRef.current });
+}, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages]);
+
+// Quick-reply variant: sends a fixed string without touching chatInput state.
+// Used by CoachPanel's OK button to confirm Step 3a interpretations.
+const sendChatWithText = useCallback(async (text) => {
+  if (!text || loading) return;
+  // No setChatInput('') here — the input field is untouched.
+  setMessages(prev => [...prev, { role: 'user', text }]);
+  await callAI(text, coachMode, chatHistory, { emailContext: emailContextRef.current });
+}, [loading, coachMode, chatHistory, callAI, setMessages]);
+
+// Both functions are returned from the hook and wired into the app:
+return { callAI, sendChat, sendChatWithText, fetchModels, lastInputLog, setEmailContext };
+
+
+// ── CoachPanel.jsx ────────────────────────────────────────────────────────
+
+// The OK button appears only in process mode, when:
+//   - the AI is not currently loading a response
+//   - there is no pending action bar showing
+//   - the last message in the conversation is from the assistant
+// Clicking it calls onQuickReply('confirm'), which is sendChatWithText
+// passed down as a prop from App.jsx.
+
+{coachMode === 'process' &amp;&amp; !loading &amp;&amp; !pendingAction &amp;&amp;
+ messages.length &gt; 0 &amp;&amp; messages[messages.length - 1]?.role === 'assistant' &amp;&amp; (
+  &lt;div style={{ padding: '4px 12px 0', display: 'flex', gap: 6, flexShrink: 0 }}&gt;
+    &lt;button
+      onClick={() =&gt; onQuickReply &amp;&amp; onQuickReply('confirm')}
+      // &#10003; is the HTML entity for a checkmark ✓
+      style={{ padding: '4px 14px', borderRadius: 6,
+               background: COLORS.next,   // green — confirms/approves
+               color: '#111', border: 'none',
+               fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+               cursor: 'pointer' }}
+    &gt;&#10003; OK&lt;/button&gt;
+  &lt;/div&gt;
+)}</code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why two separate functions?</strong> <code>sendChat</code> and
+    <code>sendChatWithText</code> both call <code>callAI</code>, but they differ
+    in one important way: <code>sendChat</code> reads from and clears the
+    controlled textarea (<code>chatInput</code> state), while
+    <code>sendChatWithText</code> bypasses it entirely. If you tried to reuse
+    <code>sendChat</code> for a quick-reply button, you'd have to set
+    <code>chatInput</code> to the fixed text, wait for a re-render, then call
+    <code>sendChat</code> — fragile and async-messy. A dedicated function is
+    cleaner.
+  </div>
+</div>
+
+<!-- extractAddAction dispatch -->
+<div class="snippet" id="snip-extract-add-action-dispatch">
+  <div class="snip-header">
+    <span class="snip-title">extractAddAction dispatch — wiring →ACTION:add into process mode</span>
+    <span class="snip-file">src/features/coach/useCallAI.js · ~line 1080</span>
+    <span class="snip-back"><a href="project-summary.html#feat-process-inbox">↑ Feature: Process Inbox</a></span>
+  </div>
+  <div class="hljs-wrap">
+    <pre><code class="language-javascript">// Inside the callAI response handler, after the AI reply comes back:
+// The app checks for three mutually-exclusive action types in priority order.
+
+// 1. →ACTION:update — modify an existing task (highest priority check)
+const updateAction = extractUpdateAction(reply);
+if (updateAction &amp;&amp; !_hasQuestion) {
+  const target = tasks.find(t =&gt; t.id === updateAction.taskId);
+  setPendingAction({
+    type: 'update',
+    taskId: updateAction.taskId,
+    changes: updateAction.changes,
+    title: target?.text || updateAction.taskId,
+  });
+} else {
+  // 2. →ACTION:add — place a new task under an existing project
+  // NOTE: extractAction() never returns type:'add' — its regex only matches
+  // next/project/someday/waiting/delete. So we need a separate parser here.
+  const addAction = extractAddAction(reply);
+  if (addAction &amp;&amp; !_hasQuestion) {
+
+    // Resolve the parent: try by ID first, then by exact name match.
+    // The AI might emit a task ID or a project name — both are supported.
+    const parent = tasks.find(t =&gt; t.id === addAction.parentId)
+                || tasks.find(t =&gt; t.text.toLowerCase() === (addAction.parentId || '').toLowerCase());
+
+    // Build the pending action object — all metadata fields are forwarded.
+    // The user can edit these in the metadata bar before confirming.
+    setPendingAction({
+      type: 'add',
+      title:      addAction.title,
+      parentRef:  addAction.parentId,         // raw value from ACTION line
+      parentName: parent?.text || addAction.parentId,  // display name
+      dueDate:    addAction.dueDate    || null,
+      deferUntil: addAction.deferUntil || null,
+      effort:     addAction.effort     || null,
+      location:   addAction.location   || [],
+      priority:   addAction.priority   || [],
+      category:   addAction.category   || null,
+      notes:      addAction.notes      || null,
+      recurrence: addAction.recurrence || null,
+    });
+  }
+  // If neither update nor add matched, the reply was informational only.
+  // (extractAction for next/project/someday/waiting/delete is handled
+  //  in a separate block earlier in the function.)
+}</code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why three separate parsers?</strong> The <code>→ACTION:</code>
+    protocol has grown over time. <code>extractAction</code> handles the
+    original types (next, project, someday, waiting, delete).
+    <code>extractUpdateAction</code> handles the later-added update type.
+    <code>extractAddAction</code> handles the newest add type. Each parser
+    uses a different regex tuned to its format. Merging them into one would
+    create a complex regex; keeping them separate makes each one easy to
+    read and modify independently.
+  </div>
+</div>
+
+<!-- Category picker dropdown -->
+<div class="snippet" id="snip-cat-picker-dropdown">
+  <div class="snip-header">
+    <span class="snip-title">Collapsible category picker — custom dropdown in PendingActionBar</span>
+    <span class="snip-file">src/features/coach/AICoach.jsx · PendingActionBar component</span>
+    <span class="snip-back"><a href="project-summary.html#feat-process-inbox">↑ Feature: Process Inbox</a></span>
+  </div>
+  <div class="hljs-wrap">
+    <pre><code class="language-javascript">// ── State &amp; outside-click handler ────────────────────────────────────────
+
+// catOpen tracks whether the dropdown list is visible.
+const [catOpen, setCatOpen] = useState(false);
+
+// catPickerRef points at the wrapper div that contains both the button
+// and the dropdown list. Used to detect outside clicks.
+const catPickerRef = useRef(null);
+
+// When the dropdown is open, listen for any mousedown on the document.
+// If the click target is outside our wrapper div, close the dropdown.
+// The cleanup function (return) removes the listener when catOpen changes,
+// preventing handler stacking.
+useEffect(() =&gt; {
+  if (!catOpen) return;  // no-op when dropdown is already closed
+  const handler = e =&gt; {
+    if (catPickerRef.current &amp;&amp; !catPickerRef.current.contains(e.target)) {
+      setCatOpen(false);  // clicked outside → close
+    }
+  };
+  document.addEventListener('mousedown', handler);
+  return () =&gt; document.removeEventListener('mousedown', handler);  // cleanup
+}, [catOpen]);
+
+
+// ── JSX: the button + dropdown list ──────────────────────────────────────
+
+&lt;div ref={catPickerRef} style={{ position: 'relative' }}&gt;
+  {/* The trigger button. Flexbox puts the label left, chevron right. */}
+  &lt;button
+    onClick={() =&gt; setCatOpen(o =&gt; !o)}    // toggle open/closed
+    style={{
+      background: COLORS.surface2, border: `1px solid ${COLORS.border}`,
+      borderRadius: 6, color: category ? COLORS.text : COLORS.muted,
+      padding: '4px 8px', fontFamily: 'inherit', fontSize: 12, outline: 'none',
+      width: '100%', boxSizing: 'border-box', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    }}
+  &gt;
+    {/* Label takes all available space; chevron stays fixed on the right */}
+    &lt;span style={{ flex: 1 }}&gt;{category || '— none —'}&lt;/span&gt;
+    &lt;span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}&gt;▾&lt;/span&gt;
+  &lt;/button&gt;
+
+  {/* The dropdown list — only rendered when catOpen is true */}
+  {catOpen &amp;&amp; (
+    &lt;div style={{
+      position: 'absolute', top: 'calc(100% + 2px)',
+      left: 0, right: 0,                  // same width as button
+      background: COLORS.surface2,
+      border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4,
+      zIndex: 50,                          // float above other content
+      maxHeight: 200, overflowY: 'auto',   // scroll if many categories
+      boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+    }}&gt;
+      {/* "none" option always at top */}
+      &lt;div onClick={() =&gt; { onUpdatePendingAction('category', null); setCatOpen(false); }}
+           style={{ padding: '5px 8px', cursor: 'pointer', fontSize: 12, borderRadius: 4,
+                    color: !category ? COLORS.text : COLORS.muted,
+                    background: !category ? COLORS.surface3 : 'transparent' }}&gt;
+        — none —
+      &lt;/div&gt;
+
+      {/* If the AI suggested a category not in the user's list, show it first */}
+      {category &amp;&amp; !(categories || []).includes(category) &amp;&amp; (
+        &lt;div onClick={() =&gt; { onUpdatePendingAction('category', category); setCatOpen(false); }}
+             style={{ padding: '5px 8px', cursor: 'pointer', fontSize: 12, borderRadius: 4,
+                      color: COLORS.text, background: COLORS.surface3 }}&gt;
+          {category}
+        &lt;/div&gt;
+      )}
+
+      {/* User's configured category list */}
+      {(categories || []).map(c =&gt; (
+        &lt;div key={c}
+             onClick={() =&gt; { onUpdatePendingAction('category', c); setCatOpen(false); }}
+             style={{ padding: '5px 8px', cursor: 'pointer', fontSize: 12, borderRadius: 4,
+                      color: category === c ? COLORS.project : COLORS.text,
+                      background: category === c ? COLORS.surface3 : 'transparent' }}&gt;
+          {c}
+        &lt;/div&gt;
+      ))}
+    &lt;/div&gt;
+  )}
+&lt;/div&gt;</code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why not use a native &lt;select&gt;?</strong> The native HTML
+    <code>&lt;select&gt;</code> element cannot be styled to match the dark
+    theme or the button/chip aesthetic used elsewhere in the app. By building
+    a custom dropdown (button + absolute-positioned list), every pixel is
+    under your control. The outside-click handler via <code>useEffect</code>
+    + <code>useRef</code> is the standard React pattern for click-away
+    dismissal — think of it as "if the user clicks anywhere except this div,
+    close it."
+  </div>
+</div>
+</main>
+</body>
+</html>
