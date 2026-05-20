@@ -4,6 +4,7 @@ import { COLORS } from "../../constants.jsx";
 import { formatBubble } from "../tasks/taskUtils.jsx";
 import { PRIORITIES } from "../tasks/TaskRow.jsx";
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
+import { ProjectTreePicker } from "../tasks/ProjectTreePicker.jsx";
 
 function ActionBtn({ children, onClick, color }) {
   const [hover, setHover] = useState(false);
@@ -97,7 +98,7 @@ function TypingIndicator() {
   );
 }
 
-function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, locations, categories, onUpdatePendingAction }) {
+function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, locations, categories, allTasks, onUpdatePendingAction }) {
   if (!action) return null;
   const { type, title, nextAction, parentName, dueDate, deferUntil, effort, category, priority = [], location = [], taskId, changes } = action;
 
@@ -112,7 +113,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
   };
   const cfg = configs[type] || configs.next;
 
-  const hasAIValues = !!(dueDate || deferUntil || effort || category);
+  const hasAIValues = !!(dueDate || deferUntil || effort || category || (location && location.length) || (priority && priority.length));
   const [expanded, setExpanded] = useState(hasAIValues);
   const [catOpen, setCatOpen] = useState(false);
   const catPickerRef = useRef(null);
@@ -123,11 +124,22 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
     return () => document.removeEventListener('mousedown', handler);
   }, [catOpen]);
 
+  const [projPickerOpen, setProjPickerOpen] = useState(false);
+  const projPickerRef = useRef(null);
+  useEffect(() => {
+    if (!projPickerOpen) return;
+    const handler = e => { if (projPickerRef.current && !projPickerRef.current.contains(e.target)) setProjPickerOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [projPickerOpen]);
+  const eligibleProjects = (allTasks || []).filter(t => t.bucket === 'project' && !t.done);
+
   const showDue      = ['next', 'project', 'add', 'waiting'].includes(type);
   const showDefer    = ['next', 'project', 'add', 'someday'].includes(type);
   const showEffort   = ['next', 'project', 'add', 'someday', 'waiting'].includes(type);
-  const showPriority = ['next', 'add'].includes(type);
-  const showLocation = ['next', 'add'].includes(type);
+  const showPriority = ['next', 'add', 'project', 'someday', 'waiting'].includes(type);
+  const showLocation = ['next', 'add', 'project', 'someday', 'waiting'].includes(type);
+  const showProject  = ['next', 'project', 'someday', 'waiting'].includes(type);
   const showMeta     = type !== 'delete';
 
   const chip = (label, active, color, onClick) => (
@@ -139,7 +151,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
   );
 
   const collapsedHint = !expanded && hasAIValues
-    ? ` (${[dueDate && `due ${dueDate}`, deferUntil && `defer ${deferUntil}`, effort, category].filter(Boolean).join(", ")})`
+    ? ` (${[dueDate && `due ${dueDate}`, deferUntil && `defer ${deferUntil}`, effort, category, location && location.length && location.join(','), priority && priority.length && priority.join(',')].filter(Boolean).join(", ")})`
     : "";
 
   return (
@@ -152,7 +164,34 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
         </div>
       ) : type === "add" ? (
         <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
-          <div><span style={{ color: COLORS.muted }}>Under: </span><strong style={{ color: COLORS.project }}>{parentName}</strong></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: COLORS.muted, flexShrink: 0 }}>Under: </span>
+            <div ref={projPickerRef} style={{ position: "relative", flex: 1 }}>
+              <button
+                onClick={() => setProjPickerOpen(o => !o)}
+                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: parentName ? COLORS.project : COLORS.muted, padding: "3px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, width: "100%", boxSizing: "border-box" }}
+              >
+                <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{parentName || "— UnCategorized"}</span>
+                <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>▾</span>
+              </button>
+              {projPickerOpen && (
+                <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 50, maxHeight: 240, overflowY: "auto", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}>
+                  <ProjectTreePicker
+                    eligibleProjects={eligibleProjects}
+                    selectedId={action.parentRef}
+                    onSelect={id => {
+                      const proj = eligibleProjects.find(p => p.id === id);
+                      onUpdatePendingAction("parentRef", id || null);
+                      onUpdatePendingAction("parentName", proj ? proj.text : "");
+                      setProjPickerOpen(false);
+                    }}
+                    showUncategorized
+                    sorted
+                  />
+                </div>
+              )}
+            </div>
+          </div>
           <div><span style={{ color: COLORS.muted }}>Action: </span><strong style={{ color: COLORS.next }}>{title}</strong></div>
         </div>
       ) : type === "update" ? (
@@ -176,13 +215,43 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
           </button>
           {expanded && (
             <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${COLORS.border}` }}>
+              {showProject && (
+                <div>
+                  <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Project</div>
+                  <div ref={projPickerRef} style={{ position: "relative" }}>
+                    <button
+                      onClick={() => setProjPickerOpen(o => !o)}
+                      style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: action.parentRef ? COLORS.project : COLORS.muted, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                    >
+                      <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{parentName || "— UnCategorized"}</span>
+                      <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>▾</span>
+                    </button>
+                    {projPickerOpen && (
+                      <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 50, maxHeight: 240, overflowY: "auto", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}>
+                        <ProjectTreePicker
+                          eligibleProjects={eligibleProjects}
+                          selectedId={action.parentRef}
+                          onSelect={id => {
+                            const proj = eligibleProjects.find(p => p.id === id);
+                            onUpdatePendingAction("parentRef", id || null);
+                            onUpdatePendingAction("parentName", proj ? proj.text : "");
+                            setProjPickerOpen(false);
+                          }}
+                          showUncategorized
+                          sorted
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: -4 }}>Category</div>
               <div ref={catPickerRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => setCatOpen(o => !o)}
                   style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: category ? COLORS.text : COLORS.muted, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
                 >
-                  <span style={{ flex: 1 }}>{category || "— none —"}</span>
+                  <span style={{ flex: 1, textAlign: "left" }}>{category || "— none —"}</span>
                   <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>▾</span>
                 </button>
                 {catOpen && (

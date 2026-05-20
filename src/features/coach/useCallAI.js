@@ -1066,8 +1066,8 @@ function useCallAI({
       const _hasQuestion = _lastLine.replace(/\[[^\]]*\]/g, '').includes('?');
       if (action) {
         if (!_hasQuestion) {
-          // Resolve parent name for →ACTION:add so PendingActionBar can display it
-          if (action.type === 'add' && action.parentRef) {
+          // Resolve parent name for →ACTION:add and →ACTION:project so PendingActionBar can display it
+          if ((action.type === 'add' || action.type === 'project') && action.parentRef) {
             const parent = tasks.find(t => t.id === action.parentRef)
                         || tasks.find(t => t.text.toLowerCase() === action.parentRef.toLowerCase());
             action.parentName = parent?.text || action.parentRef;

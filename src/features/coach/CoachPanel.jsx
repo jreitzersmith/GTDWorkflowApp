@@ -162,6 +162,7 @@ function CoachPanel({
         {loading && <TypingIndicator />}
         {pendingAction && (
           <PendingActionBar
+            key={`${pendingAction.type}|${pendingAction.title || ""}`}
             action={pendingAction}
             onConfirm={onConfirmMove}
             onDismiss={onDismissPendingAction}
@@ -169,6 +170,7 @@ function CoachPanel({
             efforts={efforts}
             locations={locations}
             categories={categories}
+            allTasks={tasks}
             onUpdatePendingAction={onUpdatePendingAction}
           />
         )}
