@@ -389,7 +389,7 @@ function useCallAI({
             if (availableTools.length > 0) reqBody.tools = availableTools;
           }
           if (loopCount > 1) {
-            setMessages(prev => [...prev, { role: 'assistant', text: `⏳ Thinking... (step ${loopCount})`, isSearchChip: true }]);
+            setMessages(prev => [...prev, { role: 'assistant', text: `⏳ Processing Tool #${loopCount - 1} Output...`, isSearchChip: true }]);
           }
           const reqStart = Date.now();
           const abortCtrl = new AbortController();
