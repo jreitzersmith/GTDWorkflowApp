@@ -6,8 +6,6 @@
 
 ## Known issues / remaining work
 
-- [ ] Issue#30 [GH#128] (2026-05-20) — Coach/user names not reflected in chat avatars or exports — hardcoded "G"/"Y" initials in ChatBubble; hardcoded "You:"/"Coach:" speaker labels and "GTD Coach" header in exportUtils.js
-
 
 ---
 
