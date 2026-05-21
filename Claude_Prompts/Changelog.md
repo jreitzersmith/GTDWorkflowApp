@@ -143,4 +143,12 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-16 | Feature      | FR#45   | GH#41  | Drive full-text search bar in TaskDetailPanel DriveAttachments section | ec3c80a |
 | 2026-05-16 | Feature      | FR#42   | GH#38  | Weekly Review Save to Drive button; reviewDriveFolderId setting in SettingsPanel + useAppSettings | ec3c80a |
 | 2026-05-16 | Feature      | FR#41   | GH#37  | →ACTION:create-doc handler in useCallAI; creates Google Doc from coach output, links to task | ec3c80a |
-| 2026-05-16 | Feature    
+| 2026-05-16 | Feature      | FR#43   | GH#39  | →ACTION:create-sheet and →ACTION:create-slides handlers in useCallAI; coach prompt updated | ec3c80a |
+| 2026-05-16 | Feature      | FR#44   | GH#40  | SlidesGenerator component in TaskDetailPanel: slides briefing button on project tasks | ec3c80a |
+| 2026-05-17 | Feature      | —       | —      | pptxApi.js: dark slate theme (DARK_BG/TITLE_BAR palette, cover + content slide builders) | 5b74ede |
+| 2026-05-17 | Feature      | —       | —      | docsApi.js: docsAppendMarkdown — native Docs formatting (headings, bullets, bold/italic via batchUpdate) | 5b74ede |
+| 2026-05-17 | Bug Fix      | Issue#23| GH#108 | create-sheet: AI listed tasks instead of emitting ACTION when date range specified; add applyTaskFilters shared utility with 11 filter params | 14b2a01 |
+| 2026-05-18 | Feature | FR#103 | GH#111 | ExportPopover inline format selector; 'User messages' label unification | 6083b8c9 |
+| 2026-05-18 | Feature      | FR#98   | GH#104 | Configurable AI coach name and user display name — threaded into all system prompts | 4588ad5 |
+| 2026-05-18 | Feature      | FR#105  | GH#113 | AI coach get_weather tool (OpenWeatherMap) — current + forecast, userCity default   | f0ec825 |
+| 2026-05-21 | Feature      | FR#116  | GH#132 | Process inbox: emit action immediately, remove OK confirmation step; metadata panel defaults collapsed | f21eb22 |
