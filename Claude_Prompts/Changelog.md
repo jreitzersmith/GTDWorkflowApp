@@ -7,6 +7,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
+| 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |
 | 2026-05-20 | Bug Fix | Issue#30 | GH#128 | Coach/user names not reflected in chat avatars or exports — threaded coachName/userName through ChatBubble and exportUtils | 3db965b9 |
 | 2026-05-20 | Bug Fix | Issue#29 | GH#126 | PendingActionBar missing Effort for project-type actions — added 'project' to showEffort list | f1c1baec |
