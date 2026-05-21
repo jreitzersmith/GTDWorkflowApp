@@ -81,7 +81,6 @@ function CoachPanel({
   rawApiThread,
   coachName,
   userName,
-  onQuickReply,
 }) {
   return (
     <div style={{ height: coachHeight, display: "flex", flexDirection: "column", flexShrink: 0 }}>
@@ -224,16 +223,6 @@ function CoachPanel({
         <div ref={chatEndRef} />
       </div>
 
-      {/* Process mode quick-reply OK button */}
-      {coachMode === 'process' && !loading && !pendingAction &&
-       messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && (
-        <div style={{ padding: '4px 12px 0', display: 'flex', gap: 6, flexShrink: 0 }}>
-          <button
-            onClick={() => onQuickReply && onQuickReply('confirm')}
-            style={{ padding: '4px 14px', borderRadius: 6, background: COLORS.next, color: '#111', border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-          >&#10003; OK</button>
-        </div>
-      )}
       {/* Chat input */}
       <ResizeHandle onMouseDown={chatInputDragDown} direction="v" />
       <div style={{ display: "flex", gap: 6, padding: "8px 12px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, alignItems: "flex-end" }}>
@@ -328,7 +317,6 @@ CoachPanel.propTypes = {
   rawApiThread:           PropTypes.array,
   coachName:              PropTypes.string,
   userName:               PropTypes.string,
-  onQuickReply:           PropTypes.func,
 };
 
 export { CoachPanel };

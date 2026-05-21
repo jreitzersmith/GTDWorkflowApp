@@ -1543,7 +1543,6 @@ export default function GTDManager() {
                 rawApiThread={rawApiThread}
                 coachName={coachName}
                 userName={userName}
-                onQuickReply={sendChatWithText}
               />
             </ErrorBoundary>
           </div>
