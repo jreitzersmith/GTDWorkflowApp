@@ -433,6 +433,7 @@ export default function GTDManager() {
     driveSpreadsheetFolderId,
     driveSlideDeckFolderId,
     driveBaseFolderId,
+    onFocusSet: () => setCurrentView('focus'),
   });
 
   const switchCoachMode = useCallback((mode, introMsg) => {
@@ -567,9 +568,8 @@ export default function GTDManager() {
       setChatHistory([]);
       setRawApiThread([]);
       setPendingAction(null);
-      setMessages([]);
+      setMessages([{ role: 'user', text: `Good morning! Let's start my day.${urgencyNote}` }]);
       callAI(`Good morning! Let's start my day.${urgencyNote}\n\n${lines}`, 'daily', []);
-      setCurrentView('gtd');
       const newPhase = 'end';
       setDailyReviewPhase(newPhase);
       localStorage.setItem('gtd-daily-phase', JSON.stringify({ phase: newPhase, date: today }));
@@ -596,9 +596,8 @@ export default function GTDManager() {
       setChatHistory([]);
       setRawApiThread([]);
       setPendingAction(null);
-      setMessages([]);
+      setMessages([{ role: 'user', text: `Let's close out my day.` }]);
       callAI(`Let's close out my day.\n\n${lines}`, 'daily', []);
-      setCurrentView('gtd');
       const newPhase = 'start';
       setDailyReviewPhase(newPhase);
       localStorage.setItem('gtd-daily-phase', JSON.stringify({ phase: newPhase, date: today }));
@@ -617,6 +616,7 @@ export default function GTDManager() {
     const userMsg = `My MITs for today:\n${listText}`;
     setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     callAI(userMsg, 'daily', chatHistory);
+    setCurrentView('focus');
   };
 
   // Prefill the coach chat with email content so the user can process it into tasks
@@ -1532,6 +1532,7 @@ export default function GTDManager() {
                 onUpdatePendingAction={(field, value) => setPendingAction(prev => prev ? ({ ...prev, [field]: value }) : prev)}
                 onStartBrainDump={startBrainDump}
                 onStartProjectReview={startProjectReview}
+                onStartDailyReview={startDailyReview}
                 onSwitchToChat={() => switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.")}
                 onMITSubmit={handleMITSubmit}
                 docsEnabled={docsEnabled}

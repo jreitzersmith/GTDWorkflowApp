@@ -292,6 +292,7 @@ function useCallAI({
   driveSpreadsheetFolderId,
   driveSlideDeckFolderId,
   driveBaseFolderId,
+  onFocusSet,
 }) {
   const fetchModels = useCallback(async () => {
     try {
@@ -1024,6 +1025,7 @@ function useCallAI({
             const today = new Date().toISOString().slice(0, 10);
             localStorage.setItem(`gtd-todays-focus-${today}`, JSON.stringify({ ids, date: today }));
             updateChip = { taskName: `${ids.length} task${ids.length !== 1 ? 's' : ''}`, fields: ["set as Today's Focus"] };
+            if (onFocusSet) onFocusSet();
           }
         }
       }
@@ -1124,7 +1126,7 @@ function useCallAI({
       googleToken, googleScope, calendarEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
       setCalendarEvents, recordUsage, setLastInputLog, setTasks, setGmailQueue,
       setMessages, setChatHistory, setLoading, setPendingAction, authUser, userCity, userHomeAddress, userWorkAddress, coachName, userName,
-      driveEnabled, driveDocumentFolderId, driveSpreadsheetFolderId, driveSlideDeckFolderId, driveBaseFolderId]); // eslint-disable-line react-hooks/exhaustive-deps
+      driveEnabled, driveDocumentFolderId, driveSpreadsheetFolderId, driveSlideDeckFolderId, driveBaseFolderId, onFocusSet]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();

@@ -66,6 +66,7 @@ function CoachPanel({
   onStartWeeklyReview,
   onStartBrainDump,
   onStartProjectReview,
+  onStartDailyReview,
   onSwitchToChat,
   onMITSubmit,
   efforts,
@@ -122,6 +123,7 @@ function CoachPanel({
                         else if (key === 'review') onStartWeeklyReview();
                         else if (key === 'dump') onStartBrainDump();
                         else if (key === 'projectReview') onStartProjectReview();
+                        else if (key === 'daily') onStartDailyReview?.();
                         else onSwitchToChat();
                       }}
                       style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', borderRadius: 4, color: coachMode === key ? '#d4a844' : COLORS.text, fontWeight: coachMode === key ? 600 : 400 }}
@@ -312,6 +314,7 @@ CoachPanel.propTypes = {
   onStartWeeklyReview:    PropTypes.func.isRequired,
   onStartBrainDump:       PropTypes.func.isRequired,
   onStartProjectReview:   PropTypes.func.isRequired,
+  onStartDailyReview:     PropTypes.func,
   onSwitchToChat:         PropTypes.func.isRequired,
   efforts:                PropTypes.array,
   locations:              PropTypes.array,
