@@ -328,7 +328,7 @@ function TaskBucketView({
             })()}
 
             <TaskListExportPopover
-              tasks={tasks}
+              tasks={tasks.filter(t => t.bucket === 'project')}
               googleToken={googleToken}
               docsEnabled={docsEnabled}
               driveConversationExportFolderId={driveConversationExportFolderId}
