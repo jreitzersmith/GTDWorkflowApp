@@ -155,7 +155,20 @@ function buildJsonExport({ rawApiThread, messages, include, coachMode, tasks, co
   return JSON.stringify(output, null, 2);
 }
 
-const TASK_BUCKET_LABELS = {
+// Flag-based view filters matching App.jsx bucketTasks logic.
+// next/waiting/someday/deferred are virtual views: tasks stored as bucket:'project' + flag.
+const _todayStr = () => new Date().toISOString().slice(0, 10);
+const TASK_VIEW_FILTERS = {
+  inbox:        t => t.bucket === 'inbox',
+  next:         t => t.bucket === 'project' && !!t.isNextAction && !t.isSomeday && !t.isWaitingFor,
+  project:      t => t.bucket === 'project' && !t.isNextAction && !t.isSomeday && !t.isWaitingFor && !(t.deferUntil && t.deferUntil > _todayStr()),
+  waiting:      t => t.bucket === 'project' && !!t.isWaitingFor,
+  someday:      t => t.bucket === 'project' && !!t.isSomeday,
+  deferred:     t => t.bucket === 'project' && !!(t.deferUntil && t.deferUntil > _todayStr()),
+  done:         t => t.bucket === 'done',
+  inboxHistory: t => t.bucket === 'inboxHistory',
+};
+const TASK_VIEW_LABELS = {
   inbox:        'Inbox',
   next:         'Next Actions',
   project:      'Projects',
@@ -165,7 +178,7 @@ const TASK_BUCKET_LABELS = {
   done:         'Completed',
   inboxHistory: 'Inbox History',
 };
-const TASK_BUCKET_ORDER = ['inbox', 'next', 'project', 'waiting', 'someday', 'deferred'];
+const TASK_VIEW_ORDER = ['inbox', 'next', 'project', 'waiting', 'someday', 'deferred'];
 
 // Build a human-readable markdown string for all tasks, grouped by bucket.
 // include: { header, metadata, notes, completed }
@@ -180,13 +193,13 @@ function buildTaskListExportContent(tasks, include) {
     lines.push('---');
     lines.push('');
   }
-  const order = [...TASK_BUCKET_ORDER, ...(include.completed ? ['done', 'inboxHistory'] : [])];
-  for (const bucket of order) {
-    const bucketTasks = tasks.filter(t => t.bucket === bucket);
-    if (bucketTasks.length === 0) continue;
-    lines.push('## ' + (TASK_BUCKET_LABELS[bucket] || bucket) + ' (' + bucketTasks.length + ')');
+  const order = [...TASK_VIEW_ORDER, ...(include.completed ? ['done', 'inboxHistory'] : [])];
+  for (const view of order) {
+    const viewTasks = tasks.filter(TASK_VIEW_FILTERS[view] || (() => false));
+    if (viewTasks.length === 0) continue;
+    lines.push('## ' + (TASK_VIEW_LABELS[view] || view) + ' (' + viewTasks.length + ')');
     lines.push('');
-    for (const t of bucketTasks) {
+    for (const t of viewTasks) {
       lines.push((t.done ? '- [x] ' : '- [ ] ') + t.text);
       if (include.metadata) {
         const meta = [];
@@ -206,25 +219,23 @@ function buildTaskListExportContent(tasks, include) {
 }
 
 function buildTaskListJsonExport(tasks, include) {
-  const order = [...TASK_BUCKET_ORDER, ...(include.completed ? ['done', 'inboxHistory'] : [])];
+  const order = [...TASK_VIEW_ORDER, ...(include.completed ? ['done', 'inboxHistory'] : [])];
   const output = {
     exportedAt: new Date().toISOString(),
     type: 'task-list',
     ...(include.header ? { totalTasks: tasks.length } : {}),
-    tasks: tasks
-      .filter(t => order.includes(t.bucket))
-      .map(t => {
-        const row = { id: t.id, text: t.text, bucket: t.bucket, done: !!t.done };
-        if (include.metadata) {
-          if (t.dueDate)           row.dueDate  = t.dueDate;
-          if (t.effort)            row.effort   = t.effort;
-          if (t.location?.length)  row.location = t.location;
-          if (t.priority?.length)  row.priority = t.priority;
-          row.created = t.created;
-        }
-        if (include.notes && t.notes) row.notes = t.notes;
-        return row;
-      }),
+    tasks: order.flatMap(view => tasks.filter(TASK_VIEW_FILTERS[view] || (() => false)).map(t => {
+      const row = { id: t.id, text: t.text, bucket: t.bucket, done: !!t.done };
+      if (include.metadata) {
+        if (t.dueDate)           row.dueDate  = t.dueDate;
+        if (t.effort)            row.effort   = t.effort;
+        if (t.location?.length)  row.location = t.location;
+        if (t.priority?.length)  row.priority = t.priority;
+        row.created = t.created;
+      }
+      if (include.notes && t.notes) row.notes = t.notes;
+      return row;
+    })),
   };
   return JSON.stringify(output, null, 2);
 }
