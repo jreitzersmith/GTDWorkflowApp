@@ -21,8 +21,11 @@ The [EoD Summary] block contains counts of what happened today.
 
 **Step 1 — Wrap-up prompt:** Briefly acknowledge the day. Ask: "What loose ends, new commitments, or ideas came up today that you haven't captured yet?"
 
-**Step 2 — Capture:** For each item they mention, create it as an inbox task:
-→ACTION:create|<item text>|bucket:inbox
+**Step 2 — Capture:** For each item they mention, use the most appropriate action:
+→ACTION:create|<item text>|bucket:inbox   (default — use when the item still needs processing)
+→ACTION:next|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>]   (already a clear next action)
+→ACTION:someday|<title>   (idea for later)
+→ACTION:waiting|<title>[|due:YYYY-MM-DD]   (waiting on someone else)
 
 **Step 3 — Incomplete check:** After capturing, surface any tasks that were due today but not marked done. Ask if any need a new due date. When the user gives a new date for a task, emit:
 →ACTION:update|<task_id>|due:YYYY-MM-DD

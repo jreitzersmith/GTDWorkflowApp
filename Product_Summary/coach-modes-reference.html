@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GTD Coach Modes — Implementation Reference</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --surface: #1e2128;
+    --surface2: #252830;
+    --surface3: #2d3038;
+    --border: #333740;
+    --text: #e2e4e9;
+    --text2: #9ca3af;
+    --muted: #6b7280;
+    --accent: #6c8cff;
+    --accent-soft: #6c8cff22;
+    --inbox: #e8c84a;
+    --inbox-soft: #e8c84a22;
+    --project: #7ec8a0;
+    --project-soft: #7ec8a022;
+    --review: #c084fc;
+    --review-soft: #c084fc22;
+    --daily: #fb923c;
+    --daily-soft: #fb923c22;
+    --dump: #38bdf8;
+    --dump-soft: #38bdf822;
+    --chat: #6c8cff;
+    --chat-soft: #6c8cff22;
+    --code-bg: #0e1015;
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.65;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 28px 14px;
+  }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--text); }
+  header p  { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  .tab-bar {
+    display: flex;
+    gap: 2px;
+    padding: 10px 28px 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); background: var(--surface2); }
+
+  .tab-btn[data-mode="chat"].active     { border-bottom-color: var(--chat); }
+  .tab-btn[data-mode="process"].active  { border-bottom-color: var(--inbox); }
+  .tab-btn[data-mode="dump"].active     { border-bottom-color: var(--dump); }
+  .tab-btn[data-mode="project"].active  { border-bottom-color: var(--project); }
+  .tab-btn[data-mode="daily"].active    { border-bottom-color: var(--daily); }
+  .tab-btn[data-mode="weekly"].active   { border-bottom-color: var(--review); }
+
+  .content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 28px 28px 60px;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ─── Typography ─────────────────────────────────── */
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .mode-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  h3 {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 28px 0 10px;
+  }
+  h3:first-of-type { margin-top: 20px; }
+
+  h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 18px 0 6px;
+  }
+
+  p { margin-bottom: 10px; color: var(--text2); }
+  p strong { color: var(--text); font-weight: 600; }
+
+  ul, ol { padding-left: 20px; margin-bottom: 10px; color: var(--text2); }
+  li { margin-bottom: 4px; }
+  li strong { color: var(--text); }
+
+  /* ─── Cards / Sections ───────────────────────────── */
+  .section-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+
+  .section-card.highlight-chat     { border-left: 3px solid var(--chat);    background: var(--surface2); }
+  .section-card.highlight-inbox    { border-left: 3px solid var(--inbox);   background: var(--surface2); }
+  .section-card.highlight-dump     { border-left: 3px solid var(--dump);    background: var(--surface2); }
+  .section-card.highlight-project  { border-left: 3px solid var(--project); background: var(--surface2); }
+  .section-card.highlight-daily    { border-left: 3px solid var(--daily);   background: var(--surface2); }
+  .section-card.highlight-review   { border-left: 3px solid var(--review);  background: var(--surface2); }
+
+  /* ─── Code / Action syntax ───────────────────────── */
+  code {
+    font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+    background: var(--code-bg);
+    color: var(--amber);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin-bottom: 14px;
+    font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--amber);
+  }
+  pre .comment { color: var(--muted); }
+  pre .kw { color: #93c5fd; }
+  pre .str { color: var(--green); }
+
+  /* ─── Flow diagram ───────────────────────────────── */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 14px;
+  }
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    position: relative;
+  }
+  .flow-step:first-child { border-radius: 8px 8px 0 0; }
+  .flow-step:last-child  { border-radius: 0 0 8px 8px; }
+  .flow-step + .flow-step { border-top: none; }
+  .flow-num {
+    min-width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .flow-body { flex: 1; }
+  .flow-body strong { color: var(--text); font-size: 13px; }
+  .flow-body p { margin: 2px 0 0; font-size: 12.5px; }
+
+  /* ─── Action type pills ──────────────────────────── */
+  .action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 600px) { .action-grid { grid-template-columns: 1fr; } }
+
+  .action-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px 12px;
+  }
+  .action-pill .pill-head {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 3px;
+    font-family: 'Fira Code', monospace;
+  }
+  .action-pill p { font-size: 12px; margin: 0; }
+
+  /* ─── Phase blocks ───────────────────────────────── */
+  .phase-block {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .phase-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  /* ─── Inline note box ────────────────────────────── */
+  .note-box {
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--amber);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-size: 12.5px;
+    color: var(--text2);
+  }
+  .note-box strong { color: var(--amber); }
+
+  /* ─── Two-col layout ─────────────────────────────── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* ─── Tag ────────────────────────────────────────── */
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 4px;
+    margin-right: 4px;
+  }
+  .tag-green  { background: #14532d; color: var(--green); }
+  .tag-blue   { background: #1e3a5f; color: #93c5fd; }
+  .tag-amber  { background: #451a03; color: var(--amber); }
+  .tag-purple { background: #3b0764; color: #c084fc; }
+  .tag-red    { background: #450a0a; color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>GTD Coach Modes — Implementation Reference</h1>
+  <p>Per-mode description of system prompts, context, action types, and UI flow · GTDWorkflowApp</p>
+</header>
+
+<div class="tab-bar">
+  <button class="tab-btn active" data-mode="chat"    onclick="switchTab('chat')">💬 Chat</button>
+  <button class="tab-btn"        data-mode="process" onclick="switchTab('process')">📥 Process Inbox</button>
+  <button class="tab-btn"        data-mode="dump"    onclick="switchTab('dump')">🧠 Brain Dump</button>
+  <button class="tab-btn"        data-mode="project" onclick="switchTab('project')">🔍 Project Review</button>
+  <button class="tab-btn"        data-mode="daily"   onclick="switchTab('daily')">🌅 Daily Review</button>
+  <button class="tab-btn"        data-mode="weekly"  onclick="switchTab('weekly')">📋 Weekly Review</button>
+</div>
+
+<div class="content">
+
+<!-- ════════════════════════════════════════════════════════ CHAT ══ -->
+<div class="tab-panel active" id="panel-chat">
+  <h2>
+    💬 Chat
+    <span class="mode-tag" style="background:var(--chat-soft);color:var(--chat)">General Assistant</span>
+  </h2>
+  <p style="color:var(--muted);margin-top:4px;margin-bottom:20px;">The default mode. Open-ended GTD coaching with lazy task context, live tool use, and full action coverage.</p>
+
+  <h3>Context Sent to API</h3>
+  <div class="section-card highlight-chat">
+    <p>Chat is the only mode that uses <strong>lazy task context</strong>. Instead of sending the full task list on every message, the system prompt includes a compact bucket-count summary:</p>
+    <pre>[Task Overview — Today: 2026-05-21 | Inbox: 4 · Next Actions: 12 · Projects: 8 · Waiting For: 3]
+Call get_task_context to retrieve full task details when needed.</pre>
+    <p>The AI calls the <code>get_task_context</code> tool on demand when it needs specific task IDs or content. This keeps per-message token cost low. All other modes send the full task list unconditionally.</p>
+    <p>No calibration context is injected (effort calibration is reserved for process and projectMetadata modes).</p>
+  </div>
+
+  <h3>Tools Available (Claude provider only)</h3>
+  <div class="action-grid">
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--chat)">get_task_context</div>
+      <p>Fetches the full task list filtered by optional bucket array. Called automatically when the AI needs task details.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--dump)">web_search / web_fetch</div>
+      <p>Tavily-powered search and fetch. Available when <code>VITE_TAVILY_API_KEY</code> is set.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--inbox)">Gmail tools</div>
+      <p>Search, label, bulk-action, compose, send, filter management. Available when Google token is connected; write tools gated on <code>modify/compose/send</code> scope.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--project)">Drive tools</div>
+      <p>Search and read Drive files. Available when Drive is enabled.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--amber)">get_weather</div>
+      <p>Current conditions + 24-hour forecast. Available when <code>VITE_OPENWEATHERMAP_API_KEY</code> is set.</p>
+    </div>
+  </div>
+
+  <h3>Action Types</h3>
+  <p>Chat mode auto-processes multiple action lines per response via the <code>taskActionLines</code> loop. Actions are applied immediately with no pending-action bar (no user confirmation step).</p>
+  <div class="action-grid">
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--amber)">→ACTION:update</div>
+      <p>Patch any field on an existing task by ID. Supports <code>notes_append</code> to add to existing notes rather than replace.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--green)">→ACTION:add</div>
+      <p>Add a child task under an existing project. Parent resolved by fuzzy lookup: exact ID → exact title → substring/contains match. Supports full metadata: due, defer, effort, location, priority, category, recurrence, notes, <code>isSomeday</code>, <code>isWaitingFor</code>.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--green)">→ACTION:create</div>
+      <p>Create a standalone task with no known parent. Supports <code>bucket:inbox|next|project</code>. Next-action tasks go under Uncategorized.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--dump)">→ACTION:link_email</div>
+      <p>Attach a Gmail message ID to a task as a Drive-attachment-style reference.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--review)">→ACTION:calendar_create/update/delete</div>
+      <p>Create, reschedule, or delete Google Calendar events. Calendar actions and task actions are mutually exclusive in one reply.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--inbox)">→ACTION:create-doc / create-sheet / create-slides</div>
+      <p>Generate a Google Doc (from response text), Sheets export (from live task list with filter params), or PowerPoint upload.</p>
+    </div>
+  </div>
+
+  <h3>Response Constraints</h3>
+  <ul>
+    <li>Under 100 words per response before any action tags.</li>
+    <li>Multiple ACTION lines allowed per response — placed at the end, parent-before-child.</li>
+    <li>For hierarchical task creation, the AI writes a flat plain-English plan first, then emits one ACTION line per task.</li>
+    <li>Task and calendar actions are mutually exclusive in a single reply.</li>
+    <li>Gmail bulk workflow is two-phase: discovery (sample + propose query) → explicit user confirmation → execution. This prevents over-labelling.</li>
+  </ul>
+
+  <h3>No Pending Action Bar</h3>
+  <div class="note-box">
+    <strong>Note:</strong> Chat mode does not use the pending-action confirmation bar. All task actions are applied immediately when the AI response is received. The user can undo via the task list directly.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════ PROCESS ══ -->
+<div class="tab-panel" id="panel-process">
+  <h2>
+    📥 Process Inbox
+    <span class="mode-tag" style="background:var(--inbox-soft);color:var(--inbox)">GTD Capture → Clarify → Organise</span>
+  </h2>
+  <p style="color:var(--muted);margin-top:4px;margin-bottom:20px;">Processes inbox items one at a time. The AI makes a routing decision immediately; the user reviews and confirms via a metadata bar before the action is committed.</p>
+
+  <h3>Entry Points</h3>
+  <div class="two-col">
+    <div class="section-card" style="margin-bottom:0">
+      <h4 style="margin-top:0">Full inbox processing</h4>
+      <p>Clicking "Process Inbox" in the coach mode selector calls <code>startProcessInbox()</code>. Resets skipped-IDs set and session-created-tasks list, switches to process mode, fires the first inbox item immediately.</p>
+    </div>
+    <div class="section-card" style="margin-bottom:0">
+      <h4 style="margin-top:0">Single-task mode</h4>
+      <p>Clicking "Ask AI" on an individual inbox task calls <code>askAIAboutTask()</code>. Sets <code>singleTaskMode = true</code>. Processes just that one task, then stops rather than auto-advancing.</p>
+    </div>
+  </div>
+
+  <h3>Context Sent to API</h3>
+  <div class="section-card highlight-inbox">
+    <p><strong>Buckets:</strong> <code>inbox</code>, <code>project</code>, <code>waiting</code>. Projects and waiting-for items are included so the AI can detect duplicates and look up real parent IDs for <code>→ACTION:add</code>.</p>
+    <p><strong>Calibration context:</strong> injected — shows configured effort labels and any per-label overrides so the AI suggests effort values using the correct label set.</p>
+    <p><strong>User message format:</strong> <code>Process this GTD inbox item: "task text"</code></p>
+    <p><strong>History:</strong> reset to <code>[]</code> for each new item — every item is an independent conversation.</p>
+  </div>
+
+  <h3>AI Decision Flow</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div class="flow-body">
+        <strong>Actionability check</strong>
+        <p>Is the item actionable? If not, emit <code>→ACTION:delete</code>. Also delete if the item already exists in another bucket — the AI notes where it is already tracked.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div class="flow-body">
+        <strong>Reword as concrete action</strong>
+        <p>Rewrite the title starting with a strong verb (Call, Draft, Research, Buy, Schedule, etc.).</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div class="flow-body">
+        <strong>Route immediately</strong>
+        <p>File to one of five destinations (see Action Types below). Routing must be immediate — the AI makes a best-guess and flags the assumption in prose. It does <em>not</em> ask a clarifying question unless the item is completely uninterpretable (e.g. a single ambiguous word with no context).</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">3a</div>
+      <div class="flow-body">
+        <strong>Emit exactly one →ACTION line</strong>
+        <p>Includes all inferred metadata: due date, defer date, effort, location, category, recurrence, notes. Under 80 words before the tag. The action line never appears mid-response.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Action Types (Process Mode)</h3>
+  <div class="action-grid">
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--project)">→ACTION:add</div>
+      <p>Child of an existing project. Parent resolved by fuzzy lookup: exact ID match → exact title match → substring/contains match on active project titles. Inherits sibling category if consistent.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--green)">→ACTION:next</div>
+      <p>Standalone next action. Goes under Uncategorized project. Same syntax with optional <code>someday:true</code> or <code>waitingFor:true</code> flags.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--dump)">→ACTION:project</div>
+      <p>New project + first next action. Optionally parented under a category or subcategory node. Accepts optional <code>someday:true</code> or <code>waitingFor:true</code> to create the project directly in Someday/Maybe or Waiting For.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--red)">→ACTION:delete</div>
+      <p>Item is not actionable, or is already tracked elsewhere. The original inbox item is moved to <code>inboxHistory</code>.</p>
+    </div>
+  </div>
+  <pre><span class="comment">// Full syntax reference</span>
+→ACTION:add|&lt;title&gt;|parent:&lt;id&gt;[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|recur:FREQ:N[:DAYS]][|effort:&lt;label&gt;][|notes:&lt;text&gt;]
+→ACTION:next|&lt;title&gt;[|due:...][|someday:true][|waitingFor:true][|effort:...][|category:...][|notes:...]
+→ACTION:project|&lt;name&gt;|&lt;first next action&gt;[|parent:&lt;category_id&gt;][|effort:...][|someday:true][|waitingFor:true][|notes:...]
+→ACTION:delete</pre>
+
+  <h3>Question Guard</h3>
+  <div class="section-card highlight-inbox">
+    <p>After the API returns, the code checks the <strong>last non-empty line before</strong> the <code>→ACTION:</code> marker for a <code>?</code> character (stripping markdown link brackets first). If that last line contains a question, <code>setPendingAction</code> is <strong>skipped</strong> — the message renders as a chat bubble and the user answers before any action bar appears.</p>
+    <p>This prevents the confirmation bar from showing up when the AI is asking for clarification rather than proposing a routing decision.</p>
+  </div>
+
+  <h3>Pending Action Bar (User Review Step)</h3>
+  <p>When <code>setPendingAction</code> fires, <code>PendingActionBar</code> renders at the top of the chat panel showing the proposed filing with all inferred metadata. For <code>add</code> and <code>project</code> types, the parent name is resolved from the task list and stored on the action object for display. The user has three choices:</p>
+  <ul>
+    <li><strong>Confirm (OK)</strong> — calls <code>handleConfirmMove()</code>. Commits the action.</li>
+    <li><strong>Skip</strong> — calls <code>handleSkipPendingAction()</code>. Item stays in inbox, its ID added to <code>skippedInSessionIds</code>. Auto-advances.</li>
+    <li><strong>Delete</strong> — calls <code>handleDeleteInboxItem()</code>. Archives to <code>inboxHistory</code>. Auto-advances.</li>
+  </ul>
+  <p>The bar also supports <strong>inline metadata editing</strong> via <code>onUpdatePendingAction</code> — the user can change due date, effort, location, etc. before confirming without going back to chat.</p>
+
+  <h3>Confirm Flow (<code>handleConfirmMove</code>)</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div class="flow-body">
+        <strong>Find current inbox task</strong>
+        <p>Looks up the task being processed via <code>processingTaskId.current</code>. If null (action came from chat/review, not inbox), skips the archive step.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div class="flow-body">
+        <strong>Archive original</strong>
+        <p>Moves the source inbox item to <code>bucket: 'inboxHistory'</code> (soft archive, never deleted).</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div class="flow-body">
+        <strong>Create new task(s)</strong>
+        <p><span class="tag tag-green">next/someday/waiting</span> → single task, <code>bucket:'project'</code> + appropriate flag, parented under Uncategorized.<br>
+        <span class="tag tag-blue">project</span> → project node + first next-action child; optional category parent; <code>isSomeday</code>/<code>isWaitingFor</code> flags applied when present.<br>
+        <span class="tag tag-amber">add</span> → child task under specified parent; falls back to Uncategorized if parent not found.<br>
+        <span class="tag tag-red">delete</span> → no new task.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">4</div>
+      <div class="flow-body">
+        <strong>Auto-advance</strong>
+        <p>Clears <code>pendingAction</code>, then after a 300 ms delay calls <code>processNextInboxItem</code> on the next non-skipped inbox item. If none remain, triggers end-of-session logic.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Session End</h3>
+  <p>When the inbox is cleared, <code>sessionCreatedTasksRef</code> is checked. If 2 or more "loose" tasks were created (next actions, someday, waiting — but <em>not</em> tasks placed under an explicit project via <code>add</code> or <code>project</code>), the <strong>project group suggestion bar</strong> appears in the chat panel, offering to group the new tasks under an existing or new project. Then "🎉 All items processed." is shown.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════ DUMP ══ -->
+<div class="tab-panel" id="panel-dump">
+  <h2>
+    🧠 Brain Dump
+    <span class="mode-tag" style="background:var(--dump-soft);color:var(--dump)">Capture Everything</span>
+  </h2>
+  <p style="color:var(--muted);margin-top:4px;margin-bottom:20px;">Surfaces open loops by cycling through life areas one at a time. Each captured item is immediately added to the inbox as a task.</p>
+
+  <h3>Context Sent to API</h3>
+  <div class="section-card highlight-dump">
+    <p>Full task list (all buckets, no filter). No calibration context. The task list is present so the AI can avoid suggesting duplicates, though it does not actively de-duplicate — it relies on the user's judgment.</p>
+  </div>
+
+  <h3>How It Works</h3>
+  <p>The AI cycles through ten life areas in fixed order, asking about each one and waiting for the user to finish before moving on:</p>
+  <div class="section-card" style="background:var(--surface2)">
+    <ol style="color:var(--text2);column-count:2;column-gap:24px;">
+      <li>Work tasks</li>
+      <li>Emails to send</li>
+      <li>People to follow up with</li>
+      <li>Projects falling behind</li>
+      <li>Personal errands</li>
+      <li>Home tasks</li>
+      <li>Health commitments</li>
+      <li>Finances</li>
+      <li>Learning goals</li>
+      <li>Anything nagging you</li>
+    </ol>
+  </div>
+
+  <h3>Action Type</h3>
+  <p>A single action type is used in this mode:</p>
+  <pre>→ACTION:create|&lt;exact item text&gt;|bucket:inbox</pre>
+  <p>One <code>→ACTION:create</code> line per captured item, emitted immediately in the same response as the acknowledgement. The item is created directly in the inbox — no pending-action bar or user confirmation step. Multiple items mentioned in a single message each get their own action line.</p>
+
+  <h3>Response Constraints</h3>
+  <ul>
+    <li>Under 60 words per response, before the action tags.</li>
+    <li>After each area, immediately ask about the next.</li>
+    <li>After all ten areas, give a closing summary listing exactly the items captured this session with a count. The count is derived from <code>→ACTION:create</code> lines emitted in the conversation — not from the task list context (which includes pre-existing tasks).</li>
+  </ul>
+
+  <h3>No Pending Action Bar</h3>
+  <div class="note-box">
+    <strong>Note:</strong> Brain Dump actions are applied immediately via the <code>taskActionLines</code> loop (same path as Chat mode). Items go straight to the inbox. The user reviews and processes them later using Process Inbox mode.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════ PROJECT REVIEW ══ -->
+<div class="tab-panel" id="panel-project">
+  <h2>
+    🔍 Project Review
+    <span class="mode-tag" style="background:var(--project-soft);color:var(--project)">Two Sub-Modes</span>
+  </h2>
+  <p style="color:var(--muted);margin-top:4px;margin-bottom:20px;">Reviews every active project in sequence. After selecting a sub-mode, the AI works through the project queue one project at a time.</p>
+
+  <h3>Entry Point &amp; Mode Selection</h3>
+  <p>Clicking Project Review in the mode selector calls <code>startProjectReview()</code>, which builds the review queue (all active, non-done project-bucket tasks), resets all review state, and renders a <strong>ReviewModeBar</strong> offering two choices:</p>
+  <div class="two-col">
+    <div class="section-card" style="margin-bottom:0">
+      <h4 style="margin-top:0;color:var(--project)">Mode A — Missing Tasks</h4>
+      <p>Reviews each project for missing next actions. The AI suggests 2–4 new concrete actions not already present in the subtask list.</p>
+    </div>
+    <div class="section-card" style="margin-bottom:0">
+      <h4 style="margin-top:0;color:var(--amber)">Mode B — Metadata Quality</h4>
+      <p>Reviews each project node and its active subtasks for incomplete or incorrect metadata fields (effort, due date, defer, priority, location, category, nodeType).</p>
+    </div>
+  </div>
+
+  <h3>Review Queue</h3>
+  <p><code>buildReviewQueue(tasks)</code> returns the ordered list of reviewable projects. Tasks tagged <code>type:category</code> or <code>type:subcategory</code> are organisational containers and are excluded — only <code>type:project</code>, <code>type:subproject</code>, and untagged project-bucket tasks are in the queue.</p>
+
+  <h3>Mode A — Missing Tasks</h3>
+  <div class="section-card highlight-project">
+    <h4 style="margin-top:0">Prompt sent to API</h4>
+    <pre>Project N of M: "full/path/name"
+Metadata: effort:2h | Due: 2026-06-01 | ...
+Current subtasks:
+- Subtask one [id:abc]
+- Subtask two [id:def]</pre>
+    <p><strong>System prompt:</strong> <code>projectReview</code>. The AI writes 2–3 sentences assessing the project's state, then proposes up to 4 new actions starting with strong verbs. It must not suggest anything already present in the subtask list, even with different wording.</p>
+    <p><strong>Response block:</strong></p>
+    <pre>→SUGGESTIONS:
+1. Draft initial outline for Q3 report
+2. Schedule stakeholder review meeting
+3. Research vendor pricing options</pre>
+  </div>
+
+  <h4>ProjectReviewBar (UI)</h4>
+  <p>After the API returns, <code>extractSuggestions(reply)</code> parses the <code>→SUGGESTIONS:</code> block and filters out any suggestions whose text (case-insensitive) already appears in existing subtasks. Each remaining suggestion is shown as a checkbox item, all pre-checked. The user can uncheck any they don't want.</p>
+  <ul>
+    <li><strong>Accept (Next →)</strong> — <code>advanceProjectReview()</code>: creates all checked suggestions as new next-action subtasks under the current project, marks the project <code>reviewed: true</code>, then calls <code>reviewProject</code> on the next queue item.</li>
+    <li><strong>Skip</strong> — <code>skipProjectReview()</code>: marks the project reviewed, advances without adding tasks.</li>
+  </ul>
+  <p>When the queue is exhausted, the mode reverts to chat and shows "🎉 All N projects reviewed!"</p>
+
+  <h3>Mode B — Metadata Quality</h3>
+  <div class="section-card highlight-project">
+    <h4 style="margin-top:0">Prompt sent to API</h4>
+    <pre>Project N of M: "full/path/name"
+Today: 2026-05-21
+Available locations: Home, Office, Phone
+Available efforts: 15m, 30m, 1h, 2h, 1d
+Nodes to review:
+- Project Name [id:xyz] (effort:none, due:none, ...) ← container node
+- Subtask one [id:abc] (effort:1h, due:none, priority:none, ...)</pre>
+    <p><strong>System prompt:</strong> <code>projectMetadata</code>. The AI reviews effort, due date, dueTime, defer date, priority, location, category, and nodeType for each node. It only uses values from the available lists, only suggests due dates when context strongly implies a deadline, and only suggests priority when clearly warranted.</p>
+    <p><strong>Response block:</strong></p>
+    <pre>→METADATA:
+abc123|effort:30m|category:Admin
+def456|due:2026-06-01|priority:p1</pre>
+  </div>
+
+  <h4>MetadataReviewBar (UI)</h4>
+  <p><code>extractMetadata(reply)</code> parses the <code>→METADATA:</code> block into <code>{ taskId, fields }</code> entries. Each entry is shown with the task name, the suggested fields, and editable text inputs for overriding values before accepting. Priority and location fields are normalised from comma strings back to arrays when applied.</p>
+  <ul>
+    <li><strong>Accept (Next →)</strong> — <code>advanceMetadataReview()</code>: calls <code>updateTask(id, overrides)</code> for each accepted suggestion, marks the project reviewed, advances.</li>
+    <li><strong>Skip</strong> — <code>skipMetadataReview()</code>: marks reviewed, advances without applying changes.</li>
+  </ul>
+
+  <h3>Calibration Context</h3>
+  <p>The <code>projectMetadata</code> prompt receives a calibration context block (same as process mode) so the AI knows which effort labels are valid and won't invent new ones.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════ DAILY ══ -->
+<div class="tab-panel" id="panel-daily">
+  <h2>
+    🌅 Daily Review
+    <span class="mode-tag" style="background:var(--daily-soft);color:var(--daily)">Start of Day / End of Day</span>
+  </h2>
+  <p style="color:var(--muted);margin-top:4px;margin-bottom:20px;">A single button that toggles between Start of Day and End of Day modes. Phase state persists across app restarts via <code>localStorage</code>; it auto-resets each calendar day.</p>
+
+  <h3>Phase Persistence</h3>
+  <div class="section-card highlight-daily">
+    <p>Phase is stored as <code>gtd-daily-phase</code> in <code>localStorage</code> as <code>{ phase: 'start'|'end', date: '...' }</code>. On load, if the stored date is today, the phase is restored; otherwise it resets to <code>'start'</code>. This means on the first trigger of each day the user sees Start of Day; after completing it, the button shows End of Day until midnight.</p>
+  </div>
+
+  <h3>Start of Day (SoD)</h3>
+  <div class="phase-block">
+    <div class="phase-label" style="background:var(--daily-soft);color:var(--daily)">Phase: start → flips to end after trigger</div>
+    <h4 style="margin-top:8px">Pre-computed summary block</h4>
+    <p>Before calling the API, the app computes counts from the live task list and injects them into the user message as a <code>[SoD Summary]</code> block:</p>
+    <pre>[SoD Summary]
+- Overdue: 3
+- Due today: 2
+- Due this week (&gt;1 hr effort): 5
+- Have due date but no calendar event: 1  <span class="comment">// only if Calendar enabled</span>
+- Unprocessed inbox items: 4
+[/SoD Summary]</pre>
+    <p>If there are overdue items, an urgency note is appended to the user message: <em>"You have 3 overdue items that need attention."</em></p>
+    <h4>AI Conversation Flow (4 steps)</h4>
+    <ol>
+      <li><strong>Counts</strong> — echo the summary counts in a brief paragraph, mention overdue urgently.</li>
+      <li><strong>MUST ACCOMPLISH</strong> — ask which tasks the user MUST accomplish today (not just want to). Wait for their answer.</li>
+      <li><strong>Confirm focus</strong> — echo the named tasks back as a numbered checklist, ask for confirmation. On confirmation, emit: <code>→ACTION:set-focus|id1,id2,id3</code></li>
+      <li><strong>Close</strong> — wish a productive day.</li>
+    </ol>
+  </div>
+
+  <h3>MIT Picker Widget</h3>
+  <p>When the AI emits <code>→ACTION:set-focus</code>, the app does not apply this directly. Instead, it renders an <strong>MITPicker</strong> message type in the chat — a checkbox list of overdue and due-today tasks. The user selects their actual MITs via checkboxes. Once tasks are selected, a <strong>Priority order</strong> panel appears below showing the selected tasks numbered in priority order with ▲/▼ buttons for reordering. The final ordered array is passed to <code>handleMITSubmit(ids)</code>:</p>
+  <ol>
+    <li>Saves selected IDs to <code>localStorage</code> as <code>gtd-todays-focus-YYYY-MM-DD</code>.</li>
+    <li>Removes the picker message from the chat.</li>
+    <li>Posts the selected task list as a user chat bubble.</li>
+    <li>Calls <code>callAI</code> again so the AI can give a final confirmation/close response.</li>
+    <li>Switches the main view to the <strong>Today's Focus</strong> view.</li>
+  </ol>
+  <p>Focus task completion is tracked: at End of Day, the app counts how many focus IDs are now marked done.</p>
+
+  <h3>End of Day (EoD)</h3>
+  <div class="phase-block">
+    <div class="phase-label" style="background:var(--daily-soft);color:var(--daily)">Phase: end → flips back to start after trigger</div>
+    <h4 style="margin-top:8px">Pre-computed summary block</h4>
+    <pre>[EoD Summary]
+- Focus tasks completed: 2 / 3
+- Due today (not yet done): 1
+- Unprocessed inbox items: 2
+[/EoD Summary]</pre>
+    <h4>AI Conversation Flow (4 steps)</h4>
+    <ol>
+      <li><strong>Wrap-up prompt</strong> — acknowledge the day, ask: "What loose ends, new commitments, or ideas came up today that you haven't captured yet?"</li>
+      <li><strong>Capture</strong> — for each item mentioned, create an inbox task: <code>→ACTION:create|item text|bucket:inbox</code></li>
+      <li><strong>Incomplete check</strong> — surface tasks due today that are not yet done, ask if any need a new due date. On confirmation: <code>→ACTION:update|task_id|due:YYYY-MM-DD</code></li>
+      <li><strong>Close</strong> — brief positive close.</li>
+    </ol>
+  </div>
+
+  <h3>Context Sent to API</h3>
+  <div class="section-card highlight-daily">
+    <p>Full task list (all buckets). The SoD/EoD summary block is embedded in the user message, not the system prompt, so the AI sees it as data rather than instruction. No calibration context. Chat history reset to <code>[]</code> at the start of each daily review session.</p>
+    <p>No tools are active in daily mode — no <code>get_task_context</code>, no Gmail, no search.</p>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════ WEEKLY ══ -->
+<div class="tab-panel" id="panel-weekly">
+  <h2>
+    📋 Weekly Review
+    <span class="mode-tag" style="background:var(--review-soft);color:var(--review)">6-Step GTD Review</span>
+  </h2>
+  <p style="color:var(--muted);margin-top:4px;margin-bottom:20px;">Guides the user through the full GTD weekly review in 6 steps. Strict action-line discipline: the AI must never emit an action in the same response as a question, and at most one action per response.</p>
+
+  <h3>Context Sent to API</h3>
+  <div class="section-card highlight-review">
+    <p>Full task list (all buckets, no filter). No calibration context. Chat history carries forward across all six steps — this is a continuous multi-turn session, unlike Process mode which resets history per item.</p>
+  </div>
+
+  <h3>The 6 Steps</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div class="flow-body">
+        <strong>Capture loose ends, new ideas, or goals</strong>
+        <p>Two-phase: <span class="tag tag-amber">Phase A</span> keep asking "Anything else?" until the user says done — <em>no</em> action lines during collection. <span class="tag tag-green">Phase B</span> after the user signals done, emit <em>all</em> captured items in a single response — one <code>→ACTION:next</code> or <code>→ACTION:someday</code> line per item — then move directly to Step 2 in the same response. This is the one exception to the one-action-per-response rule.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div class="flow-body">
+        <strong>Process inbox to zero</strong>
+        <p>Review any remaining inbox items with the user. May use <code>→ACTION:next</code> or <code>→ACTION:someday</code> to file them.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div class="flow-body">
+        <strong>Review Projects</strong>
+        <p>Does each project have a next action? Use <code>→ACTION:add|title|parent:&lt;project_id&gt;</code> to parent a new next action under a specific project, or <code>→ACTION:next|title</code> for a standalone action under UnCategorized.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">4</div>
+      <div class="flow-body">
+        <strong>Review Someday/Maybe</strong>
+        <p>Anything ready to activate? May use <code>→ACTION:update|id|someday:false</code> to move to Next Actions.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">5</div>
+      <div class="flow-body">
+        <strong>Review Waiting For</strong>
+        <p>Any follow-ups needed? Use <code>→ACTION:waiting|title</code> to create a new Waiting For item, <code>→ACTION:update|id|due:YYYY-MM-DD</code> to update due dates, or <code>→ACTION:update|id|waitingFor:false</code> to activate an item back to Next Actions.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">6</div>
+      <div class="flow-body">
+        <strong>Review Next Actions</strong>
+        <p>Anything to complete or remove? May use <code>→ACTION:update|id|done:true</code> to mark items complete.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Action Types (Weekly Review)</h3>
+  <p>Weekly review action lines are <strong>auto-applied</strong> (no confirmation bar) — the same auto-apply path as Chat, Brain Dump, and Daily Review modes.</p>
+  <div class="action-grid">
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--green)">→ACTION:next|title[|due:|defer:|effort:|notes:]</div>
+      <p>Add a standalone Next Action (goes under UnCategorized). Supports optional metadata fields.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--green)">→ACTION:add|title|parent:&lt;project_id&gt;</div>
+      <p>Add a Next Action as a child of a specific project. Use for Step 3 when a project lacks a next action.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--review)">→ACTION:someday|title[|due:|defer:|notes:]</div>
+      <p>Add a new Someday/Maybe item. Supports optional metadata fields.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--amber)">→ACTION:waiting|title[|due:|defer:]</div>
+      <p>Create a new Waiting For item (goes under UnCategorized).</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--amber)">→ACTION:update|id|done:true</div>
+      <p>Mark an existing task as completed.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--amber)">→ACTION:update|id|someday:true/false</div>
+      <p>Move to Someday/Maybe or activate back to Next Actions.</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--amber)">→ACTION:update|id|waitingFor:true/false</div>
+      <p>Move to Waiting For, or activate back to Next Actions (<code>waitingFor:false</code>).</p>
+    </div>
+    <div class="action-pill">
+      <div class="pill-head" style="color:var(--amber)">→ACTION:update|id|due:YYYY-MM-DD</div>
+      <p>Set or update a due date on an existing task.</p>
+    </div>
+  </div>
+
+  <h3>Strict Action Discipline</h3>
+  <div class="note-box">
+    <strong>Critical constraints (violating these breaks the app):</strong>
+    <ul style="margin-top:6px;">
+      <li>Never emit <code>→ACTION</code> in the same response as a question — not ever.</li>
+      <li>Emit exactly <strong>one</strong> <code>→ACTION</code> line per response — <em>exception:</em> Step 1 Phase B may emit multiple <code>→ACTION:next</code>/<code>→ACTION:someday</code> lines to batch-log all captures at once.</li>
+      <li>Only emit when the user explicitly confirms — never if they declined or gave no clear answer.</li>
+      <li>If multiple changes are needed, handle them one at a time across turns — except during Step 1 Phase B batch logging.</li>
+    </ul>
+  </div>
+
+  <h3>Project Tree Structure Note</h3>
+  <p>The system prompt reminds the AI that <code>[type:category]</code> and <code>[type:subcategory]</code> nodes are organisational containers — they group projects but do not require next actions themselves. Only <code>[type:project]</code> and <code>[type:subproject]</code> nodes are reviewable items. Untagged project-bucket tasks are treated as <code>[type:project]</code> by default. Tasks without a parent project are treated as being under the UnCategorized project.</p>
+
+  <h3>No Auto-Advance</h3>
+  <div class="note-box">
+    <strong>Note:</strong> Unlike Process Inbox, Weekly Review does not auto-advance between steps. The AI drives the step progression through the conversation. If the AI gets confused by a response, it asks a short clarifying question and continues from the same step — it does not restart or re-introduce the review.
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<script>
+function switchTab(mode) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.tab-btn[data-mode="${mode}"]`).classList.add('active');
+  document.getElementById(`panel-${mode}`).classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>
