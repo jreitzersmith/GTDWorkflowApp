@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useContext } from "react";
 import { COLORS, BUCKETS } from "../../constants.jsx";
 import { TaskRowContext } from "../../contexts.js";
 import { Btn, ToolbarBtn } from "../../shared/SidebarComponents.jsx";
+import { TaskListExportPopover } from "../coach/ExportPopover.jsx";
 import { TaskRow } from "./TaskRow.jsx";
 import { ArchivedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListHelpers.jsx";
 import { InboxBulkBar } from "./InboxBars.jsx";
@@ -59,6 +60,9 @@ EffortAccuracyBar.propTypes = {
 function TaskBucketView({
   currentBucket,
   tasks,
+  googleToken,
+  docsEnabled,
+  driveConversationExportFolderId,
   bucketTasks,
   addText,
   setAddText,
@@ -323,6 +327,12 @@ function TaskBucketView({
               );
             })()}
 
+            <TaskListExportPopover
+              tasks={tasks}
+              googleToken={googleToken}
+              docsEnabled={docsEnabled}
+              driveConversationExportFolderId={driveConversationExportFolderId}
+            />
           </div>
         )}
 

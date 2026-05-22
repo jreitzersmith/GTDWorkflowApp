@@ -1456,6 +1456,9 @@ export default function GTDManager() {
                           setShowCompletedInProjects={setShowCompletedInProjects}
                           focusedTaskId={focusedTaskId}
                           setFocusedTaskId={setFocusedTaskId}
+                          googleToken={googleToken}
+                          docsEnabled={docsEnabled}
+                          driveConversationExportFolderId={driveConversationExportFolderId}
                         />
                       )}
                     </div>

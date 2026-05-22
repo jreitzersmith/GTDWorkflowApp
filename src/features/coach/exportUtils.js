@@ -229,4 +229,66 @@ function buildTaskListJsonExport(tasks, include) {
   return JSON.stringify(output, null, 2);
 }
 
-export { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport, buildTaskListExportContent, buildTaskListJsonExport };
+// Build a human-readable markdown string for the Today's Focus view tiers.
+// tiers: [{ label, tasks }]
+// include: { header, metadata, notes }
+function buildFocusViewExportContent(tiers, include) {
+  const lines = [];
+  const totalTasks = tiers.reduce((n, t) => n + t.tasks.length, 0);
+  if (include.header) {
+    lines.push("# Today's Focus Export");
+    lines.push('');
+    lines.push('**Date:** ' + new Date().toLocaleString());
+    lines.push('**Items:** ' + totalTasks);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  }
+  for (const tier of tiers) {
+    if (tier.tasks.length === 0) continue;
+    lines.push('## ' + tier.label + ' (' + tier.tasks.length + ')');
+    lines.push('');
+    for (const t of tier.tasks) {
+      lines.push((t.done ? '- [x] ' : '- [ ] ') + t.text);
+      if (include.metadata) {
+        const meta = [];
+        if (t.dueDate) meta.push('Due: ' + t.dueDate);
+        if (t.effort)  meta.push('Effort: ' + t.effort);
+        if ((t.location || []).length) meta.push('Location: ' + t.location.join(', '));
+        if (meta.length) lines.push('  *' + meta.join(' · ') + '*');
+      }
+      if (include.notes && t.notes) {
+        lines.push('  > ' + t.notes.replace(/\n/g, '\n  > '));
+      }
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+function buildFocusViewJsonExport(tiers, include) {
+  const totalTasks = tiers.reduce((n, t) => n + t.tasks.length, 0);
+  const output = {
+    exportedAt: new Date().toISOString(),
+    type: 'focus-view',
+    ...(include.header ? { totalItems: totalTasks } : {}),
+    tiers: tiers
+      .filter(tier => tier.tasks.length > 0)
+      .map(tier => ({
+        label: tier.label,
+        tasks: tier.tasks.map(t => {
+          const row = { id: t.id, text: t.text, bucket: t.bucket, done: !!t.done };
+          if (include.metadata) {
+            if (t.dueDate)          row.dueDate  = t.dueDate;
+            if (t.effort)           row.effort   = t.effort;
+            if (t.location?.length) row.location = t.location;
+          }
+          if (include.notes && t.notes) row.notes = t.notes;
+          return row;
+        }),
+      })),
+  };
+  return JSON.stringify(output, null, 2);
+}
+
+export { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport, buildTaskListExportContent, buildTaskListJsonExport, buildFocusViewExportContent, buildFocusViewJsonExport };
