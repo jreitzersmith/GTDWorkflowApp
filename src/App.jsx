@@ -1406,6 +1406,9 @@ export default function GTDManager() {
                           onSetFocusExpandedDefaults={setFocusExpandedDefaults}
                           shortcutModifier={shortcutModifier}
                           onSetShortcutModifier={setShortcutModifier}
+                          googleToken={googleToken}
+                          docsEnabled={docsEnabled}
+                          driveConversationExportFolderId={driveConversationExportFolderId}
                         />
                       ) : currentView === "analytics" ? (
                         <TaskAnalyticsView

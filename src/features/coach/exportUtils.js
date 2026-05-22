@@ -155,4 +155,78 @@ function buildJsonExport({ rawApiThread, messages, include, coachMode, tasks, co
   return JSON.stringify(output, null, 2);
 }
 
-export { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport };
+const TASK_BUCKET_LABELS = {
+  inbox:        'Inbox',
+  next:         'Next Actions',
+  project:      'Projects',
+  waiting:      'Waiting For',
+  someday:      'Someday / Maybe',
+  deferred:     'Deferred',
+  done:         'Completed',
+  inboxHistory: 'Inbox History',
+};
+const TASK_BUCKET_ORDER = ['inbox', 'next', 'project', 'waiting', 'someday', 'deferred'];
+
+// Build a human-readable markdown string for all tasks, grouped by bucket.
+// include: { header, metadata, notes, completed }
+function buildTaskListExportContent(tasks, include) {
+  const lines = [];
+  if (include.header) {
+    lines.push('# GTD Task List Export');
+    lines.push('');
+    lines.push('**Date:** ' + new Date().toLocaleString());
+    lines.push('**Total tasks:** ' + tasks.length);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  }
+  const order = [...TASK_BUCKET_ORDER, ...(include.completed ? ['done', 'inboxHistory'] : [])];
+  for (const bucket of order) {
+    const bucketTasks = tasks.filter(t => t.bucket === bucket);
+    if (bucketTasks.length === 0) continue;
+    lines.push('## ' + (TASK_BUCKET_LABELS[bucket] || bucket) + ' (' + bucketTasks.length + ')');
+    lines.push('');
+    for (const t of bucketTasks) {
+      lines.push((t.done ? '- [x] ' : '- [ ] ') + t.text);
+      if (include.metadata) {
+        const meta = [];
+        if (t.dueDate) meta.push('Due: ' + t.dueDate);
+        if (t.effort)  meta.push('Effort: ' + t.effort);
+        if ((t.location || []).length) meta.push('Location: ' + t.location.join(', '));
+        if ((t.priority || []).length) meta.push('Priority: ' + t.priority.join(', '));
+        if (meta.length) lines.push('  *' + meta.join(' · ') + '*');
+      }
+      if (include.notes && t.notes) {
+        lines.push('  > ' + t.notes.replace(/\n/g, '\n  > '));
+      }
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+function buildTaskListJsonExport(tasks, include) {
+  const order = [...TASK_BUCKET_ORDER, ...(include.completed ? ['done', 'inboxHistory'] : [])];
+  const output = {
+    exportedAt: new Date().toISOString(),
+    type: 'task-list',
+    ...(include.header ? { totalTasks: tasks.length } : {}),
+    tasks: tasks
+      .filter(t => order.includes(t.bucket))
+      .map(t => {
+        const row = { id: t.id, text: t.text, bucket: t.bucket, done: !!t.done };
+        if (include.metadata) {
+          if (t.dueDate)           row.dueDate  = t.dueDate;
+          if (t.effort)            row.effort   = t.effort;
+          if (t.location?.length)  row.location = t.location;
+          if (t.priority?.length)  row.priority = t.priority;
+          row.created = t.created;
+        }
+        if (include.notes && t.notes) row.notes = t.notes;
+        return row;
+      }),
+  };
+  return JSON.stringify(output, null, 2);
+}
+
+export { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport, buildTaskListExportContent, buildTaskListJsonExport };
