@@ -114,7 +114,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
   const cfg = configs[type] || configs.next;
 
   const hasAIValues = !!(dueDate || deferUntil || effort || category || (location && location.length) || (priority && priority.length));
-  const [expanded, setExpanded] = useState(hasAIValues);
+  const [expanded, setExpanded] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const catPickerRef = useRef(null);
   useEffect(() => {
@@ -673,80 +673,147 @@ ProjectReviewBar.propTypes = {
 
 function MITPicker({ overdue, dueToday, onSubmit }) {
   const today8601 = new Date().toISOString().slice(0, 10);
-  const [selected, setSelected] = useState(() => new Set());
-  const toggle = (id) => setSelected(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const [selected, setSelected] = useState([]);
+  const [phase, setPhase] = useState('select'); // 'select' | 'order'
+
+  const toggle = (id) => setSelected(prev =>
+    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  );
+  const moveUp   = (idx) => setSelected(prev => { const a = [...prev]; [a[idx-1], a[idx]] = [a[idx], a[idx-1]]; return a; });
+  const moveDown = (idx) => setSelected(prev => { const a = [...prev]; [a[idx], a[idx+1]] = [a[idx+1], a[idx]]; return a; });
+
   const allTasks = [...overdue, ...dueToday];
-  const handleSubmit = () => {
-    if (selected.size === 0) return;
-    onSubmit([...selected]);
-  };
-  const TaskLine = ({ task, group }) => {
-    const isChecked = selected.has(task.id);
-    const dotColor = group === 'overdue' ? '#e05050' : COLORS.next;
+  const taskById = Object.fromEntries(allTasks.map(t => [t.id, t]));
+
+  const btnBase = { fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' };
+
+  if (phase === 'order') {
+    // Phase 2 — compact reorder view, replaces the task list entirely
     return (
-      <div
-        onClick={() => toggle(task.id)}
-        style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 8px', borderRadius: 6,
-          cursor: 'pointer', background: isChecked ? dotColor + '18' : 'transparent',
-          border: `1px solid ${isChecked ? dotColor + '55' : 'transparent'}`, transition: 'all 0.1s' }}
-      >
-        <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${isChecked ? dotColor : COLORS.border2}`,
-          background: isChecked ? dotColor : 'transparent', flexShrink: 0, marginTop: 2,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.1s' }}>
-          {isChecked && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span>}
+      <div style={{ border: `1px solid ${COLORS.border2}`, borderRadius: 10, overflow: 'hidden', margin: '2px 0' }}>
+        <div style={{ padding: '8px 12px', background: COLORS.surface2, borderBottom: `1px solid ${COLORS.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Set priority order
+          </span>
+          <button onClick={() => setPhase('select')}
+            style={{ ...btnBase, fontSize: 11, color: COLORS.muted, background: 'none', border: 'none', padding: '2px 6px' }}>
+            ← back
+          </button>
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, color: COLORS.text, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.text}</div>
-          {task.dueDate && (
-            <div style={{ fontSize: 10, color: dotColor, marginTop: 1 }}>
-              {task.dueDate < today8601 ? `Overdue · ${task.dueDate}` : `Due today`}{task.dueTime ? ` · ${task.dueTime}` : ''}
-            </div>
-          )}
+        <div style={{ padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {selected.map((id, idx) => {
+            const task = taskById[id];
+            if (!task) return null;
+            return (
+              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
+                borderRadius: 7, background: COLORS.surface3, border: `1px solid ${COLORS.border}` }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.muted, minWidth: 18, textAlign: 'center' }}>{idx + 1}</span>
+                <span style={{ flex: 1, fontSize: 12, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {task.text}
+                </span>
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <button onClick={() => idx > 0 && moveUp(idx)} disabled={idx === 0}
+                    style={{ ...btnBase, padding: '4px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 5,
+                      background: COLORS.surface2, color: idx === 0 ? COLORS.muted : COLORS.text2,
+                      fontSize: 13, opacity: idx === 0 ? 0.35 : 1 }}>↑</button>
+                  <button onClick={() => idx < selected.length - 1 && moveDown(idx)} disabled={idx === selected.length - 1}
+                    style={{ ...btnBase, padding: '4px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 5,
+                      background: COLORS.surface2, color: idx === selected.length - 1 ? COLORS.muted : COLORS.text2,
+                      fontSize: 13, opacity: idx === selected.length - 1 ? 0.35 : 1 }}>↓</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ padding: '8px 8px 10px', borderTop: `1px solid ${COLORS.border}`, background: COLORS.surface2 }}>
+          <button onClick={() => onSubmit([...selected])}
+            style={{ ...btnBase, width: '100%', padding: '10px 0', borderRadius: 8, border: 'none',
+              background: '#f0c040', color: '#1a1a0e', fontSize: 13, fontWeight: 700 }}>
+            Set {selected.length} task{selected.length > 1 ? 's' : ''} as Today's Focus →
+          </button>
         </div>
       </div>
     );
-  };
+  }
+
+  // Phase 1 — task selection with bounded scroll
   return (
     <div style={{ border: `1px solid ${COLORS.border2}`, borderRadius: 10, overflow: 'hidden', margin: '2px 0' }}>
       <div style={{ padding: '8px 12px', background: COLORS.surface2, borderBottom: `1px solid ${COLORS.border}`,
         fontSize: 11, fontWeight: 600, color: COLORS.text2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         Select your MUST ACCOMPLISH tasks
       </div>
-      <div style={{ padding: '6px 8px', maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {overdue.length > 0 && (
-          <>
-            <div style={{ fontSize: 10, color: '#e05050', fontWeight: 600, padding: '4px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Overdue ({overdue.length})
-            </div>
-            {overdue.map(t => <TaskLine key={t.id} task={t} group="overdue" />)}
-          </>
-        )}
-        {dueToday.length > 0 && (
-          <>
-            <div style={{ fontSize: 10, color: COLORS.next, fontWeight: 600, padding: '6px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Due Today ({dueToday.length})
-            </div>
-            {dueToday.map(t => <TaskLine key={t.id} task={t} group="today" />)}
-          </>
-        )}
-        {allTasks.length === 0 && (
-          <div style={{ padding: '12px 8px', fontSize: 12, color: COLORS.muted, fontStyle: 'italic' }}>No overdue or due-today tasks.</div>
-        )}
+      <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+        <div style={{ padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {overdue.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, color: '#e05050', fontWeight: 600, padding: '4px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Overdue ({overdue.length})
+              </div>
+              {overdue.map(t => {
+                const checked = selected.includes(t.id);
+                return (
+                  <div key={t.id} onClick={() => toggle(t.id)}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 8px', borderRadius: 6,
+                      cursor: 'pointer', background: checked ? '#e0505018' : 'transparent',
+                      border: `1px solid ${checked ? '#e0505055' : 'transparent'}` }}>
+                    <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${checked ? '#e05050' : COLORS.border2}`,
+                      background: checked ? '#e05050' : 'transparent', flexShrink: 0, marginTop: 2,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {checked && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.text}</div>
+                      {t.dueDate && <div style={{ fontSize: 10, color: '#e05050', marginTop: 1 }}>Overdue · {t.dueDate}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+          {dueToday.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, color: COLORS.next, fontWeight: 600, padding: '6px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Due Today ({dueToday.length})
+              </div>
+              {dueToday.map(t => {
+                const checked = selected.includes(t.id);
+                return (
+                  <div key={t.id} onClick={() => toggle(t.id)}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 8px', borderRadius: 6,
+                      cursor: 'pointer', background: checked ? COLORS.next + '18' : 'transparent',
+                      border: `1px solid ${checked ? COLORS.next + '55' : 'transparent'}` }}>
+                    <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${checked ? COLORS.next : COLORS.border2}`,
+                      background: checked ? COLORS.next : 'transparent', flexShrink: 0, marginTop: 2,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {checked && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.text}</div>
+                      {t.dueDate && <div style={{ fontSize: 10, color: COLORS.next, marginTop: 1 }}>Due today{t.dueTime ? ` · ${t.dueTime}` : ''}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+          {allTasks.length === 0 && (
+            <div style={{ padding: '12px 8px', fontSize: 12, color: COLORS.muted, fontStyle: 'italic' }}>No overdue or due-today tasks.</div>
+          )}
+        </div>
       </div>
-      <div style={{ padding: '8px 12px', borderTop: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontSize: 11, color: COLORS.muted }}>{selected.size} selected</span>
+      {/* Footer always outside scroll */}
+      <div style={{ padding: '8px 8px 10px', borderTop: `1px solid ${COLORS.border}`, background: COLORS.surface2 }}>
         <button
-          onClick={handleSubmit}
-          disabled={selected.size === 0}
-          style={{ padding: '5px 14px', borderRadius: 6, border: 'none', background: selected.size > 0 ? '#f0c040' : COLORS.surface3,
-            color: selected.size > 0 ? '#1a1a0e' : COLORS.muted, fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
-            cursor: selected.size > 0 ? 'pointer' : 'default', transition: 'all 0.15s' }}
-        >
-          Set as Today's Focus →
+          onClick={() => selected.length > 0 && setPhase('order')}
+          style={{ ...btnBase, width: '100%', padding: '9px 0', borderRadius: 8,
+            border: selected.length > 0 ? 'none' : `1px solid ${COLORS.border}`,
+            background: selected.length > 0 ? COLORS.next : COLORS.surface3,
+            color: selected.length > 0 ? '#0a1a0e' : COLORS.muted,
+            fontSize: 12, fontWeight: 600,
+            cursor: selected.length > 0 ? 'pointer' : 'default' }}>
+          {selected.length > 0 ? `Continue with ${selected.length} task${selected.length > 1 ? 's' : ''} →` : 'Select tasks above'}
         </button>
       </div>
     </div>

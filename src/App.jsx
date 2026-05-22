@@ -568,7 +568,7 @@ export default function GTDManager() {
       setChatHistory([]);
       setRawApiThread([]);
       setPendingAction(null);
-      setMessages([{ role: 'user', text: `Good morning! Let's start my day.${urgencyNote}` }]);
+      setMessages([{ role: 'user', text: `Good morning! Let's start my day.` }]);
       callAI(`Good morning! Let's start my day.${urgencyNote}\n\n${lines}`, 'daily', []);
       const newPhase = 'end';
       setDailyReviewPhase(newPhase);
