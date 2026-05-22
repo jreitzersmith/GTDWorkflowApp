@@ -29,6 +29,13 @@ export const BUCKETS = {
   inboxHistory: { label: "📋 Inbox History",   desc: "Processed inbox items — archived for reference", color: COLORS.muted },
 };
 
+// True storage buckets — t.bucket is set to one of these values.
+export const STORAGE_BUCKETS = ['inbox', 'project', 'done', 'inboxHistory'];
+
+// Virtual filter views — tasks are stored as bucket:'project' with flags.
+// isNextAction, isWaitingFor, isSomeday, and deferUntil determine visibility.
+export const VIRTUAL_VIEWS = ['next', 'waiting', 'someday', 'deferred'];
+
 export const NODE_TYPES = [
   { value: 'category',    label: 'Category',   color: '#5a8fd4' },
   { value: 'subcategory', label: 'SubCategory', color: '#5a8fd4' },
