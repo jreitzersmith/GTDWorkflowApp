@@ -674,70 +674,11 @@ ProjectReviewBar.propTypes = {
 function MITPicker({ overdue, dueToday, onSubmit }) {
   const today8601 = new Date().toISOString().slice(0, 10);
   const [selected, setSelected] = useState([]);
-  const [phase, setPhase] = useState('select'); // 'select' | 'order'
-
   const toggle = (id) => setSelected(prev =>
     prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
   );
-  const moveUp   = (idx) => setSelected(prev => { const a = [...prev]; [a[idx-1], a[idx]] = [a[idx], a[idx-1]]; return a; });
-  const moveDown = (idx) => setSelected(prev => { const a = [...prev]; [a[idx], a[idx+1]] = [a[idx+1], a[idx]]; return a; });
-
   const allTasks = [...overdue, ...dueToday];
-  const taskById = Object.fromEntries(allTasks.map(t => [t.id, t]));
 
-  const btnBase = { fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' };
-
-  if (phase === 'order') {
-    // Phase 2 — compact reorder view, replaces the task list entirely
-    return (
-      <div style={{ border: `1px solid ${COLORS.border2}`, borderRadius: 10, overflow: 'hidden', margin: '2px 0' }}>
-        <div style={{ padding: '8px 12px', background: COLORS.surface2, borderBottom: `1px solid ${COLORS.border}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Set priority order
-          </span>
-          <button onClick={() => setPhase('select')}
-            style={{ ...btnBase, fontSize: 11, color: COLORS.muted, background: 'none', border: 'none', padding: '2px 6px' }}>
-            ← back
-          </button>
-        </div>
-        <div style={{ padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {selected.map((id, idx) => {
-            const task = taskById[id];
-            if (!task) return null;
-            return (
-              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
-                borderRadius: 7, background: COLORS.surface3, border: `1px solid ${COLORS.border}` }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.muted, minWidth: 18, textAlign: 'center' }}>{idx + 1}</span>
-                <span style={{ flex: 1, fontSize: 12, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {task.text}
-                </span>
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  <button onClick={() => idx > 0 && moveUp(idx)} disabled={idx === 0}
-                    style={{ ...btnBase, padding: '4px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 5,
-                      background: COLORS.surface2, color: idx === 0 ? COLORS.muted : COLORS.text2,
-                      fontSize: 13, opacity: idx === 0 ? 0.35 : 1 }}>↑</button>
-                  <button onClick={() => idx < selected.length - 1 && moveDown(idx)} disabled={idx === selected.length - 1}
-                    style={{ ...btnBase, padding: '4px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 5,
-                      background: COLORS.surface2, color: idx === selected.length - 1 ? COLORS.muted : COLORS.text2,
-                      fontSize: 13, opacity: idx === selected.length - 1 ? 0.35 : 1 }}>↓</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div style={{ padding: '8px 8px 10px', borderTop: `1px solid ${COLORS.border}`, background: COLORS.surface2 }}>
-          <button onClick={() => onSubmit([...selected])}
-            style={{ ...btnBase, width: '100%', padding: '10px 0', borderRadius: 8, border: 'none',
-              background: '#f0c040', color: '#1a1a0e', fontSize: 13, fontWeight: 700 }}>
-            Set {selected.length} task{selected.length > 1 ? 's' : ''} as Today's Focus →
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Phase 1 — task selection with bounded scroll
   return (
     <div style={{ border: `1px solid ${COLORS.border2}`, borderRadius: 10, overflow: 'hidden', margin: '2px 0' }}>
       <div style={{ padding: '8px 12px', background: COLORS.surface2, borderBottom: `1px solid ${COLORS.border}`,
@@ -803,17 +744,17 @@ function MITPicker({ overdue, dueToday, onSubmit }) {
           )}
         </div>
       </div>
-      {/* Footer always outside scroll */}
-      <div style={{ padding: '8px 8px 10px', borderTop: `1px solid ${COLORS.border}`, background: COLORS.surface2 }}>
+      {/* Submit button — always outside scroll, with bottom padding so it clears the panel edge */}
+      <div style={{ padding: '8px 8px 32px', borderTop: `1px solid ${COLORS.border}`, background: COLORS.surface2 }}>
         <button
-          onClick={() => selected.length > 0 && setPhase('order')}
-          style={{ ...btnBase, width: '100%', padding: '9px 0', borderRadius: 8,
+          onClick={() => selected.length > 0 && onSubmit([...selected])}
+          style={{ width: '100%', padding: '9px 0', borderRadius: 8, fontFamily: 'inherit',
             border: selected.length > 0 ? 'none' : `1px solid ${COLORS.border}`,
-            background: selected.length > 0 ? COLORS.next : COLORS.surface3,
-            color: selected.length > 0 ? '#0a1a0e' : COLORS.muted,
+            background: selected.length > 0 ? '#f0c040' : COLORS.surface3,
+            color: selected.length > 0 ? '#1a1a0e' : COLORS.muted,
             fontSize: 12, fontWeight: 600,
-            cursor: selected.length > 0 ? 'pointer' : 'default' }}>
-          {selected.length > 0 ? `Continue with ${selected.length} task${selected.length > 1 ? 's' : ''} →` : 'Select tasks above'}
+            cursor: selected.length > 0 ? 'pointer' : 'default', transition: 'all 0.15s' }}>
+          {selected.length > 0 ? `Set ${selected.length} task${selected.length > 1 ? 's' : ''} as Today's Focus →` : 'Select tasks above'}
         </button>
       </div>
     </div>
