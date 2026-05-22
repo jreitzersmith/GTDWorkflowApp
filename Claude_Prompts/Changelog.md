@@ -151,4 +151,4 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-18 | Feature | FR#103 | GH#111 | ExportPopover inline format selector; 'User messages' label unification | 6083b8c9 |
 | 2026-05-18 | Feature      | FR#98   | GH#104 | Configurable AI coach name and user display name — threaded into all system prompts | 4588ad5 |
 | 2026-05-18 | Feature      | FR#105  | GH#113 | AI coach get_weather tool (OpenWeatherMap) — current + forecast, userCity default   | f0ec825 |
-| 2026-05-21 | Feature      | FR#116  | GH#132 | Process inbox: emit action immediately, remove OK confirmation step; metadata panel defaults collapsed | f21eb22 |
+| 2026-05-21 | Feature      | FR#116  | GH#132 | Process inbox: emit action immediately, remove OK confirmation step | f21eb22 |

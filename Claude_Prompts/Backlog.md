@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#32** · Code Quality — **CQ#11** · Feature Requests — **FR#115**
+> **Last used numbers:** Known Issues — **Issue#32** · Code Quality — **CQ#11** · Feature Requests — **FR#117**
 
 ---
 
@@ -23,6 +23,7 @@
 
 #### Daily workflow / GTD core
 
+- FR#117 [GH#133] (2026-05-21) — Relax chat mode task/calendar action mutual exclusivity — allow combined task + calendar actions in one reply; fix setTasks race by passing workingTasks into calendar block; guard only calendar_create-without-taskId case
 
 #### Inbox / processing improvements
 
