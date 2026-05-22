@@ -6,6 +6,8 @@ One row per item: date · type · # · GH# · name · commit hash(es).
 When an item is resolved, **remove** it from `Backlog.md` and add a full row here. Close the corresponding GitHub issue via the GitHub MCP.
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
+| 2026-05-22 | Feature      | FR#116  | GH#132 | Process inbox: emit action immediately, remove OK confirmation step | f21eb22 |
+| 2026-05-22 | Feature/Fix  | —       | —     | Coach mode improvements: action alignment (next/someday/waiting), weekly review auto-apply + batch capture, metadata parsing, MITPicker two-phase UI, SoD urgency note hidden from bubble | 6b0bb21, ce93de2 |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |
