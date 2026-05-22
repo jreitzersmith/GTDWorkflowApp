@@ -273,7 +273,7 @@ function extractCalendarDeleteAction(text) {
 function waterfallFilter(nextTasks, allTasks) {
   return nextTasks.filter(task => {
     const incompleteNextChildren = allTasks.filter(
-      t => t.parentId === task.id && t.bucket === "next" && !t.done
+      t => t.parentId === task.id && !!t.isNextAction && !t.done
     );
     return incompleteNextChildren.length === 0;
   });
@@ -635,12 +635,11 @@ function moveTaskInTree(allTasks, dragId, targetId, position) {
   if (isAncestorOf(dragId, targetId)) return allTasks;
 
   const newParentId = position === "inside" ? targetId : (target.parentId || null);
-  // Root items are always "project". When reparenting under a "next" item the
-  // dragged item becomes "next"; under a "project" item, preserve its own bucket
-  // so sub-projects stay "project" and tasks stay "next" across reorders.
+  // Root items are always "project". When reparenting under an existing item,
+  // preserve the dragged item's own bucket so sub-projects and tasks
+  // maintain their type across reorders.
   const newParent = newParentId ? allTasks.find(t => t.id === newParentId) : null;
   const newBucket = !newParentId ? "project"
-    : newParent?.bucket === "next" ? "next"
     : dragged.bucket;
 
   // 1. Remove dragged from its current parent's childIds.
