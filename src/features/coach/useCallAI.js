@@ -700,12 +700,12 @@ function useCallAI({
       // Apply →ACTION lines when in chat or dump mode — supports multiple actions per response
       let updateChip = null;
       let actionError = null;
-      if (mode === 'chat' || mode === 'dump' || mode === 'daily') {
+      if (mode === 'chat' || mode === 'dump' || mode === 'daily' || mode === 'review') {
         // Extract →ACTION lines — notes values may span multiple non-blank lines,
         // so match each block until the first blank line (\n\n) which separates
         // action lines from the AI's subsequent prose response.
         const taskActionLines = [];
-        const actionRe = /→ACTION:(?:update|add|create|link_email)\|(?:[^\n]|\n(?!\n)(?!→ACTION:))+/g;
+        const actionRe = /→ACTION:(?:update|add|create|link_email|next|someday|waiting)\|(?:[^\n]|\n(?!\n)(?!→ACTION:))+/g;
         for (const am of reply.matchAll(actionRe)) {
           taskActionLines.push(am[0].trimEnd());
         }
@@ -819,6 +819,120 @@ function useCallAI({
                   });
                   chips.push({ taskName: target.text, fields: ['email linked'] });
                 }
+              }
+              continue;
+            }
+
+            // →ACTION:next|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|priority:<p1,p2>][|location:<loc>][|notes:<text>]
+            if (line.startsWith('→ACTION:next|')) {
+              const parts = line.slice('→ACTION:next|'.length).split('|');
+              const title = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                const k = parts[i].slice(0, ci).trim();
+                const v = parts[i].slice(ci + 1).trim();
+                if (k === 'due')      xtra.dueDate    = v;
+                if (k === 'defer')    xtra.deferUntil = v;
+                if (k === 'effort')   xtra.effort     = normalizeEffort(v, efforts);
+                if (k === 'notes')    xtra.notes      = v;
+                if (k === 'location') xtra.location   = v.split(',').map(s => s.trim()).filter(Boolean);
+                if (k === 'priority') xtra.priority   = v.split(',').map(s => s.trim()).filter(Boolean);
+              }
+              if (title) {
+                const newId = genId();
+                const parentId = uncategorizedProjectId || undefined;
+                const newTask = {
+                  id: newId, text: title, bucket: 'project', done: false, created: Date.now(),
+                  priority: xtra.priority || [], location: xtra.location || [],
+                  dueDate: xtra.dueDate || null, effort: xtra.effort || null, actualEffort: null,
+                  deferUntil: xtra.deferUntil || null, notes: xtra.notes || null,
+                  recurrence: null, isNextAction: true,
+                  ...(parentId ? { parentId } : {}),
+                };
+                if (parentId) {
+                  workingTasks = [newTask, ...workingTasks.map(t => t.id === parentId
+                    ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
+                } else {
+                  workingTasks = [newTask, ...workingTasks];
+                }
+                chips.push({ taskName: title, fields: ['created in Next Actions'] });
+              }
+              continue;
+            }
+
+            // →ACTION:someday|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|notes:<text>]
+            if (line.startsWith('→ACTION:someday|')) {
+              const parts = line.slice('→ACTION:someday|'.length).split('|');
+              const title = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                const k = parts[i].slice(0, ci).trim();
+                const v = parts[i].slice(ci + 1).trim();
+                if (k === 'due')      xtra.dueDate    = v;
+                if (k === 'defer')    xtra.deferUntil = v;
+                if (k === 'effort')   xtra.effort     = normalizeEffort(v, efforts);
+                if (k === 'notes')    xtra.notes      = v;
+                if (k === 'location') xtra.location   = v.split(',').map(s => s.trim()).filter(Boolean);
+                if (k === 'priority') xtra.priority   = v.split(',').map(s => s.trim()).filter(Boolean);
+              }
+              if (title) {
+                const newId = genId();
+                const parentId = uncategorizedProjectId || undefined;
+                const newTask = {
+                  id: newId, text: title, bucket: 'project', done: false, created: Date.now(),
+                  priority: xtra.priority || [], location: xtra.location || [],
+                  dueDate: xtra.dueDate || null, effort: xtra.effort || null, actualEffort: null,
+                  deferUntil: xtra.deferUntil || null, notes: xtra.notes || null,
+                  recurrence: null, isSomeday: true,
+                  ...(parentId ? { parentId } : {}),
+                };
+                if (parentId) {
+                  workingTasks = [newTask, ...workingTasks.map(t => t.id === parentId
+                    ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
+                } else {
+                  workingTasks = [newTask, ...workingTasks];
+                }
+                chips.push({ taskName: title, fields: ['created in Someday/Maybe'] });
+              }
+              continue;
+            }
+
+            // →ACTION:waiting|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|notes:<text>]
+            if (line.startsWith('→ACTION:waiting|')) {
+              const parts = line.slice('→ACTION:waiting|'.length).split('|');
+              const title = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                const k = parts[i].slice(0, ci).trim();
+                const v = parts[i].slice(ci + 1).trim();
+                if (k === 'due')   xtra.dueDate    = v;
+                if (k === 'defer') xtra.deferUntil = v;
+                if (k === 'notes') xtra.notes      = v;
+              }
+              if (title) {
+                const newId = genId();
+                const parentId = uncategorizedProjectId || undefined;
+                const newTask = {
+                  id: newId, text: title, bucket: 'project', done: false, created: Date.now(),
+                  priority: [], location: [],
+                  dueDate: xtra.dueDate || null, effort: null, actualEffort: null,
+                  deferUntil: xtra.deferUntil || null, notes: xtra.notes || null,
+                  recurrence: null, isWaitingFor: true,
+                  ...(parentId ? { parentId } : {}),
+                };
+                if (parentId) {
+                  workingTasks = [newTask, ...workingTasks.map(t => t.id === parentId
+                    ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
+                } else {
+                  workingTasks = [newTask, ...workingTasks];
+                }
+                chips.push({ taskName: title, fields: ['created in Waiting For'] });
               }
               continue;
             }
@@ -1094,8 +1208,10 @@ function useCallAI({
           // regex only matches next/project/someday/waiting/delete.
           const addAction = extractAddAction(reply);
           if (addAction && !_hasQuestion) {
+            const _spPrl = (addAction.parentId || '').toLowerCase();
             const parent = tasks.find(t => t.id === addAction.parentId)
-                        || tasks.find(t => t.text.toLowerCase() === (addAction.parentId || '').toLowerCase());
+                        || tasks.find(t => t.text.toLowerCase() === _spPrl)
+                        || tasks.find(t => t.bucket === 'project' && !t.done && (t.text.toLowerCase().includes(_spPrl) || _spPrl.includes(t.text.toLowerCase())));
             setPendingAction({
               type: 'add',
               title: addAction.title,

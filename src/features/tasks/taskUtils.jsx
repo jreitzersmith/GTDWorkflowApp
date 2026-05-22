@@ -177,6 +177,8 @@ function extractAddAction(text) {
     if (key === 'priority') fields.priority  = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
     if (key === 'dueTime') fields.dueTime = val;
+    if (key === 'someday')    fields.isSomeday    = val === 'true';
+    if (key === 'waitingFor') fields.isWaitingFor = val === 'true';
   });
   if (!fields.parentId || !title) return null;
   return { title, ...fields };
@@ -203,6 +205,10 @@ function extractCreateAction(text) {
     if (key === 'notes')    fields.notes      = val;
     if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
     if (key === 'dueTime') fields.dueTime = val;
+    if (key === 'priority') fields.priority = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'category') fields.category = val;
+    if (key === 'someday')    fields.isSomeday    = val === 'true';
+    if (key === 'waitingFor') fields.isWaitingFor = val === 'true';
   });
   if (!title || !fields.bucket) return null;
   return { title, ...fields };

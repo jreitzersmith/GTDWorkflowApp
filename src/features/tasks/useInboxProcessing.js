@@ -91,7 +91,7 @@ function useInboxProcessing({
         ? (tasks.find(t => t.id === parentRef) || tasks.find(t => t.text.toLowerCase() === (parentRef || '').toLowerCase()))
         : null;
       setTasks(prev => [
-        { id: projectId, text: title || current?.text || '', bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || parentNode?.category || null, reviewed: true, ...(parentNode ? { parentId: parentNode.id } : {}) },
+        { id: projectId, text: title || current?.text || '', bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || parentNode?.category || null, reviewed: true, ...(aiSomeday ? { isSomeday: true } : {}), ...(aiWaitingFor ? { isWaitingFor: true } : {}), ...(parentNode ? { parentId: parentNode.id } : {}) },
         { id: actionId, text: nextAction || title, bucket: 'project', isNextAction: true, done: false, created: Date.now(), parentId: projectId, priority: aiPriority || [], location: aiLocation || [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: aiNotes || null, category: null, reviewed: true },
         ...prev.map(t => t.id === parentNode?.id ? { ...t, childIds: [...(t.childIds || []), projectId] } : t),
       ]);
@@ -122,8 +122,10 @@ function useInboxProcessing({
       // Add as child of existing project (ID or title lookup)
       // Do NOT push to sessionCreatedTasksRef — add-type tasks already have a parent
       // and don't need the post-session group suggestion.
+      const _prl = (parentRef || '').toLowerCase();
       const parent = tasks.find(t => t.id === parentRef)
-                  || tasks.find(t => t.text.toLowerCase() === (parentRef || '').toLowerCase());
+                  || tasks.find(t => t.text.toLowerCase() === _prl)
+                  || tasks.find(t => t.bucket === 'project' && !t.done && (t.text.toLowerCase().includes(_prl) || _prl.includes(t.text.toLowerCase())));
       const childId = genId();
       const taskText = title || current.text;
       if (parent) {
