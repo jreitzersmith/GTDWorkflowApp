@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#32** · Code Quality — **CQ#14** · Feature Requests — **FR#126**
+> **Last used numbers:** Known Issues — **Issue#32** · Code Quality — **CQ#14** · Feature Requests — **FR#127**
 
 ---
 
@@ -19,7 +19,7 @@
 
 #### UI polish / quick wins
 
-
+- FR#127 [GH#146] (2026-05-23) — Analytics layout configurability — reorder, collapse, hide sections; preferences in localStorage under `gtd_analytics_layout`
 
 #### Daily workflow / GTD core
 
