@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#32** · Code Quality — **CQ#11** · Feature Requests — **FR#117**
+> **Last used numbers:** Known Issues — **Issue#32** · Code Quality — **CQ#14** · Feature Requests — **FR#126**
 
 ---
 
@@ -24,6 +24,25 @@
 #### Daily workflow / GTD core
 
 - FR#117 [GH#133] (2026-05-21) — Relax chat mode task/calendar action mutual exclusivity — allow combined task + calendar actions in one reply; fix setTasks race by passing workingTasks into calendar block; guard only calendar_create-without-taskId case
+
+
+- FR#119 [GH#138] (2026-05-23) — User-editable export templates — {{variable}} substitution for conversation and task list exports; template editor in Settings › Export; storage in user_settings JSONB; reset-to-default per template
+
+#### Analytics
+
+- FR#120 [GH#139] (2026-05-23) — Task throughput and inbox latency — completion rate over time, Next Actions dwell time, inbox-to-processed latency; derived from existing fields, no schema change
+
+- FR#121 [GH#140] (2026-05-23) — Project health signals — flag stalled projects (no next action), all-waiting projects, and inactive projects (no completions in N days); badge/indicator on project tree rows
+
+- FR#122 [GH#141] (2026-05-23) — Bucket aging — per-task age display in Waiting For / Someday / Deferred views, sort-by-age, longest-waiting summary; option (a) add bucketMovedAt column or (b) use created as proxy
+
+- FR#123 [GH#142] (2026-05-23) — Effort accuracy over time and by project — extend EffortAccuracyBar to time series (weekly/monthly) and per-project breakdown; derived from existing effort/actualEffort fields
+
+- FR#124 [GH#143] (2026-05-23) — Context/location utilization — completion rate and backlog count by location tag; idle context detection; derived from existing location[] array
+
+- FR#125 [GH#144] (2026-05-23) — Someday/Maybe decay detection — flag items older than configurable threshold (default 90 days); visual indicator in view; Weekly Review coach integration; Settings threshold field
+
+- FR#126 [GH#145] (2026-05-23) — Defer patterns — re-defer count per task, defer duration histogram, chronic-deferred flag; requires deferCount integer field (Supabase migration) incremented on each deferUntil write
 
 #### Inbox / processing improvements
 
@@ -62,4 +81,3 @@
 ## Deferred Testing Scenarios
 
 Test cases that could not be executed during their cycle due to a missing condition (no live email, second device required, Supabase not ready, specific data state needed, etc.). Check these when the condition is next available, then remove the item and note the result in the commit or GitHub issue.
-

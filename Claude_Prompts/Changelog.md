@@ -155,3 +155,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-18 | Feature      | FR#98   | GH#104 | Configurable AI coach name and user display name — threaded into all system prompts | 4588ad5 |
 | 2026-05-18 | Feature      | FR#105  | GH#113 | AI coach get_weather tool (OpenWeatherMap) — current + forecast, userCity default   | f0ec825 |
 | 2026-05-21 | Feature      | FR#116  | GH#132 | Process inbox: emit action immediately, remove OK confirmation step | f21eb22 |
+| 2026-05-22 | Code Quality | CQ#13   | GH#135 | constants.jsx: add STORAGE_BUCKETS / VIRTUAL_VIEWS exports to document storage vs virtual view distinction | 69cc156 |
+| 2026-05-22 | Code Quality | CQ#12   | GH#134 | exportUtils.js: fix task list grouping — flag-based TASK_VIEW_FILTERS replace bucket-value matching | c08c9ef |
+| 2026-05-22 | Code Quality | CQ#14   | GH#136 | taskUtils.jsx: fix waterfallFilter (isNextAction); remove dead bucket=next drag-drop branch | cd46d13 |
+| 2026-05-22 | Feature | FR#118 | GH#137 | Hierarchical export — section checkboxes in export popover, per-view default sections, buildHierarchicalExportContent | 782677f |
