@@ -680,8 +680,9 @@ function MITPicker({ overdue, dueToday, onSubmit }) {
   const allTasks = [...overdue, ...dueToday];
 
   return (
-    <div style={{ border: `1px solid ${COLORS.border2}`, borderRadius: 10, overflow: 'hidden', margin: '2px 0 28px 0' }}>
+    <div style={{ border: `1px solid ${COLORS.border2}`, borderRadius: 10, margin: '2px 0 28px 0', overflow: 'visible' }}>
       <div style={{ padding: '8px 12px', background: COLORS.surface2, borderBottom: `1px solid ${COLORS.border}`,
+        borderRadius: '9px 9px 0 0',
         fontSize: 11, fontWeight: 600, color: COLORS.text2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         Select your MUST ACCOMPLISH tasks
       </div>
@@ -745,7 +746,7 @@ function MITPicker({ overdue, dueToday, onSubmit }) {
         </div>
       </div>
       {/* Submit button — always outside scroll, with bottom padding so it clears the panel edge */}
-      <div style={{ padding: '8px', borderTop: `1px solid ${COLORS.border}`, background: COLORS.surface2 }}>
+      <div style={{ padding: '8px 8px 16px', borderTop: `1px solid ${COLORS.border}`, background: COLORS.surface2, borderRadius: '0 0 9px 9px' }}>
         <button
           onClick={() => selected.length > 0 && onSubmit([...selected])}
           style={{ width: '100%', padding: '9px 0', borderRadius: 8, fontFamily: 'inherit',

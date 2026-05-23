@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { COLORS } from '../../constants.jsx';
-import { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport, buildTaskListExportContent, buildTaskListJsonExport } from './exportUtils.js';
+import { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport, buildHierarchicalExportContent, buildHierarchicalJsonExport } from './exportUtils.js';
 
 // Format options: Rich Text | Markdown | Plain text
 // Download delivers the native file type; Save to Drive always creates a Google Doc.
@@ -271,17 +271,24 @@ const TASK_FORMAT_OPTIONS = [
   { value: 'text',     shortLabel: 'Plain text' },
   { value: 'json',     shortLabel: 'JSON'       },
 ];
+const SECTION_OPTIONS = [
+  { key: 'project',  label: 'Project structure' },
+  { key: 'next',     label: 'Next Actions'      },
+  { key: 'waiting',  label: 'Waiting For'       },
+  { key: 'someday',  label: 'Someday / Maybe'   },
+  { key: 'deferred', label: 'Deferred'          },
+];
 const TASK_INCLUDE_OPTIONS = [
-  { key: 'header',    label: 'Export header'       },
-  { key: 'metadata',  label: 'Dates, effort & tags' },
-  { key: 'notes',     label: 'Task notes'           },
-  { key: 'completed', label: 'Completed tasks'      },
+  { key: 'header',   label: 'Export header'       },
+  { key: 'metadata', label: 'Dates, effort & tags' },
+  { key: 'notes',    label: 'Task notes'           },
 ];
 
-function TaskListExportPopover({ tasks, googleToken, docsEnabled, driveConversationExportFolderId }) {
+function TaskListExportPopover({ tasks, googleToken, docsEnabled, driveConversationExportFolderId, defaultSections }) {
   const [open, setOpen]       = useState(false);
   const [fmt, setFmt]         = useState('rtf');
-  const [include, setInclude] = useState({ header: true, metadata: true, notes: false, completed: false });
+  const [include, setInclude] = useState({ header: true, metadata: true, notes: false });
+  const [sections, setSections] = useState(defaultSections ?? { project: true, next: true, waiting: false, someday: false, deferred: false });
   const [status, setStatus]   = useState('idle');
   const [driveUrl, setDriveUrl] = useState(null);
   const [errMsg, setErrMsg]   = useState(null);
@@ -295,12 +302,13 @@ function TaskListExportPopover({ tasks, googleToken, docsEnabled, driveConversat
   }, [open]);
 
   const toggleInclude = key => setInclude(prev => ({ ...prev, [key]: !prev[key] }));
+  const toggleSection = key => setSections(prev => ({ ...prev, [key]: !prev[key] }));
   const handleOpen = () => { setOpen(o => !o); setStatus('idle'); setDriveUrl(null); setErrMsg(null); };
 
   const getContent = useCallback(() => {
-    if (fmt === 'json') return buildTaskListJsonExport(tasks, include);
-    return buildTaskListExportContent(tasks, include);
-  }, [tasks, include, fmt]);
+    if (fmt === 'json') return buildHierarchicalJsonExport(tasks, sections, include);
+    return buildHierarchicalExportContent(tasks, sections, include);
+  }, [tasks, sections, include, fmt]);
 
   const handleDownload = useCallback(() => {
     setStatus('downloading'); setDriveUrl(null); setErrMsg(null);
@@ -354,6 +362,16 @@ function TaskListExportPopover({ tasks, googleToken, docsEnabled, driveConversat
                   fontWeight: fmt === value ? 600 : 400 }}>
                 {shortLabel}
               </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 6 }}>Sections</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
+            {SECTION_OPTIONS.map(({ key, label }) => (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: COLORS.text, cursor: 'pointer' }}>
+                <input type="checkbox" checked={!!sections[key]} onChange={() => toggleSection(key)}
+                  style={{ accentColor: COLORS.next, width: 13, height: 13, flexShrink: 0 }} />
+                {label}
+              </label>
             ))}
           </div>
           <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 6 }}>Include</div>
