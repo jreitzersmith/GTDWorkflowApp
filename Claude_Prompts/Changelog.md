@@ -9,6 +9,12 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-22 | Feature      | FR#116  | GH#132 | Process inbox: emit action immediately, remove OK confirmation step | f21eb22 |
 | 2026-05-22 | Feature/Fix  | —       | —     | Coach mode improvements: action alignment (next/someday/waiting), weekly review auto-apply + batch capture, metadata parsing, MITPicker two-phase UI, SoD urgency note hidden from bubble | 6b0bb21, ce93de2 |
 | 2026-05-22 | Bug Fix      | —       | —     | MITPicker — remove up/down reorder feature, add 32px bottom padding so Continue button is always visible | 1cbfa0a |
+| 2026-05-23 | Feature      | FR#120  | GH#139 | Analytics: task throughput 8-week trend with prior/current 4-week callout tiles | 0ec5e74 |
+| 2026-05-23 | Feature      | FR#121  | GH#140 | Analytics: project health signals (stalled, all-waiting, inactive) | 0ec5e74 |
+| 2026-05-23 | Feature      | FR#123  | GH#142 | Analytics: effort accuracy by month (6-period) and by project | 0ec5e74 |
+| 2026-05-23 | Feature      | FR#124  | GH#143 | Analytics: context/location utilization chart | 0ec5e74 |
+| 2026-05-23 | Feature      | FR#125  | GH#144 | Analytics: Someday/Maybe decay detection with live threshold input | 0ec5e74 |
+| 2026-05-23 | Feature      | FR#127  | GH#146 | Analytics layout configurability — reorder, collapse, hide sections; localStorage persistence | a8ffe4a |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |
