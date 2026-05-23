@@ -41,7 +41,8 @@ function buildExportContent(messages, include, coachMode, tasks, { coachName, us
 }
 
 // Convert a markdown string to RTF for browser download.
-// Supports: headings (h1-h3), bold, italic, blockquotes, horizontal rules.
+// Supports: headings (h1-h3), bold, italic, indented bullet lists (- [ ]/- [x]/- ),
+// blockquotes, horizontal rules. 2-space indent levels map to RTF \li increments.
 function buildRtfContent(markdownText) {
   function escRtf(s) {
     return s.replace(/\\/g, '\\\\').replace(/\{/g, '\\{').replace(/\}/g, '\\}');
@@ -53,29 +54,42 @@ function buildRtfContent(markdownText) {
     return s;
   }
 
+  const INDENT_TWIPS = 360; // 0.25 in per 2-space markdown indent level
   const rtfLines = [];
   for (const raw of markdownText.split('\n')) {
     let m;
-    if ((m = raw.match(/^###\s+(.+)/))) {
-      rtfLines.push('{\\b\\fs26 ' + applyInline(m[1]) + '}\\par');
-    } else if ((m = raw.match(/^##\s+(.+)/))) {
-      rtfLines.push('{\\b\\fs28 ' + applyInline(m[1]) + '}\\par');
-    } else if ((m = raw.match(/^#\s+(.+)/))) {
+    const leadingSpaces = (raw.match(/^( *)/) || ['', ''])[1].length;
+    const indentLevel = Math.floor(leadingSpaces / 2);
+    const li = indentLevel * INDENT_TWIPS;
+    const liCmd   = li > 0 ? '\\li' + li + ' ' : '';
+    const liReset = li > 0 ? '\\li0' : '';
+    const stripped = raw.trimStart();
+
+    if ((m = stripped.match(/^###\s+(.+)/))) {
+      rtfLines.push(liCmd + '{\\b\\fs26 ' + applyInline(m[1]) + '}' + liReset + '\\par');
+    } else if ((m = stripped.match(/^##\s+(.+)/))) {
+      rtfLines.push(liCmd + '{\\b\\fs28 ' + applyInline(m[1]) + '}' + liReset + '\\par');
+    } else if ((m = stripped.match(/^#\s+(.+)/))) {
       rtfLines.push('{\\b\\fs32 ' + applyInline(m[1]) + '}\\par');
-    } else if ((m = raw.match(/^>\s*(.*)/))) {
-      rtfLines.push('\\li720 ' + applyInline(m[1]) + '\\li0\\par');
-    } else if (/^---+$/.test(raw.trim())) {
+    } else if ((m = stripped.match(/^-\s+\[x\]\s+(.*)/))) {
+      rtfLines.push(liCmd + '{\\strike ' + applyInline(m[1]) + '}' + liReset + '\\par');
+    } else if ((m = stripped.match(/^-\s+\[\s\]\s+(.*)/))) {
+      rtfLines.push(liCmd + '\\u8226? ' + applyInline(m[1]) + liReset + '\\par');
+    } else if ((m = stripped.match(/^-\s+(.*)/))) {
+      rtfLines.push(liCmd + '\\u8226? ' + applyInline(m[1]) + liReset + '\\par');
+    } else if ((m = stripped.match(/^>\s*(.*)/))) {
+      rtfLines.push('\\li' + ((indentLevel + 1) * INDENT_TWIPS) + ' {\\i ' + applyInline(m[1]) + '}\\li0\\par');
+    } else if (/^---+$/.test(stripped)) {
       rtfLines.push('\\par');
-    } else if (!raw.trim()) {
+    } else if (!stripped) {
       rtfLines.push('\\par');
     } else {
-      rtfLines.push(applyInline(raw) + '\\par');
+      rtfLines.push(liCmd + applyInline(stripped) + liReset + '\\par');
     }
   }
 
   return '{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0\\fswiss\\fcharset0 Arial;}}\\f0\\fs24\\pard\n' + rtfLines.join('\n') + '\n}';
 }
-
 // Strip markdown symbols to produce plain text.
 function stripMarkdown(markdownText) {
   return markdownText
@@ -302,4 +316,126 @@ function buildFocusViewJsonExport(tiers, include) {
   return JSON.stringify(output, null, 2);
 }
 
-export { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport, buildTaskListExportContent, buildTaskListJsonExport, buildFocusViewExportContent, buildFocusViewJsonExport };
+
+// Section labels for hierarchical export.
+const HIERARCHICAL_SECTION_LABELS = {
+  project: 'Project Structure',
+  next:    'Next Actions',
+  waiting: 'Waiting For',
+  someday: 'Someday / Maybe',
+  deferred: 'Deferred',
+};
+
+// Determine which virtual section a task belongs to.
+function _taskSection(t, todayStr) {
+  if (t.isWaitingFor) return 'waiting';
+  if (t.isSomeday) return 'someday';
+  if (t.deferUntil && t.deferUntil > todayStr) return 'deferred';
+  if (t.isNextAction) return 'next';
+  return 'project';
+}
+
+// Build a hierarchical markdown export by walking the childIds/parentId tree.
+// tasks: full task array
+// sections: { project, next, waiting, someday, deferred } — booleans
+// include: { header, metadata, notes }
+function buildHierarchicalExportContent(tasks, sections, include) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const taskMap = new Map(tasks.map(t => [t.id, t]));
+  const lines = [];
+
+  if (include.header) {
+    const activeSections = Object.entries(sections)
+      .filter(([, v]) => v)
+      .map(([k]) => HIERARCHICAL_SECTION_LABELS[k] || k)
+      .join(', ');
+    lines.push('# GTD Project Export');
+    lines.push('');
+    lines.push('**Date:** ' + new Date().toLocaleString());
+    lines.push('**Sections:** ' + (activeSections || 'none'));
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  }
+
+  function walk(task, depth) {
+    const section = _taskSection(task, todayStr);
+    const indent = '  '.repeat(depth);
+    const children = (task.childIds || [])
+      .map(id => taskMap.get(id))
+      .filter(Boolean)
+      .filter(c => !c.done);
+
+    if (sections[section]) {
+      lines.push(indent + (task.done ? '- [x] ' : '- [ ] ') + task.text);
+      if (include.metadata) {
+        const meta = [];
+        if (task.dueDate)                    meta.push('Due: ' + task.dueDate);
+        if (task.effort)                     meta.push('Effort: ' + task.effort);
+        if ((task.location || []).length)    meta.push('Location: ' + task.location.join(', '));
+        if ((task.priority || []).length)    meta.push('Priority: ' + task.priority.join(', '));
+        if (meta.length) lines.push(indent + '  *' + meta.join(' · ') + '*');
+      }
+      if (include.notes && task.notes) {
+        lines.push(indent + '  > ' + task.notes.replace(/\n/g, '\n' + indent + '  > '));
+      }
+    }
+
+    for (const child of children) {
+      walk(child, sections[section] ? depth + 1 : depth);
+    }
+  }
+
+  const roots = tasks.filter(t => t.bucket === 'project' && !t.parentId && !t.done);
+  for (const root of roots) {
+    walk(root, 0);
+  }
+
+  return lines.join('\n');
+}
+
+// Build a JSON hierarchical export. Emits a nested structure with children arrays.
+// tasks: full task array
+// sections: { project, next, waiting, someday, deferred } — booleans
+// include: { header, metadata, notes }
+function buildHierarchicalJsonExport(tasks, sections, include) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const taskMap = new Map(tasks.map(t => [t.id, t]));
+
+  function walk(task, depth) {
+    const section = _taskSection(task, todayStr);
+    const children = (task.childIds || [])
+      .map(id => taskMap.get(id))
+      .filter(Boolean)
+      .filter(c => !c.done);
+    const childNodes = children.flatMap(c => walk(c, depth + 1));
+
+    if (!sections[section]) return childNodes;
+
+    const row = { id: task.id, text: task.text, section, depth, done: !!task.done };
+    if (include.metadata) {
+      if (task.dueDate)           row.dueDate  = task.dueDate;
+      if (task.effort)            row.effort   = task.effort;
+      if (task.location?.length)  row.location = task.location;
+      if (task.priority?.length)  row.priority = task.priority;
+    }
+    if (include.notes && task.notes) row.notes = task.notes;
+    if (childNodes.length) row.children = childNodes;
+    return [row];
+  }
+
+  const roots = tasks.filter(t => t.bucket === 'project' && !t.parentId && !t.done);
+  const nodes = roots.flatMap(r => walk(r, 0));
+  const activeSections = Object.entries(sections).filter(([, v]) => v).map(([k]) => k);
+
+  const output = {
+    exportedAt: new Date().toISOString(),
+    type: 'hierarchical',
+    ...(include.header ? { totalNodes: nodes.length } : {}),
+    sections: activeSections,
+    tasks: nodes,
+  };
+  return JSON.stringify(output, null, 2);
+}
+
+export { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport, buildTaskListExportContent, buildTaskListJsonExport, buildFocusViewExportContent, buildFocusViewJsonExport, buildHierarchicalExportContent, buildHierarchicalJsonExport };
