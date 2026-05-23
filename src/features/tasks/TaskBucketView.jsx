@@ -332,6 +332,7 @@ function TaskBucketView({
               googleToken={googleToken}
               docsEnabled={docsEnabled}
               driveConversationExportFolderId={driveConversationExportFolderId}
+              defaultSections={{ project: true, next: true, waiting: false, someday: false, deferred: false }}
             />
           </div>
         )}
@@ -346,6 +347,31 @@ function TaskBucketView({
             >
               {GROUP_OPTS.map(opt => <option key={opt.key} value={opt.key}>{opt.label}</option>)}
             </select>
+            <TaskListExportPopover
+              tasks={tasks.filter(t => t.bucket === 'project')}
+              googleToken={googleToken}
+              docsEnabled={docsEnabled}
+              driveConversationExportFolderId={driveConversationExportFolderId}
+              defaultSections={{ project: false, next: true, waiting: false, someday: false, deferred: false }}
+            />
+          </div>
+        )}
+        {(currentBucket === "waiting" || currentBucket === "someday" || currentBucket === "deferred") && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <TaskListExportPopover
+              key={currentBucket}
+              tasks={tasks.filter(t => t.bucket === 'project')}
+              googleToken={googleToken}
+              docsEnabled={docsEnabled}
+              driveConversationExportFolderId={driveConversationExportFolderId}
+              defaultSections={{
+                project:  false,
+                next:     false,
+                waiting:  currentBucket === 'waiting',
+                someday:  currentBucket === 'someday',
+                deferred: currentBucket === 'deferred',
+              }}
+            />
           </div>
         )}
       </div>
