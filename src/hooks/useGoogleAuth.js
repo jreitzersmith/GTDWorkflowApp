@@ -25,8 +25,11 @@ const SLIDES_SCOPES = {
   readonly: 'https://www.googleapis.com/auth/presentations.readonly',
   full:     'https://www.googleapis.com/auth/presentations',
 };
+const CONTACTS_SCOPES = {
+  readonly: 'https://www.googleapis.com/auth/contacts.readonly',
+};
 
-export { GMAIL_SCOPES, DRIVE_SCOPES, DOCS_SCOPES, SHEETS_SCOPES, SLIDES_SCOPES };
+export { GMAIL_SCOPES, DRIVE_SCOPES, DOCS_SCOPES, SHEETS_SCOPES, SLIDES_SCOPES, CONTACTS_SCOPES };
 
 const TOKEN_KEY = 'gtd_google_token';
 const PKCE_KEY  = 'gtd_google_pkce';
@@ -34,7 +37,7 @@ const PREFS_KEY = 'gtd_google_scope_prefs';
 
 const DEFAULT_PREFS = {
   gmail: 'modify', calendar: true,
-  drive: 'standard', docs: 'full', sheets: 'full', slides: 'full',
+  drive: 'standard', docs: 'full', sheets: 'full', slides: 'full', contacts: false,
 };
 
 // ── useGoogleAuth ──────────────────────────────────────────────────────────────
@@ -85,6 +88,9 @@ function useGoogleAuth({ setCalendarEvents }) {
   });
   const [slidesEnabled, setSlidesEnabled] = useState(() => {
     try { return JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null')?.slidesEnabled || false; } catch { return false; }
+  });
+  const [contactsEnabled, setContactsEnabled] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null')?.contactsEnabled || false; } catch { return false; }
   });
 
   // scopePrefs: desired access level per service — stored separately from the token
@@ -158,7 +164,8 @@ function useGoogleAuth({ setCalendarEvents }) {
             driveEnabled:    pkce.driveEnabled    ?? true,
             docsEnabled:     pkce.docsEnabled     ?? true,
             sheetsEnabled:   pkce.sheetsEnabled   ?? true,
-            slidesEnabled:   pkce.slidesEnabled   ?? true,
+            slidesEnabled:    pkce.slidesEnabled   ?? true,
+            contactsEnabled:  pkce.contactsEnabled ?? false,
           };
           localStorage.setItem(TOKEN_KEY, JSON.stringify(payload));
           setGoogleToken(data.access_token);
@@ -168,6 +175,7 @@ function useGoogleAuth({ setCalendarEvents }) {
           setDocsEnabled(payload.docsEnabled);
           setSheetsEnabled(payload.sheetsEnabled);
           setSlidesEnabled(payload.slidesEnabled);
+          setContactsEnabled(payload.contactsEnabled);
           setGmailError(null);
         } else {
           const msg = data.error_description || data.error || JSON.stringify(data);
@@ -190,8 +198,9 @@ function useGoogleAuth({ setCalendarEvents }) {
     const verifier  = generateCodeVerifier();
     const challenge = await generateCodeChallenge(verifier);
     const state     = 'gtd_' + generateCodeVerifier().slice(0, 16);
-    const prefs     = overrides.prefs || scopePrefs;
-    const calOn     = overrides.calendarEnabled ?? prefs.calendar;
+    const prefs        = overrides.prefs || scopePrefs;
+    const calOn        = overrides.calendarEnabled ?? prefs.calendar;
+    const contactsOn   = overrides.contactsEnabled ?? !!(prefs.contacts);
 
     const scopeParts = [
       GMAIL_SCOPES[prefs.gmail]    || GMAIL_SCOPES.modify,
@@ -200,6 +209,7 @@ function useGoogleAuth({ setCalendarEvents }) {
       DOCS_SCOPES[prefs.docs]     || DOCS_SCOPES.full,
       SHEETS_SCOPES[prefs.sheets] || SHEETS_SCOPES.full,
       SLIDES_SCOPES[prefs.slides] || SLIDES_SCOPES.full,
+      contactsOn ? CONTACTS_SCOPES.readonly : null,
     ].filter(Boolean).join(' ');
 
     localStorage.setItem(PKCE_KEY, JSON.stringify({
@@ -211,7 +221,8 @@ function useGoogleAuth({ setCalendarEvents }) {
       driveEnabled:    true,
       docsEnabled:     true,
       sheetsEnabled:   true,
-      slidesEnabled:   true,
+      slidesEnabled:    true,
+      contactsEnabled:  contactsOn,
     }));
 
     const params = new URLSearchParams({
@@ -250,6 +261,7 @@ function useGoogleAuth({ setCalendarEvents }) {
     setDocsEnabled(false);
     setSheetsEnabled(false);
     setSlidesEnabled(false);
+    setContactsEnabled(false);
     setGmailError(null);
     setCalendarEvents([]);
   }, [setCalendarEvents]);
@@ -273,7 +285,8 @@ function useGoogleAuth({ setCalendarEvents }) {
   const disconnectDrive  = useCallback(() => _flipOff(setDriveEnabled,  'driveEnabled'),  [_flipOff]);
   const disconnectDocs   = useCallback(() => _flipOff(setDocsEnabled,   'docsEnabled'),   [_flipOff]);
   const disconnectSheets = useCallback(() => _flipOff(setSheetsEnabled, 'sheetsEnabled'), [_flipOff]);
-  const disconnectSlides = useCallback(() => _flipOff(setSlidesEnabled, 'slidesEnabled'), [_flipOff]);
+  const disconnectSlides   = useCallback(() => _flipOff(setSlidesEnabled,   'slidesEnabled'),   [_flipOff]);
+  const disconnectContacts = useCallback(() => _flipOff(setContactsEnabled, 'contactsEnabled'), [_flipOff]);
 
   // ── Silent token refresh ─────────────────────────────────────────────────────
   const refreshGoogleToken = useCallback(async () => {
@@ -331,14 +344,14 @@ function useGoogleAuth({ setCalendarEvents }) {
     // Token + gmail scope (googleScope name kept for backward compat with EmailPanel/CoachPanel)
     googleToken, googleScope, gmailError,
     // Per-service enabled flags
-    calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
+    calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled, contactsEnabled,
     // Scope preferences (desired level per service)
     scopePrefs, setScopePref,
     // Auth actions
     reauthorizeGoogle, connectCalendar,
     // Disconnect actions
     disconnectGmail, disconnectAll,
-    disconnectCalendar, disconnectDrive, disconnectDocs, disconnectSheets, disconnectSlides,
+    disconnectCalendar, disconnectDrive, disconnectDocs, disconnectSheets, disconnectSlides, disconnectContacts,
     // Token maintenance
     refreshGoogleToken,
   };

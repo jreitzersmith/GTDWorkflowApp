@@ -46,16 +46,18 @@ const GOOGLE_SERVICES = [
       { key: 'full',     label: 'Full',      desc: '+ create & edit slides' },
     ],
   },
+  { id: 'contacts', icon: '👤', name: 'Contacts', isToggle: true },
 ];
 
 // Map service id → enabled prop
-function getEnabled(id, { googleToken, calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled }) {
+function getEnabled(id, { googleToken, calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled, contactsEnabled }) {
   if (id === 'gmail')    return !!googleToken;
   if (id === 'calendar') return calendarEnabled;
   if (id === 'drive')    return driveEnabled;
   if (id === 'docs')     return docsEnabled;
   if (id === 'sheets')   return sheetsEnabled;
   if (id === 'slides')   return slidesEnabled;
+  if (id === 'contacts') return contactsEnabled;
   return false;
 }
 
@@ -86,9 +88,9 @@ function SettingsPanel({
   onExport, onImport, onClose,
   // Google props
   googleToken, gmailScope, gmailError,
-  calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
+  calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled, contactsEnabled,
   scopePrefs, onSetScopePref,
-  onReauthorizeGoogle, onDisconnectCalendar, onDisconnectAll,
+  onReauthorizeGoogle, onDisconnectCalendar, onDisconnectContacts, onDisconnectAll,
   // Other
   recurringReviewDays, onSetRecurringReviewDays,
   driveBaseFolderId, onSetDriveBaseFolderId,
@@ -157,12 +159,20 @@ function SettingsPanel({
 
   const handleCalendarToggle = () => {
     if (calendarEnabled) {
-      // Disconnect immediately; also mark calendar pref as off
       onDisconnectCalendar();
       onSetScopePref('calendar', false);
     } else {
-      // Not yet authorized — mark desired and prompt re-auth
       onSetScopePref('calendar', true);
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleContactsToggle = () => {
+    if (contactsEnabled) {
+      onDisconnectContacts();
+      onSetScopePref('contacts', false);
+    } else {
+      onSetScopePref('contacts', true);
       setHasUnsavedChanges(true);
     }
   };
@@ -177,7 +187,7 @@ function SettingsPanel({
   const TOGGLE_OFF = { ...TOGGLE_ON, background: COLORS.border2 };
   const THUMB      = (on) => ({ width: 12, height: 12, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2, ...(on ? { right: 2 } : { left: 2 }) });
 
-  const enabledFlags = { googleToken, calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled };
+  const enabledFlags = { googleToken, calendarEnabled, driveEnabled, docsEnabled, sheetsEnabled, slidesEnabled, contactsEnabled };
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -225,21 +235,21 @@ function SettingsPanel({
                     /* Calendar: toggle only */
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button
-                        onClick={handleCalendarToggle}
+                        onClick={svc.id === 'contacts' ? handleContactsToggle : handleCalendarToggle}
                         style={isConnected ? TOGGLE_ON : TOGGLE_OFF}
-                        title={isConnected ? 'Disconnect Calendar' : 'Enable Calendar (requires Re-authorize)'}
+                        title={isConnected ? `Disconnect ${svc.name}` : `Enable ${svc.name} (requires Re-authorize)`}
                       >
                         <div style={THUMB(isConnected)} />
                       </button>
                       <span style={{ fontSize: 11, color: COLORS.text2 }}>
                         {isConnected
-                          ? 'Full access'
-                          : scopePrefs.calendar && !isConnected
+                          ? (svc.id === 'contacts' ? 'Read only' : 'Full access')
+                          : scopePrefs[svc.id] && !isConnected
                             ? <span style={{ color: COLORS.inbox }}>Pending re-authorize</span>
                             : <span style={{ color: COLORS.muted }}>Off</span>
                         }
                       </span>
-                      {isConnected && (
+                      {isConnected && svc.id === 'calendar' && (
                         <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
                           <span style={{ fontSize: 11, color: COLORS.muted }}>Reminder:</span>
                           <select
@@ -656,6 +666,7 @@ SettingsPanel.propTypes = {
   gmailError:                 PropTypes.string,
   calendarEnabled:            PropTypes.bool.isRequired,
   driveEnabled:               PropTypes.bool.isRequired,
+  contactsEnabled:            PropTypes.bool.isRequired,
   docsEnabled:                PropTypes.bool.isRequired,
   sheetsEnabled:              PropTypes.bool.isRequired,
   slidesEnabled:              PropTypes.bool.isRequired,
@@ -663,6 +674,7 @@ SettingsPanel.propTypes = {
   onSetScopePref:             PropTypes.func.isRequired,
   onReauthorizeGoogle:        PropTypes.func.isRequired,
   onDisconnectCalendar:       PropTypes.func.isRequired,
+  onDisconnectContacts:       PropTypes.func.isRequired,
   onDisconnectAll:            PropTypes.func.isRequired,
   // Other
   recurringReviewDays:        PropTypes.number.isRequired,

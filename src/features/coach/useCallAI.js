@@ -18,6 +18,7 @@ import { docsCreateDocument, docsAppendText, docsAppendMarkdown, docsMoveToFolde
 import { driveListFiles, driveGetFile, driveDownloadFile, driveExportFile } from '../../api/driveApi.js';
 import { sheetsCreateSpreadsheet, sheetsAppendRows, sheetsBatchUpdate, sheetsMoveToFolder } from '../../api/sheetsApi.js';
 import { createAndUploadPptx, PPTX_MIME } from '../../api/pptxApi.js';
+import { peopleSearchContacts } from '../../api/peopleApi.js';
 
 // Lazy task-retrieval tool — used in chat mode so the full task list isn't
 // sent on every message. The AI calls this when it needs task details.
@@ -85,6 +86,20 @@ const GET_WEATHER_TOOL = {
       city: { type: 'string', description: "City name. Omit to use the user's configured default city." },
       units: { type: 'string', enum: ['imperial', 'metric'], description: 'Temperature units: imperial = °F, metric = °C. Defaults to imperial.' },
     },
+  },
+};
+
+// Contacts lookup tool — available in chat mode when Contacts is connected (FR#115)
+const CONTACTS_LOOKUP_TOOL = {
+  name: 'contacts_lookup',
+  description: "Search the user's Google Contacts by name or email address. Returns matching contacts with names, email addresses, and phone numbers. Use when the user asks to find someone's contact info, or when composing an email to a person by name.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Name or email to search for.' },
+      max_results: { type: 'number', description: 'Maximum contacts to return (default 5, max 30).' },
+    },
+    required: ['query'],
   },
 };
 
@@ -288,6 +303,7 @@ function useCallAI({
   coachName,
   userName,
   driveEnabled,
+  contactsEnabled,
   driveDocumentFolderId,
   driveSpreadsheetFolderId,
   driveSlideDeckFolderId,
@@ -386,6 +402,7 @@ function useCallAI({
               availableTools.push(DRIVE_SEARCH_TOOL);
               availableTools.push(GET_DRIVE_FILE_TOOL);
             }
+            if (googleToken && contactsEnabled) availableTools.push(CONTACTS_LOOKUP_TOOL);
             if (import.meta.env.VITE_OPENWEATHERMAP_API_KEY) availableTools.push(GET_WEATHER_TOOL);
             if (availableTools.length > 0) reqBody.tools = availableTools;
           }
@@ -628,6 +645,14 @@ function useCallAI({
                     toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result) });
                   } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: 'Weather fetch failed: ' + e.message }); }
                 }
+              } else if (toolUse.name === 'contacts_lookup') {
+                const contactsQuery = toolUse.input.query;
+                const contactsMax = Math.min(toolUse.input.max_results || 5, 30);
+                setMessages(prev => [...prev, { role: 'assistant', text: `👤 Searching contacts: "${contactsQuery}"`, isSearchChip: true }]);
+                try {
+                  const results = await peopleSearchContacts({ token: googleToken, query: contactsQuery, maxResults: contactsMax });
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(results) });
+                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               }
             }
             // Ensure every tool_use block has a result (empty content triggers Anthropic 400)
@@ -1242,7 +1267,7 @@ function useCallAI({
       googleToken, googleScope, calendarEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
       setCalendarEvents, recordUsage, setLastInputLog, setTasks, setGmailQueue,
       setMessages, setChatHistory, setLoading, setPendingAction, authUser, userCity, userHomeAddress, userWorkAddress, coachName, userName,
-      driveEnabled, driveDocumentFolderId, driveSpreadsheetFolderId, driveSlideDeckFolderId, driveBaseFolderId, onFocusSet]); // eslint-disable-line react-hooks/exhaustive-deps
+      driveEnabled, contactsEnabled, driveDocumentFolderId, driveSpreadsheetFolderId, driveSlideDeckFolderId, driveBaseFolderId, onFocusSet]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
