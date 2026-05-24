@@ -15,6 +15,8 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-23 | Feature      | FR#124  | GH#143 | Analytics: context/location utilization chart | 0ec5e74 |
 | 2026-05-23 | Feature      | FR#125  | GH#144 | Analytics: Someday/Maybe decay detection with live threshold input | 0ec5e74 |
 | 2026-05-23 | Feature      | FR#127  | GH#146 | Analytics layout configurability — reorder, collapse, hide sections; localStorage persistence | a8ffe4a |
+| 2026-05-23 | Feature      | FR#122  | GH#141 | Bucket aging — age badge on Waiting For/Someday/Deferred tasks, sort-by-age, oldest-task summary bar | de9dd10 |
+| 2026-05-23 | Feature      | FR#126  | GH#145 | Defer patterns — chronic-deferred badge on task rows (≥3 defers), top-deferrers list in analytics | 5ca9d8e |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |
@@ -165,3 +167,5 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-22 | Code Quality | CQ#12   | GH#134 | exportUtils.js: fix task list grouping — flag-based TASK_VIEW_FILTERS replace bucket-value matching | c08c9ef |
 | 2026-05-22 | Code Quality | CQ#14   | GH#136 | taskUtils.jsx: fix waterfallFilter (isNextAction); remove dead bucket=next drag-drop branch | cd46d13 |
 | 2026-05-22 | Feature | FR#118 | GH#137 | Hierarchical export — section checkboxes in export popover, per-view default sections, buildHierarchicalExportContent | 782677f |
+| 2026-05-23 | Bug Fix      | Issue#33 | GH#147 | Analytics task counter double-count fixed in buildBucketStats | 3e88e3b |
+| 2026-05-23 | Code Quality | CQ#15    | GH#148 | Hide done-circle on category/subcategory rows in project list | eaa52d6 |

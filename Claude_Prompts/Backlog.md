@@ -1,16 +1,16 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#33** · Code Quality — **CQ#14** · Feature Requests — **FR#127**
+> **Last used numbers:** Known Issues — **Issue#33** · Code Quality — **CQ#15** · Feature Requests — **FR#127**
 
 ---
 
 ## Known issues / remaining work
 
-- Issue#33 [GH#147] (2026-05-23) — Analytics header task counter shows ~2x expected count — `buildBucketStats` in `analyticsUtils.js` may double-count tasks; investigate `totalActive` calculation
 
 ---
 
 ## Code quality
+
 
 ---
 
@@ -32,12 +32,7 @@
 
 
 
-- FR#122 [GH#141] (2026-05-23) — Bucket aging — per-task age display in Waiting For / Someday / Deferred views, sort-by-age, longest-waiting summary; option (a) add bucketMovedAt column or (b) use created as proxy
 
-
-
-
-- FR#126 [GH#145] (2026-05-23) — Defer patterns — re-defer count per task, defer duration histogram, chronic-deferred flag; requires deferCount integer field (Supabase migration) incremented on each deferUntil write
 
 #### Inbox / processing improvements
 
