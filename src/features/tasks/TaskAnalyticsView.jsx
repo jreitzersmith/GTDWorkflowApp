@@ -8,6 +8,7 @@ import {
   buildThroughputTrend, buildProjectHealth,
   buildEffortAccuracyByPeriod, buildEffortAccuracyByProject,
   buildContextUtilization, buildSomedayDecay,
+  buildTopChronicDeferrers,
 } from './analyticsUtils.js';
 import { SECTION_DEFS, loadLayout, saveLayout, defaultLayout, SectionManager } from './analyticsConfig.jsx';
 
@@ -514,6 +515,33 @@ SomedayDecaySection.propTypes = {
   onThresholdChange: PropTypes.func.isRequired,
 };
 
+// --- FR#126: Top chronic deferrers list ---
+
+function TopDeferrersList({ deferrers }) {
+  if (!deferrers.length) return null;
+  return (
+    <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${COLORS.border}` }}>
+      <div style={{ fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 600 }}>
+        Chronic deferrers (3+)
+      </div>
+      {deferrers.map(d => (
+        <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', borderBottom: `0.5px solid ${COLORS.border}` }}>
+          <div style={{ flex: 1, fontSize: 13, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {d.text}
+          </div>
+          <span style={{ fontSize: 11, padding: '1px 8px', borderRadius: 10, background: '#c8444422', color: '#c84444', border: '1px solid #c8444444', flexShrink: 0, whiteSpace: 'nowrap' }}>
+            🔁 {d.deferCount}×
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+TopDeferrersList.propTypes = {
+  deferrers: PropTypes.arrayOf(PropTypes.shape({ id: PropTypes.string, text: PropTypes.string, deferCount: PropTypes.number })).isRequired,
+};
+
 // --- Main export ---
 
 function TaskAnalyticsView({ tasks }) {
@@ -539,6 +567,7 @@ function TaskAnalyticsView({ tasks }) {
   const effortByProject = buildEffortAccuracyByProject(tasks);
   const contexts        = buildContextUtilization(tasks);
   const somedayDecay    = buildSomedayDecay(tasks, decayThreshold);
+  const topChronicDeferrers = buildTopChronicDeferrers(tasks);
   const totalActive    = ACTIVE_BUCKET_KEYS.reduce((s, k) => s + (bucketCounts[k] || 0), 0);
   const totalCompleted = bucketCounts['done'] || 0;
 
@@ -556,7 +585,7 @@ function TaskAnalyticsView({ tasks }) {
     effort_by_period:  { title: 'Effort accuracy — by month',      node: <EffortAccuracyByPeriodChart periods={effortByPeriod} /> },
     effort_by_project: { title: 'Effort accuracy — by project',   node: <EffortAccuracyByProjectChart projects={effortByProject} /> },
     due_date:          { title: 'Due date compliance',             node: <DueDateComplianceChart {...compliance} /> },
-    deferrals:         { title: 'Deferral frequency',              node: <DeferralFrequencyChart {...deferralFreq} /> },
+    deferrals:         { title: 'Deferral frequency',              node: <><DeferralFrequencyChart {...deferralFreq} /><TopDeferrersList deferrers={topChronicDeferrers} /></> },
     context:           { title: 'Context utilization',             node: <ContextUtilizationChart contexts={contexts} /> },
     someday:           { title: 'Someday / Maybe decay',           node: <SomedayDecaySection {...somedayDecay} onThresholdChange={setDecayThreshold} /> },
   };

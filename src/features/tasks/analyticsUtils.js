@@ -252,10 +252,21 @@ function buildSomedayDecay(tasks, thresholdDays = 90) {
   return { flagged, threshold: thresholdDays, total: somedayActive.length };
 }
 
+// --- FR#126: Top chronic deferrers ---
+// Returns tasks with deferCount >= minCount, sorted by deferCount desc (active tasks only).
+function buildTopChronicDeferrers(tasks, minCount = 3) {
+  return tasks
+    .filter(t => !t.done && (t.deferCount || 0) >= minCount)
+    .sort((a, b) => (b.deferCount || 0) - (a.deferCount || 0))
+    .slice(0, 8)
+    .map(t => ({ id: t.id, text: t.text, deferCount: t.deferCount || 0 }));
+}
+
 export {
   buildBucketStats, buildWeeklyCompletions, buildEffortAccuracy,
   buildDueDateCompliance, buildDeferralFrequency,
   buildThroughputTrend, buildProjectHealth,
   buildEffortAccuracyByPeriod, buildEffortAccuracyByProject,
   buildContextUtilization, buildSomedayDecay,
+  buildTopChronicDeferrers,
 };
