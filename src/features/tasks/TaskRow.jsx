@@ -60,6 +60,8 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
     }
   };
 
+  const isContainer = task.nodeType === 'category' || task.nodeType === 'subcategory';
+
   // Computed effort total for project-bucket rows (recursive sum across all descendants).
   const projectEffortTotal = (() => {
     if (task.bucket !== "project" || currentBucket !== "project") return null;
@@ -160,12 +162,16 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
         {!hasChildren && currentBucket === "project" && (
           <span style={{ width: 14, flexShrink: 0 }} />
         )}
-        <div
-          onClick={() => onComplete(task.id)}
-          style={{ width: 15, height: 15, borderRadius: "50%", border: `1.5px solid ${task.done ? COLORS.next : COLORS.border2}`, background: task.done ? COLORS.next : "transparent", flexShrink: 0, marginTop: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#111", transition: "all 0.15s" }}
-        >
-          {task.done ? "✓" : ""}
-        </div>
+        {isContainer ? (
+          <span style={{ width: 15, height: 15, flexShrink: 0, marginTop: 2 }} />
+        ) : (
+          <div
+            onClick={() => onComplete(task.id)}
+            style={{ width: 15, height: 15, borderRadius: "50%", border: `1.5px solid ${task.done ? COLORS.next : COLORS.border2}`, background: task.done ? COLORS.next : "transparent", flexShrink: 0, marginTop: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#111", transition: "all 0.15s" }}
+          >
+            {task.done ? "✓" : ""}
+          </div>
+        )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13.5, color: task.isWaitingFor ? "#c04040" : task.isSomeday ? "#b8960c" : COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
