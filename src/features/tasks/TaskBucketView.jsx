@@ -111,9 +111,10 @@ function TaskBucketView({
   const taskListRef = useRef(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [ageSortDir, setAgeSortDir] = useState(null); // null=tree, 'asc'=oldest-first, 'desc'=newest-first
 
   // Reset filter when switching buckets
-  useEffect(() => { setFilterText(""); setSelectedCategory(null); setSelectedLocation(null); setFocusedTaskId?.(null); }, [currentBucket]);
+  useEffect(() => { setFilterText(""); setSelectedCategory(null); setSelectedLocation(null); setAgeSortDir(null); setFocusedTaskId?.(null); }, [currentBucket]);
 
   // Close project picker on outside click
   useEffect(() => {
@@ -358,6 +359,13 @@ function TaskBucketView({
         )}
         {(currentBucket === "waiting" || currentBucket === "someday" || currentBucket === "deferred") && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <ToolbarBtn
+              onClick={() => setAgeSortDir(d => d === null ? 'asc' : d === 'asc' ? 'desc' : null)}
+              active={ageSortDir !== null}
+              title="Sort by age (oldest first / newest first / tree)"
+            >
+              {ageSortDir === 'desc' ? 'Age ↓' : 'Age ↑'}
+            </ToolbarBtn>
             <TaskListExportPopover
               key={currentBucket}
               tasks={tasks.filter(t => t.bucket === 'project')}
@@ -534,20 +542,42 @@ function TaskBucketView({
         })() : (currentBucket === "waiting" || currentBucket === "someday" || currentBucket === "deferred") ? (() => {
           const flaggedIds = bucketTasks.map(t => t.id);
           const visibleSet = computeVisibleIds(flaggedIds, tasks);
+          const oldestTask = bucketTasks.length > 0
+            ? bucketTasks.reduce((oldest, t) => t.created < oldest.created ? t : oldest, bucketTasks[0])
+            : null;
+          const oldestDays = oldestTask ? Math.floor((Date.now() - oldestTask.created) / 86400000) : null;
+          const oldestColor = oldestDays === null ? COLORS.muted
+            : oldestDays >= 90 ? '#c87070'
+            : oldestDays >= 30 ? '#d4a844'
+            : COLORS.muted;
+          const sortedFlat = ageSortDir !== null
+            ? [...bucketTasks].sort((a, b) => ageSortDir === 'asc' ? a.created - b.created : b.created - a.created)
+            : null;
           return (
             <div>
+              {oldestTask && (
+                <div style={{ padding: "5px 18px 5px", fontSize: 11, color: COLORS.text2, borderBottom: `1px solid ${COLORS.border}`, display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ color: COLORS.muted, flexShrink: 0 }}>Oldest:</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{oldestTask.text}</span>
+                  <span style={{ color: oldestColor, flexShrink: 0, fontWeight: 500 }}>{oldestDays}d</span>
+                </div>
+              )}
               {currentBucket === "deferred" && (
                 <div style={{ padding: "6px 18px 4px", fontSize: 11, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
                   Tasks with a defer date — shown in project hierarchy. Move to Inbox automatically when their date arrives.
                 </div>
               )}
-              <ProjectTree
-                parentId={null}
-                depth={0}
-                dragId={null}
-                dropTarget={null}
-                visibilitySet={visibleSet}
-              />
+              {sortedFlat !== null ? (
+                sortedFlat.map(task => <TaskRow key={task.id} task={task} />)
+              ) : (
+                <ProjectTree
+                  parentId={null}
+                  depth={0}
+                  dragId={null}
+                  dropTarget={null}
+                  visibilitySet={visibleSet}
+                />
+              )}
             </div>
           );
         })() : (

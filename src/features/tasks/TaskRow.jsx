@@ -62,6 +62,18 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
 
   const isContainer = task.nodeType === 'category' || task.nodeType === 'subcategory';
 
+  // FR#122: Bucket aging — show age badge in waiting/someday/deferred views
+  const AGING_BUCKETS = ['waiting', 'someday', 'deferred'];
+  const taskAgeDays = AGING_BUCKETS.includes(currentBucket)
+    ? Math.floor((Date.now() - task.created) / 86400000)
+    : null;
+  const ageColor = taskAgeDays === null ? null
+    : taskAgeDays >= 90 ? '#c87070'
+    : taskAgeDays >= 30 ? '#d4a844'
+    : COLORS.muted;
+  // FR#126: Chronic-deferred flag — tasks deferred 3+ times
+  const chronicallyDeferred = (task.deferCount || 0) >= 3;
+
   // Computed effort total for project-bucket rows (recursive sum across all descendants).
   const projectEffortTotal = (() => {
     if (task.bucket !== "project" || currentBucket !== "project") return null;
@@ -196,6 +208,16 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
             )}
             {deferred && currentBucket === "project" && (
               <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44`, flexShrink: 0 }}>⏰ {task.deferUntil}</span>
+            )}
+            {taskAgeDays !== null && (
+              <span title={`In this bucket for ~${taskAgeDays} days`} style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.surface3, color: ageColor, border: `1px solid ${ageColor}44`, flexShrink: 0 }}>
+                {taskAgeDays}d
+              </span>
+            )}
+            {chronicallyDeferred && (
+              <span title={`Deferred ${task.deferCount} times`} style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: "#c8444422", color: "#c84444", border: "1px solid #c8444444", flexShrink: 0 }}>
+                🔁 {task.deferCount}×
+              </span>
             )}
           </div>
           {/* Metadata summary chips — below-text mode */}
