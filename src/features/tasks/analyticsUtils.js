@@ -21,7 +21,7 @@ function getDescendantIds(taskId, taskMap, visited = new Set()) {
 function buildBucketStats(tasks) {
   return {
     inbox:        tasks.filter(t => t.bucket === 'inbox').length,
-    project:      tasks.filter(t => t.bucket === 'project').length,
+    project:      tasks.filter(t => t.bucket === 'project' && !t.done && !t.isNextAction && !t.isWaitingFor && !t.isSomeday && !isDeferred(t)).length,
     next:         tasks.filter(t => t.isNextAction && !t.isSomeday && !t.isWaitingFor && !t.done).length,
     waiting:      tasks.filter(t => t.isWaitingFor && !t.done).length,
     someday:      tasks.filter(t => t.isSomeday && !t.done).length,
