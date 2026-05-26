@@ -38,8 +38,6 @@
 
 #### Integrations / data
 
-- FR#128 [GH#149] (2026-05-26) — Coach gmail_send: expand scope gate to modify/compose/send; add confirmation step before sending via PendingActionBar
-
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
   - `sheetsApi.js` API wrapper exists. Missing: (1) Settings UI to configure target Sheet ID, (2) a `→ACTION:append_sheet` coach action line handler in `useCallAI.js`, (3) coach prompt instruction to identify financial emails and emit the action. Pattern matches FR#46 (receipt pipeline) — these two could be implemented together.
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
@@ -71,3 +69,6 @@
 ## Deferred Testing Scenarios
 
 Test cases that could not be executed during their cycle due to a missing condition (no live email, second device required, Supabase not ready, specific data state needed, etc.). Check these when the condition is next available, then remove the item and note the result in the commit or GitHub issue.
+
+- [FR#128 GH#149] Dismissing the send action bar does not send the email — needs: manual test of dismiss/cancel path in confirm bar
+- [FR#128 GH#149] If send fails (e.g. revoked token), error appears in coach chat — needs: test with expired/revoked Google token
