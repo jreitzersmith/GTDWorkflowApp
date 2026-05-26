@@ -395,7 +395,7 @@ function useCallAI({
               }
               if (googleScope === 'compose' || googleScope === 'send')
                 availableTools.push(GMAIL_COMPOSE_TOOL);
-              if (googleScope === 'send')
+              if (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send')
                 availableTools.push(GMAIL_SEND_TOOL);
             }
             if (googleToken && driveEnabled) {
@@ -562,14 +562,14 @@ function useCallAI({
                   toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result) });
                 } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === 'gmail_send') {
-                setMessages(prev => [...prev, { role: 'assistant', text: `📤 Sending email...`, isSearchChip: true }]);
-                try {
-                  const result = await doGmailSend(
-                    toolUse.input.to, toolUse.input.subject, toolUse.input.body,
-                    toolUse.input.thread_id, googleToken
-                  );
-                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result) });
-                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+                setPendingAction({
+                  type: 'gmail_send',
+                  to: toolUse.input.to,
+                  subject: toolUse.input.subject,
+                  body: toolUse.input.body,
+                  threadId: toolUse.input.thread_id || null,
+                });
+                toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify({ status: 'Email staged for sending — awaiting user confirmation in the action bar.' }) });
               } else if (toolUse.name === 'drive_search') {
                 const driveQuery = toolUse.input.query;
                 const driveMax = Math.min(toolUse.input.max_results || 10, 50);

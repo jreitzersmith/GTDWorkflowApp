@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#33** · Code Quality — **CQ#15** · Feature Requests — **FR#127**
+> **Last used numbers:** Known Issues — **Issue#33** · Code Quality — **CQ#15** · Feature Requests — **FR#128**
 
 ---
 
@@ -37,6 +37,8 @@
 #### Inbox / processing improvements
 
 #### Integrations / data
+
+- FR#128 [GH#149] (2026-05-26) — Coach gmail_send: expand scope gate to modify/compose/send; add confirmation step before sending via PendingActionBar
 
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
   - `sheetsApi.js` API wrapper exists. Missing: (1) Settings UI to configure target Sheet ID, (2) a `→ACTION:append_sheet` coach action line handler in `useCallAI.js`, (3) coach prompt instruction to identify financial emails and emit the action. Pattern matches FR#46 (receipt pipeline) — these two could be implemented together.

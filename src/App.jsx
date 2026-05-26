@@ -29,6 +29,7 @@ import { createEmptyUsageStats } from "./features/settings/useAIUsageTracking.js
 
 import { parseRRULE, calEventStart, isAllDayEvent, genId } from "./features/calendar/calendarApi.js";
 import { driveUploadFile } from "./api/driveApi.js";
+import { doGmailSend } from "./features/email/gmailTools.js";
 import { todayStr, isDeferred, buildNextOccurrence, extractSuggestions, extractMetadata, getOrderedChildren, useResizer, effortToMinutes } from "./features/tasks/taskUtils.jsx";
 import { useDragDrop } from "./features/tasks/useDragDrop.js";
 import { useSupabaseSync } from "./hooks/useSupabaseSync.js";
@@ -465,6 +466,22 @@ export default function GTDManager() {
     callAI, switchCoachMode,
     onSessionTasksCreated: (ids, titles) => suggestProjectGroupRef.current?.(ids, titles),
   });
+
+  // Intercepts gmail_send before delegating to the inbox-processing confirm handler.
+  const handleConfirmMoveWithSend = useCallback(async () => {
+    if (pendingAction?.type === 'gmail_send') {
+      const { to, subject, body, threadId } = pendingAction;
+      setPendingAction(null);
+      try {
+        await doGmailSend(to, subject, body, threadId, googleToken);
+        setMessages(prev => [...prev, { role: 'assistant', text: `Email sent to ${to}.` }]);
+      } catch (e) {
+        setMessages(prev => [...prev, { role: 'assistant', text: `Failed to send email: ${e.message}` }]);
+      }
+      return;
+    }
+    handleConfirmMove();
+  }, [pendingAction, googleToken, handleConfirmMove, setPendingAction, setMessages]);
 
   const {
     addTask, addAndProcess, addProjectTask,
@@ -1500,7 +1517,7 @@ export default function GTDManager() {
                 chatInputRef={chatInputRef}
                 sessionUsage={sessionUsage}
                 onSendChat={sendChat}
-                onConfirmMove={handleConfirmMove}
+                onConfirmMove={handleConfirmMoveWithSend}
                 onDismissPendingAction={handleSkipPendingAction}
                 onDeleteInboxItem={handleDeleteInboxItem}
                 onRecurringStillFine={handleRecurringStillFine}

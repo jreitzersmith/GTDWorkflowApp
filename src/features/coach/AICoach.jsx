@@ -109,7 +109,8 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
     waiting: { color: COLORS.waiting, label: "Waiting For", confirmText: "Move ✓" },
     delete:  { color: COLORS.muted,   label: "Archive (not actionable)", confirmText: "Archive ✓" },
     add:     { color: COLORS.project, label: "Add to existing project", confirmText: "Add ✓" },
-    update:  { color: COLORS.accent,  label: "Update task",              confirmText: "Apply ✓" },
+    update:   { color: COLORS.accent,  label: "Update task",              confirmText: "Apply ✓" },
+    gmail_send: { color: '#4285F4',       label: "Send email",               confirmText: "Send ✓" },
   };
   const cfg = configs[type] || configs.next;
 
@@ -154,7 +155,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
   const showPriority = ['next', 'add', 'project', 'someday', 'waiting'].includes(type);
   const showLocation = ['next', 'add', 'project', 'someday', 'waiting'].includes(type);
   const showProject  = ['next', 'project', 'someday', 'waiting'].includes(type);
-  const showMeta     = type !== 'delete';
+  const showMeta     = type !== 'delete' && type !== 'gmail_send';
 
   const chip = (label, active, color, onClick) => (
     <button
@@ -207,6 +208,16 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
             </div>
           </div>
           <div><span style={{ color: COLORS.muted }}>Action: </span><strong style={{ color: COLORS.next }}>{title}</strong></div>
+        </div>
+      ) : type === "gmail_send" ? (
+        <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
+          <div><span style={{ color: COLORS.muted }}>To: </span><strong style={{ color: COLORS.text }}>{action.to}</strong></div>
+          <div><span style={{ color: COLORS.muted }}>Subject: </span><strong style={{ color: COLORS.text }}>{action.subject}</strong></div>
+          {action.body && (
+            <div style={{ marginTop: 4, padding: "6px 8px", background: COLORS.surface2, borderRadius: 5, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 120, overflowY: "auto", color: COLORS.text2 }}>
+              {action.body.length > 400 ? action.body.slice(0, 400) + '…' : action.body}
+            </div>
+          )}
         </div>
       ) : type === "update" ? (
         <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
