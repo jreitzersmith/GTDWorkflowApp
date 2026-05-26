@@ -169,3 +169,4 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-22 | Feature | FR#118 | GH#137 | Hierarchical export — section checkboxes in export popover, per-view default sections, buildHierarchicalExportContent | 782677f |
 | 2026-05-23 | Bug Fix      | Issue#33 | GH#147 | Analytics task counter double-count fixed in buildBucketStats | 3e88e3b |
 | 2026-05-23 | Code Quality | CQ#15    | GH#148 | Hide done-circle on category/subcategory rows in project list | eaa52d6 |
+| 2026-05-26 | Feature      | FR#115  | GH#129 | Google Contacts integration — peopleApi.js wrapper, contacts.readonly scope, Settings toggle, contacts_lookup coach tool | f8cd96a |

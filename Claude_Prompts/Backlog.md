@@ -38,8 +38,6 @@
 
 #### Integrations / data
 
-- FR#115 [GH#129] (2026-05-20) — Google Contacts integration — peopleApi.js wrapper, contacts.readonly scope, Settings toggle, on-demand lookup tool for coach; contact list not bulk-sent to AI
-
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
   - `sheetsApi.js` API wrapper exists. Missing: (1) Settings UI to configure target Sheet ID, (2) a `→ACTION:append_sheet` coach action line handler in `useCallAI.js`, (3) coach prompt instruction to identify financial emails and emit the action. Pattern matches FR#46 (receipt pipeline) — these two could be implemented together.
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
