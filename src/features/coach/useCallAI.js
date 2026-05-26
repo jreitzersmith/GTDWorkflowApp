@@ -735,10 +735,10 @@ function useCallAI({
           taskActionLines.push(am[0].trimEnd());
         }
 
+        let workingTasks = [...tasks];
         if (taskActionLines.length > 0) {
           // Process all actions against a local working copy so parent lookups
           // work across the batch (e.g. create parent then add children in same response)
-          let workingTasks = [...tasks];
           const chips = [];
           const actionErrors = [];
 
@@ -992,15 +992,17 @@ function useCallAI({
             });
             setCalendarEvents(prev => [...prev, ev]);
             if (calCreate.taskId) {
-              setTasks(prev => prev.map(t => t.id === calCreate.taskId ? { ...t, calendarEventId: ev.id } : t));
+              workingTasks = workingTasks.map(t => t.id === calCreate.taskId ? { ...t, calendarEventId: ev.id } : t);
+              setTasks(workingTasks);
             } else {
               const newId = genId();
-              setTasks(prev => [{
+              workingTasks = [{
                 id: newId, text: calCreate.title, bucket: 'inbox', done: false, created: Date.now(),
                 priority: [], location: [], dueDate: calCreate.date, effort: null, actualEffort: null,
                 deferUntil: null, notes: calCreate.description || null, recurrence: null,
                 calendarEventId: ev.id,
-              }, ...prev]);
+              }, ...workingTasks];
+              setTasks(workingTasks);
             }
             updateChip = { taskName: calCreate.title, fields: ['created in Google Calendar', 'added to Inbox'] };
           } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
@@ -1013,7 +1015,8 @@ function useCallAI({
             });
             setCalendarEvents(prev => prev.map(e => e.id === ev.id ? ev : e));
             if (calUpdate.taskId) {
-              setTasks(prev => prev.map(t => t.id === calUpdate.taskId ? { ...t, dueDate: calUpdate.date } : t));
+              workingTasks = workingTasks.map(t => t.id === calUpdate.taskId ? { ...t, dueDate: calUpdate.date } : t);
+              setTasks(workingTasks);
             }
             updateChip = { taskName: calUpdate.title || calUpdate.eventId, fields: ['updated in Google Calendar'] };
           } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
@@ -1029,13 +1032,15 @@ function useCallAI({
                 const eStart = e.start?.date || e.start?.dateTime?.slice(0, 10);
                 return eStart && eStart < cutoffDateStr;
               }));
-              setTasks(prev => prev.map(t =>
+              workingTasks = workingTasks.map(t =>
                 (t.calendarEventId === calDelete.eventId || t.calendarEventId === masterEventId)
                   ? { ...t, calendarEventId: null } : t
-              ));
+              );
+              setTasks(workingTasks);
             } else {
               setCalendarEvents(prev => prev.filter(e => e.id !== calDelete.eventId));
-              setTasks(prev => prev.map(t => t.calendarEventId === calDelete.eventId ? { ...t, calendarEventId: null } : t));
+              workingTasks = workingTasks.map(t => t.calendarEventId === calDelete.eventId ? { ...t, calendarEventId: null } : t);
+              setTasks(workingTasks);
             }
             updateChip = { taskName: 'Calendar event', fields: ['deleted from Google Calendar'] };
           } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }

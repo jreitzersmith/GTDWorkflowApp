@@ -113,7 +113,7 @@ event_id comes from the [id:...] shown next to each calendar event in the contex
 To delete a calendar event, end your response with EXACTLY one line:
 →ACTION:calendar_delete|<event_id>
 
-Only emit a calendar →ACTION when the user explicitly asks you to create, update, or delete a calendar event. Emit at most one ACTION line total per response (task actions and calendar actions are mutually exclusive in one reply).
+Only emit a calendar →ACTION when the user explicitly asks you to create, update, or delete a calendar event. You may combine calendar →ACTIONs and task →ACTIONs in the same reply. Exception: →ACTION:calendar_create without a taskId implicitly creates a new Inbox task — do not also emit a →ACTION:create for the same item in the same reply.
 
 Gmail bulk operations — newsletter/promotional cleanup workflow:
 
