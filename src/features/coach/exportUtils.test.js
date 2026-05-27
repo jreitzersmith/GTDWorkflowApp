@@ -169,4 +169,28 @@ describe('buildHierarchicalExportContent taskRowTemplate', () => {
     expect(result).toContain('Project A');
     expect(result).toContain('----Subtask');
   });
+
+  it('metadata sub-row uses indentUnit at depth+1', () => {
+    const withEffort = [
+      { id: '1', text: 'Root',  bucket: 'project', isNextAction: false, done: false, childIds: ['2'], effort: '2h' },
+      { id: '2', text: 'Child', bucket: 'project', isNextAction: true,  done: false, parentId: '1', childIds: [], effort: '30m' },
+    ];
+    const result = buildHierarchicalExportContent(withEffort, sections, { header: false, metadata: true, notes: false }, undefined, {
+      taskRowTemplate: '{{indent}}{{text}}',
+      indentUnit: '--',
+    });
+    expect(result).toContain('--*Effort: 2h*');    // root depth 0 → sub at depth 1 = '--'
+    expect(result).toContain('----*Effort: 30m*'); // child depth 1 → sub at depth 2 = '----'
+  });
+
+  it('notes sub-row uses indentUnit at depth+1', () => {
+    const withNotes = [
+      { id: '1', text: 'Root', bucket: 'project', isNextAction: false, done: false, childIds: [], notes: 'My note' },
+    ];
+    const result = buildHierarchicalExportContent(withNotes, sections, { header: false, metadata: false, notes: true }, undefined, {
+      taskRowTemplate: '{{indent}}{{text}}',
+      indentUnit: '__',
+    });
+    expect(result).toContain('__> My note'); // depth 0 → sub at depth 1 = '__'
+  });
 });

@@ -386,16 +386,17 @@ function buildHierarchicalExportContent(tasks, sections, include, template, rowO
 
     if (sections[section]) {
       lines.push(applyTemplate(resolvedTaskRowTemplate, { indent, depth: String(depth), bullet: task.done ? '[x]' : '[ ]', text: task.text }));
+      const subIndent = resolvedIndentUnit.repeat(depth + 1);
       if (include.metadata) {
         const meta = [];
         if (task.dueDate)                    meta.push('Due: ' + task.dueDate);
         if (task.effort)                     meta.push('Effort: ' + task.effort);
         if ((task.location || []).length)    meta.push('Location: ' + task.location.join(', '));
         if ((task.priority || []).length)    meta.push('Priority: ' + task.priority.join(', '));
-        if (meta.length) lines.push(indent + '  *' + meta.join(' · ') + '*');
+        if (meta.length) lines.push(subIndent + '*' + meta.join(' · ') + '*');
       }
       if (include.notes && task.notes) {
-        lines.push(indent + '  > ' + task.notes.replace(/\n/g, '\n' + indent + '  > '));
+        lines.push(subIndent + '> ' + task.notes.replace(/\n/g, '\n' + subIndent + '> '));
       }
     }
 
