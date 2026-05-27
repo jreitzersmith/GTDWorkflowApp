@@ -224,7 +224,7 @@
   <a href="project-summary.html" class="active">📄 Feature Summary</a>
   <a href="project-snippets.html">🔬 Code Snippets</a>
   <a href="project-commits.html">📜 Commit Log</a>
-  <span class="updated">Last updated: May 20, 2026</span>
+  <span class="updated">Last updated: May 27, 2026</span>
 </nav>
 
 <div class="layout">
@@ -378,6 +378,13 @@
   <ul>
     <li><a href="#feat-process-overhaul">Process Inbox Overhaul</a></li>
     <li><a href="#feat-process-bugfixes2">Process Inbox Bug Fixes</a></li>
+  </ul>
+
+  <div class="section-label">May 22&#8211;27 &#8212; New</div>
+  <ul>
+    <li><a href="#feat-analytics">Analytics Dashboard</a></li>
+    <li><a href="#feat-combined-actions">Combined Coach Actions</a></li>
+    <li><a href="#feat-export-templates">User-Editable Export Templates</a></li>
     <li><a href="#feat-workflow-tooling">Workflow Tooling</a></li>
   </ul>
 
@@ -4280,6 +4287,121 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
     <a class="link-chip chip-commit" href="project-commits.html#commit-37017f5">📜 37017f5 — Issue#26/27/28 batch fix</a>
     <a class="link-chip chip-commit" href="project-commits.html#commit-f1c1bae">📜 f1c1bae — Issue#29 + FR#114 category dropdown</a>
     <a class="link-chip chip-commit" href="project-commits.html#commit-f6fb894">📜 f6fb894 — Chevron alignment fix</a>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ Analytics Dashboard ═══════════════════ -->
+
+<section class="feat" id="feat-analytics">
+  <div class="feat-header">
+    <span class="feat-icon">📊</span>
+    <span class="feat-title">Analytics Dashboard (FR#120–127)</span>
+    <span class="feat-badge badge-core">Feature</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>A full analytics panel added to the Coach sidebar, surfacing productivity patterns from your task history. Charts and metrics include:</p>
+    <ul style="margin: 8px 0 12px 20px; color: #c0c8e0; font-size: 14px;">
+      <li><strong>FR#120 — Task throughput trend:</strong> 8-week bar chart of completed tasks with prior/current 4-week callout tiles for quick trend spotting.</li>
+      <li><strong>FR#121 — Project health signals:</strong> Flags projects as stalled (no completions in 14+ days), all-waiting (every task is in Waiting For), or inactive.</li>
+      <li><strong>FR#122 — Bucket aging:</strong> Age badge on Waiting For / Someday / Deferred tasks; sort-by-age; oldest-task summary bar at top of each bucket.</li>
+      <li><strong>FR#123 — Effort accuracy:</strong> Bar chart of estimated vs actual effort by month (6-period rolling) and by project, so you can calibrate future estimates.</li>
+      <li><strong>FR#124 — Context/location utilization:</strong> Shows how often each location tag (e.g. @home, @office) is used, helping identify underused contexts.</li>
+      <li><strong>FR#125 — Someday/Maybe decay detection:</strong> Surfaces items that have sat in Someday/Maybe beyond a configurable threshold, with a live threshold input.</li>
+      <li><strong>FR#126 — Chronic-deferred badge:</strong> Tasks deferred 3+ times get a badge; a top-deferrers list appears in analytics.</li>
+      <li><strong>FR#127 — Layout configurability:</strong> Analytics sections can be reordered, collapsed, or hidden; preferences stored in localStorage.</li>
+    </ul>
+    <p>All charts use inline SVG or lightweight DOM rendering — no external chart library dependency.</p>
+  </div>
+
+  <div class="box box-concept">
+    <h4>React Concept: derived data from a single source of truth</h4>
+    <p>All analytics are computed fresh from the task array on every render — no separate analytics state. This is the React "derive, don't duplicate" principle: rather than keeping a <code>throughputData</code> state variable that must be kept in sync with tasks, the throughput array is computed inline with <code>useMemo</code> whenever the tasks array changes. <code>useMemo</code> caches the result so it only recalculates when its declared dependencies change, not on every keystroke or unrelated re-render.</p>
+  </div>
+
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>Think of <code>useMemo</code> as a cached query: instead of hitting the database every second, you cache the result and only invalidate it when the underlying data changes. The task array is the database; the analytics are materialized views.</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-0ec5e74">📜 0ec5e74 — Analytics suite (FR#120/121/123/124/125)</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-a8ffe4a">📜 a8ffe4a — FR#127 layout configurability</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-de9dd10">📜 de9dd10 — FR#122 bucket aging</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-5ca9d8e">📜 5ca9d8e — FR#126 chronic-deferred badge</a>
+  </div>
+</section>
+
+<!-- ═══════════════════ Combined Coach Actions ═══════════════════ -->
+
+<section class="feat" id="feat-combined-actions">
+  <div class="feat-header">
+    <span class="feat-icon">⚡</span>
+    <span class="feat-title">Combined Task + Calendar Actions (FR#117)</span>
+    <span class="feat-badge badge-core">Feature</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>The AI coach can now emit both a task action and a calendar action in the same reply — previously, only one action per message was processed. For example, the coach can add a task to Next Actions <em>and</em> create a calendar event for a deadline in a single response.</p>
+    <p>Implementation required hoisting <code>workingTasks</code> to a <code>useRef</code> so both action handlers see the same task list without stale closures, and relaxing the system prompt's one-action-per-reply constraint.</p>
+  </div>
+
+  <div class="box box-concept">
+    <h4>React Concept: stale closures and useRef</h4>
+    <p>A <em>stale closure</em> is a common React bug: an event handler or effect captures the value of a variable at the time it was created, and doesn't see later updates. The fix here is a <code>useRef</code> — a mutable container whose <code>.current</code> property is always the latest value, because refs are not captured by closures the same way state is. Think of a ref as a pointer to a shared memory address, versus a state variable which is a snapshot copied into the function's local scope.</p>
+  </div>
+
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>A stale closure is like a shell script that captures the value of <code>$VAR</code> at sourcing time rather than reading it live. Using a ref is like reading from a file or environment variable at execution time — you always get the current value, not the one from when the script was compiled.</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-ed40ccc">📜 ed40ccc — FR#117 combined task+calendar actions</a>
+  </div>
+</section>
+
+<!-- ═══════════════════ User-Editable Export Templates ═══════════════════ -->
+
+<section class="feat" id="feat-export-templates">
+  <div class="feat-header">
+    <span class="feat-icon">📝</span>
+    <span class="feat-title">User-Editable Export Templates (FR#119)</span>
+    <span class="feat-badge badge-core">Feature</span>
+  </div>
+
+  <div class="feat-desc">
+    <p>All three export types — coach conversation, task list, and hierarchical project tree — now use user-editable templates with <code>{{variable}}</code> substitution. The template editor lives in Settings › Export Settings and includes:</p>
+    <ul style="margin: 8px 0 12px 20px; color: #c0c8e0; font-size: 14px;">
+      <li><strong>Formatting toolbar:</strong> H1, H2, Bold, Italic, Underline, blockquote, bullet list, and horizontal rule (HR) — inserts Markdown syntax at the cursor position.</li>
+      <li><strong>Variable chips:</strong> Grouped by category (Identity, Date &amp; Time, Counts, Content). Clicking a chip inserts the variable at the cursor.</li>
+      <li><strong>Live preview:</strong> Renders the template with sample data. For RTF/MD format, Markdown is rendered; for plain text, Markdown is stripped. A badge shows which format is being previewed.</li>
+      <li><strong>Reset to default:</strong> One-click reset per tab to restore the built-in template.</li>
+      <li><strong>Persistence:</strong> Templates saved to <code>localStorage</code> immediately and to Supabase <code>user_settings.export_templates</code> on the debounced settings write.</li>
+    </ul>
+    <p>The <code>applyTemplate(template, vars)</code> function is a pure function that performs string replacement using <code>split/join</code> — no regex, so curly braces in content don't need escaping. The plain-text path runs templates through <code>stripMarkdown()</code>, which converts <code>---</code> to a row of dashes and strips all heading and emphasis markers.</p>
+  </div>
+
+  <div class="box box-concept">
+    <h4>React Concept: controlled textarea with cursor preservation</h4>
+    <p>Inserting text at the cursor in a <code>&lt;textarea&gt;</code> requires reading <code>selectionStart</code> and <code>selectionEnd</code> from the DOM element, constructing the new string, and then restoring the cursor position after React re-renders. Because React's rendering is asynchronous, cursor restoration is wrapped in <code>requestAnimationFrame</code> — this defers the <code>setSelectionRange</code> call until after the browser has painted the new value, preventing the cursor from jumping to the end.</p>
+  </div>
+
+  <div class="box box-concept">
+    <h4>React Concept: pure functions for data transformation</h4>
+    <p><code>applyTemplate</code> and <code>stripMarkdown</code> are <em>pure functions</em> — given the same input, they always return the same output and produce no side effects. This makes them trivially unit-testable (15 Vitest tests cover them), and safe to call anywhere without worrying about component state.</p>
+  </div>
+
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>The template system is exactly like <code>envsubst</code> or Ansible's Jinja2 templates: a text file with <code>{{variable}}</code> placeholders is rendered by substituting a dict of values. The split/join approach avoids regex pitfalls (backtracking, special character escaping) the same way <code>str.replace()</code> in Python is safer than <code>re.sub()</code> for literal string substitution.</p>
+  </div>
+
+  <div class="link-row">
+    <a class="link-chip chip-snippet" href="project-snippets.html#snippet-applyTemplate">💻 applyTemplate() pure function</a>
+    <a class="link-chip chip-snippet" href="project-snippets.html#snippet-stripMarkdown">💻 stripMarkdown() converter</a>
+    <a class="link-chip chip-commit" href="project-commits.html#commit-fee84a3">📜 fee84a3 — FR#119 user-editable export templates</a>
   </div>
 </section>
 

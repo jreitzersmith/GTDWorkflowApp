@@ -110,7 +110,7 @@
     <a href="project-snippets.html">📝 Code Snippets</a>
     <span class="current">📦 Commit Log</span>
   </div>
-  <span class="updated">Last updated: May 20, 2026</span>
+  <span class="updated">Last updated: May 27, 2026</span>
 </header>
 
 <div class="shell">
@@ -4483,6 +4483,198 @@
   <div class="commit-back"><a href="project-summary.html#feat-process-inbox">↑ Feature: Process Inbox</a></div>
 </div>
 
+
+<!-- f21eb22 -->
+<div class="commit-entry" id="commit-f21eb22">
+  <div class="commit-top">
+    <span class="commit-hash">f21eb22</span>
+    <span class="commit-date">2026-05-22</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: FR#116 — Process inbox: emit action immediately, remove OK confirmation step</div>
+  <div class="commit-body">
+    When the AI coach suggested adding a task in Process mode, the user
+    previously had to click an OK button to confirm. This step was removed:
+    the action now fires the moment the AI response is received, matching the
+    speed of the Brain Dump mode. The pending action bar still shows the
+    proposed task so the user can edit or reject it, but the default path
+    is instant.
+  </div>
+  <div class="commit-lesson"><strong>UX principle — minimize confirmation gates:</strong>
+    Every confirmation dialog adds friction. If an action is easily reversible
+    (delete the task you just added), removing the gate improves flow.
+    GTD's "process" phase is meant to be fast — hesitating on each item
+    defeats the purpose.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-process-inbox">↑ Feature: Process Inbox</a></div>
+</div>
+
+<!-- 0ec5e74 -->
+<div class="commit-entry" id="commit-0ec5e74">
+  <div class="commit-top">
+    <span class="commit-hash">0ec5e74</span>
+    <span class="commit-date">2026-05-23</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: Analytics suite — throughput trend, project health, effort accuracy, context utilization, Someday decay (FR#120/121/123/124/125)</div>
+  <div class="commit-body">
+    Added the first five analytics panels to the Coach sidebar. Each panel
+    computes its metrics from the live task array using <code>useMemo</code>.
+    Throughput uses a rolling 8-week window grouped by <code>completedAt</code>
+    date; project health scans bucket membership and last-completion timestamps;
+    effort accuracy compares <code>effort</code> vs <code>actualEffort</code>
+    grouped by month; context utilization counts tag occurrences across all
+    tasks; Someday decay filters by <code>createdAt</code> age against a
+    configurable threshold stored in state.
+  </div>
+  <div class="commit-lesson"><strong>useMemo for expensive derived data:</strong>
+    Without <code>useMemo</code>, every keystroke anywhere in the app would
+    re-scan all tasks to recompute analytics. <code>useMemo(() => compute(), [tasks])</code>
+    caches the result and only recomputes when the <code>tasks</code> array
+    reference changes — i.e., when a task is actually added, edited, or deleted.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-analytics">↑ Feature: Analytics Dashboard</a></div>
+</div>
+
+<!-- a8ffe4a -->
+<div class="commit-entry" id="commit-a8ffe4a">
+  <div class="commit-top">
+    <span class="commit-hash">a8ffe4a</span>
+    <span class="commit-date">2026-05-23</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: FR#127 — Analytics layout configurability — reorder, collapse, hide; localStorage persistence</div>
+  <div class="commit-body">
+    Each analytics panel can be reordered via drag-and-drop, collapsed to a
+    title bar, or hidden entirely. The panel order and visibility state are
+    stored in <code>localStorage</code> under <code>gtd_analytics_layout</code>
+    so the arrangement persists across sessions without needing a Supabase
+    round-trip.
+  </div>
+  <div class="commit-lesson"><strong>When to use localStorage vs Supabase:</strong>
+    Layout preferences (order, collapsed state) are purely cosmetic and
+    device-specific — there is no value in syncing them across devices. Using
+    <code>localStorage</code> keeps the read/write instant (synchronous, no
+    network) and avoids polluting the server schema with UI trivia. Data that
+    matters across devices (tasks, templates, settings) goes to Supabase.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-analytics">↑ Feature: Analytics Dashboard</a></div>
+</div>
+
+<!-- de9dd10 -->
+<div class="commit-entry" id="commit-de9dd10">
+  <div class="commit-top">
+    <span class="commit-hash">de9dd10</span>
+    <span class="commit-date">2026-05-23</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: FR#122 — Bucket aging — age badge, sort-by-age, oldest-task summary bar</div>
+  <div class="commit-body">
+    Tasks in Waiting For, Someday/Maybe, and Deferred buckets now display an
+    age badge showing how many days the task has sat there. A sort-by-age
+    control lets you surface the oldest items first. An "oldest task" summary
+    bar at the top of each bucket gives an at-a-glance warning for neglected
+    items. Age is computed from <code>task.created</code> (or
+    <code>deferUntil</code> for Deferred) against today's date using plain
+    arithmetic — no date library required.
+  </div>
+  <div class="commit-lesson"><strong>Date arithmetic in JavaScript:</strong>
+    <code>new Date() - new Date(task.created)</code> gives milliseconds.
+    Divide by <code>1000 * 60 * 60 * 24</code> to get days.
+    <code>Math.floor()</code> gives whole days. No moment.js needed for
+    simple age calculations.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-analytics">↑ Feature: Analytics Dashboard</a></div>
+</div>
+
+<!-- 5ca9d8e -->
+<div class="commit-entry" id="commit-5ca9d8e">
+  <div class="commit-top">
+    <span class="commit-hash">5ca9d8e</span>
+    <span class="commit-date">2026-05-23</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: FR#126 — Chronic-deferred badge (≥3 defers) and top-deferrers analytics list</div>
+  <div class="commit-body">
+    Tasks that have been deferred three or more times display a small badge
+    on their task row — a visual nudge that this item is being perpetually
+    avoided. A "top deferrers" section in the analytics panel ranks tasks
+    by defer count, helping identify work that may need to be abandoned,
+    delegated, or broken down differently.
+  </div>
+  <div class="commit-lesson"><strong>Adding a counter field vs. reconstructing from history:</strong>
+    Rather than storing a full defer history, the task data model was extended
+    with a simple <code>deferCount</code> integer. Every time a task is
+    deferred, the counter increments. This is a classic trade-off: a counter
+    is O(1) to read and write, but loses the history of <em>when</em> each
+    defer happened. For the current use case (just the count) the integer is
+    the right choice.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-analytics">↑ Feature: Analytics Dashboard</a></div>
+</div>
+
+<!-- ed40ccc -->
+<div class="commit-entry" id="commit-ed40ccc">
+  <div class="commit-top">
+    <span class="commit-hash">ed40ccc</span>
+    <span class="commit-date">2026-05-26</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: FR#117 — Allow combined task+calendar actions in one coach reply</div>
+  <div class="commit-body">
+    The AI coach can now emit both a <code>→ACTION:update</code> (or add)
+    and a <code>→ACTION:calendar</code> line in a single response, and both
+    will be processed. Previously only the first action was acted on.
+    The fix hoisted the working task list to a <code>useRef</code> so both
+    action handlers read the same up-to-date list; replaced a
+    <code>setTasks(prev =&gt; …)</code> call in the calendar block with a
+    direct ref mutation; and relaxed the system prompt's one-action constraint.
+  </div>
+  <div class="commit-lesson"><strong>Stale closures and useRef:</strong>
+    When two event handlers both need to read and write the same array,
+    using state causes stale closure bugs: handler A captures the array at
+    time T, handler B modifies it at time T+1, but A still operates on T's
+    snapshot. A <code>useRef</code> holds a mutable <code>.current</code>
+    pointer that always reflects the latest value, because it is not captured
+    by closure — both handlers dereference the same pointer at call time.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-combined-actions">↑ Feature: Combined Coach Actions</a></div>
+</div>
+
+<!-- fee84a3 -->
+<div class="commit-entry" id="commit-fee84a3">
+  <div class="commit-top">
+    <span class="commit-hash">fee84a3</span>
+    <span class="commit-date">2026-05-27</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: FR#119 — User-editable export templates</div>
+  <div class="commit-body">
+    All three export types (coach conversation, flat task list, hierarchical
+    project tree) now render from user-editable templates with
+    <code>{{variable}}</code> substitution. A new
+    <code>ExportTemplateEditor</code> component lives in
+    Settings › Export Settings with a formatting toolbar (H1/H2/B/I/U/blockquote/bullet/HR),
+    variable chip groups for one-click insertion, and a live format-aware
+    preview. Templates default to <code>DEFAULT_EXPORT_TEMPLATES</code>
+    in <code>constants.jsx</code>; users can reset any tab to defaults.
+    State is persisted to <code>localStorage</code> immediately and to
+    Supabase <code>user_settings.export_templates</code> JSONB on the
+    debounced settings write. A <code>stripMarkdown()</code> function
+    converts templates to plain text for .txt exports; 15 Vitest unit
+    tests cover both <code>applyTemplate</code> and <code>stripMarkdown</code>.
+  </div>
+  <div class="commit-lesson"><strong>Pure functions and unit testing:</strong>
+    <code>applyTemplate</code> and <code>stripMarkdown</code> are pure functions:
+    no component state, no side effects, same output for same input. This
+    makes them trivial to unit-test with Vitest — no mocking, no React
+    test renderer, just import and call. The 15 tests run in milliseconds
+    and catch regressions instantly. Isolating data-transformation logic
+    into pure functions is one of the highest-ROI refactors in a React
+    codebase.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-export-templates">↑ Feature: User-Editable Export Templates</a></div>
+</div>
 </main>
 </body>
 </html>

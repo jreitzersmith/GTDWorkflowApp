@@ -107,7 +107,7 @@
     <span class="current">📝 Code Snippets</span>
     <a href="project-commits.html">📦 Commit Log</a>
   </div>
-  <span class="updated">Last updated: May 20, 2026</span>
+  <span class="updated">Last updated: May 27, 2026</span>
 </header>
 
 <div class="shell">
@@ -6299,6 +6299,78 @@ useEffect(() =&gt; {
     dismissal — think of it as "if the user clicks anywhere except this div,
     close it."
   </div>
+</div>
+
+<!-- ═══ applyTemplate ═══ -->
+<div class="snippet-entry" id="snippet-applyTemplate">
+  <div class="snippet-header">
+    <span class="snippet-title">applyTemplate() — pure template substitution</span>
+    <span class="snippet-file">src/features/coach/exportUtils.js</span>
+  </div>
+  <div class="snippet-body">
+    <pre><code class="language-javascript">
+// applyTemplate takes a template string and a vars object.
+// It replaces every {{key}} placeholder with the corresponding value.
+// Pure function: no side effects, always same output for same input.
+export function applyTemplate(template, vars) {
+  return Object.entries(vars).reduce((acc, [key, val]) => {
+    // split on "{{key}}" then rejoin with the value — avoids regex entirely.
+    // null/undefined values become empty string (not the word "null").
+    return acc.split('{{' + key + '}}').join(val != null ? String(val) : '');
+  }, template);
+  // reduce starts with the full template string as the accumulator (acc),
+  // then applies each variable substitution in turn.
+}
+    </code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why split/join instead of regex replace?</strong> A regex like
+    <code>/\{\{key\}\}/g</code> requires escaping and can behave
+    unexpectedly if the value contains <code>$</code> signs (which regex
+    replace interprets as backreferences). The split/join idiom is simpler,
+    faster for few substitutions, and handles any value string safely.
+  </div>
+  <div class="snippet-back"><a href="project-summary.html#feat-export-templates">↑ Feature: User-Editable Export Templates</a></div>
+</div>
+
+<!-- ═══ stripMarkdown ═══ -->
+<div class="snippet-entry" id="snippet-stripMarkdown">
+  <div class="snippet-header">
+    <span class="snippet-title">stripMarkdown() — convert Markdown to plain text</span>
+    <span class="snippet-file">src/features/coach/exportUtils.js</span>
+  </div>
+  <div class="snippet-body">
+    <pre><code class="language-javascript">
+// stripMarkdown converts a Markdown string to plain text suitable for
+// .txt export or clipboard paste. It preserves the structure but removes
+// all Markdown syntax markers.
+export function stripMarkdown(text) {
+  return text
+    // Convert --- (horizontal rule on its own line) to a row of dashes.
+    // The word boundary \b ensures we don't match "---extra" or "----".
+    .replace(/^---$/gm, '----------')
+    // Remove heading markers (# ## ###) at start of line, plus trailing space.
+    .replace(/^#{1,3} /gm, '')
+    // Remove bold markers (**text** or __text__).
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    // Remove italic markers (*text* or _text_).
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/_(.*?)_/g, '$1');
+  // Note: blockquote (>) and bullet (-) markers are left as-is
+  // because they read naturally in plain text.
+}
+    </code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why convert --- to ----------?</strong> A horizontal rule in plain
+    text export looks better as a visible divider line. Ten dashes are wide
+    enough to read as a separator without being overwhelming. The <code>^---$</code>
+    with <code>gm</code> flags (global + multiline) ensures only a line that
+    is <em>exactly</em> three dashes triggers the conversion — not
+    <code>---extra</code> or <code>----</code>.
+  </div>
+  <div class="snippet-back"><a href="project-summary.html#feat-export-templates">↑ Feature: User-Editable Export Templates</a></div>
 </div>
 </main>
 </body>
