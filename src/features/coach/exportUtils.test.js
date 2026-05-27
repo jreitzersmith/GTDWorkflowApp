@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyTemplate, stripMarkdown } from './exportUtils.js';
+import { applyTemplate, stripMarkdown, buildRtfContent } from './exportUtils.js';
 
 describe('applyTemplate', () => {
   it('substitutes a single variable', () => {
@@ -77,5 +77,31 @@ describe('stripMarkdown', () => {
   it('passes through plain text unchanged (aside from whitespace normalisation)', () => {
     const result = stripMarkdown('just plain text');
     expect(result).toBe('just plain text');
+  });
+});
+
+describe('buildRtfContent RTF unicode encoding', () => {
+  it('encodes em dash as RTF unicode escape', () => {
+    // U+2014 (8212) is within signed 16-bit range so N is 8212
+    const result = buildRtfContent('\u2014');
+    expect(result).toContain('\\u8212?');
+  });
+
+  it('encodes middle dot as RTF unicode escape', () => {
+    // U+00B7 = 183
+    const result = buildRtfContent('\u00B7');
+    expect(result).toContain('\\u183?');
+  });
+
+  it('does not produce RTF unicode escapes for plain ASCII', () => {
+    const result = buildRtfContent('Hello world');
+    expect(result).not.toMatch(/\\u\d+\?/);
+  });
+
+  it('replaces emoji surrogate code units with ? placeholder', () => {
+    // \uD83D\uDE00 is the UTF-16 encoding of U+1F600 (grinning face)
+    // Each surrogate must become ? rather than a malformed \u escape
+    const result = buildRtfContent('A\uD83D\uDE00B');
+    expect(result).toContain('A??B');
   });
 });

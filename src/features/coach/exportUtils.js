@@ -60,7 +60,15 @@ function buildExportContent(messages, include, coachMode, tasks, { coachName, us
 // blockquotes, horizontal rules. 2-space indent levels map to RTF \li increments.
 function buildRtfContent(markdownText) {
   function escRtf(s) {
-    return s.replace(/\\/g, '\\\\').replace(/\{/g, '\\{').replace(/\}/g, '\\}');
+    return s
+      .replace(/\\/g, '\\\\')
+      .replace(/\{/g, '\\{')
+      .replace(/\}/g, '\\}')
+      .replace(/[\uD800-\uDFFF]/g, '?')
+      .replace(/[^\x00-\x7F]/g, ch => {
+        const cp = ch.charCodeAt(0);
+        return '\\u' + (cp > 0x7FFF ? cp - 0x10000 : cp) + '?';
+      });
   }
   function applyInline(s) {
     s = escRtf(s);
@@ -103,7 +111,7 @@ function buildRtfContent(markdownText) {
     }
   }
 
-  return '{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0\\fswiss\\fcharset0 Arial;}}\\f0\\fs24\\pard\n' + rtfLines.join('\n') + '\n}';
+  return '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss\\fcharset0 Arial;}}\\f0\\fs24\\pard\n' + rtfLines.join('\n') + '\n}';
 }
 // Strip markdown symbols to produce plain text.
 function stripMarkdown(markdownText) {
