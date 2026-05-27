@@ -133,8 +133,8 @@ describe('getOrderedChildren', () => {
 describe('waterfallFilter', () => {
   it('includes tasks that have no next-bucket children', () => {
     const allTasks = [
-      { id: 'parent', bucket: 'next', done: false },
-      { id: 'child', bucket: 'inbox', parentId: 'parent', done: false },
+      { id: 'parent', bucket: 'project', isNextAction: true, done: false },
+      { id: 'child', bucket: 'project', parentId: 'parent', done: false }, // not a next action
     ];
     const result = waterfallFilter([allTasks[0]], allTasks);
     expect(result).toHaveLength(1);
@@ -142,16 +142,16 @@ describe('waterfallFilter', () => {
 
   it('excludes tasks that have at least one incomplete next-bucket child', () => {
     const allTasks = [
-      { id: 'parent', bucket: 'next', done: false },
-      { id: 'child', bucket: 'next', parentId: 'parent', done: false },
+      { id: 'parent', bucket: 'project', isNextAction: true, done: false },
+      { id: 'child', bucket: 'project', isNextAction: true, parentId: 'parent', done: false },
     ];
     expect(waterfallFilter([allTasks[0]], allTasks)).toHaveLength(0);
   });
 
   it('includes tasks whose next-bucket children are all done', () => {
     const allTasks = [
-      { id: 'parent', bucket: 'next', done: false },
-      { id: 'child', bucket: 'next', parentId: 'parent', done: true },
+      { id: 'parent', bucket: 'project', isNextAction: true, done: false },
+      { id: 'child', bucket: 'project', isNextAction: true, parentId: 'parent', done: true },
     ];
     expect(waterfallFilter([allTasks[0]], allTasks)).toHaveLength(1);
   });
