@@ -7,7 +7,7 @@ import { useGmailRulesCache } from "./useGmailRulesCache.js";
 
 // Tab container for the Email Management view — renders one of three panels
 // (Inbox, Cleanup, Rules) based on the active emailTab prop.
-function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, processEmailWithAI, attachEmailToTask, tasks, openCoachChat, authUser }) {
+function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, processEmailWithAI, attachEmailToTask, tasks, openCoachChat, authUser, logEmailAsReceipt }) {
   const { gmailLabels, setGmailLabels, gmailFilters, setGmailFilters, supabaseLoading } = useGmailRulesCache({ authUser });
 
   const tabStyle = (t) => ({
@@ -42,7 +42,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
         ))}
       </div>
 
-      {emailTab === 'inbox'   && <EmailInboxPanel   googleToken={googleToken} googleScope={googleScope} processEmailWithAI={processEmailWithAI} attachEmailToTask={attachEmailToTask} tasks={tasks} />}
+      {emailTab === 'inbox'   && <EmailInboxPanel   googleToken={googleToken} googleScope={googleScope} processEmailWithAI={processEmailWithAI} attachEmailToTask={attachEmailToTask} tasks={tasks} logEmailAsReceipt={logEmailAsReceipt} />}
       {emailTab === 'cleanup' && <EmailCleanupPanel gmailQueue={gmailQueue} setGmailQueue={setGmailQueue} googleToken={googleToken} authUser={authUser} openCoachChat={openCoachChat} />}
       {emailTab === 'rules'   && <EmailRulesPanel   googleToken={googleToken} googleScope={googleScope} gmailLabels={gmailLabels} setGmailLabels={setGmailLabels} gmailFilters={gmailFilters} setGmailFilters={setGmailFilters} supabaseLoading={supabaseLoading} />}
     </div>
@@ -61,6 +61,7 @@ EmailManagementView.propTypes = {
   tasks:              PropTypes.array,
   openCoachChat:      PropTypes.func.isRequired,
   authUser:           PropTypes.object,
+  logEmailAsReceipt:  PropTypes.func,
 };
 
 export { EmailManagementView };

@@ -122,6 +122,10 @@ function useAppSettings() {
   });
   useEffect(() => { localStorage.setItem('gtd_export_templates', JSON.stringify(exportTemplates)); }, [exportTemplates]);
 
+  // FR#46: receipt-to-sheets pipeline — target spreadsheet ID
+  const [receiptSheetId, setReceiptSheetId] = useState(() => localStorage.getItem('gtd_receipt_sheet_id') || '');
+  useEffect(() => { localStorage.setItem('gtd_receipt_sheet_id', receiptSheetId); }, [receiptSheetId]);
+
   return {
     locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides,
     tagDisplay, setTagDisplay, categories, setCategories,
@@ -149,6 +153,7 @@ function useAppSettings() {
     coachName, setCoachName,
     userName, setUserName,
     exportTemplates, setExportTemplates,
+    receiptSheetId, setReceiptSheetId,
   };
 }
 

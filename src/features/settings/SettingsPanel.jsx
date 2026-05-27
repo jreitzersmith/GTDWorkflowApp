@@ -107,6 +107,7 @@ function SettingsPanel({
   driveBackupFolderId, onSetDriveBackupFolderId,
   driveBackupFolderPath, onSetDriveBackupFolderPath,
   onBackupToDrive,
+  receiptSheetId, onSetReceiptSheetId,
   calendarReminderMinutes, onSetCalendarReminderMinutes,
   userCity, onSetUserCity,
   userHomeAddress, onSetUserHomeAddress,
@@ -361,6 +362,41 @@ function SettingsPanel({
           {!googleToken && (
             <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4, lineHeight: 1.4 }}>
               Connect Google Drive above to configure folder destinations.
+            </div>
+          )}
+        </SettingsSection>
+
+        {/* ── Receipt Tracking ─────────────────────────────────────────────── */}
+        <SettingsSection label="Receipt Tracking" storageKey="gtd_settings_receipt_tracking">
+          <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
+            Paste the ID of a Google Sheet to log receipts to. The sheet must be shared with your Google account
+            and have Sheets access enabled above. The ID is the long string in the sheet URL between
+            <code style={{ background: COLORS.surface3, padding: '0 4px', borderRadius: 3 }}>/d/</code> and
+            <code style={{ background: COLORS.surface3, padding: '0 4px', borderRadius: 3 }}>/edit</code>.
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 12, color: COLORS.text2, flexShrink: 0 }}>Sheet ID</label>
+            <input
+              type="text"
+              value={receiptSheetId || ''}
+              onChange={e => onSetReceiptSheetId(e.target.value.trim())}
+              placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+              disabled={!sheetsEnabled}
+              style={{
+                flex: 1, padding: '5px 8px', borderRadius: 6,
+                border: `1px solid ${COLORS.border2}`, background: COLORS.surface3,
+                color: COLORS.text, fontFamily: 'monospace', fontSize: 11, outline: 'none',
+              }}
+            />
+          </div>
+          {!sheetsEnabled && (
+            <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 6, lineHeight: 1.4 }}>
+              Enable Google Sheets above to use receipt tracking.
+            </div>
+          )}
+          {receiptSheetId && sheetsEnabled && (
+            <div style={{ fontSize: 11, color: COLORS.project, marginTop: 6 }}>
+              ✓ Receipt sheet configured — use "Log as receipt" in the Email inbox panel.
             </div>
           )}
         </SettingsSection>
@@ -716,6 +752,8 @@ SettingsPanel.propTypes = {
   driveBackupFolderPath:              PropTypes.string,
   onSetDriveBackupFolderPath:         PropTypes.func.isRequired,
   onBackupToDrive:                    PropTypes.func,
+  receiptSheetId:             PropTypes.string,
+  onSetReceiptSheetId:        PropTypes.func.isRequired,
   exportSettings:             PropTypes.object,
   onExportSettingsChange:     PropTypes.func,
   userCity:                   PropTypes.string,

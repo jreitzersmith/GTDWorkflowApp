@@ -6,7 +6,7 @@ import { doGmailFetchInbox, doGmailGetMessageBody, doGmailBatchLabel } from "./g
 import { avatarInitials, avatarColor, formatEmailDate, gmailBtn, gmailBtnPrimary, gmailBtnSm, gmailBtnSmDanger } from "./emailUtils.js";
 
 // Inbox list with checkboxes, avatar chips, pagination, and a detail slide-out panel.
-function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachEmailToTask, tasks }) {
+function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachEmailToTask, tasks, logEmailAsReceipt }) {
   const [inboxEmails, setInboxEmails] = useState([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError] = useState(null);
@@ -16,6 +16,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
   const [emailDetail, setEmailDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [receiptStatus, setReceiptStatus] = useState(null); // null | 'loading' | 'ok' | error string
 
   // Task-link picker state
   const [showTaskPicker, setShowTaskPicker] = useState(false);
@@ -38,10 +39,11 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
       .finally(() => setDetailLoading(false));
   }, [selectedId, googleToken]);
 
-  // Reset task picker when email changes
+  // Reset task picker and receipt status when email changes
   useEffect(() => {
     setShowTaskPicker(false);
     setLinkedConfirm(null);
+    setReceiptStatus(null);
   }, [selectedId]);
 
   // Close picker on outside click
@@ -211,6 +213,37 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                   Process with AI ↗
                 </button>
 
+                {/* Log as receipt */}
+                {logEmailAsReceipt && (
+                  <div>
+                    {receiptStatus === 'ok' ? (
+                      <div style={{ fontSize: 11, color: COLORS.project, padding: '4px 0' }}>✓ Logged to receipt sheet</div>
+                    ) : (
+                      <>
+                        <button
+                          style={{ ...gmailBtn(), textAlign: 'left', width: '100%', color: COLORS.text2 }}
+                          disabled={receiptStatus === 'loading'}
+                          onClick={async () => {
+                            setReceiptStatus('loading');
+                            try {
+                              await logEmailAsReceipt(emailDetail);
+                              setReceiptStatus('ok');
+                              setTimeout(() => setReceiptStatus(null), 5000);
+                            } catch (e) {
+                              setReceiptStatus(e.message);
+                            }
+                          }}
+                        >
+                          {receiptStatus === 'loading' ? 'Logging…' : '📈 Log as receipt'}
+                        </button>
+                        {receiptStatus && receiptStatus !== 'loading' && receiptStatus !== 'ok' && (
+                          <div style={{ fontSize: 11, color: '#e05555', marginTop: 2, lineHeight: 1.4 }}>{receiptStatus}</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* Link to task */}
                 {attachEmailToTask && (
                   <div>
@@ -294,6 +327,7 @@ EmailInboxPanel.propTypes = {
   processEmailWithAI: PropTypes.func.isRequired,
   attachEmailToTask:  PropTypes.func,
   tasks:              PropTypes.array,
+  logEmailAsReceipt:  PropTypes.func,
 };
 
 export { EmailInboxPanel };

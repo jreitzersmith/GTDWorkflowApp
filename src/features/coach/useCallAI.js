@@ -308,6 +308,7 @@ function useCallAI({
   driveSpreadsheetFolderId,
   driveSlideDeckFolderId,
   driveBaseFolderId,
+  receiptSheetId,
   onFocusSet,
 }) {
   const fetchModels = useCallback(async () => {
@@ -1126,6 +1127,29 @@ function useCallAI({
         }
       }
 
+      // →ACTION:append-sheet|<date>|<vendor>|<amount>|<currency>|<category>|<description>
+      // Appends one receipt row to the configured receipt sheet (Settings → Receipt Tracking)
+      if (googleToken && sheetsEnabled && receiptSheetId) {
+        const appendLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('→ACTION:append-sheet|'));
+        if (appendLine) {
+          try {
+            const parts = appendLine.slice('→ACTION:append-sheet|'.length).split('|');
+            const [rowDate, rowVendor, rowAmount, rowCurrency, rowCategory, ...descParts] = parts;
+            const rowDescription = descParts.join('|').trim();
+            const row = [
+              (rowDate || new Date().toISOString().slice(0, 10)).trim(),
+              (rowVendor || '').trim(),
+              (rowAmount || '').trim(),
+              (rowCurrency || 'USD').trim(),
+              (rowCategory || '').trim(),
+              rowDescription,
+            ];
+            await sheetsAppendRows({ token: googleToken, spreadsheetId: receiptSheetId, range: 'Sheet1', values: [row], onTokenRefresh: refreshGoogleToken });
+            updateChip = { taskName: rowVendor || 'Receipt', fields: ['appended to receipt sheet'] };
+          } catch (e) { actionError = `⚠ Receipt sheet append failed: ${e.message}`; }
+        }
+      }
+
       // →ACTION:create-slides|<title> — create PowerPoint (.pptx) via pptxgenjs + Drive upload
       if (googleToken && slidesEnabled) {
         const slidesLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-slides|'));
@@ -1272,7 +1296,7 @@ function useCallAI({
       googleToken, googleScope, calendarEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
       setCalendarEvents, recordUsage, setLastInputLog, setTasks, setGmailQueue,
       setMessages, setChatHistory, setLoading, setPendingAction, authUser, userCity, userHomeAddress, userWorkAddress, coachName, userName,
-      driveEnabled, contactsEnabled, driveDocumentFolderId, driveSpreadsheetFolderId, driveSlideDeckFolderId, driveBaseFolderId, onFocusSet]); // eslint-disable-line react-hooks/exhaustive-deps
+      driveEnabled, contactsEnabled, driveDocumentFolderId, driveSpreadsheetFolderId, driveSlideDeckFolderId, driveBaseFolderId, receiptSheetId, onFocusSet]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();

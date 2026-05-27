@@ -30,6 +30,8 @@ import { createEmptyUsageStats } from "./features/settings/useAIUsageTracking.js
 import { parseRRULE, calEventStart, isAllDayEvent, genId } from "./features/calendar/calendarApi.js";
 import { driveUploadFile } from "./api/driveApi.js";
 import { doGmailSend } from "./features/email/gmailTools.js";
+import { sheetsAppendRows } from './api/sheetsApi.js';
+import { extractReceiptFields } from './features/email/receiptUtils.js';
 import { todayStr, isDeferred, buildNextOccurrence, extractSuggestions, extractMetadata, getOrderedChildren, useResizer, effortToMinutes } from "./features/tasks/taskUtils.jsx";
 import { useDragDrop } from "./features/tasks/useDragDrop.js";
 import { useSupabaseSync } from "./hooks/useSupabaseSync.js";
@@ -61,7 +63,7 @@ export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates} = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId} = useAppSettings();
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState(coachName);
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
@@ -436,6 +438,7 @@ export default function GTDManager() {
     driveSpreadsheetFolderId,
     driveSlideDeckFolderId,
     driveBaseFolderId,
+    receiptSheetId,
     onFocusSet: () => setCurrentView('focus'),
   });
 
@@ -682,6 +685,22 @@ export default function GTDManager() {
       return { ...t, driveAttachments: [...existing, emailAttachment] };
     }));
   }, [setTasks]);
+
+  // Log an email as a receipt to the configured Google Sheet (FR#46)
+  const logEmailAsReceipt = useCallback(async (email) => {
+    if (!receiptSheetId || !sheetsEnabled || !googleToken) return;
+    const fields = await extractReceiptFields(email, import.meta.env.VITE_ANTHROPIC_API_KEY);
+    const row = [
+      fields.date || new Date().toISOString().slice(0, 10),
+      fields.vendor || '(unknown)',
+      fields.amount || '',
+      fields.currency || 'USD',
+      fields.category || '',
+      fields.description || email.subject || '',
+      email.id ? `https://mail.google.com/mail/#inbox/${email.id}` : '',
+    ];
+    await sheetsAppendRows({ token: googleToken, spreadsheetId: receiptSheetId, range: 'Sheet1', values: [row] });
+  }, [receiptSheetId, sheetsEnabled, googleToken]);
 
   // Prefill the coach chat with a raw prompt (no email wrapper) — used by cleanup workflow buttons
   const openCoachChat = useCallback((prompt) => {
@@ -1372,6 +1391,8 @@ export default function GTDManager() {
                           onSetCoachName={setCoachName}
                           userName={userName}
                           onSetUserName={setUserName}
+                          receiptSheetId={receiptSheetId}
+                          onSetReceiptSheetId={setReceiptSheetId}
                         />
                       ) : showUsage ? (
                         <UsagePanel
@@ -1393,6 +1414,7 @@ export default function GTDManager() {
                           tasks={tasks}
                           openCoachChat={openCoachChat}
                           authUser={authUser}
+                          logEmailAsReceipt={logEmailAsReceipt}
                         />
                       ) : currentView === "calendar" ? (
                         <CalendarManagementView
