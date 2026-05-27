@@ -4675,6 +4675,183 @@
   </div>
   <div class="commit-back"><a href="project-summary.html#feat-export-templates">↑ Feature: User-Editable Export Templates</a></div>
 </div>
+
+<!-- 23d563f -->
+<div class="commit-entry" id="commit-23d563f">
+  <div class="commit-top">
+    <span class="commit-hash">23d563f</span>
+    <span class="commit-date">2026-05-27</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: Issue#34 RTF encoding — encode non-ASCII as \uN? escapes</div>
+  <div class="commit-body">
+    When an exported conversation was opened in Microsoft Word, em dashes,
+    middle dots, and other non-ASCII characters appeared as garbled
+    sequences like <code>â€"</code>. The root cause was that the RTF
+    generator was writing raw UTF-8 bytes into a format that only
+    understands 7-bit ASCII with an explicit Unicode escape protocol.
+    The fix: every character with a code point above 127 is now written
+    as <code>\uN?</code> (RTF's own Unicode notation), where N is the
+    signed 16-bit code point value and the trailing <code>?</code> is the
+    fallback ASCII placeholder. Emoji, which require Unicode surrogate
+    pairs and have no clean RTF equivalent, are replaced with
+    <code>?</code> rather than producing broken output.
+    Four new unit tests cover em dash, middle dot, plain ASCII (no change),
+    and emoji (surrogate dropped).
+  </div>
+  <div class="commit-lesson"><strong>RTF is ASCII-only at its core:</strong>
+    RTF (Rich Text Format) dates from the 1980s and was designed for 7-bit
+    ASCII. The <code>\uN?</code> escape is the standard way to embed
+    Unicode: <code>\u8212?</code> is an em dash (U+2014 = 8212 decimal).
+    Signed 16-bit means code points above 0x7FFF (32767) are written as
+    negative numbers — that is the spec, even though it looks odd. If you
+    are ever writing a file format that specifies its own encoding rules,
+    read the spec before assuming UTF-8 "just works".
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-rtf-unicode">↑ Feature: RTF Unicode Fix</a></div>
+</div>
+
+<!-- 0824601 -->
+<div class="commit-entry" id="commit-0824601">
+  <div class="commit-top">
+    <span class="commit-hash">0824601</span>
+    <span class="commit-date">2026-05-27</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">fix: CQ#16 correct waterfallFilter test mock data</div>
+  <div class="commit-body">
+    The three <code>waterfallFilter</code> unit tests were using
+    <code>bucket:'next'</code> in their fixture tasks — a bucket name
+    that no longer exists in the data model. "Next Actions" are stored
+    as <code>bucket:'project'</code> combined with <code>isNextAction:true</code>.
+    Because the filter logic was matching on different criteria, two of
+    the three tests were passing by accident (a false positive), and the
+    third was actively failing. Updated all fixtures to use the real
+    data model shape so each test is passing or failing for the right reason.
+  </div>
+  <div class="commit-lesson"><strong>False-positive tests are dangerous:</strong>
+    A test that passes because of a coincidence in the test data — not
+    because the code is correct — gives you false confidence. When the
+    data model changes the coincidence disappears and the test starts
+    failing for reasons that have nothing to do with the code you just
+    changed. Keeping fixture data in sync with the real data model is
+    part of test maintenance, not optional housekeeping.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-workflow-tooling">↑ Feature: Workflow Tooling</a></div>
+</div>
+
+<!-- 7235ba4 -->
+<div class="commit-entry" id="commit-7235ba4">
+  <div class="commit-top">
+    <span class="commit-hash">7235ba4</span>
+    <span class="commit-date">2026-05-27</span>
+    <span class="commit-type type-fix">fix</span>
+  </div>
+  <div class="commit-msg">test: correct stale bucket:'next' fixture data (CQ#17)</div>
+  <div class="commit-body">
+    Same root cause as CQ#16 — fixtures in <code>calendarApi.test.js</code>
+    and <code>taskUtils.test.js</code> (the <code>getOrderedChildren</code>
+    and <code>moveTaskInTree</code> groups) were using the obsolete
+    <code>bucket:'next'</code> value. Updated to
+    <code>bucket:'project', isNextAction:true</code>. One assertion in
+    <code>getOrderedChildren</code> was also updated: orphan project tasks
+    with no <code>parentId</code> are valid root-level items and should
+    appear in the result, which the old assertion did not account for.
+    Parser tests that use <code>bucket:next</code> inside action <em>strings</em>
+    were intentionally left alone — those test the AI action parser's
+    string handling, not the task data model.
+  </div>
+  <div class="commit-lesson"><strong>Scope a fix carefully:</strong>
+    When fixing test fixtures, it's easy to overcorrect. The rule is:
+    change what is wrong, leave what is right. Action parser tests use
+    the string <code>"bucket:next"</code> as the literal text the AI emits
+    — that is correct input for the parser and should stay unchanged.
+    Changing it would test the wrong thing.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-workflow-tooling">↑ Feature: Workflow Tooling</a></div>
+</div>
+
+<!-- 907608c -->
+<div class="commit-entry" id="commit-907608c">
+  <div class="commit-top">
+    <span class="commit-hash">907608c</span>
+    <span class="commit-date">2026-05-27</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: FR#129 Tier 1 — per-row sub-templates in exports</div>
+  <div class="commit-body">
+    Extended the export template system with a configurable row format and
+    indent unit. The conversation export now applies a
+    <code>messageRowTemplate</code> per message (variables:
+    <code>{{speaker}}</code>, <code>{{role}}</code>, <code>{{text}}</code>).
+    The hierarchical project export applies a <code>taskRowTemplate</code>
+    per task (variables: <code>{{indent}}</code>, <code>{{depth}}</code>,
+    <code>{{bullet}}</code>, <code>{{text}}</code>) and uses a configurable
+    <code>indentUnit</code> string (default two spaces) repeated once per
+    depth level to build the indent prefix.
+    Two bugs were fixed in the process: the <code>exportTemplates</code>
+    value was missing from <code>useCallback</code> dependency arrays in
+    <code>ExportPopover.jsx</code> (stale closure — always read the initial
+    default), and the <code>exportTemplates</code> prop was not being passed
+    to <code>TaskBucketView</code> in <code>App.jsx</code> at all (silent
+    prop-chain break). The <code>ExportTemplateEditor</code> was also
+    reworked: chip insertion now uses a <code>useRef</code> to capture
+    cursor position via <code>onBlur</code>/<code>onSelect</code> (because
+    clicking the chip button stole focus before the check ran), and reset
+    buttons are now independent per section.
+    Six new unit tests bring the total to 25.
+  </div>
+  <div class="commit-lesson"><strong>Two classic React bugs in one commit:</strong>
+    (1) A stale closure is when a function captures a variable from the
+    time it was created rather than reading the current value. The fix is
+    to list the variable in the <code>useCallback</code> dependency array
+    so a new function is created whenever the variable changes.
+    (2) A broken prop chain is when a value is passed partway down the
+    component tree but accidentally dropped at one level. React gives no
+    error — the child simply receives <code>undefined</code> silently.
+    Tracing the chain from top to bottom (App → TaskBucketView →
+    TaskListExportPopover) is the diagnostic approach.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-export-row-templates">↑ Feature: Export Row Sub-Templates</a></div>
+</div>
+
+<!-- f16294d -->
+<div class="commit-entry" id="commit-f16294d">
+  <div class="commit-top">
+    <span class="commit-hash">f16294d</span>
+    <span class="commit-date">2026-05-27</span>
+    <span class="commit-type type-feat">feat</span>
+  </div>
+  <div class="commit-msg">feat: FR#130 — Hierarchical export: effort/notes as indented sub-rows</div>
+  <div class="commit-body">
+    In the hierarchical project export, task metadata (due date, effort,
+    location, priority) and notes were previously indented with a hardcoded
+    two-space prefix regardless of the configured indent unit. After FR#129
+    added a user-configurable <code>indentUnit</code>, the sub-rows needed
+    to follow the same rule. The fix computes
+    <code>subIndent = resolvedIndentUnit.repeat(depth + 1)</code> and applies
+    it to both the metadata line and the notes blockquote. A task at depth 0
+    gets one repetition of the indent unit for its sub-rows; a child at
+    depth 1 gets two repetitions; and so on. The result is a consistently
+    indented tree where structural lines and content lines all use the same
+    unit, regardless of what the user configured (spaces, dashes, dots, etc.).
+    Two new unit tests verify the behavior with a custom
+    <code>indentUnit</code> of <code>'--'</code> (metadata) and
+    <code>'__'</code> (notes).
+  </div>
+  <div class="commit-lesson"><strong>depth + 1 for sub-rows:</strong>
+    When you are building an indented tree, the task row lives at
+    <code>depth</code> and any content that belongs to that task but is
+    subordinate to it (metadata, notes, attachments) logically lives at
+    <code>depth + 1</code>. Using <code>indentUnit.repeat(depth + 1)</code>
+    instead of a hardcoded string means the sub-rows automatically track
+    any future change to the indent unit — no second place to update.
+    This is the same DRY (Don't Repeat Yourself) principle that makes
+    CSS variables worth using.
+  </div>
+  <div class="commit-back"><a href="project-summary.html#feat-hierarchical-sub-rows">↑ Feature: Hierarchical Export Sub-rows</a></div>
+</div>
+
 </main>
 </body>
 </html>

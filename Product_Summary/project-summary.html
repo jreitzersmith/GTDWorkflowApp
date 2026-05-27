@@ -385,6 +385,9 @@
     <li><a href="#feat-analytics">Analytics Dashboard</a></li>
     <li><a href="#feat-combined-actions">Combined Coach Actions</a></li>
     <li><a href="#feat-export-templates">User-Editable Export Templates</a></li>
+    <li><a href="#feat-rtf-unicode">RTF Unicode Fix</a></li>
+    <li><a href="#feat-row-templates">Export Row Sub-Templates</a></li>
+    <li><a href="#feat-export-subrows">Hierarchical Export Sub-rows</a></li>
     <li><a href="#feat-workflow-tooling">Workflow Tooling</a></li>
   </ul>
 
@@ -4420,13 +4423,109 @@ VITE_GOOGLE_DESKTOPCLIENT_SECRET=&lt;your desktop client secret&gt;</code></pre>
 
   <div class="box box-sysadmin">
     <h4>Sysadmin Analogy</h4>
-    <p>The EPERM issue is a classic cross-filesystem restriction: the Linux sandbox mounts the Windows drive via FUSE (Filesystem in Userspace), and FUSE does not support the <code>unlink</code> syscall that Vite uses to clean up old build chunks. The fix is the same as any sysadmin would apply — build to a local tmpfs first, where all syscalls work natively.</p>
+    <p>The EPERM issue is a classic cross-filesystem restriction: the Linux sandbox mounts the Windows drive via FUSE (Filesystem in Userspace), and FUSE does not support the <code>unlink</code> syscall that Vite uses to clean up old build chunks. The fix is the same as any sysadmin would apply when hitting a cross-mount restriction: route the temporary output to a native path on the local filesystem, not across the mount boundary. Once the build lands in <code>/tmp</code>, the FUSE issue disappears entirely.</p>
   </div>
 
-  <div class="link-row">
-    <a class="link-chip chip-commit" href="project-commits.html#commit-e041723">📜 e041723 — Workflow.md syntax check + EPERM workaround</a>
+  <div class="feat-links">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-fee84a3">&#128220; fee84a3 &#8212; FR#119 export templates</a>
   </div>
 </section>
 
+<!-- =================== RTF Unicode Fix =================== -->
+<section class="feat" id="feat-rtf-unicode">
+  <div class="feat-header">
+    <span class="feat-icon">&#128273;</span>
+    <span class="feat-title">RTF Unicode Encoding Fix (Issue#34)</span>
+    <span class="feat-badge badge-core">Bug Fix</span>
+  </div>
+  <div class="feat-desc">
+    <p>RTF exports were garbled whenever a task or message contained non-ASCII characters &#8212; accented letters, curly quotes, em-dashes, or emoji. The root cause was that the <code>escRtf()</code> function was passing all characters through as-is, but the RTF format only understands 7-bit ASCII. Any byte above 127 is undefined behaviour in RTF.</p>
+    <p>The fix: <code>escRtf()</code> now iterates each character, converts to its Unicode code point, and for anything above 127 emits an RTF Unicode escape sequence in the form <code>\uN?</code> where N is the signed 16-bit code point (negative for values above 32767) and <code>?</code> is the ASCII fallback character for older readers. Emoji are made up of two JavaScript string units (a surrogate pair); the function detects these and substitutes a literal <code>?</code> rather than producing a malformed escape. The RTF document header also gained <code>\ansicpg1252</code> to declare Windows-1252 as the fallback encoding.</p>
+  </div>
+  <div class="box box-concept">
+    <h4>React Concept: Pure Utility Functions</h4>
+    <p>The <code>escRtf()</code> function is a <em>pure utility</em> &#8212; it takes a string and returns a string, with no state, no side effects, and no knowledge of React. This makes it trivially testable: call it with a known input, assert the output. The same pattern applies to <code>applyTemplate()</code> and <code>stripMarkdown()</code>. Extracting business logic into pure functions is one of the highest-value moves you can make in a React codebase &#8212; it separates the "what do we compute" layer from the "how do we render it" layer.</p>
+  </div>
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>RTF's 7-bit ASCII constraint is the same class of problem as sending raw binary over an SMTP relay that only supports 7-bit transport: you need to encode the data (Base64 or quoted-printable for email; <code>\uN?</code> escapes for RTF) so the transport layer sees only safe characters, and the receiver knows how to decode it back. The <code>?</code> fallback in the RTF escape is the same idea as the text/plain fallback part in a MIME multipart message.</p>
+  </div>
+  <div class="feat-links">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-23d563f">&#128220; 23d563f &#8212; Issue#34 RTF unicode fix</a>
+  </div>
+</section>
+
+<!-- =================== Export Row Sub-Templates =================== -->
+<section class="feat" id="feat-row-templates">
+  <div class="feat-header">
+    <span class="feat-icon">&#128196;</span>
+    <span class="feat-title">Export Row Sub-Templates (FR#129)</span>
+    <span class="feat-badge badge-core">Feature</span>
+  </div>
+  <div class="feat-desc">
+    <p>Export templates could already control the overall document structure (headers, footers, metadata blocks), but the rows inside the content &#8212; each message in a conversation, each task in a project tree &#8212; were rendered with hardcoded formatting. FR#129 makes those rows user-configurable too.</p>
+    <p>Two new sub-template keys were added to <code>DEFAULT_EXPORT_TEMPLATES</code>:</p>
+    <ul style="margin: 8px 0 12px 20px; color: #c0c8e0; font-size: 14px;">
+      <li><strong>messageRowTemplate</strong> (conversation exports) &#8212; variables: <code>{{speaker}}</code>, <code>{{role}}</code>, <code>{{text}}</code>. Default: <code>**{{speaker}}:** {{text}}</code></li>
+      <li><strong>taskRowTemplate</strong> (hierarchical exports) &#8212; variables: <code>{{indent}}</code>, <code>{{depth}}</code>, <code>{{bullet}}</code>, <code>{{text}}</code>. Default: <code>{{indent}}{{bullet}}{{text}}</code></li>
+      <li><strong>indentUnit</strong> &#8212; the string repeated per depth level to build the <code>{{indent}}</code> variable. Default: two spaces.</li>
+    </ul>
+    <p>The <code>ExportTemplateEditor</code> component grew a collapsible "Row format" section beneath each tab's main textarea, with its own variable chip row and an Indent unit input for the hierarchical tab. The main template section is also now collapsible. Each section has its own independent "Reset to default" button. Chip insertion uses an <code>onBlur</code>/<code>onSelect</code> ref to save cursor position before the button click steals focus, so the chip always lands at the cursor rather than appending to the end.</p>
+    <p>Two bugs were fixed during testing: (1) a stale <code>useCallback</code> closure in <code>TaskListExportPopover</code> where <code>exportTemplates</code> was missing from the dependency array, causing the export to always read the initial default; (2) <code>exportTemplates</code> was not passed as a prop to <code>TaskBucketView</code> in <code>App.jsx</code>, breaking the entire prop chain silently.</p>
+  </div>
+  <div class="box box-concept">
+    <h4>React Concept: useCallback Dependency Arrays</h4>
+    <p>A <code>useCallback</code> hook caches a function between renders. The second argument is a <em>dependency array</em> &#8212; a list of values the function reads from outside itself. If a value is missing from the array, React never re-creates the function when that value changes, so the function keeps reading the stale value it captured on the first render. This is called a <em>stale closure</em> and is one of the most common bugs in React hooks code. The fix is always the same: add the missing value to the dependency array.</p>
+  </div>
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>A stale closure is the same class of problem as a cron job that reads a config file path from an environment variable &#8212; but the environment was captured when the daemon started, not when the job runs. If the variable changes later, the job still uses the old path. The fix in both cases is to re-read the value at call time rather than capturing it at registration time.</p>
+  </div>
+  <div class="feat-links">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-907608c">&#128220; 907608c &#8212; FR#129 row sub-templates</a>
+  </div>
+</section>
+
+<!-- =================== Hierarchical Export Sub-rows =================== -->
+<section class="feat" id="feat-export-subrows">
+  <div class="feat-header">
+    <span class="feat-icon">&#128203;</span>
+    <span class="feat-title">Hierarchical Export: Effort &amp; Notes Sub-rows (FR#130)</span>
+    <span class="feat-badge badge-core">Feature</span>
+  </div>
+  <div class="feat-desc">
+    <p>Previously, when exporting a hierarchical project tree, a task's effort estimate and notes were either omitted or rendered at the same indent level as the task itself. FR#130 moves them to <code>depth&nbsp;+&nbsp;1</code> &#8212; one level deeper than their parent task &#8212; so the structure reads naturally as nested detail rather than sibling content.</p>
+    <p>The key change in <code>buildHierarchicalExportContent</code>: after emitting the task row, compute <code>const subIndent = resolvedIndentUnit.repeat(depth + 1)</code> and use that string to prefix the metadata line (<code>*Effort: 2h &#183; Due: 2026-06-01*</code>) and the notes blockquote (<code>&gt; My note</code>). Previously both used the hardcoded string <code>indent + '&#160;&#160;'</code>, which ignored the user-configured indent unit entirely.</p>
+  </div>
+  <div class="box box-concept">
+    <h4>React Concept: Recursive Tree Walking</h4>
+    <p>The <code>walk(task, depth)</code> function inside the export builder is a recursive function &#8212; it calls itself for each child task, incrementing <code>depth</code> by one each time. This is the standard way to traverse a tree structure in JavaScript. The base case (stop recursing) is implicit: when a task has no children, the <code>for&nbsp;(const child of children)</code> loop has no iterations and the recursion unwinds. Each call to <code>walk</code> produces the lines for exactly one task plus all its descendants.</p>
+  </div>
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>Walking a task tree with a depth counter is the same pattern as <code>find . -maxdepth N</code> or a recursive directory listing: each directory level increments a counter, and the indentation of the output is <code>indent_unit * depth</code>. The only difference is that here the caller controls what <code>indent_unit</code> is, so users can change it from the default two spaces to anything they like.</p>
+  </div>
+  <div class="feat-links">
+    <a class="link-chip chip-commit" href="project-commits.html#commit-f16294d">&#128220; f16294d &#8212; FR#130 effort/notes sub-rows</a>
+  </div>
+</section>
+
+<!-- =================== Workflow Tooling =================== -->
+<section class="feat" id="feat-workflow-tooling">
+  <div class="feat-header">
+    <span class="feat-icon">&#128295;</span>
+    <span class="feat-title">Workflow Tooling Updates</span>
+    <span class="feat-badge badge-core">Docs</span>
+  </div>
+  <div class="feat-desc">
+    <p>Two developer-experience improvements added to <code>Workflow.md</code>: a <strong>syntax check step</strong> (<code>node -e "require('./src/constants.jsx')"</code>) run after every edit to <code>constants.jsx</code> to catch template-literal or bracket errors before a full Vite build; and a <strong>build path workaround</strong> directing builds to <code>/tmp/gtd-build</code> (a native Linux path in the sandbox) rather than the FUSE-mounted Windows filesystem, which returns EPERM on file unlink during Vite&#8217;s chunk cleanup.</p>
+  </div>
+  <div class="box box-sysadmin">
+    <h4>Sysadmin Analogy</h4>
+    <p>The EPERM issue is a classic cross-filesystem restriction: the Linux sandbox mounts the Windows drive via FUSE (Filesystem in Userspace), and FUSE does not support the <code>unlink</code> syscall that Vite uses to clean up old build chunks. The fix is the same as any sysadmin would apply when hitting a cross-mount restriction: route the temporary output to a native path on the local filesystem rather than across the mount boundary. Once the build lands in <code>/tmp</code>, the FUSE issue disappears entirely.</p>
+  </div>
+</section>
+
+</main>
 </body>
 </html>

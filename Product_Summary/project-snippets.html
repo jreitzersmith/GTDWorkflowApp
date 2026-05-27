@@ -6372,6 +6372,207 @@ export function stripMarkdown(text) {
   </div>
   <div class="snippet-back"><a href="project-summary.html#feat-export-templates">↑ Feature: User-Editable Export Templates</a></div>
 </div>
+
+<!-- ═══ escRtf ═══ -->
+<div class="snippet-entry" id="snippet-escRtf">
+  <div class="snippet-header">
+    <span class="snippet-title">escRtf() — encode non-ASCII characters for RTF files</span>
+    <span class="snippet-file">src/features/coach/exportUtils.js</span>
+  </div>
+  <div class="snippet-body">
+    <pre><code class="language-javascript">
+// escRtf converts a string so it is safe to embed in an RTF file.
+// RTF is a 7-bit ASCII format — any character with a code point > 127
+// must be written using RTF's own Unicode escape notation: \uN?
+// where N is the signed 16-bit code point and ? is the ASCII fallback.
+function escRtf(str) {
+  // First escape the three characters RTF uses as control signals.
+  let s = str
+    .replace(/\\/g, '\\\\')   // backslash → \\
+    .replace(/\{/g, '\\{')       // { → \{
+    .replace(/\}/g, '\\}');      // } → \}
+
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const cp = s.codePointAt(i);    // Unicode code point of this character
+
+    if (cp > 0xFFFF) {
+      // Characters above U+FFFF need two UTF-16 code units (a surrogate pair).
+      // RTF \u only understands 16-bit values — skip these with a ? placeholder.
+      out += '?';
+      i++;  // skip the second half of the surrogate pair
+    } else if (cp > 127) {
+      // Non-ASCII BMP character: write as RTF Unicode escape.
+      // RTF uses signed 16-bit, so values above 32767 become negative.
+      const signed = cp <= 0x7FFF ? cp : cp - 0x10000;
+      out += '\\u' + signed + '?';  // e.g. \u8212? for em dash (U+2014)
+    } else {
+      out += s[i];                    // plain ASCII — pass through unchanged
+    }
+  }
+  return out;
+}
+    </code></pre>
+  </div>
+  <div class="annotation">
+    <strong>The signed 16-bit rule feels odd but is the spec:</strong>
+    U+2014 (em dash) has decimal value 8212, which is below 32767, so it
+    writes as <code>\u8212?</code>. U+00B7 (middle dot) is 183 — also
+    direct. A character at U+9000 (36864 decimal) exceeds 32767, so it
+    becomes <code>36864 - 65536 = -28672</code>, written as
+    <code>\u-28672?</code>. This is exactly what the RTF specification
+    requires; Word and other readers implement it correctly.
+    The <code>?</code> at the end is the "fallback" — what to show if the
+    reader does not understand the Unicode escape. For most readers today
+    it is never displayed.
+  </div>
+  <div class="snippet-back"><a href="project-summary.html#feat-rtf-unicode">↑ Feature: RTF Unicode Fix</a></div>
+</div>
+
+<!-- ═══ insertIntoRowTemplate ═══ -->
+<div class="snippet-entry" id="snippet-insertIntoRowTemplate">
+  <div class="snippet-header">
+    <span class="snippet-title">insertIntoRowTemplate() — cursor-position-aware chip insertion</span>
+    <span class="snippet-file">src/features/settings/ExportTemplateEditor.jsx</span>
+  </div>
+  <div class="snippet-body">
+    <pre><code class="language-javascript">
+// rowTemplateSelectionRef remembers where the cursor was in the row
+// template textarea, even after the user clicks away to press a chip button.
+const rowTemplateSelectionRef = useRef({ start: 0, end: 0 });
+
+// saveRowSelection is called whenever focus leaves the textarea (onBlur)
+// or the selection changes (onSelect). It records the cursor position.
+const saveRowSelection = useCallback((e) => {
+  const ta = e.target;
+  rowTemplateSelectionRef.current = {
+    start: ta.selectionStart,
+    end: ta.selectionEnd,
+  };
+}, []);
+
+// The textarea uses both handlers so the ref is always up to date.
+// &lt;textarea
+//   ref={rowTemplateRef}
+//   onBlur={saveRowSelection}
+//   onSelect={saveRowSelection}
+//   ...
+// /&gt;
+
+// insertIntoRowTemplate splices the insertion string at the saved cursor
+// position, then restores focus and repositions the cursor after the insertion.
+const insertIntoRowTemplate = useCallback((templateKey, insertion) => {
+  // Read the saved cursor position from the ref (not document.activeElement —
+  // that would be the chip button, because clicking it stole focus).
+  const { start, end } = rowTemplateSelectionRef.current;
+
+  // Get the current template value and splice the insertion in.
+  const currentValue = exportTemplates[templateKey] || DEFAULT_EXPORT_TEMPLATES[templateKey];
+  const newValue = currentValue.slice(0, start) + insertion + currentValue.slice(end);
+
+  // Update the template state.
+  onExportTemplatesChange({ ...exportTemplates, [templateKey]: newValue });
+
+  // After React re-renders, refocus the textarea and set the cursor
+  // to just after the inserted text. requestAnimationFrame defers this
+  // until after the DOM has been updated.
+  requestAnimationFrame(() => {
+    const ta = rowTemplateRef.current;
+    if (ta) {
+      ta.focus();
+      const pos = start + insertion.length;
+      ta.setSelectionRange(pos, pos);
+      rowTemplateSelectionRef.current = { start: pos, end: pos };
+    }
+  });
+}, [exportTemplates, onExportTemplatesChange]);
+    </code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why not just check document.activeElement?</strong>
+    Clicking a button is a two-step event: mousedown (focus moves to the button,
+    textarea loses focus) then click (handler runs). By the time the click handler
+    fires, <code>document.activeElement</code> is the button, not the textarea.
+    The check <code>if (document.activeElement === ta)</code> always fails.
+    Saving the cursor position in a <code>useRef</code> on <code>onBlur</code>
+    captures it at the moment focus leaves — which is before the click fires.
+    The ref persists the value across renders and event handlers without
+    causing re-renders itself, making it perfect for mutable bookkeeping
+    like "where was the cursor last time?"
+  </div>
+  <div class="snippet-back"><a href="project-summary.html#feat-export-row-templates">↑ Feature: Export Row Sub-Templates</a></div>
+</div>
+
+<!-- ═══ subIndent ═══ -->
+<div class="snippet-entry" id="snippet-subIndent">
+  <div class="snippet-header">
+    <span class="snippet-title">subIndent pattern — depth+1 for task sub-rows in hierarchical export</span>
+    <span class="snippet-file">src/features/coach/exportUtils.js</span>
+  </div>
+  <div class="snippet-body">
+    <pre><code class="language-javascript">
+// Inside buildHierarchicalExportContent, walk() is called recursively for
+// each task in the tree. `depth` tracks how many levels deep we are.
+// `resolvedIndentUnit` is the user-configured indent string (e.g. "  " or "--").
+
+function walk(task, depth) {
+  // Build the indent prefix for this task's main row.
+  // depth 0 = root, depth 1 = one level in, etc.
+  const indent = resolvedIndentUnit.repeat(depth);
+
+  // Apply the user's row template (e.g. "{{indent}}{{bullet}} {{text}}").
+  lines.push(applyTemplate(resolvedTaskRowTemplate, {
+    indent,
+    depth: String(depth),
+    bullet: task.done ? '[x]' : '[ ]',
+    text: task.text,
+  }));
+
+  // Sub-rows (metadata and notes) belong to this task but are visually
+  // subordinate — so they live at depth + 1.
+  const subIndent = resolvedIndentUnit.repeat(depth + 1);
+
+  if (include.metadata) {
+    const meta = [];
+    if (task.dueDate)                 meta.push('Due: ' + task.dueDate);
+    if (task.effort)                  meta.push('Effort: ' + task.effort);
+    if ((task.location || []).length) meta.push('Location: ' + task.location.join(', '));
+    if ((task.priority || []).length) meta.push('Priority: ' + task.priority.join(', '));
+    // subIndent is one level deeper than the task row itself.
+    if (meta.length) lines.push(subIndent + '*' + meta.join(' · ') + '*');
+  }
+
+  if (include.notes && task.notes) {
+    // Multi-line notes: every continuation line gets the same subIndent prefix.
+    lines.push(subIndent + '> ' + task.notes.replace(/\n/g, '\n' + subIndent + '> '));
+  }
+
+  // Recurse into children at depth + 1.
+  (task.childIds || []).forEach(childId => {
+    const child = taskMap[childId];
+    if (child) walk(child, depth + 1);
+  });
+}
+    </code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Recursive tree walking:</strong>
+    Each call to <code>walk(task, depth)</code> processes one task and then
+    calls itself for each child, passing <code>depth + 1</code>. This is
+    the standard algorithm for traversing any tree structure. The base case
+    is implicit: when a task has no <code>childIds</code> the
+    <code>forEach</code> does nothing and the recursion stops naturally.
+    <br><br>
+    <strong>DRY sub-indent:</strong>
+    Using <code>resolvedIndentUnit.repeat(depth + 1)</code> means the
+    sub-row indent always tracks the main-row indent unit. If you later
+    change the indent unit from spaces to dashes, both the task row and its
+    metadata/notes automatically update — there is no second constant to
+    change.
+  </div>
+  <div class="snippet-back"><a href="project-summary.html#feat-hierarchical-sub-rows">↑ Feature: Hierarchical Export Sub-rows</a></div>
+</div>
+
 </main>
 </body>
 </html>
