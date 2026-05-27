@@ -77,6 +77,7 @@ function CoachPanel({
   driveConversationExportFolderId,
   exportSettings,
   onExportSettingsChange,
+  exportTemplates,
   googleToken,
   rawApiThread,
   coachName,
@@ -151,6 +152,7 @@ function CoachPanel({
               rawApiThread={rawApiThread}
               coachName={coachName}
               userName={userName}
+              exportTemplates={exportTemplates}
             />
           </div>
         )}
@@ -313,6 +315,7 @@ CoachPanel.propTypes = {
   driveConversationExportFolderId: PropTypes.string,
   exportSettings:         PropTypes.object,
   onExportSettingsChange: PropTypes.func,
+  exportTemplates:        PropTypes.object,
   googleToken:            PropTypes.string,
   rawApiThread:           PropTypes.array,
   coachName:              PropTypes.string,

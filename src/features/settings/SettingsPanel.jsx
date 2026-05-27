@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import PropTypes from "prop-types";
+import ExportTemplateEditor from "./ExportTemplateEditor.jsx";
 import { COLORS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { SettingsSection } from "./SettingsSection.jsx";
@@ -113,6 +114,7 @@ function SettingsPanel({
   coachName, onSetCoachName,
   userName, onSetUserName,
   exportSettings, onExportSettingsChange,
+  exportTemplates, onExportTemplatesChange,
 }) {
   const fileInputRef = useRef(null);
   const [importMode, setImportMode] = useState("replace");
@@ -484,7 +486,7 @@ function SettingsPanel({
             onClearOverride={onClearCalibrationOverride}
           />
         </SettingsSection>
-        <SettingsSection label="Conversation Export" storageKey="gtd_settings_export">
+        <SettingsSection label="Export Settings" storageKey="gtd_settings_export">
           <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12, lineHeight: 1.5 }}>
             Default settings for the coach conversation export. Use the Export button in the AI Coach header to export at any time.
           </div>
@@ -546,6 +548,12 @@ function SettingsPanel({
             </div>
           </div>
 
+          <div style={{ fontSize: 12, color: COLORS.text2, marginTop: 16, marginBottom: 6 }}>Export templates</div>
+          <ExportTemplateEditor
+            exportTemplates={exportTemplates || {}}
+            onExportTemplatesChange={onExportTemplatesChange}
+            exportFormat={(exportSettings || {}).format}
+          />
         </SettingsSection>
 
         <SettingsSection label="Coach & identity" storageKey="gtd_settings_identity">
@@ -720,6 +728,8 @@ SettingsPanel.propTypes = {
   onSetCoachName:             PropTypes.func,
   userName:                   PropTypes.string,
   onSetUserName:              PropTypes.func,
+  exportTemplates:            PropTypes.object,
+  onExportTemplatesChange:    PropTypes.func,
 };
 
 export { SettingsPanel };

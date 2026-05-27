@@ -21,6 +21,7 @@ import { DEFAULT_EFFORTS } from '../features/settings/useAppSettings.js';
  *   setRecurringAcknowledgedMap: Function, setRecurringReviewDays: Function,
  *   setUncategorizedProjectId: Function,
  *   setGmailQueue: Function,
+ *   exportTemplates: object, setExportTemplates: Function,
  * }} params
  * @returns {{ syncStatus: string, supabaseReady: boolean }}
  */
@@ -35,6 +36,7 @@ function useSupabaseSync({
   setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
   setUncategorizedProjectId,
   setGmailQueue,
+  exportTemplates, setExportTemplates,
 }) {
   // true once the initial Supabase read (or migration) has completed
   const [supabaseReady, setSupabaseReady] = useState(false);
@@ -115,6 +117,7 @@ function useSupabaseSync({
           if (typeof data.recurring_review_days === 'number') setRecurringReviewDays(data.recurring_review_days);
           if (Array.isArray(data.review_node_types)) setReviewNodeTypes(data.review_node_types);
           if (data.uncategorized_project_id) setUncategorizedProjectId(data.uncategorized_project_id);
+          if (data.export_templates && typeof data.export_templates === 'object') setExportTemplates(data.export_templates);
           settingsReadyRef.current = true;
         } else {
           // Supabase empty — migrate from localStorage
@@ -202,6 +205,7 @@ function useSupabaseSync({
           recurring_review_days: recurringReviewDays,
           review_node_types: reviewNodeTypes,
           uncategorized_project_id: uncategorizedProjectId,
+          export_templates: exportTemplates,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         .then(({ error }) => {
@@ -210,7 +214,7 @@ function useSupabaseSync({
         });
     }, 1500);
     return () => clearTimeout(settingsDebounceRef.current);
-  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, reviewNodeTypes, uncategorizedProjectId, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, reviewNodeTypes, uncategorizedProjectId, exportTemplates, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fallback: keep localStorage in sync for unauthenticated sessions
   useEffect(() => {

@@ -1,23 +1,19 @@
 import { docsCreateDocument, docsAppendText, docsAppendMarkdown, docsMoveToFolder } from '../../api/docsApi.js';
-import { COACH_MODES } from '../../constants.jsx';
+import { COACH_MODES, DEFAULT_EXPORT_TEMPLATES } from '../../constants.jsx';
+
+// Apply {{variable}} substitution to a template string.
+// Unknown variables are left as-is so typos are visible rather than silently erased.
+function applyTemplate(template, vars) {
+  return Object.entries(vars).reduce((acc, [key, val]) => {
+    return acc.split('{{' + key + '}}').join(val != null ? String(val) : '');
+  }, template);
+}
 
 // Build a human-readable markdown string from the messages array.
 // include: { userMessages, aiResponses, toolChips, metadata }
-function buildExportContent(messages, include, coachMode, tasks, { coachName, userName } = {}) {
+function buildExportContent(messages, include, coachMode, tasks, { coachName, userName, template, provider } = {}) {
   const modeLabel = (COACH_MODES[coachMode] || {}).label || coachMode;
   const lines = [];
-
-  if (include.metadata) {
-    const now = new Date();
-    lines.push('# ' + (coachName || 'GTD Coach') + ' Export');
-    lines.push('');
-    lines.push('**Date:** ' + now.toLocaleString());
-    lines.push('**Mode:** ' + modeLabel);
-    if (Array.isArray(tasks)) lines.push('**Tasks in system:** ' + tasks.length);
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-  }
 
   for (const msg of messages) {
     if (msg.isSearchChip) {
@@ -37,7 +33,26 @@ function buildExportContent(messages, include, coachMode, tasks, { coachName, us
     }
   }
 
-  return lines.join('\n');
+  const messagesContent = lines.join('\n');
+  const now = new Date();
+  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNumber = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+  const messageCount = messages.filter(m =>
+    (m.role === 'user' && include.userMessages) || (m.role === 'assistant' && include.aiResponses)
+  ).length;
+  return applyTemplate(template || DEFAULT_EXPORT_TEMPLATES.conversation, {
+    coachName: coachName || 'GTD Coach',
+    userName: userName || '',
+    date: now.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }),
+    time,
+    weekNumber,
+    mode: modeLabel,
+    taskCount: Array.isArray(tasks) ? tasks.length : 0,
+    messageCount,
+    provider: provider || 'Claude',
+    messages: messagesContent,
+  });
 }
 
 // Convert a markdown string to RTF for browser download.
@@ -97,7 +112,7 @@ function stripMarkdown(markdownText) {
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^>\s*/gm, '')
-    .replace(/^---$/gm, '');
+    .replace(/^---$/gm, '----------');
 }
 
 // Create a new Google Doc and append content formatted for Drive.
@@ -196,17 +211,8 @@ const TASK_VIEW_ORDER = ['inbox', 'next', 'project', 'waiting', 'someday', 'defe
 
 // Build a human-readable markdown string for all tasks, grouped by bucket.
 // include: { header, metadata, notes, completed }
-function buildTaskListExportContent(tasks, include) {
+function buildTaskListExportContent(tasks, include, template) {
   const lines = [];
-  if (include.header) {
-    lines.push('# GTD Task List Export');
-    lines.push('');
-    lines.push('**Date:** ' + new Date().toLocaleString());
-    lines.push('**Total tasks:** ' + tasks.length);
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-  }
   const order = [...TASK_VIEW_ORDER, ...(include.completed ? ['done', 'inboxHistory'] : [])];
   for (const view of order) {
     const viewTasks = tasks.filter(TASK_VIEW_FILTERS[view] || (() => false));
@@ -229,7 +235,22 @@ function buildTaskListExportContent(tasks, include) {
     }
     lines.push('');
   }
-  return lines.join('\n');
+  const sectionsContent = lines.join('\n');
+  const nowT = new Date();
+  const timeT = nowT.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const startT = new Date(nowT.getFullYear(), 0, 1);
+  const weekT = Math.ceil(((nowT - startT) / 86400000 + startT.getDay() + 1) / 7);
+  return applyTemplate(template || DEFAULT_EXPORT_TEMPLATES.taskList, {
+    userName: '',
+    date: nowT.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }),
+    time: timeT,
+    weekNumber: weekT,
+    totalTasks: tasks.filter(t => !t.done).length,
+    nextActionCount: tasks.filter(t => t.isNextAction && !t.done).length,
+    overdueCount: tasks.filter(t => t.dueDate && new Date(t.dueDate) < nowT && !t.done).length,
+    inboxCount: tasks.filter(t => t.bucket === 'inbox' && !t.done).length,
+    sections: sectionsContent,
+  });
 }
 
 function buildTaskListJsonExport(tasks, include) {
@@ -339,24 +360,10 @@ function _taskSection(t, todayStr) {
 // tasks: full task array
 // sections: { project, next, waiting, someday, deferred } — booleans
 // include: { header, metadata, notes }
-function buildHierarchicalExportContent(tasks, sections, include) {
+function buildHierarchicalExportContent(tasks, sections, include, template) {
   const todayStr = new Date().toISOString().slice(0, 10);
   const taskMap = new Map(tasks.map(t => [t.id, t]));
   const lines = [];
-
-  if (include.header) {
-    const activeSections = Object.entries(sections)
-      .filter(([, v]) => v)
-      .map(([k]) => HIERARCHICAL_SECTION_LABELS[k] || k)
-      .join(', ');
-    lines.push('# GTD Project Export');
-    lines.push('');
-    lines.push('**Date:** ' + new Date().toLocaleString());
-    lines.push('**Sections:** ' + (activeSections || 'none'));
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-  }
 
   function walk(task, depth) {
     const section = _taskSection(task, todayStr);
@@ -391,7 +398,20 @@ function buildHierarchicalExportContent(tasks, sections, include) {
     walk(root, 0);
   }
 
-  return lines.join('\n');
+  const tasksContent = lines.join('\n');
+  const nowH = new Date();
+  const timeH = nowH.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const startH = new Date(nowH.getFullYear(), 0, 1);
+  const weekH = Math.ceil(((nowH - startH) / 86400000 + startH.getDay() + 1) / 7);
+  return applyTemplate(template || DEFAULT_EXPORT_TEMPLATES.hierarchical, {
+    userName: '',
+    date: nowH.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }),
+    time: timeH,
+    weekNumber: weekH,
+    totalTasks: tasks.filter(t => !t.done).length,
+    projectCount: tasks.filter(t => t.bucket === 'project' && !t.parentId && !t.done).length,
+    tasks: tasksContent,
+  });
 }
 
 // Build a JSON hierarchical export. Emits a nested structure with children arrays.
@@ -438,4 +458,4 @@ function buildHierarchicalJsonExport(tasks, sections, include) {
   return JSON.stringify(output, null, 2);
 }
 
-export { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport, buildTaskListExportContent, buildTaskListJsonExport, buildFocusViewExportContent, buildFocusViewJsonExport, buildHierarchicalExportContent, buildHierarchicalJsonExport };
+export { applyTemplate, buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport, buildTaskListExportContent, buildTaskListJsonExport, buildFocusViewExportContent, buildFocusViewJsonExport, buildHierarchicalExportContent, buildHierarchicalJsonExport };

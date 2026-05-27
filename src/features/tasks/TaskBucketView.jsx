@@ -99,6 +99,7 @@ function TaskBucketView({
   locations,
   focusedTaskId,
   setFocusedTaskId,
+  exportTemplates,
 }) {
   const { efforts, collapsedNodes } = useContext(TaskRowContext);
   const [filterText, setFilterText] = useState("");
@@ -334,6 +335,7 @@ function TaskBucketView({
               docsEnabled={docsEnabled}
               driveConversationExportFolderId={driveConversationExportFolderId}
               defaultSections={{ project: true, next: true, waiting: false, someday: false, deferred: false }}
+              exportTemplates={exportTemplates}
             />
           </div>
         )}
@@ -354,6 +356,7 @@ function TaskBucketView({
               docsEnabled={docsEnabled}
               driveConversationExportFolderId={driveConversationExportFolderId}
               defaultSections={{ project: false, next: true, waiting: false, someday: false, deferred: false }}
+              exportTemplates={exportTemplates}
             />
           </div>
         )}
@@ -372,6 +375,7 @@ function TaskBucketView({
               googleToken={googleToken}
               docsEnabled={docsEnabled}
               driveConversationExportFolderId={driveConversationExportFolderId}
+              exportTemplates={exportTemplates}
               defaultSections={{
                 project:  false,
                 next:     false,
@@ -651,6 +655,7 @@ TaskBucketView.propTypes = {
   showSomeDayInProjects:   PropTypes.bool,
   focusedTaskId:           PropTypes.string,
   setFocusedTaskId:        PropTypes.func,
+  exportTemplates:         PropTypes.object,
   setShowWaitingInProjects: PropTypes.func,
   setShowSomeDayInProjects: PropTypes.func,
   setShowCompletedInProjects: PropTypes.func,

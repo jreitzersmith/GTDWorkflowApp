@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DEFAULT_EXPORT_TEMPLATES } from "../../constants.jsx";
 
 const DEFAULT_EFFORTS = ["2 min", "5 min", "10 min", "30 min", "1 hour", "2 hours", "6 hours", "1 day", "3 days", "1 week", "1 month"];
 
@@ -114,6 +115,13 @@ function useAppSettings() {
   useEffect(() => { localStorage.setItem('gtd_coach_name', coachName); }, [coachName]);
   useEffect(() => { localStorage.setItem('gtd_user_name', userName); }, [userName]);
 
+  // FR#119: user-editable export templates — persisted to localStorage (and Supabase via useSupabaseSync)
+  const [exportTemplates, setExportTemplates] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_export_templates') || 'null') || DEFAULT_EXPORT_TEMPLATES; }
+    catch { return DEFAULT_EXPORT_TEMPLATES; }
+  });
+  useEffect(() => { localStorage.setItem('gtd_export_templates', JSON.stringify(exportTemplates)); }, [exportTemplates]);
+
   return {
     locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides,
     tagDisplay, setTagDisplay, categories, setCategories,
@@ -140,6 +148,7 @@ function useAppSettings() {
     userWorkAddress, setUserWorkAddress,
     coachName, setCoachName,
     userName, setUserName,
+    exportTemplates, setExportTemplates,
   };
 }
 

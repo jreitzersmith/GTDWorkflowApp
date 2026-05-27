@@ -23,8 +23,6 @@
 
 #### Daily workflow / GTD core
 
-- FR#117 [GH#133] (2026-05-21) — Relax chat mode task/calendar action mutual exclusivity — allow combined task + calendar actions in one reply; fix setTasks race by passing workingTasks into calendar block; guard only calendar_create-without-taskId case
-
 
 - FR#119 [GH#138] (2026-05-23) — User-editable export templates — {{variable}} substitution for conversation and task list exports; template editor in Settings › Export; storage in user_settings JSONB; reset-to-default per template
 

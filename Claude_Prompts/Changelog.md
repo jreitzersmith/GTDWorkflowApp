@@ -17,6 +17,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-23 | Feature      | FR#127  | GH#146 | Analytics layout configurability — reorder, collapse, hide sections; localStorage persistence | a8ffe4a |
 | 2026-05-23 | Feature      | FR#122  | GH#141 | Bucket aging — age badge on Waiting For/Someday/Deferred tasks, sort-by-age, oldest-task summary bar | de9dd10 |
 | 2026-05-23 | Feature      | FR#126  | GH#145 | Defer patterns — chronic-deferred badge on task rows (≥3 defers), top-deferrers list in analytics | 5ca9d8e |
+| 2026-05-26 | Feature      | FR#117  | GH#133 | Allow combined task+calendar actions in one coach reply; hoist workingTasks; replace setTasks(prev=>) in calendar block; relax system prompt + duplicate-guard note | ed40ccc |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |

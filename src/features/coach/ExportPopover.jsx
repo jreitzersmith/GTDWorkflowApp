@@ -26,7 +26,7 @@ function resolveFormat(fmt) {
   return (!fmt || fmt === 'docs') ? 'rtf' : fmt;
 }
 
-function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSettingsChange, googleToken, docsEnabled, driveConversationExportFolderId, rawApiThread, coachName, userName }) {
+function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSettingsChange, googleToken, docsEnabled, driveConversationExportFolderId, rawApiThread, coachName, userName, exportTemplates }) {
   const [open, setOpen]               = useState(false);
   // status: 'idle' | 'downloading' | 'saving' | 'downloaded' | 'saved' | 'error'
   const [status, setStatus]           = useState('idle');
@@ -75,7 +75,7 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSet
         const jsonText = buildJsonExport({ rawApiThread: rawApiThread || [], messages, include: localInclude, coachMode, tasks, coachName, userName });
         downloadText(jsonText, title + '.json', 'application/json');
       } else {
-        const markdownText = buildExportContent(messages, localInclude, coachMode, tasks, { coachName, userName });
+        const markdownText = buildExportContent(messages, localInclude, coachMode, tasks, { coachName, userName, template: (exportTemplates || {}).conversation });
         if (localFormat === 'rtf') {
           downloadText(buildRtfContent(markdownText), title + '.rtf', 'application/rtf');
         } else if (localFormat === 'markdown') {
@@ -104,7 +104,7 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSet
       const title = buildExportTitle(coachMode, coachName);
       const exportText = localFormat === 'json'
         ? buildJsonExport({ rawApiThread: rawApiThread || [], messages, include: localInclude, coachMode, tasks, coachName, userName })
-        : buildExportContent(messages, localInclude, coachMode, tasks, { coachName, userName });
+        : buildExportContent(messages, localInclude, coachMode, tasks, { coachName, userName, template: (exportTemplates || {}).conversation });
       const url = await saveToDrive({ markdownText: exportText, googleToken, title, format: localFormat === 'json' ? 'text' : localFormat, driveConversationExportFolderId });
       setDriveUrl(url);
       setStatus('saved');
@@ -284,7 +284,7 @@ const TASK_INCLUDE_OPTIONS = [
   { key: 'notes',    label: 'Task notes'           },
 ];
 
-function TaskListExportPopover({ tasks, googleToken, docsEnabled, driveConversationExportFolderId, defaultSections }) {
+function TaskListExportPopover({ tasks, googleToken, docsEnabled, driveConversationExportFolderId, defaultSections, exportTemplates }) {
   const [open, setOpen]       = useState(false);
   const [fmt, setFmt]         = useState('rtf');
   const [include, setInclude] = useState({ header: true, metadata: true, notes: false });
@@ -307,7 +307,7 @@ function TaskListExportPopover({ tasks, googleToken, docsEnabled, driveConversat
 
   const getContent = useCallback(() => {
     if (fmt === 'json') return buildHierarchicalJsonExport(tasks, sections, include);
-    return buildHierarchicalExportContent(tasks, sections, include);
+    return buildHierarchicalExportContent(tasks, sections, include, (exportTemplates || {}).hierarchical);
   }, [tasks, sections, include, fmt]);
 
   const handleDownload = useCallback(() => {
@@ -423,6 +423,16 @@ ExportPopover.propTypes = {
   rawApiThread:           PropTypes.array,
   coachName:              PropTypes.string,
   userName:               PropTypes.string,
+  exportTemplates:        PropTypes.object,
+};
+
+TaskListExportPopover.propTypes = {
+  tasks:                           PropTypes.array.isRequired,
+  googleToken:                     PropTypes.string,
+  docsEnabled:                     PropTypes.bool,
+  driveConversationExportFolderId: PropTypes.string,
+  defaultSections:                 PropTypes.object,
+  exportTemplates:                 PropTypes.object,
 };
 
 export { ExportPopover, TaskListExportPopover };
