@@ -19,6 +19,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-23 | Feature      | FR#126  | GH#145 | Defer patterns — chronic-deferred badge on task rows (≥3 defers), top-deferrers list in analytics | 5ca9d8e |
 | 2026-05-26 | Feature      | FR#117  | GH#133 | Allow combined task+calendar actions in one coach reply; hoist workingTasks; replace setTasks(prev=>) in calendar block; relax system prompt + duplicate-guard note | ed40ccc |
 | 2026-05-27 | Feature      | FR#119  | GH#138 | User-editable export templates — {{variable}} substitution; ExportTemplateEditor with formatting toolbar, variable chips, live format-aware preview; localStorage + Supabase persistence | fee84a3 |
+| 2026-05-27 | Bug Fix      | Issue#34 | GH#150 | RTF export unicode encoding — escRtf now encodes non-ASCII chars as \\uN? RTF Unicode escapes; strips emoji surrogates as ?; adds \\ansicpg1252 to RTF header | 23d563f |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |
@@ -170,6 +171,4 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-22 | Code Quality | CQ#14   | GH#136 | taskUtils.jsx: fix waterfallFilter (isNextAction); remove dead bucket=next drag-drop branch | cd46d13 |
 | 2026-05-22 | Feature | FR#118 | GH#137 | Hierarchical export — section checkboxes in export popover, per-view default sections, buildHierarchicalExportContent | 782677f |
 | 2026-05-23 | Bug Fix      | Issue#33 | GH#147 | Analytics task counter double-count fixed in buildBucketStats | 3e88e3b |
-| 2026-05-23 | Code Quality | CQ#15    | GH#148 | Hide done-circle on category/subcategory rows in project list | eaa52d6 |
-| 2026-05-26 | Feature      | FR#115  | GH#129 | Google Contacts integration — peopleApi.js wrapper, contacts.readonly scope, Settings toggle, contacts_lookup coach tool | f8cd96a |
-| 2026-05-26 | Feature      | FR#128  | GH#149 | Coach gmail_send: expand scope gate to modify/compose/send; confirmation step via PendingActionBar before sending | 0ebf197 |
+| 2026-05-

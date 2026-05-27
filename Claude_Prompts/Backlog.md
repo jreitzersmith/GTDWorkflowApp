@@ -1,12 +1,11 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#34** · Code Quality — **CQ#15** · Feature Requests — **FR#128**
+> **Last used numbers:** Known Issues — **Issue#34** · Code Quality — **CQ#15** · Feature Requests — **FR#129**
 
 ---
 
 ## Known issues / remaining work
 
-- Issue#34 [GH#150] (2026-05-27) — RTF export encoding — em dash (`—`), middle dot (`·`), degree symbol, and emoji render as garbled UTF-8 sequences (e.g. `â€"`) when RTF is opened in Microsoft Word. Google Docs renders correctly. Root cause: RTF header specifies `\ansicpg1252` but content is written as raw UTF-8 without `\uN?` escaping for non-ANSI characters. Fix: encode non-ASCII characters as RTF Unicode escapes in `buildRtfContent`.
 
 ---
 
@@ -23,6 +22,8 @@
 
 
 #### Daily workflow / GTD core
+
+- FR#129 [GH#151] (2026-05-27) — Expandable export row templates — allow users to define per-message format (conversation exports) and per-level indentation/prefix (hierarchical exports) via sub-templates in ExportTemplateEditor
 
 
 
@@ -70,4 +71,4 @@ Test cases that could not be executed during their cycle due to a missing condit
 
 - [FR#128 GH#149] Dismissing the send action bar does not send the email — needs: manual test of dismiss/cancel path in confirm bar
 - [FR#128 GH#149] If send fails (e.g. revoked token), error appears in coach chat — needs: test with expired/revoked Google token
-- [FR#119 GH#138] Supabase persistence round-trip — export templates saved to Supabase and reloaded correctly across sessions — needs: Supabase session active (test was skipped; localStorage path confirmed working)
+- [FR#119 GH#138] Supabase persistence round-
