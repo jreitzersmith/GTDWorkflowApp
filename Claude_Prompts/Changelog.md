@@ -20,6 +20,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-26 | Feature      | FR#117  | GH#133 | Allow combined task+calendar actions in one coach reply; hoist workingTasks; replace setTasks(prev=>) in calendar block; relax system prompt + duplicate-guard note | ed40ccc |
 | 2026-05-27 | Feature      | FR#119  | GH#138 | User-editable export templates — {{variable}} substitution; ExportTemplateEditor with formatting toolbar, variable chips, live format-aware preview; localStorage + Supabase persistence | fee84a3 |
 | 2026-05-27 | Bug Fix      | Issue#34 | GH#150 | RTF export unicode encoding — escRtf now encodes non-ASCII chars as \\uN? RTF Unicode escapes; strips emoji surrogates as ?; adds \\ansicpg1252 to RTF header | 23d563f |
+| 2026-05-27 | Code Quality | CQ#16    | GH#152 | waterfallFilter test mock data corrected — bucket:'next' replaced with bucket:'project'+isNextAction:true; 1 failing test now passes for the right reason | 0824601 |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |
