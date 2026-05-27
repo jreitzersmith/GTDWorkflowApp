@@ -361,4 +361,7 @@ export const DEFAULT_EXPORT_TEMPLATES = {
   conversation: `# {{coachName}} — {{mode}}\nDate: {{date}} at {{time}}  \nWeek: {{weekNumber}} · Tasks in context: {{taskCount}} · Messages: {{messageCount}}  \nProvider: {{provider}}\n\n---\n\n{{messages}}`,
   taskList: `# GTD task export — {{date}}\nWeek {{weekNumber}} · Exported by {{userName}} at {{time}}\n\nTotal: {{totalTasks}} · Next actions: {{nextActionCount}} · Overdue: {{overdueCount}} · Inbox: {{inboxCount}}\n\n---\n\n{{sections}}`,
   hierarchical: `# Project export — {{date}}\nWeek {{weekNumber}} · Exported by {{userName}} at {{time}}\n\n{{projectCount}} projects · {{totalTasks}} total tasks\n\n---\n\n{{tasks}}`,
+  messageRowTemplate: `**{{speaker}}:** {{text}}`,
+  taskRowTemplate: `{{indent}}- {{bullet}} {{text}}`,
+  indentUnit: `  `,
 };

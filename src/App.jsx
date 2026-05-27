@@ -1483,6 +1483,7 @@ export default function GTDManager() {
                           googleToken={googleToken}
                           docsEnabled={docsEnabled}
                           driveConversationExportFolderId={driveConversationExportFolderId}
+                          exportTemplates={exportTemplates}
                         />
                       )}
                     </div>

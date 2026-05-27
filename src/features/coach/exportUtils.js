@@ -11,9 +11,10 @@ function applyTemplate(template, vars) {
 
 // Build a human-readable markdown string from the messages array.
 // include: { userMessages, aiResponses, toolChips, metadata }
-function buildExportContent(messages, include, coachMode, tasks, { coachName, userName, template, provider } = {}) {
+function buildExportContent(messages, include, coachMode, tasks, { coachName, userName, template, provider, messageRowTemplate } = {}) {
   const modeLabel = (COACH_MODES[coachMode] || {}).label || coachMode;
   const lines = [];
+  const resolvedMsgRowTemplate = messageRowTemplate || DEFAULT_EXPORT_TEMPLATES.messageRowTemplate;
 
   for (const msg of messages) {
     if (msg.isSearchChip) {
@@ -24,11 +25,11 @@ function buildExportContent(messages, include, coachMode, tasks, { coachName, us
     }
     if (msg.role === 'user') {
       if (!include.userMessages) continue;
-      lines.push('**' + (userName || 'You') + ':** ' + (msg.text || ''));
+      lines.push(applyTemplate(resolvedMsgRowTemplate, { speaker: userName || 'You', role: 'user', text: msg.text || '' }));
       lines.push('');
     } else if (msg.role === 'assistant') {
       if (!include.aiResponses) continue;
-      lines.push('**' + (coachName || 'Coach') + ':** ' + (msg.text || ''));
+      lines.push(applyTemplate(resolvedMsgRowTemplate, { speaker: coachName || 'Coach', role: 'assistant', text: msg.text || '' }));
       lines.push('');
     }
   }
@@ -368,21 +369,23 @@ function _taskSection(t, todayStr) {
 // tasks: full task array
 // sections: { project, next, waiting, someday, deferred } — booleans
 // include: { header, metadata, notes }
-function buildHierarchicalExportContent(tasks, sections, include, template) {
+function buildHierarchicalExportContent(tasks, sections, include, template, rowOptions = {}) {
   const todayStr = new Date().toISOString().slice(0, 10);
   const taskMap = new Map(tasks.map(t => [t.id, t]));
   const lines = [];
+  const resolvedIndentUnit = rowOptions.indentUnit != null ? rowOptions.indentUnit : DEFAULT_EXPORT_TEMPLATES.indentUnit;
+  const resolvedTaskRowTemplate = rowOptions.taskRowTemplate || DEFAULT_EXPORT_TEMPLATES.taskRowTemplate;
 
   function walk(task, depth) {
     const section = _taskSection(task, todayStr);
-    const indent = '  '.repeat(depth);
+    const indent = resolvedIndentUnit.repeat(depth);
     const children = (task.childIds || [])
       .map(id => taskMap.get(id))
       .filter(Boolean)
       .filter(c => !c.done);
 
     if (sections[section]) {
-      lines.push(indent + (task.done ? '- [x] ' : '- [ ] ') + task.text);
+      lines.push(applyTemplate(resolvedTaskRowTemplate, { indent, depth: String(depth), bullet: task.done ? '[x]' : '[ ]', text: task.text }));
       if (include.metadata) {
         const meta = [];
         if (task.dueDate)                    meta.push('Due: ' + task.dueDate);

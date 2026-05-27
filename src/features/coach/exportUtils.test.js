@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyTemplate, stripMarkdown, buildRtfContent } from './exportUtils.js';
+import { applyTemplate, stripMarkdown, buildRtfContent, buildExportContent, buildHierarchicalExportContent } from './exportUtils.js';
 
 describe('applyTemplate', () => {
   it('substitutes a single variable', () => {
@@ -103,5 +103,70 @@ describe('buildRtfContent RTF unicode encoding', () => {
     // Each surrogate must become ? rather than a malformed \u escape
     const result = buildRtfContent('A\uD83D\uDE00B');
     expect(result).toContain('A??B');
+  });
+});
+
+
+describe('buildExportContent messageRowTemplate', () => {
+  const messages = [
+    { role: 'user',      text: 'Hello coach' },
+    { role: 'assistant', text: 'Hello John'  },
+  ];
+  const include = { userMessages: true, aiResponses: true, toolChips: false };
+
+  it('applies default row template when no messageRowTemplate provided', () => {
+    const result = buildExportContent(messages, include, 'chat', [], { coachName: 'Coach', userName: 'John' });
+    expect(result).toContain('**John:** Hello coach');
+    expect(result).toContain('**Coach:** Hello John');
+  });
+
+  it('applies custom messageRowTemplate to each message', () => {
+    const result = buildExportContent(messages, include, 'chat', [], {
+      coachName: 'Coach', userName: 'John',
+      messageRowTemplate: '[{{role}}] {{speaker}}: {{text}}',
+    });
+    expect(result).toContain('[user] John: Hello coach');
+    expect(result).toContain('[assistant] Coach: Hello John');
+  });
+
+  it('omits messages excluded by include flags', () => {
+    const result = buildExportContent(messages, { userMessages: false, aiResponses: true, toolChips: false }, 'chat', [], {
+      messageRowTemplate: '{{speaker}}: {{text}}',
+      coachName: 'Coach', userName: 'John',
+    });
+    expect(result).not.toContain('John:');
+    expect(result).toContain('Coach: Hello John');
+  });
+});
+
+describe('buildHierarchicalExportContent taskRowTemplate', () => {
+  const tasks = [
+    { id: '1', text: 'Project A', bucket: 'project', isNextAction: false, done: false, childIds: ['2'] },
+    { id: '2', text: 'Subtask',   bucket: 'project', isNextAction: true,  done: false, parentId: '1', childIds: [] },
+  ];
+  const sections = { project: true, next: true, waiting: false, someday: false, deferred: false };
+  const include = { header: false, metadata: false, notes: false };
+
+  it('applies default task row template', () => {
+    const result = buildHierarchicalExportContent(tasks, sections, include);
+    expect(result).toContain('- [ ] Project A');
+    expect(result).toContain('  - [ ] Subtask');
+  });
+
+  it('applies custom taskRowTemplate with depth and bullet vars', () => {
+    const result = buildHierarchicalExportContent(tasks, sections, include, undefined, {
+      taskRowTemplate: '{{depth}}:{{bullet}}:{{text}}',
+    });
+    expect(result).toContain('0:[ ]:Project A');
+    expect(result).toContain('1:[ ]:Subtask');
+  });
+
+  it('uses custom indentUnit for indent var', () => {
+    const result = buildHierarchicalExportContent(tasks, sections, include, undefined, {
+      taskRowTemplate: '{{indent}}{{text}}',
+      indentUnit: '----',
+    });
+    expect(result).toContain('Project A');
+    expect(result).toContain('----Subtask');
   });
 });

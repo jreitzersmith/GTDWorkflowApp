@@ -30,6 +30,11 @@ const VAR_GROUPS = {
   ],
 };
 
+const ROW_TEMPLATE_CONFIG = {
+  conversation: { key: 'messageRowTemplate', label: 'Message row', vars: ['speaker', 'role', 'text'] },
+  hierarchical:  { key: 'taskRowTemplate',   label: 'Task row',    vars: ['indent', 'depth', 'bullet', 'text'], indentUnit: true },
+};
+
 const SAMPLE_DATA = {
   coachName: 'GTD Coach', userName: 'John', provider: 'Claude',
   date: '2026-05-27', time: '09:15', weekNumber: '22',
@@ -65,13 +70,17 @@ function renderMarkdownPreview(md) {
     .replace(/\n/g, '<br/>');
 }
 
-// ── ExportTemplateEditor ─────────────────────────────────────────────────────
+// ── ExportTemplateEditor ───────────────────────────────────────────
 // Per-tab template editor with formatting toolbar, variable chips, and
 // format-aware live preview. FR#119.
 function ExportTemplateEditor({ exportTemplates, onExportTemplatesChange, exportFormat }) {
   const [activeTab, setActiveTab] = useState('conversation');
   const [previewOn, setPreviewOn] = useState(false);
+  const [mainExpanded, setMainExpanded] = useState(true);
+  const [rowExpanded, setRowExpanded] = useState({});
   const textareaRef = useRef(null);
+  const rowTemplateRef = useRef(null);
+  const rowTemplateSelectionRef = useRef({ start: 0, end: 0 });
 
   const currentTemplate = exportTemplates[activeTab] || DEFAULT_EXPORT_TEMPLATES[activeTab];
 
@@ -119,9 +128,40 @@ function ExportTemplateEditor({ exportTemplates, onExportTemplatesChange, export
     });
   }, [currentTemplate, handleChange]);
 
-  const handleReset = useCallback(() => {
+  const handleResetMain = useCallback(() => {
     onExportTemplatesChange({ ...exportTemplates, [activeTab]: DEFAULT_EXPORT_TEMPLATES[activeTab] });
   }, [exportTemplates, activeTab, onExportTemplatesChange]);
+
+  const handleResetRow = useCallback(() => {
+    const rowConfig = ROW_TEMPLATE_CONFIG[activeTab];
+    if (!rowConfig) return;
+    const resetKeys = { [rowConfig.key]: DEFAULT_EXPORT_TEMPLATES[rowConfig.key] };
+    if (rowConfig.indentUnit) resetKeys.indentUnit = DEFAULT_EXPORT_TEMPLATES.indentUnit;
+    onExportTemplatesChange({ ...exportTemplates, ...resetKeys });
+  }, [exportTemplates, activeTab, onExportTemplatesChange]);
+
+  const saveRowSelection = useCallback(() => {
+    const ta = rowTemplateRef.current;
+    if (ta) {
+      rowTemplateSelectionRef.current = { start: ta.selectionStart, end: ta.selectionEnd };
+    }
+  }, []);
+
+  const insertIntoRowTemplate = useCallback((templateKey, insertion) => {
+    const { start, end } = rowTemplateSelectionRef.current;
+    const currentValue = exportTemplates[templateKey] || DEFAULT_EXPORT_TEMPLATES[templateKey];
+    const newValue = currentValue.slice(0, start) + insertion + currentValue.slice(end);
+    onExportTemplatesChange({ ...exportTemplates, [templateKey]: newValue });
+    requestAnimationFrame(() => {
+      const ta = rowTemplateRef.current;
+      if (ta) {
+        ta.focus();
+        const pos = start + insertion.length;
+        ta.setSelectionRange(pos, pos);
+        rowTemplateSelectionRef.current = { start: pos, end: pos };
+      }
+    });
+  }, [exportTemplates, onExportTemplatesChange]);
 
   const previewContent = previewOn
     ? (() => {
@@ -142,6 +182,31 @@ function ExportTemplateEditor({ exportTemplates, onExportTemplatesChange, export
       cursor: 'pointer',
       fontSize: 12,
     }),
+    mainSection: {
+      border: `1px solid ${COLORS.border}`,
+      borderRadius: 4,
+      overflow: 'hidden',
+    },
+    mainHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '5px 10px',
+      background: COLORS.surface3,
+      border: 'none',
+      width: '100%',
+      cursor: 'pointer',
+      color: COLORS.text2,
+      fontSize: 11,
+      textAlign: 'left',
+      fontFamily: 'inherit',
+    },
+    mainBody: {
+      padding: '8px 10px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 8,
+    },
     toolbar: { display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' },
     toolbarBtn: (id) => ({
       padding: '3px 8px',
@@ -193,11 +258,59 @@ function ExportTemplateEditor({ exportTemplates, onExportTemplatesChange, export
       border: `1px solid ${COLORS.border}`, borderRadius: 10,
       color: COLORS.text2, fontSize: 11, cursor: 'pointer', fontFamily: 'monospace',
     },
-    footer: { display: 'flex', justifyContent: 'flex-end' },
     resetBtn: {
       background: 'transparent', border: `1px solid ${COLORS.border}`,
       borderRadius: 4, color: COLORS.text2, cursor: 'pointer',
       fontSize: 11, padding: '3px 10px',
+    },
+    rowSection: {
+      border: `1px solid ${COLORS.border}`,
+      borderRadius: 4,
+      overflow: 'hidden',
+    },
+    rowHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '5px 10px',
+      background: COLORS.surface3,
+      border: 'none',
+      width: '100%',
+      cursor: 'pointer',
+      color: COLORS.text2,
+      fontSize: 11,
+      textAlign: 'left',
+      fontFamily: 'inherit',
+    },
+    rowBody: {
+      padding: '8px 10px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 8,
+    },
+    rowTemplateTextarea: {
+      width: '100%',
+      background: COLORS.surface2,
+      border: `1px solid ${COLORS.border}`,
+      borderRadius: 4,
+      color: COLORS.text,
+      padding: '6px 8px',
+      fontSize: 12,
+      fontFamily: 'monospace',
+      resize: 'vertical',
+      boxSizing: 'border-box',
+      lineHeight: 1.5,
+      minHeight: 44,
+    },
+    indentUnitInput: {
+      background: COLORS.surface2,
+      border: `1px solid ${COLORS.border}`,
+      borderRadius: 4,
+      color: COLORS.text,
+      padding: '3px 6px',
+      fontSize: 12,
+      fontFamily: 'monospace',
+      width: 60,
     },
   };
 
@@ -213,65 +326,133 @@ function ExportTemplateEditor({ exportTemplates, onExportTemplatesChange, export
         ))}
       </div>
 
-      {/* Toolbar */}
-      <div style={s.toolbar}>
-        {TOOLBAR_BUTTONS.map(btn => (
-          <button key={btn.id} style={s.toolbarBtn(btn.id)}
-            onClick={() => insertFormatting(btn.id)} title={btn.id}>
-            {btn.label}
-          </button>
-        ))}
-        <div style={s.toolbarSep} />
-        <button style={s.previewToggle(previewOn)} onClick={() => setPreviewOn(p => !p)}>
-          {previewOn ? 'Edit' : 'Preview'}
+      {/* Main template section (collapsible) */}
+      <div style={s.mainSection}>
+        <button style={s.mainHeader} onClick={() => setMainExpanded(p => !p)}>
+          <span>Export template</span>
+          <span>{mainExpanded ? '▲' : '▼'}</span>
         </button>
-      </div>
-
-      {/* Editor or preview */}
-      {previewOn ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={s.previewBadge}>Previewing as {exportFormat || 'rtf'}</span>
-          {exportFormat === 'text' ? (
-            <pre style={{ ...s.previewBox, fontFamily: 'monospace', whiteSpace: 'pre-wrap', margin: 0 }}>
-              {previewContent}
-            </pre>
-          ) : (
-            <div style={s.previewBox}
-              dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(previewContent || '') }} />
-          )}
-        </div>
-      ) : (
-        <textarea
-          ref={textareaRef}
-          style={s.textarea}
-          value={currentTemplate}
-          onChange={e => handleChange(e.target.value)}
-          spellCheck={false}
-        />
-      )}
-
-      {/* Variable chips */}
-      <div style={s.varSection}>
-        {(VAR_GROUPS[activeTab] || []).map(group => (
-          <div key={group.label} style={s.varGroup}>
-            <span style={s.varGroupLabel}>{group.label}</span>
-            <div style={s.varChips}>
-              {group.vars.map(v => (
-                <button key={v} style={s.chip}
-                  onClick={() => insertAtCursor(`{{${v}}}`)}
-                  title={`Insert {{${v}}}`}>
-                  {`{{${v}}}`}
+        {mainExpanded && (
+          <div style={s.mainBody}>
+            {/* Toolbar */}
+            <div style={s.toolbar}>
+              {TOOLBAR_BUTTONS.map(btn => (
+                <button key={btn.id} style={s.toolbarBtn(btn.id)}
+                  onClick={() => insertFormatting(btn.id)} title={btn.id}>
+                  {btn.label}
                 </button>
               ))}
+              <div style={s.toolbarSep} />
+              <button style={s.previewToggle(previewOn)} onClick={() => setPreviewOn(p => !p)}>
+                {previewOn ? 'Edit' : 'Preview'}
+              </button>
+            </div>
+
+            {/* Editor or preview */}
+            {previewOn ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={s.previewBadge}>Previewing as {exportFormat || 'rtf'}</span>
+                {exportFormat === 'text' ? (
+                  <pre style={{ ...s.previewBox, fontFamily: 'monospace', whiteSpace: 'pre-wrap', margin: 0 }}>
+                    {previewContent}
+                  </pre>
+                ) : (
+                  <div style={s.previewBox}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(previewContent || '') }} />
+                )}
+              </div>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                style={s.textarea}
+                value={currentTemplate}
+                onChange={e => handleChange(e.target.value)}
+                spellCheck={false}
+              />
+            )}
+
+            {/* Variable chips */}
+            <div style={s.varSection}>
+              {(VAR_GROUPS[activeTab] || []).map(group => (
+                <div key={group.label} style={s.varGroup}>
+                  <span style={s.varGroupLabel}>{group.label}</span>
+                  <div style={s.varChips}>
+                    {group.vars.map(v => (
+                      <button key={v} style={s.chip}
+                        onClick={() => insertAtCursor(`{{${v}}}`)}
+                        title={`Insert {{${v}}}`}>
+                        {`{{${v}}}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Reset main */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button style={s.resetBtn} onClick={handleResetMain}>↺ Reset to default</button>
             </div>
           </div>
-        ))}
+        )}
       </div>
 
-      {/* Reset */}
-      <div style={s.footer}>
-        <button style={s.resetBtn} onClick={handleReset}>↺ Reset to default</button>
-      </div>
+      {/* Row format (collapsible) */}
+      {ROW_TEMPLATE_CONFIG[activeTab] && (() => {
+        const rowConfig = ROW_TEMPLATE_CONFIG[activeTab];
+        const expanded = !!rowExpanded[activeTab];
+        const rowValue = exportTemplates[rowConfig.key] || DEFAULT_EXPORT_TEMPLATES[rowConfig.key];
+        return (
+          <div style={s.rowSection}>
+            <button
+              style={s.rowHeader}
+              onClick={() => setRowExpanded(prev => ({ ...prev, [activeTab]: !prev[activeTab] }))}
+            >
+              <span>Row format</span>
+              <span>{expanded ? '▲' : '▼'}</span>
+            </button>
+            {expanded && (
+              <div style={s.rowBody}>
+                <textarea
+                  ref={rowTemplateRef}
+                  style={s.rowTemplateTextarea}
+                  value={rowValue}
+                  onChange={e => onExportTemplatesChange({ ...exportTemplates, [rowConfig.key]: e.target.value })}
+                  onBlur={saveRowSelection}
+                  onSelect={saveRowSelection}
+                  spellCheck={false}
+                />
+                <div style={s.varChips}>
+                  {rowConfig.vars.map(v => (
+                    <button key={v} style={s.chip}
+                      onClick={() => insertIntoRowTemplate(rowConfig.key, `{{${v}}}`)}
+                      title={`Insert {{${v}}}`}>
+                      {`{{${v}}}`}
+                    </button>
+                  ))}
+                </div>
+                {rowConfig.indentUnit && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: COLORS.text2 }}>Indent unit</span>
+                    <input
+                      style={s.indentUnitInput}
+                      value={exportTemplates.indentUnit != null ? exportTemplates.indentUnit : DEFAULT_EXPORT_TEMPLATES.indentUnit}
+                      onChange={e => onExportTemplatesChange({ ...exportTemplates, indentUnit: e.target.value })}
+                      placeholder="  "
+                      spellCheck={false}
+                    />
+                    <span style={{ fontSize: 10, color: COLORS.muted }}>per depth level</span>
+                  </div>
+                )}
+                {/* Reset row */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button style={s.resetBtn} onClick={handleResetRow}>↺ Reset to default</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
