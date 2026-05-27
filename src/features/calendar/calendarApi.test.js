@@ -4,10 +4,10 @@ import { getLinkedTasks } from './calendarApi.js';
 // getLinkedTasks is a pure filter — no API or React dependencies to mock.
 
 describe('getLinkedTasks', () => {
-  const taskA = { id: 't1', text: 'Task A', bucket: 'next', done: false, calendarEventId: 'ev-123' };
-  const taskB = { id: 't2', text: 'Task B', bucket: 'next', done: false, calendarEventId: 'ev-master' };
-  const taskC = { id: 't3', text: 'Task C', bucket: 'next', done: false, calendarEventId: 'ev-other' };
-  const taskD = { id: 't4', text: 'Task D', bucket: 'next', done: false, calendarEventId: null };
+  const taskA = { id: 't1', text: 'Task A', bucket: 'project', isNextAction: true, done: false, calendarEventId: 'ev-123' };
+  const taskB = { id: 't2', text: 'Task B', bucket: 'project', isNextAction: true, done: false, calendarEventId: 'ev-master' };
+  const taskC = { id: 't3', text: 'Task C', bucket: 'project', isNextAction: true, done: false, calendarEventId: 'ev-other' };
+  const taskD = { id: 't4', text: 'Task D', bucket: 'project', isNextAction: true, done: false, calendarEventId: null };
 
   it('returns tasks matching the event id', () => {
     const ev = { id: 'ev-123' };

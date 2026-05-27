@@ -103,14 +103,14 @@ describe('getOrderedChildren', () => {
   const tasks = [
     { id: 'proj-1', bucket: 'project', childIds: ['child-b', 'child-a'] },
     { id: 'proj-2', bucket: 'project', childIds: [] },
-    { id: 'child-a', bucket: 'next', parentId: 'proj-1' },
-    { id: 'child-b', bucket: 'next', parentId: 'proj-1' },
-    { id: 'orphan', bucket: 'next' },
+    { id: 'child-a', bucket: 'project', isNextAction: true, parentId: 'proj-1' },
+    { id: 'child-b', bucket: 'project', isNextAction: true, parentId: 'proj-1' },
+    { id: 'orphan', bucket: 'project', isNextAction: true },
   ];
 
   it('returns all root projects when parentId is null', () => {
     const result = getOrderedChildren(null, tasks);
-    expect(result.map(t => t.id)).toEqual(['proj-1', 'proj-2']);
+    expect(result.map(t => t.id)).toEqual(['proj-1', 'proj-2', 'orphan']);
   });
 
   it('returns children in the order specified by parent.childIds', () => {
@@ -378,8 +378,8 @@ describe('moveTaskInTree', () => {
   const baseTasks = [
     { id: 'proj-a', bucket: 'project', childIds: ['child-1', 'child-2'] },
     { id: 'proj-b', bucket: 'project', childIds: [] },
-    { id: 'child-1', bucket: 'next', parentId: 'proj-a' },
-    { id: 'child-2', bucket: 'next', parentId: 'proj-a' },
+    { id: 'child-1', bucket: 'project', isNextAction: true, parentId: 'proj-a' },
+    { id: 'child-2', bucket: 'project', isNextAction: true, parentId: 'proj-a' },
   ];
 
   it('returns the original array reference when drag and target are the same task', () => {
