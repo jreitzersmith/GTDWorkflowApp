@@ -174,3 +174,4 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-23 | Bug Fix      | Issue#33 | GH#147 | Analytics task counter double-count fixed in buildBucketStats | 3e88e3b |
 | 2026-05-27 | Code Quality | CQ#17    | GH#153 | Correct stale bucket:'next' fixture data in calendarApi and taskUtils tests | 7235ba4 |
 | 2026-05-27 | Feature      | FR#129   | GH#151 | Per-row sub-templates in exports — messageRowTemplate (conversation) and taskRowTemplate+indentUnit (hierarchical); collapsible sections with independent reset buttons in ExportTemplateEditor; fixed missing exportTemplates prop in App.jsx→TaskBucketView chain | 907608c |
+| 2026-05-27 | Feature      | FR#130   | GH#154 | Hierarchical export: effort and notes rendered as indented sub-rows at depth+1 using resolvedIndentUnit — tracks custom indent unit correctly | f16294d |

@@ -71,4 +71,3 @@ Test cases that could not be executed during their cycle due to a missing condit
 - [FR#128 GH#149] Dismissing the send action bar does not send the email — needs: manual test of dismiss/cancel path in confirm bar
 - [FR#128 GH#149] If send fails (e.g. revoked token), error appears in coach chat — needs: test with expired/revoked Google token
 - [FR#119 GH#138] Supabase persistence round-
-- [ ] FR#130 [GH#154] (2026-05-27) — Hierarchical export: render effort and notes as indented sub-rows under their task
