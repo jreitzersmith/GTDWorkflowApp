@@ -27,6 +27,7 @@ const SLIDES_SCOPES = {
 };
 const CONTACTS_SCOPES = {
   readonly: 'https://www.googleapis.com/auth/contacts.readonly',
+  full:     'https://www.googleapis.com/auth/contacts',
 };
 
 export { GMAIL_SCOPES, DRIVE_SCOPES, DOCS_SCOPES, SHEETS_SCOPES, SLIDES_SCOPES, CONTACTS_SCOPES };
@@ -209,7 +210,7 @@ function useGoogleAuth({ setCalendarEvents }) {
       DOCS_SCOPES[prefs.docs]     || DOCS_SCOPES.full,
       SHEETS_SCOPES[prefs.sheets] || SHEETS_SCOPES.full,
       SLIDES_SCOPES[prefs.slides] || SLIDES_SCOPES.full,
-      contactsOn ? CONTACTS_SCOPES.readonly : null,
+      contactsOn ? CONTACTS_SCOPES.full : null,
     ].filter(Boolean).join(' ');
 
     localStorage.setItem(PKCE_KEY, JSON.stringify({

@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#34** · Code Quality — **CQ#17** · Feature Requests — **FR#131**
+> **Last used numbers:** Known Issues — **Issue#34** · Code Quality — **CQ#17** · Feature Requests — **FR#132**
 
 ---
 
@@ -34,6 +34,8 @@
 #### Inbox / processing improvements
 
 #### Integrations / data
+
+- FR#132 [GH#156] (2026-05-28) — Contact Manager: Google Contacts two-way sync + personal CRM enrichment (notes, relationship tags, likes/gift ideas, promises linked to tasks); new `contacts` Supabase table + People API integration
 
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
   - `sheetsApi.js` API wrapper exists. Missing: (1) Settings UI to configure target Sheet ID, (2) a `→ACTION:append_sheet` coach action line handler in `useCallAI.js`, (3) coach prompt instruction to identify financial emails and emit the action. Pattern matches FR#46 (receipt pipeline) — these two could be implemented together.

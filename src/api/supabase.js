@@ -110,3 +110,109 @@ function dbToTask(row) {
 
 
 export { supabase, queueEntryToRow, rowToQueueEntry, taskToDb, dbToTask };
+
+// ── Contacts CRUD (FR#132) ────────────────────────────────────────────────────
+// All functions operate on the contacts table with RLS — user_id is enforced
+// server-side via the contacts_owner policy.
+
+/**
+ * Fetch all contacts for the authenticated user.
+ * @returns {object[]} array of raw Supabase contact rows
+ */
+async function fetchContacts() {
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('*')
+    .order('display_name', { ascending: true });
+  if (error) throw new Error(`fetchContacts: ${error.message}`);
+  return data || [];
+}
+
+/**
+ * Insert or update a contact row, matching on google_resource_name.
+ * For manual contacts (no google_resource_name), matches on id.
+ * Custom enrichment fields (notes, promises, etc.) are only overwritten if
+ * explicitly included in the contact object — pass only what changed.
+ *
+ * @param {object} contactRow - Supabase-formatted row from contactToDb()
+ * @returns {object} the upserted row
+ */
+async function upsertContact(contactRow) {
+  const { data, error } = await supabase
+    .from('contacts')
+    .upsert(
+      { ...contactRow, updated_at: new Date().toISOString() },
+      { onConflict: 'google_resource_name', ignoreDuplicates: false }
+    )
+    .select()
+    .single();
+  if (error) throw new Error(`upsertContact: ${error.message}`);
+  return data;
+}
+
+/**
+ * Update only the custom enrichment fields on a contact (never overwrites
+ * Google-synced standard fields).
+ *
+ * @param {string} contactId  - UUID of the contact row
+ * @param {object} fields     - subset of custom columns to update
+ * @returns {object} the updated row
+ */
+async function updateContactCustomFields(contactId, fields) {
+  const allowed = [
+    'relationship_tags', 'notes', 'likes_preferences', 'gift_ideas', 'promises',
+  ];
+  const update = Object.fromEntries(
+    Object.entries(fields).filter(([k]) => allowed.includes(k))
+  );
+  update.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('contacts')
+    .update(update)
+    .eq('id', contactId)
+    .select()
+    .single();
+  if (error) throw new Error(`updateContactCustomFields: ${error.message}`);
+  return data;
+}
+
+/**
+ * Update standard (Google-synced) fields on a contact row.
+ * Called after a successful Google People API PATCH to keep Supabase in sync.
+ *
+ * @param {string} contactId
+ * @param {object} fields - standard columns to update (display_name, emails, etc.)
+ * @returns {object} the updated row
+ */
+async function updateContactStandardFields(contactId, fields) {
+  const { data, error } = await supabase
+    .from('contacts')
+    .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq('id', contactId)
+    .select()
+    .single();
+  if (error) throw new Error(`updateContactStandardFields: ${error.message}`);
+  return data;
+}
+
+/**
+ * Delete a contact row by id.
+ * @param {string} contactId
+ */
+async function deleteContact(contactId) {
+  const { error } = await supabase
+    .from('contacts')
+    .delete()
+    .eq('id', contactId);
+  if (error) throw new Error(`deleteContact: ${error.message}`);
+}
+
+export {
+  fetchContacts,
+  upsertContact,
+  updateContactCustomFields,
+  updateContactStandardFields,
+  deleteContact,
+};
+
