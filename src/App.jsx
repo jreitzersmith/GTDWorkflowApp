@@ -530,6 +530,17 @@ export default function GTDManager() {
     return newId;
   }, [setTasks]);
 
+  // Navigate to a specific task from the Contacts panel (promise task link).
+  // Switches to the task's bucket view and opens the task detail panel.
+  const navigateToTask = useCallback((taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    setCurrentBucket(task.bucket);
+    setCurrentView('gtd');
+    setSelectedTaskId(taskId);
+    setShowSettings(false);
+  }, [tasks, setCurrentBucket, setCurrentView, setSelectedTaskId, setShowSettings]);
+
   const startWeeklyReview = () => {
     const total = tasks.filter(t => t.bucket !== "done").length;
     const introMsg = "Let's do your Weekly Review. You have **" + total +
@@ -1507,6 +1518,7 @@ export default function GTDManager() {
                           deleteGiftIdea={deleteGiftIdea}
                           tasks={tasks}
                           createInboxTask={createInboxTask}
+                          onNavigateToTask={navigateToTask}
                           onOpenSettings={() => setShowSettings(true)}
                         />
                       ) : currentView === "analytics" ? (

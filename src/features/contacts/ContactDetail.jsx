@@ -30,6 +30,7 @@ function ContactDetail({
   deleteGiftIdea,
   tasks,
   createInboxTask,
+  onNavigateToTask,
 }) {
   const initials = contactInitials(contact);
 
@@ -82,6 +83,8 @@ function ContactDetail({
           onDelete={(id) => deletePromise(contact.id, id)}
           createInboxTask={createInboxTask}
           contactId={contact.id}
+          onNavigateToTask={onNavigateToTask}
+          contactDisplayName={contact.displayName}
         />
       </div>
     </div>
@@ -366,7 +369,7 @@ function GiftIdeasSection({ gifts, onAdd, onToggleGiven, onDelete }) {
 
 // ── Promises ──────────────────────────────────────────────────────────────────
 
-function PromisesSection({ promises, tasks, onAdd, onToggleDone, onLinkTask, onDelete, createInboxTask, contactId }) {
+function PromisesSection({ promises, tasks, onAdd, onToggleDone, onLinkTask, onDelete, createInboxTask, contactId, onNavigateToTask, contactDisplayName }) {
   const [text,      setText]      = useState('');
   const [direction, setDirection] = useState('made');
   const [taskPicker, setTaskPicker] = useState(null); // promiseId being linked
@@ -394,6 +397,8 @@ function PromisesSection({ promises, tasks, onAdd, onToggleDone, onLinkTask, onD
               onOpenPicker={() => setTaskPicker(promise.id)}
               onClosePicker={() => setTaskPicker(null)}
               createInboxTask={createInboxTask}
+              onNavigateToTask={onNavigateToTask}
+              contactDisplayName={contactDisplayName}
             />
           ))}
         </div>
@@ -420,7 +425,7 @@ function PromisesSection({ promises, tasks, onAdd, onToggleDone, onLinkTask, onD
   );
 }
 
-function PromiseRow({ promise, tasks, onToggleDone, onDelete, onLinkTask, showPicker, onOpenPicker, onClosePicker, createInboxTask }) {
+function PromiseRow({ promise, tasks, onToggleDone, onDelete, onLinkTask, showPicker, onOpenPicker, onClosePicker, createInboxTask, onNavigateToTask, contactDisplayName }) {
   const linkedTask = promise.taskId ? tasks.find(t => t.id === promise.taskId) : null;
 
   return (
@@ -446,8 +451,19 @@ function PromiseRow({ promise, tasks, onToggleDone, onDelete, onLinkTask, showPi
               </span>
             )}
             {linkedTask ? (
-              <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: COLORS.project + '22', color: COLORS.project }}>
-                → {linkedTask.text.slice(0, 30)}{linkedTask.text.length > 30 ? '…' : ''}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <span
+                  onClick={() => onNavigateToTask && onNavigateToTask(linkedTask.id)}
+                  title={linkedTask.text}
+                  style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: COLORS.project + '22', color: COLORS.project, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  → {linkedTask.text.slice(0, 30)}{linkedTask.text.length > 30 ? '…' : ''}
+                </span>
+                <span
+                  onClick={() => onLinkTask(null)}
+                  title="Remove task link"
+                  style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 10, lineHeight: 1 }}
+                >✕</span>
               </span>
             ) : (
               <span onClick={onOpenPicker} style={{ fontSize: 10, color: COLORS.muted, cursor: 'pointer', textDecoration: 'underline' }}>
@@ -467,20 +483,26 @@ function PromiseRow({ promise, tasks, onToggleDone, onDelete, onLinkTask, showPi
           onLink={onLinkTask}
           onClose={onClosePicker}
           createInboxTask={createInboxTask}
+          contactDisplayName={contactDisplayName}
         />
       )}
     </div>
   );
 }
 
-function TaskLinkPicker({ tasks, promise, onLink, onClose, createInboxTask }) {
+function TaskLinkPicker({ tasks, promise, onLink, onClose, createInboxTask, contactDisplayName }) {
   const [query, setQuery] = useState('');
-  const activeTasks = tasks.filter(t => !t.done && (
-    !query || t.text.toLowerCase().includes(query.toLowerCase())
-  )).slice(0, 12);
+  const INACTIVE_BUCKETS = new Set(['inbox_history', 'completed']);
+  const activeTasks = tasks.filter(t =>
+    !t.done && !INACTIVE_BUCKETS.has(t.bucket) && (
+      !query || t.text.toLowerCase().includes(query.toLowerCase())
+    )
+  ).slice(0, 12);
 
   const handleCreateNew = () => {
-    const newId = createInboxTask(promise.text);
+    const baseText = promise.text.replace(/^to\s+/i, '');
+    const title = contactDisplayName ? `${baseText} — ${contactDisplayName}` : baseText;
+    const newId = createInboxTask(title);
     if (newId) onLink(newId);
   };
 

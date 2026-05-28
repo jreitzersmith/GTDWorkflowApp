@@ -32,6 +32,7 @@ function ContactsPanel({
   deleteGiftIdea,
   tasks,
   createInboxTask,
+  onNavigateToTask,
   onOpenSettings,
 }) {
   const [searchText,      setSearchText]      = useState('');
@@ -107,17 +108,27 @@ function ContactsPanel({
           </div>
 
           {/* Search */}
-          <input
-            type="text"
-            placeholder="Search contacts…"
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            style={{
-              width: '100%', boxSizing: 'border-box', padding: '6px 10px',
-              background: COLORS.surface2, border: `1px solid ${COLORS.border}`,
-              borderRadius: 6, color: COLORS.text, fontSize: 13, outline: 'none',
-            }}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Search contacts…"
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: searchText ? '6px 28px 6px 10px' : '6px 10px',
+                background: COLORS.surface2, border: `1px solid ${COLORS.border}`,
+                borderRadius: 6, color: COLORS.text, fontSize: 13, outline: 'none',
+              }}
+            />
+            {searchText && (
+              <span
+                onClick={() => setSearchText('')}
+                title="Clear search"
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: COLORS.muted, fontSize: 12, lineHeight: 1, userSelect: 'none' }}
+              >✕</span>
+            )}
+          </div>
         </div>
 
         {/* Tag filter chips */}
@@ -183,6 +194,7 @@ function ContactsPanel({
             deleteGiftIdea={deleteGiftIdea}
             tasks={tasks}
             createInboxTask={createInboxTask}
+            onNavigateToTask={onNavigateToTask}
           />
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.muted, flexDirection: 'column', gap: 8 }}>
