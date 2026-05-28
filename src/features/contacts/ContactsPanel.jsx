@@ -169,6 +169,7 @@ function ContactsPanel({
         {selectedContact ? (
           <ContactDetail
             contact={selectedContact}
+            allContactTags={allTags}
             updateStandardFields={updateStandardFields}
             updateCustomFields={updateCustomFields}
             addPromise={addPromise}

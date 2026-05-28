@@ -56,9 +56,9 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
 
   // ── Auto-sync from Google when token + contacts scope become available ──────
   useEffect(() => {
-    if (!googleToken || !contactsEnabled || !supabaseReady) return;
+    if (!googleToken || !contactsEnabled || !supabaseReady || !userId) return;
     syncContacts();
-  }, [googleToken, contactsEnabled, supabaseReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [googleToken, contactsEnabled, supabaseReady, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sync ────────────────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
    * then merge back into state (preserving custom field values from Supabase).
    */
   const syncContacts = useCallback(async () => {
-    if (!googleToken || !contactsEnabled || syncInProgressRef.current) return;
+    if (!googleToken || !contactsEnabled || !userId || syncInProgressRef.current) return;
     syncInProgressRef.current = true;
     setContactsSyncing(true);
     setContactsError(null);
@@ -87,8 +87,24 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
       const upserted = await Promise.all(
         persons.map(async person => {
           const contact = googlePersonToContact(person);
-          const row     = { ...contactToDb(contact), user_id: userId };
-          const saved   = await upsertContact(row);
+          // Only sync standard Google fields — never overwrite custom enrichment
+          // (relationship_tags, notes, etc.). Omitting those columns from the
+          // payload means ON CONFLICT DO UPDATE SET will not touch them.
+          const standardRow = {
+            user_id:              userId,
+            google_resource_name: contact.googleResourceName,
+            google_etag:          contact.googleEtag,
+            display_name:         contact.displayName,
+            given_name:           contact.givenName,
+            family_name:          contact.familyName,
+            emails:               contact.emails,
+            phones:               contact.phones,
+            addresses:            contact.addresses,
+            company:              contact.company,
+            job_title:            contact.jobTitle,
+            photo_url:            contact.photoUrl,
+          };
+          const saved = await upsertContact(standardRow);
           return dbToContact(saved);
         })
       );
@@ -103,7 +119,7 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
       setContactsSyncing(false);
       syncInProgressRef.current = false;
     }
-  }, [googleToken, contactsEnabled, refreshGoogleToken]);
+  }, [googleToken, contactsEnabled, refreshGoogleToken, userId]);
 
   // ── Standard field updates (two-way) ────────────────────────────────────────
 

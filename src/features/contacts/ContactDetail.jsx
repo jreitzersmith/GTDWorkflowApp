@@ -16,6 +16,7 @@ const LIKE_CATEGORIES = ['Food', 'Hobbies', 'Music', 'Sport', 'Film/TV', 'Books'
 
 function ContactDetail({
   contact,
+  allContactTags,
   updateStandardFields,
   updateCustomFields,
   addPromise,
@@ -50,6 +51,7 @@ function ContactDetail({
         <Divider />
         <RelationshipTagsSection
           tags={contact.relationshipTags || []}
+          allContactTags={allContactTags || []}
           onChange={(tags) => updateCustomFields(contact.id, { relationshipTags: tags })}
         />
         <Divider />
@@ -193,7 +195,7 @@ function StandardFieldsSection({ contact, onSave }) {
 
 // ── Relationship tags ─────────────────────────────────────────────────────────
 
-function RelationshipTagsSection({ tags, onChange }) {
+function RelationshipTagsSection({ tags, allContactTags, onChange }) {
   const [newTag, setNewTag] = useState('');
 
   const addTag = (tag) => {
@@ -216,13 +218,16 @@ function RelationshipTagsSection({ tags, onChange }) {
         ))}
         {tags.length === 0 && <span style={{ fontSize: 12, color: COLORS.muted }}>No tags yet</span>}
       </div>
-      {/* Preset quick-add chips */}
+      {/* Suggestion chips: presets + any custom tags used on other contacts */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
-        {PRESET_TAGS.filter(t => !tags.includes(t)).map(t => (
-          <span key={t} onClick={() => addTag(t)} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: COLORS.surface2, color: COLORS.text2, border: `1px solid ${COLORS.border}`, cursor: 'pointer' }}>
-            + {t}
-          </span>
-        ))}
+        {[...new Set([...PRESET_TAGS, ...allContactTags])]
+          .filter(t => !tags.includes(t))
+          .map(t => (
+            <span key={t} onClick={() => addTag(t)} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: COLORS.surface2, color: COLORS.text2, border: `1px solid ${COLORS.border}`, cursor: 'pointer' }}>
+              + {t}
+            </span>
+          ))
+        }
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <input
