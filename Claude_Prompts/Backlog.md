@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#34** · Code Quality — **CQ#17** · Feature Requests — **FR#130**
+> **Last used numbers:** Known Issues — **Issue#34** · Code Quality — **CQ#17** · Feature Requests — **FR#131**
 
 ---
 
@@ -31,7 +31,6 @@
 
 
 
-
 #### Inbox / processing improvements
 
 #### Integrations / data
@@ -39,9 +38,6 @@
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
   - `sheetsApi.js` API wrapper exists. Missing: (1) Settings UI to configure target Sheet ID, (2) a `→ACTION:append_sheet` coach action line handler in `useCallAI.js`, (3) coach prompt instruction to identify financial emails and emit the action. Pattern matches FR#46 (receipt pipeline) — these two could be implemented together.
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
-- FR#46 [GH#42] (2026-05-09) — Receipt-to-Sheets pipeline — AI extracts vendor/amount/date from email and appends to a Sheet
-  - `sheetsApi.js` exists. Missing: (1) Settings field for target Sheet ID, (2) "Process as receipt" option in EmailInboxPanel, (3) a specialized AI prompt to extract financial fields, (4) `→ACTION:append_sheet` handler in `useCallAI.js`. Overlaps with FR#17 — implement together.
-  - `driveApi.js` exists. Missing: a `DRIVE_SEARCH_TOOL` definition added to the tool list in `useCallAI.js` (alongside `GET_TASK_CONTEXT_TOOL`), a handler in the tool dispatch loop, and coach prompt instruction. Self-contained change, low risk.
 - FR#70 [GH#70] (2026-05-12) — Multiple Google account support
   - `useGoogleAuth.js` has a single token store (`gtd_google_token` in localStorage). Significant refactor required: token store must be keyed by account email, `user_settings.google_accounts` array in Supabase, account selector UI in Email and Calendar panels, and per-account scope management. High risk — touches auth flow throughout the app.
 
@@ -70,4 +66,8 @@ Test cases that could not be executed during their cycle due to a missing condit
 
 - [FR#128 GH#149] Dismissing the send action bar does not send the email — needs: manual test of dismiss/cancel path in confirm bar
 - [FR#128 GH#149] If send fails (e.g. revoked token), error appears in coach chat — needs: test with expired/revoked Google token
-- [FR#119 GH#138] Supabase persistence round-
+- [FR#119 GH#138] Supabase persistence round-trip for notes field — needs: Supabase connected session with task that has notes
+- [FR#46 GH#42] Sheets not connected: Sheet ID input is disabled — needs: Google Sheets disconnected state
+- [FR#46 GH#42] receiptSheetId not configured: Log as receipt button is absent — needs: Sheet ID cleared in Settings
+- [FR#131 GH#155] Gmail connected at “read only” scope — Mark as spam still visible but produces an error (modify required) — needs: Gmail reconnected at read-only scope
+- [FR#131 GH#155] No email selected — button absent (not rendered) — needs: email panel with no selection active
