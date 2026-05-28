@@ -38,6 +38,8 @@ import { useSupabaseSync } from "./hooks/useSupabaseSync.js";
 import { useCallAI } from "./features/coach/useCallAI.js";
 import { useInboxProcessing } from "./features/tasks/useInboxProcessing.js";
 import { useTaskCrud } from "./features/tasks/useTaskCrud.js";
+import { ContactsPanel } from "./features/contacts/ContactsPanel.jsx";
+import { useContacts } from "./features/contacts/useContacts.js";
 import { useSettings } from "./features/settings/useSettings.js";
 
 
@@ -511,6 +513,22 @@ export default function GTDManager() {
     setRecurringAcknowledgedMap,
     askAIAboutTask,
   });
+
+  const { contacts, selectedContactId, setSelectedContactId,
+          contactsLoading, contactsSyncing, contactsError, lastSyncedAt,
+          syncContacts, updateStandardFields, updateCustomFields,
+          addPromise, togglePromiseDone, linkPromiseToTask, deletePromise,
+          addLike, deleteLike, addGiftIdea, toggleGiftGiven, deleteGiftIdea,
+  } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken });
+
+  // Create an Inbox task directly from a contact promise; returns the new task id.
+  const createInboxTask = useCallback((text) => {
+    const newId = genId();
+    setTasks(prev => [{ id: newId, text, bucket: 'inbox', done: false,
+      created: Date.now(), priority: [], location: [], dueDate: null,
+      effort: null, actualEffort: null, deferUntil: null, notes: null }, ...prev]);
+    return newId;
+  }, [setTasks]);
 
   const startWeeklyReview = () => {
     const total = tasks.filter(t => t.bucket !== "done").length;
@@ -1282,6 +1300,8 @@ export default function GTDManager() {
           onSelectEmail={() => { setCurrentView("email"); setShowSettings(false); setSelectedTaskId(null); }}
           onSelectCalendar={() => { setCurrentView("calendar"); setShowSettings(false); setSelectedTaskId(null); }}
           onSelectAnalytics={() => { setCurrentView("analytics"); setShowSettings(false); setSelectedTaskId(null); }}
+          contactsEnabled={contactsEnabled}
+          onSelectContacts={() => { setCurrentView("contacts"); setShowSettings(false); setSelectedTaskId(null); }}
           onToggleSettings={() => { setShowSettings(v => !v); setShowUsage(false); }}
           onToggleUsage={() => { setShowUsage(v => !v); setShowSettings(false); }}
           onDailyReview={startDailyReview}
@@ -1462,6 +1482,32 @@ export default function GTDManager() {
                           docsEnabled={docsEnabled}
                           driveConversationExportFolderId={driveConversationExportFolderId}
                           exportTemplates={exportTemplates}
+                        />
+                      ) : currentView === "contacts" ? (
+                        <ContactsPanel
+                          contacts={contacts}
+                          selectedContactId={selectedContactId}
+                          setSelectedContactId={setSelectedContactId}
+                          contactsLoading={contactsLoading}
+                          contactsSyncing={contactsSyncing}
+                          contactsError={contactsError}
+                          lastSyncedAt={lastSyncedAt}
+                          contactsEnabled={contactsEnabled}
+                          syncContacts={syncContacts}
+                          updateStandardFields={updateStandardFields}
+                          updateCustomFields={updateCustomFields}
+                          addPromise={addPromise}
+                          togglePromiseDone={togglePromiseDone}
+                          linkPromiseToTask={linkPromiseToTask}
+                          deletePromise={deletePromise}
+                          addLike={addLike}
+                          deleteLike={deleteLike}
+                          addGiftIdea={addGiftIdea}
+                          toggleGiftGiven={toggleGiftGiven}
+                          deleteGiftIdea={deleteGiftIdea}
+                          tasks={tasks}
+                          createInboxTask={createInboxTask}
+                          onOpenSettings={() => setShowSettings(true)}
                         />
                       ) : currentView === "analytics" ? (
                         <TaskAnalyticsView

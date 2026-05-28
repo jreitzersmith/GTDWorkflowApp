@@ -11,12 +11,14 @@ function AppSidebar({
   currentView,
   gmailUnreadCount,
   calendarEnabled,
+  contactsEnabled,
   onSelectBucket,
   onSelectFocus,
   focusCount,
   onSelectEmail,
   onSelectCalendar,
   onSelectAnalytics,
+  onSelectContacts,
   onToggleSettings,
   onToggleUsage,
   onDailyReview,
@@ -107,6 +109,20 @@ function AppSidebar({
         </div>
 
         <div
+          onClick={onSelectContacts}
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "contacts" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "contacts" ? "#4db6ac" : "transparent"}`, transition: "background 0.1s" }}
+          onMouseEnter={e => { if (currentView !== "contacts") { e.currentTarget.style.background = COLORS.surface2; } }}
+          onMouseLeave={e => { if (currentView !== "contacts") { e.currentTarget.style.background = "transparent"; } }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#4db6ac", flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "contacts" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>👤</span>
+            Contacts
+          </span>
+          {contactsEnabled && <span style={{ fontSize: 9, background: "#4db6ac33", color: "#4db6ac", padding: "1px 5px", borderRadius: 8, fontWeight: 500 }}>✓</span>}
+        </div>
+
+        <div
           onClick={onSelectAnalytics}
           accessKey="a"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "analytics" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "analytics" ? COLORS.accent : "transparent"}`, transition: "background 0.1s" }}
@@ -158,13 +174,15 @@ AppSidebar.propTypes = {
   currentBucket:   PropTypes.string.isRequired,
   currentView:     PropTypes.string.isRequired,
   gmailUnreadCount: PropTypes.number,
-  calendarEnabled: PropTypes.bool.isRequired,
+  calendarEnabled:  PropTypes.bool.isRequired,
+  contactsEnabled:  PropTypes.bool.isRequired,
   onSelectBucket:  PropTypes.func.isRequired,
   onSelectFocus:   PropTypes.func.isRequired,
   focusCount:      PropTypes.number,
   onSelectEmail:   PropTypes.func.isRequired,
   onSelectCalendar: PropTypes.func.isRequired,
-  onSelectAnalytics: PropTypes.func.isRequired,
+  onSelectAnalytics:  PropTypes.func.isRequired,
+  onSelectContacts:   PropTypes.func.isRequired,
   onToggleSettings: PropTypes.func.isRequired,
   onToggleUsage:   PropTypes.func.isRequired,
   onDailyReview:   PropTypes.func.isRequired,
