@@ -519,7 +519,7 @@ export default function GTDManager() {
           syncContacts, updateStandardFields, updateCustomFields,
           addPromise, togglePromiseDone, linkPromiseToTask, deletePromise,
           addLike, deleteLike, addGiftIdea, toggleGiftGiven, deleteGiftIdea,
-  } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken });
+  } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id });
 
   // Create an Inbox task directly from a contact promise; returns the new task id.
   const createInboxTask = useCallback((text) => {

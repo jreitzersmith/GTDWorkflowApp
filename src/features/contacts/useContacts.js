@@ -33,7 +33,7 @@ import {
  * @param {boolean}      opts.supabaseReady
  * @param {function}     opts.refreshGoogleToken
  */
-function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken }) {
+function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId }) {
   const [contacts,         setContacts]         = useState([]);
   const [selectedContactId, setSelectedContactId] = useState(null);
   const [contactsLoading,  setContactsLoading]  = useState(false);
@@ -87,7 +87,7 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
       const upserted = await Promise.all(
         persons.map(async person => {
           const contact = googlePersonToContact(person);
-          const row     = contactToDb(contact);
+          const row     = { ...contactToDb(contact), user_id: userId };
           const saved   = await upsertContact(row);
           return dbToContact(saved);
         })
