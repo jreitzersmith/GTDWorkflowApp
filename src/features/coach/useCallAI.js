@@ -1150,6 +1150,20 @@ function useCallAI({
         }
       }
 
+      // →ACTION:mark-spam|<messageId> — mark email as spam and remove from inbox
+      if (googleToken && (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send')) {
+        const spamLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('→ACTION:mark-spam|'));
+        if (spamLine) {
+          try {
+            const spamMsgId = spamLine.slice('→ACTION:mark-spam|'.length).trim();
+            if (spamMsgId) {
+              await doGmailLabel(spamMsgId, ['SPAM'], ['INBOX'], googleToken);
+              updateChip = { taskName: 'Email', fields: ['marked as spam'] };
+            }
+          } catch (e) { actionError = `⚠ Mark as spam failed: ${e.message}`; }
+        }
+      }
+
       // →ACTION:create-slides|<title> — create PowerPoint (.pptx) via pptxgenjs + Drive upload
       if (googleToken && slidesEnabled) {
         const slidesLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-slides|'));

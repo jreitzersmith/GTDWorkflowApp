@@ -7,7 +7,7 @@ import { useGmailRulesCache } from "./useGmailRulesCache.js";
 
 // Tab container for the Email Management view — renders one of three panels
 // (Inbox, Cleanup, Rules) based on the active emailTab prop.
-function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, processEmailWithAI, attachEmailToTask, tasks, openCoachChat, authUser, logEmailAsReceipt }) {
+function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, processEmailWithAI, attachEmailToTask, tasks, openCoachChat, authUser, logEmailAsReceipt, markAsSpam }) {
   const { gmailLabels, setGmailLabels, gmailFilters, setGmailFilters, supabaseLoading } = useGmailRulesCache({ authUser });
 
   const tabStyle = (t) => ({
@@ -42,7 +42,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
         ))}
       </div>
 
-      {emailTab === 'inbox'   && <EmailInboxPanel   googleToken={googleToken} googleScope={googleScope} processEmailWithAI={processEmailWithAI} attachEmailToTask={attachEmailToTask} tasks={tasks} logEmailAsReceipt={logEmailAsReceipt} />}
+      {emailTab === 'inbox'   && <EmailInboxPanel   googleToken={googleToken} googleScope={googleScope} processEmailWithAI={processEmailWithAI} attachEmailToTask={attachEmailToTask} tasks={tasks} logEmailAsReceipt={logEmailAsReceipt} markAsSpam={markAsSpam} />}
       {emailTab === 'cleanup' && <EmailCleanupPanel gmailQueue={gmailQueue} setGmailQueue={setGmailQueue} googleToken={googleToken} authUser={authUser} openCoachChat={openCoachChat} />}
       {emailTab === 'rules'   && <EmailRulesPanel   googleToken={googleToken} googleScope={googleScope} gmailLabels={gmailLabels} setGmailLabels={setGmailLabels} gmailFilters={gmailFilters} setGmailFilters={setGmailFilters} supabaseLoading={supabaseLoading} />}
     </div>
@@ -62,6 +62,7 @@ EmailManagementView.propTypes = {
   openCoachChat:      PropTypes.func.isRequired,
   authUser:           PropTypes.object,
   logEmailAsReceipt:  PropTypes.func,
+  markAsSpam:         PropTypes.func,
 };
 
 export { EmailManagementView };

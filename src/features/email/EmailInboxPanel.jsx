@@ -6,7 +6,7 @@ import { doGmailFetchInbox, doGmailGetMessageBody, doGmailBatchLabel } from "./g
 import { avatarInitials, avatarColor, formatEmailDate, gmailBtn, gmailBtnPrimary, gmailBtnSm, gmailBtnSmDanger } from "./emailUtils.js";
 
 // Inbox list with checkboxes, avatar chips, pagination, and a detail slide-out panel.
-function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachEmailToTask, tasks, logEmailAsReceipt }) {
+function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachEmailToTask, tasks, logEmailAsReceipt, markAsSpam }) {
   const [inboxEmails, setInboxEmails] = useState([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError] = useState(null);
@@ -17,6 +17,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
   const [detailLoading, setDetailLoading] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [receiptStatus, setReceiptStatus] = useState(null); // null | 'loading' | 'ok' | error string
+  const [spamStatus, setSpamStatus] = useState(null);   // null | 'loading' | 'ok' | error string
 
   // Task-link picker state
   const [showTaskPicker, setShowTaskPicker] = useState(false);
@@ -44,6 +45,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
     setShowTaskPicker(false);
     setLinkedConfirm(null);
     setReceiptStatus(null);
+    setSpamStatus(null);
   }, [selectedId]);
 
   // Close picker on outside click
@@ -311,6 +313,36 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                   }}>
                   {archiving ? 'Archiving…' : 'Archive'}
                 </button>
+                {/* Mark as spam */}
+                {markAsSpam && (
+                  <div>
+                    {spamStatus === 'ok' ? (
+                      <div style={{ fontSize: 11, color: COLORS.muted, padding: '4px 0' }}>✓ Marked as spam</div>
+                    ) : (
+                      <>
+                        <button
+                          style={{ ...gmailBtn(), textAlign: 'left', width: '100%', color: '#e05555' }}
+                          disabled={spamStatus === 'loading'}
+                          onClick={async () => {
+                            setSpamStatus('loading');
+                            try {
+                              await markAsSpam(emailDetail);
+                              setInboxEmails(prev => prev.filter(e => e.id !== selectedId));
+                              setSelectedId(null);
+                            } catch (e) {
+                              setSpamStatus(e.message);
+                            }
+                          }}
+                        >
+                          {spamStatus === 'loading' ? 'Marking…' : '🚫 Mark as spam'}
+                        </button>
+                        {spamStatus && spamStatus !== 'loading' && spamStatus !== 'ok' && (
+                          <div style={{ fontSize: 11, color: '#e05555', marginTop: 2, lineHeight: 1.4 }}>{spamStatus}</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
                 <button style={{ ...gmailBtn(), textAlign: 'left', color: COLORS.muted }} onClick={() => setSelectedId(null)}>Close</button>
               </div>
             </>
@@ -328,6 +360,7 @@ EmailInboxPanel.propTypes = {
   attachEmailToTask:  PropTypes.func,
   tasks:              PropTypes.array,
   logEmailAsReceipt:  PropTypes.func,
+  markAsSpam:         PropTypes.func,
 };
 
 export { EmailInboxPanel };

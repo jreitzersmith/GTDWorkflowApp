@@ -29,7 +29,7 @@ import { createEmptyUsageStats } from "./features/settings/useAIUsageTracking.js
 
 import { parseRRULE, calEventStart, isAllDayEvent, genId } from "./features/calendar/calendarApi.js";
 import { driveUploadFile } from "./api/driveApi.js";
-import { doGmailSend } from "./features/email/gmailTools.js";
+import { doGmailSend, doGmailLabel } from "./features/email/gmailTools.js";
 import { sheetsAppendRows } from './api/sheetsApi.js';
 import { extractReceiptFields } from './features/email/receiptUtils.js';
 import { todayStr, isDeferred, buildNextOccurrence, extractSuggestions, extractMetadata, getOrderedChildren, useResizer, effortToMinutes } from "./features/tasks/taskUtils.jsx";
@@ -701,6 +701,12 @@ export default function GTDManager() {
     ];
     await sheetsAppendRows({ token: googleToken, spreadsheetId: receiptSheetId, range: 'Sheet1', values: [row] });
   }, [receiptSheetId, sheetsEnabled, googleToken]);
+
+  // Mark an email as spam via Gmail API (FR#131)
+  const markAsSpam = useCallback(async (email) => {
+    if (!googleToken || !email?.id) return;
+    await doGmailLabel(email.id, ['SPAM'], ['INBOX'], googleToken);
+  }, [googleToken]);
 
   // Prefill the coach chat with a raw prompt (no email wrapper) — used by cleanup workflow buttons
   const openCoachChat = useCallback((prompt) => {
@@ -1415,6 +1421,7 @@ export default function GTDManager() {
                           openCoachChat={openCoachChat}
                           authUser={authUser}
                           logEmailAsReceipt={logEmailAsReceipt}
+                          markAsSpam={markAsSpam}
                         />
                       ) : currentView === "calendar" ? (
                         <CalendarManagementView
