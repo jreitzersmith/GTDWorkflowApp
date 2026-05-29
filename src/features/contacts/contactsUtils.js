@@ -144,11 +144,16 @@ function contactToDb(contact) {
     company:               contact.company            ?? '',
     job_title:             contact.jobTitle           ?? '',
     photo_url:             contact.photoUrl           ?? null,
-    relationship_tags:     contact.relationshipTags   ?? [],
-    notes:                 contact.notes              ?? '',
-    likes_preferences:     contact.likesPreferences   ?? [],
-    gift_ideas:            contact.giftIdeas          ?? [],
-    promises:              contact.promises           ?? [],
+    // Enrichment fields: only include if explicitly present in the input object.
+    // contactToDb is called with partial objects for single-field saves (e.g.
+    // { likesPreferences: [...] }); using ?? here would emit [] / '' defaults for
+    // absent enrichment keys, causing updateContactCustomFields to wipe all other
+    // enrichment with every individual save. (Issue#37 / GH#176)
+    ...('relationshipTags' in contact ? { relationship_tags: contact.relationshipTags } : {}),
+    ...('notes'            in contact ? { notes:             contact.notes }            : {}),
+    ...('likesPreferences' in contact ? { likes_preferences: contact.likesPreferences } : {}),
+    ...('giftIdeas'        in contact ? { gift_ideas:        contact.giftIdeas }        : {}),
+    ...('promises'         in contact ? { promises:          contact.promises }          : {}),
   };
 }
 
