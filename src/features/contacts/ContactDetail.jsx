@@ -33,6 +33,9 @@ function ContactDetail({
   onNavigateToTask,
   markTaskDone,
   linkGiftToTask,
+  allContacts,
+  mergeOrphanIntoContact,
+  deleteOrphanContact,
 }) {
   const initials = contactInitials(contact);
 
@@ -47,6 +50,14 @@ function ContactDetail({
 
       {/* ── Scrollable body ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 24px' }}>
+        {!contact.googleResourceName && (
+          <OrphanBanner
+            contact={contact}
+            allContacts={allContacts || []}
+            onMerge={(targetId) => mergeOrphanIntoContact && mergeOrphanIntoContact(contact.id, targetId)}
+            onDelete={() => deleteOrphanContact && deleteOrphanContact(contact.id)}
+          />
+        )}
         <StandardFieldsSection
           contact={contact}
           onSave={(fields) => updateStandardFields(contact.id, fields)}
@@ -727,6 +738,59 @@ function AddButton({ onClick }) {
     >
       Add
     </button>
+  );
+}
+
+function OrphanBanner({ contact, allContacts, onMerge, onDelete }) {
+  const [targetId, setTargetId] = useState('');
+  const candidates = allContacts.filter(c => c.id !== contact.id && c.googleResourceName);
+
+  const hasEnrichment = (
+    (contact.relationshipTags || []).length > 0 ||
+    (contact.notes || '').trim() !== '' ||
+    (contact.likesPreferences || []).length > 0 ||
+    (contact.giftIdeas || []).length > 0 ||
+    (contact.promises || []).length > 0
+  );
+
+  return (
+    <div style={{ margin: '12px 20px', padding: '10px 14px', borderRadius: 8, background: '#d4a84a22', border: '1px solid #d4a84a66' }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#d4a84a', marginBottom: 6 }}>
+        Orphaned record — no Google contact linked
+      </div>
+      <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: hasEnrichment ? 10 : 0 }}>
+        {hasEnrichment
+          ? 'This record has enrichment data (tags, notes, gifts, or promises) but no Google contact. Merge it into a real contact or delete it.'
+          : 'This record is blank — it can be safely deleted.'}
+      </div>
+      {hasEnrichment && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+          <select
+            value={targetId}
+            onChange={e => setTargetId(e.target.value)}
+            style={{ flex: 1, minWidth: 140, padding: '4px 8px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none' }}
+          >
+            <option value="">Merge into…</option>
+            {candidates.map(c => (
+              <option key={c.id} value={c.id}>{c.displayName || c.givenName || c.id.slice(0, 8)}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => targetId && onMerge(targetId)}
+            disabled={!targetId}
+            style={{ padding: '4px 12px', borderRadius: 5, border: '1px solid #d4a84a66', background: '#d4a84a22', color: '#d4a84a', fontSize: 12, cursor: targetId ? 'pointer' : 'default', opacity: targetId ? 1 : 0.5 }}
+          >
+            Merge
+          </button>
+        </div>
+      )}
+      <button
+        onClick={onDelete}
+        style={{ padding: '4px 12px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}
+      >
+        Delete orphan
+      </button>
+    </div>
   );
 }
 

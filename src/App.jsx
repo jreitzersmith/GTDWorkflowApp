@@ -542,6 +542,8 @@ export default function GTDManager() {
           addPromise, togglePromiseDone, linkPromiseToTask, deletePromise,
           addLike, deleteLike, addGiftIdea, toggleGiftGiven, deleteGiftIdea,
           linkGiftToTask,
+          mergeOrphanIntoContact,
+          deleteOrphanContact,
   } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id, createTask: createInboxTask });
 
   // Navigate to a specific task from the Contacts panel (promise task link).
@@ -1535,6 +1537,8 @@ export default function GTDManager() {
                           onNavigateToTask={navigateToTask}
                           markTaskDone={markTaskDone}
                           linkGiftToTask={linkGiftToTask}
+                          mergeOrphanIntoContact={mergeOrphanIntoContact}
+                          deleteOrphanContact={deleteOrphanContact}
                           onOpenSettings={() => setShowSettings(true)}
                         />
                       ) : currentView === "analytics" ? (

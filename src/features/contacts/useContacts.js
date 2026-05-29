@@ -15,6 +15,7 @@ import {
   upsertContact,
   updateContactCustomFields,
   updateContactStandardFields,
+  deleteContact,
 } from '../../api/supabase.js';
 import {
   googlePersonToContact,
@@ -112,7 +113,23 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
 
       // Reload everything from Supabase to get the merged custom fields
       const allRows = await fetchContacts();
-      setContacts(allRows.map(dbToContact));
+      const allContacts = allRows.map(dbToContact);
+
+      // Auto-sweep: delete rows that have no Google resource name AND no enrichment
+      // (fully blank orphans that accumulated from previous sync issues)
+      const syncedResourceNames = new Set(persons.map(p => p.resourceName).filter(Boolean));
+      const emptyOrphans = allContacts.filter(c =>
+        !c.googleResourceName &&
+        c.relationshipTags.length === 0 &&
+        !c.notes.trim() &&
+        c.likesPreferences.length === 0 &&
+        c.giftIdeas.length === 0 &&
+        c.promises.length === 0
+      );
+      await Promise.all(emptyOrphans.map(c => deleteContact(c.id).catch(() => null)));
+
+      const survivingIds = new Set(emptyOrphans.map(c => c.id));
+      setContacts(allContacts.filter(c => !survivingIds.has(c.id)));
       setLastSyncedAt(new Date().toISOString());
     } catch (err) {
       setContactsError(err.message);
@@ -295,6 +312,38 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     return updateCustomFields(contactId, { giftIdeas });
   }, [contacts, updateCustomFields]);
 
+  // Issue#35: merge enrichment from an orphaned record into a real contact, then delete orphan
+  const mergeOrphanIntoContact = useCallback(async (orphanId, targetId) => {
+    const orphan = contacts.find(c => c.id === orphanId);
+    const target = contacts.find(c => c.id === targetId);
+    if (!orphan || !target) return;
+
+    const mergedTags     = [...new Set([...target.relationshipTags, ...orphan.relationshipTags])];
+    const mergedNotes    = [target.notes, orphan.notes].filter(s => s && s.trim()).join('\n\n');
+    const mergedLikes    = [...target.likesPreferences, ...orphan.likesPreferences];
+    const mergedGifts    = [...target.giftIdeas,        ...orphan.giftIdeas];
+    const mergedPromises = [...target.promises,          ...orphan.promises];
+
+    await updateCustomFields(targetId, {
+      relationshipTags: mergedTags,
+      notes:            mergedNotes,
+      likesPreferences: mergedLikes,
+      giftIdeas:        mergedGifts,
+      promises:         mergedPromises,
+    });
+
+    await deleteContact(orphanId).catch(() => null);
+    setContacts(cs => cs.filter(c => c.id !== orphanId));
+    if (selectedContactId === orphanId) setSelectedContactId(targetId);
+  }, [contacts, updateCustomFields, selectedContactId, setSelectedContactId]);
+
+  // Issue#35: delete an orphaned record (discarding any enrichment it holds)
+  const deleteOrphanContact = useCallback(async (orphanId) => {
+    await deleteContact(orphanId).catch(() => null);
+    setContacts(cs => cs.filter(c => c.id !== orphanId));
+    if (selectedContactId === orphanId) setSelectedContactId(null);
+  }, [selectedContactId, setSelectedContactId]);
+
   // FR#133: link/unlink a gift idea to an existing task
   const linkGiftToTask = useCallback((contactId, giftId, taskId) => {
     const contact = contacts.find(c => c.id === contactId);
@@ -333,6 +382,9 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     toggleGiftGiven,
     deleteGiftIdea,
     linkGiftToTask,
+    // Orphan management
+    mergeOrphanIntoContact,
+    deleteOrphanContact,
   };
 }
 

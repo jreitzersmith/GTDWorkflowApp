@@ -199,6 +199,9 @@ function ContactsPanel({
             onNavigateToTask={onNavigateToTask}
             markTaskDone={markTaskDone}
             linkGiftToTask={linkGiftToTask}
+            allContacts={contacts}
+            mergeOrphanIntoContact={mergeOrphanIntoContact}
+            deleteOrphanContact={deleteOrphanContact}
           />
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.muted, flexDirection: 'column', gap: 8 }}>
@@ -233,6 +236,9 @@ function ContactRow({ contact, selected, onClick }) {
       <Avatar initials={initials} photoUrl={contact.photoUrl} size={34} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, color: COLORS.text, fontWeight: selected ? 500 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {!contact.googleResourceName && (
+            <span title="Orphaned record — no Google contact linked" style={{ color: '#d4a84a', marginRight: 4, fontSize: 11 }}>⚠</span>
+          )}
           {contact.displayName || '(no name)'}
         </div>
         {email && (
