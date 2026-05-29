@@ -6,8 +6,6 @@
 
 ## Known issues / remaining work
 
-- Issue#36 [GH#174] (2026-05-29) — Orphan merge deletes source row even when Supabase write fails — `updateCustomFields` does not re-throw on error; `mergeOrphanIntoContact` calls `deleteContact` unconditionally. Fix: re-throw in `updateCustomFields` catch; abort early in `mergeOrphanIntoContact` if write fails.
-
 ---
 
 ## Code quality

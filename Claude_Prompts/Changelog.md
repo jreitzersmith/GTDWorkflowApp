@@ -21,6 +21,10 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-27 | Feature      | FR#119  | GH#138 | User-editable export templates — {{variable}} substitution; ExportTemplateEditor with formatting toolbar, variable chips, live format-aware preview; localStorage + Supabase persistence | fee84a3 |
 | 2026-05-27 | Bug Fix      | Issue#34 | GH#150 | RTF export unicode encoding — escRtf now encodes non-ASCII chars as \\uN? RTF Unicode escapes; strips emoji surrogates as ?; adds \\ansicpg1252 to RTF header | 23d563f |
 | 2026-05-27 | Code Quality | CQ#16    | GH#152 | waterfallFilter test mock data corrected — bucket:'next' replaced with bucket:'project'+isNextAction:true; 1 failing test now passes for the right reason | 0824601 |
+| 2026-05-29 | Bug Fix      | Issue#35 | GH#169 | ContactsPanel crash — mergeOrphanIntoContact and deleteOrphanContact missing from props destructure; added to ContactsPanel.jsx | fb5e29e |
+| 2026-05-29 | Feature      | FR#146   | GH#171 | Received promise auto-task: routes to Inbox (not Projects) with isWaitingFor flag (Part 1); createInboxTask bucket changed from 'project' to 'inbox' in App.jsx | e557a83 |
+| 2026-05-29 | Feature      | FR#147   | GH#172 | Made promise "new task" title format: "[text] — Promised to [ContactName]" replaces "[text] - [ContactName]" | e557a83 |
+| 2026-05-29 | Bug Fix      | Issue#36 | GH#174 | Orphan merge data loss — updateCustomFields now re-throws on Supabase error; mergeOrphanIntoContact aborts early if enrichment write fails; orphan row preserved until target write succeeds | 7fb1ce8 |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |
