@@ -45,7 +45,6 @@
 - FR#149 [GH#175] (2026-05-29) — Contact link on task: display contact name (with link) in Task Detail Panel for tasks created from promises/gifts; requires new `contact_id` UUID column on tasks table + migration
 - FR#145 [GH#170] (2026-05-29) — Gift-task reverse sync: task done → mark gift as "given" (with givenDate); bidirectional undo
 - FR#146 [GH#171] (2026-05-29) — Received promise auto-task: route to Inbox (not Projects) retaining isWaitingFor flag; AI Process mode routes to Waiting For + suggests follow-up due date (Part 2 deferred to FR#139)
-- FR#147 [GH#172] (2026-05-29) — Made promise "new task" title format: "[text] — Promised to [ContactName]" instead of "[text] - [ContactName]"
 - FR#148 [GH#173] (2026-05-29) — Full bidirectional promise↔task sync: uncheck promise → unmark task; task done → promise done (reverse direction)
 - FR#136 [GH#160] (2026-05-28) — Task picker in promises should filter to active tasks only (exclude Inbox History, done, archived)
 - FR#137 [GH#161] (2026-05-28) — Linked task title on promise: make it a clickable link to the task + add clear-link (×) button
