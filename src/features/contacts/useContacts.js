@@ -224,6 +224,7 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
       // Revert
       setContacts(cs => cs.map(c => c.id === contactId ? prev : c));
       setContactsError(err.message);
+      throw err; // re-throw so callers can abort dependent operations
     }
   }, [contacts]);
 
@@ -324,13 +325,19 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     const mergedGifts    = [...target.giftIdeas,        ...orphan.giftIdeas];
     const mergedPromises = [...target.promises,          ...orphan.promises];
 
-    await updateCustomFields(targetId, {
-      relationshipTags: mergedTags,
-      notes:            mergedNotes,
-      likesPreferences: mergedLikes,
-      giftIdeas:        mergedGifts,
-      promises:         mergedPromises,
-    });
+    try {
+      await updateCustomFields(targetId, {
+        relationshipTags: mergedTags,
+        notes:            mergedNotes,
+        likesPreferences: mergedLikes,
+        giftIdeas:        mergedGifts,
+        promises:         mergedPromises,
+      });
+    } catch {
+      // updateCustomFields already reverted state and set error banner;
+      // abort here — orphan is preserved, nothing is lost
+      return;
+    }
 
     await deleteContact(orphanId).catch(() => null);
     setContacts(cs => cs.filter(c => c.id !== orphanId));

@@ -1,10 +1,12 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#35** · Code Quality — **CQ#17** · Feature Requests — **FR#148**
+> **Last used numbers:** Known Issues — **Issue#36** · Code Quality — **CQ#17** · Feature Requests — **FR#149**
 
 ---
 
 ## Known issues / remaining work
+
+- Issue#36 [GH#174] (2026-05-29) — Orphan merge deletes source row even when Supabase write fails — `updateCustomFields` does not re-throw on error; `mergeOrphanIntoContact` calls `deleteContact` unconditionally. Fix: re-throw in `updateCustomFields` catch; abort early in `mergeOrphanIntoContact` if write fails.
 
 ---
 
@@ -42,6 +44,7 @@
 
 #### Contacts enrichment
 
+- FR#149 [GH#175] (2026-05-29) — Contact link on task: display contact name (with link) in Task Detail Panel for tasks created from promises/gifts; requires new `contact_id` UUID column on tasks table + migration
 - FR#145 [GH#170] (2026-05-29) — Gift-task reverse sync: task done → mark gift as "given" (with givenDate); bidirectional undo
 - FR#146 [GH#171] (2026-05-29) — Received promise auto-task: route to Inbox (not Projects) retaining isWaitingFor flag; AI Process mode routes to Waiting For + suggests follow-up due date (Part 2 deferred to FR#139)
 - FR#147 [GH#172] (2026-05-29) — Made promise "new task" title format: "[text] — Promised to [ContactName]" instead of "[text] - [ContactName]"
