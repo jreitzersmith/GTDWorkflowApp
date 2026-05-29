@@ -31,6 +31,8 @@ function ContactDetail({
   tasks,
   createInboxTask,
   onNavigateToTask,
+  markTaskDone,
+  linkGiftToTask,
 }) {
   const initials = contactInitials(contact);
 
@@ -69,16 +71,26 @@ function ContactDetail({
         <Divider />
         <GiftIdeasSection
           gifts={contact.giftIdeas || []}
+          tasks={tasks}
           onAdd={({ text }) => addGiftIdea(contact.id, { text })}
           onToggleGiven={(id) => toggleGiftGiven(contact.id, id)}
           onDelete={(id) => deleteGiftIdea(contact.id, id)}
+          onLinkTask={(giftId, taskId) => linkGiftToTask && linkGiftToTask(contact.id, giftId, taskId)}
+          onNavigateToTask={onNavigateToTask}
+          createInboxTask={createInboxTask}
+          contactDisplayName={contact.displayName}
+          markTaskDone={markTaskDone}
         />
         <Divider />
         <PromisesSection
           promises={contact.promises || []}
           tasks={tasks}
           onAdd={({ text, direction }) => addPromise(contact.id, { text, direction })}
-          onToggleDone={(id) => togglePromiseDone(contact.id, id)}
+          onToggleDone={(id) => {
+            const p = (contact.promises || []).find(p => p.id === id);
+            if (p && !p.done && p.taskId && markTaskDone) markTaskDone(p.taskId);
+            togglePromiseDone(contact.id, id);
+          }}
           onLinkTask={(promiseId, taskId) => linkPromiseToTask(contact.id, promiseId, taskId)}
           onDelete={(id) => deletePromise(contact.id, id)}
           createInboxTask={createInboxTask}
@@ -86,6 +98,7 @@ function ContactDetail({
           onNavigateToTask={onNavigateToTask}
           contactDisplayName={contact.displayName}
         />
+        <ContactIdentityFooter contact={contact} />
       </div>
     </div>
   );
@@ -317,8 +330,9 @@ function LikesSection({ likes, onAdd, onDelete }) {
 
 // ── Gift ideas ────────────────────────────────────────────────────────────────
 
-function GiftIdeasSection({ gifts, onAdd, onToggleGiven, onDelete }) {
+function GiftIdeasSection({ gifts, tasks, onAdd, onToggleGiven, onDelete, onLinkTask, onNavigateToTask, createInboxTask, contactDisplayName, markTaskDone }) {
   const [text, setText] = useState('');
+  const [giftPicker, setGiftPicker] = useState(null); // giftId being linked
 
   const submit = () => {
     const t = text.trim();
@@ -331,26 +345,65 @@ function GiftIdeasSection({ gifts, onAdd, onToggleGiven, onDelete }) {
     <Section title="Gift Ideas">
       {gifts.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
-          {gifts.map(gift => (
-            <div key={gift.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: COLORS.surface2, borderRadius: 5 }}>
-              <input
-                type="checkbox"
-                checked={gift.given}
-                onChange={() => onToggleGiven(gift.id)}
-                title="Mark as given"
-                style={{ cursor: 'pointer', accentColor: CONTACT_COLOR }}
-              />
-              <span style={{ flex: 1, fontSize: 13, color: gift.given ? COLORS.muted : COLORS.text, textDecoration: gift.given ? 'line-through' : 'none' }}>
-                {gift.text}
-              </span>
-              {gift.given && gift.givenDate && (
-                <span style={{ fontSize: 10, color: COLORS.muted }}>
-                  given {new Date(gift.givenDate).toLocaleDateString()}
-                </span>
-              )}
-              <span onClick={() => onDelete(gift.id)} style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 12 }}>✕</span>
-            </div>
-          ))}
+          {gifts.map(gift => {
+            const linkedTask = gift.taskId && tasks ? tasks.find(t => t.id === gift.taskId) : null;
+            return (
+              <div key={gift.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: COLORS.surface2, borderRadius: 5 }}>
+                  <input
+                    type="checkbox"
+                    checked={gift.given}
+                    onChange={() => {
+                      if (!gift.given && gift.taskId && markTaskDone) markTaskDone(gift.taskId);
+                      onToggleGiven(gift.id);
+                    }}
+                    title="Mark as given"
+                    style={{ cursor: 'pointer', accentColor: CONTACT_COLOR }}
+                  />
+                  <span style={{ flex: 1, fontSize: 13, color: gift.given ? COLORS.muted : COLORS.text, textDecoration: gift.given ? 'line-through' : 'none' }}>
+                    {gift.text}
+                  </span>
+                  {gift.given && gift.givenDate && (
+                    <span style={{ fontSize: 10, color: COLORS.muted }}>
+                      given {new Date(gift.givenDate).toLocaleDateString()}
+                    </span>
+                  )}
+                  {linkedTask ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <span
+                        onClick={() => onNavigateToTask && onNavigateToTask(linkedTask.id)}
+                        title={linkedTask.text}
+                        style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: COLORS.project + '22', color: COLORS.project, cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        → {linkedTask.text.slice(0, 20)}{linkedTask.text.length > 20 ? '…' : ''}
+                      </span>
+                      <span
+                        onClick={() => onLinkTask && onLinkTask(gift.id, null)}
+                        title="Remove task link"
+                        style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 10, lineHeight: 1 }}
+                      >✕</span>
+                    </span>
+                  ) : (
+                    <span
+                      onClick={() => setGiftPicker(gift.id)}
+                      style={{ fontSize: 10, color: COLORS.muted, cursor: 'pointer', textDecoration: 'underline' }}
+                    >link task</span>
+                  )}
+                  <span onClick={() => onDelete(gift.id)} style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 12 }}>✕</span>
+                </div>
+                {giftPicker === gift.id && (
+                  <GiftTaskPicker
+                    tasks={tasks}
+                    gift={gift}
+                    onLink={(taskId) => { onLinkTask && onLinkTask(gift.id, taskId); setGiftPicker(null); }}
+                    onClose={() => setGiftPicker(null)}
+                    createInboxTask={createInboxTask}
+                    contactDisplayName={contactDisplayName}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       <div style={{ display: 'flex', gap: 6 }}>
@@ -364,6 +417,60 @@ function GiftIdeasSection({ gifts, onAdd, onToggleGiven, onDelete }) {
         <AddButton onClick={submit} />
       </div>
     </Section>
+  );
+}
+
+function GiftTaskPicker({ tasks, gift, onLink, onClose, createInboxTask, contactDisplayName }) {
+  const [query, setQuery] = useState('');
+  const INACTIVE_BUCKETS = new Set(['inbox_history', 'completed']);
+  const activeTasks = (tasks || []).filter(t =>
+    !t.done && !INACTIVE_BUCKETS.has(t.bucket) && (
+      !query || t.text.toLowerCase().includes(query.toLowerCase())
+    )
+  ).slice(0, 12);
+
+  const handleCreateNew = () => {
+    const title = contactDisplayName ? gift.text + ' — ' + contactDisplayName : gift.text;
+    const newId = createInboxTask && createInboxTask(title);
+    if (newId) onLink(newId);
+  };
+
+  return (
+    <div style={{ marginTop: 4, padding: 8, background: COLORS.surface3, borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ fontSize: 11, color: COLORS.text2 }}>Link to a task</span>
+        <span onClick={onClose} style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 11 }}>✕</span>
+      </div>
+      <input
+        autoFocus
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder="Search tasks…"
+        style={{ width: '100%', boxSizing: 'border-box', padding: '4px 8px', marginBottom: 6, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none' }}
+      />
+      <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {activeTasks.map(task => (
+          <div
+            key={task.id}
+            onClick={() => onLink(task.id)}
+            style={{ padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12, color: COLORS.text, background: 'transparent' }}
+            onMouseEnter={e => e.currentTarget.style.background = COLORS.surface2}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            {task.text}
+          </div>
+        ))}
+        {activeTasks.length === 0 && !query && (
+          <div style={{ fontSize: 12, color: COLORS.muted, padding: '4px 8px' }}>No active tasks</div>
+        )}
+      </div>
+      <button
+        onClick={handleCreateNew}
+        style={{ marginTop: 6, width: '100%', padding: '5px 8px', background: CONTACT_COLOR + '22', color: CONTACT_COLOR, border: `1px solid ${CONTACT_COLOR}44`, borderRadius: 5, cursor: 'pointer', fontSize: 12 }}
+      >
+        + Create new Inbox task
+      </button>
+    </div>
   );
 }
 
@@ -620,6 +727,23 @@ function AddButton({ onClick }) {
     >
       Add
     </button>
+  );
+}
+
+function ContactIdentityFooter({ contact }) {
+  const shortId = contact.id ? contact.id.slice(0, 8) + '...' : '—';
+  const resourceName = contact.googleResourceName || null;
+  return (
+    <div style={{ padding: '16px 20px 8px', borderTop: `1px solid ${COLORS.border}`, marginTop: 12 }}>
+      <div style={{ fontSize: 10, color: COLORS.muted, lineHeight: 1.6, fontFamily: 'monospace' }}>
+        <span style={{ color: COLORS.text2, fontFamily: 'inherit' }}>ID: </span>{contact.id || '—'}
+      </div>
+      {resourceName && (
+        <div style={{ fontSize: 10, color: COLORS.muted, lineHeight: 1.6, fontFamily: 'monospace' }}>
+          <span style={{ color: COLORS.text2, fontFamily: 'inherit' }}>Google: </span>{resourceName}
+        </div>
+      )}
+    </div>
   );
 }
 

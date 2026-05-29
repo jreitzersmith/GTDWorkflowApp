@@ -33,6 +33,8 @@ function ContactsPanel({
   tasks,
   createInboxTask,
   onNavigateToTask,
+  markTaskDone,
+  linkGiftToTask,
   onOpenSettings,
 }) {
   const [searchText,      setSearchText]      = useState('');
@@ -195,6 +197,8 @@ function ContactsPanel({
             tasks={tasks}
             createInboxTask={createInboxTask}
             onNavigateToTask={onNavigateToTask}
+            markTaskDone={markTaskDone}
+            linkGiftToTask={linkGiftToTask}
           />
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.muted, flexDirection: 'column', gap: 8 }}>

@@ -32,8 +32,9 @@ import {
  * @param {boolean}      opts.contactsEnabled
  * @param {boolean}      opts.supabaseReady
  * @param {function}     opts.refreshGoogleToken
+ * @param {function|null} opts.createTask  - creates a task, returns new task id
  */
-function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId }) {
+function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId, createTask }) {
   const [contacts,         setContacts]         = useState([]);
   const [selectedContactId, setSelectedContactId] = useState(null);
   const [contactsLoading,  setContactsLoading]  = useState(false);
@@ -215,9 +216,16 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     const contact = contacts.find(c => c.id === contactId);
     if (!contact) return;
     const newPromise = makePromise({ text, direction });
+    // FR#134: "they promised" → auto-create a Waiting For task linked to this promise
+    if (direction === 'received' && createTask) {
+      const contactName = contact.displayName || contact.givenName || 'Contact';
+      const taskTitle = text + ' — ' + contactName;
+      const taskId = createTask(taskTitle, { isWaitingFor: true });
+      if (taskId) newPromise.taskId = taskId;
+    }
     const promises   = [...(contact.promises || []), newPromise];
     return updateCustomFields(contactId, { promises });
-  }, [contacts, updateCustomFields]);
+  }, [contacts, updateCustomFields, createTask]);
 
   const togglePromiseDone = useCallback((contactId, promiseId) => {
     const contact = contacts.find(c => c.id === contactId);
@@ -287,6 +295,16 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     return updateCustomFields(contactId, { giftIdeas });
   }, [contacts, updateCustomFields]);
 
+  // FR#133: link/unlink a gift idea to an existing task
+  const linkGiftToTask = useCallback((contactId, giftId, taskId) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) return;
+    const giftIdeas = contact.giftIdeas.map(g =>
+      g.id === giftId ? { ...g, taskId } : g
+    );
+    return updateCustomFields(contactId, { giftIdeas });
+  }, [contacts, updateCustomFields]);
+
   return {
     // State
     contacts,
@@ -314,6 +332,7 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     addGiftIdea,
     toggleGiftGiven,
     deleteGiftIdea,
+    linkGiftToTask,
   };
 }
 

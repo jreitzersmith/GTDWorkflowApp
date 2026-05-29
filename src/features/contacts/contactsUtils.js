@@ -202,6 +202,7 @@ function makeGiftIdea({ text }) {
     given:     false,
     givenDate: null,
     addedDate: new Date().toISOString(),
+    taskId:    null,
   };
 }
 

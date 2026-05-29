@@ -514,21 +514,35 @@ export default function GTDManager() {
     askAIAboutTask,
   });
 
+  // Create an Inbox or Waiting For task from a contact; returns the new task id.
+  // options.isWaitingFor = true → places task in the project bucket with isWaitingFor flag (FR#134)
+  const createInboxTask = useCallback((text, options = {}) => {
+    const newId = genId();
+    const baseTask = {
+      id: newId, text, done: false,
+      created: Date.now(), priority: [], location: [], dueDate: null,
+      effort: null, actualEffort: null, deferUntil: null, notes: null,
+    };
+    if (options.isWaitingFor) {
+      setTasks(prev => [{ ...baseTask, bucket: 'project', isWaitingFor: true }, ...prev]);
+    } else {
+      setTasks(prev => [{ ...baseTask, bucket: 'inbox' }, ...prev]);
+    }
+    return newId;
+  }, [setTasks]);
+
+  // Mark a task as done from the Contacts panel (promise/gift sync — FR#133, FR#135).
+  const markTaskDone = useCallback((taskId) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, done: true } : t));
+  }, [setTasks]);
+
   const { contacts, selectedContactId, setSelectedContactId,
           contactsLoading, contactsSyncing, contactsError, lastSyncedAt,
           syncContacts, updateStandardFields, updateCustomFields,
           addPromise, togglePromiseDone, linkPromiseToTask, deletePromise,
           addLike, deleteLike, addGiftIdea, toggleGiftGiven, deleteGiftIdea,
-  } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id });
-
-  // Create an Inbox task directly from a contact promise; returns the new task id.
-  const createInboxTask = useCallback((text) => {
-    const newId = genId();
-    setTasks(prev => [{ id: newId, text, bucket: 'inbox', done: false,
-      created: Date.now(), priority: [], location: [], dueDate: null,
-      effort: null, actualEffort: null, deferUntil: null, notes: null }, ...prev]);
-    return newId;
-  }, [setTasks]);
+          linkGiftToTask,
+  } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id, createTask: createInboxTask });
 
   // Navigate to a specific task from the Contacts panel (promise task link).
   // Switches to the task's bucket view and opens the task detail panel.
@@ -1519,6 +1533,8 @@ export default function GTDManager() {
                           tasks={tasks}
                           createInboxTask={createInboxTask}
                           onNavigateToTask={navigateToTask}
+                          markTaskDone={markTaskDone}
+                          linkGiftToTask={linkGiftToTask}
                           onOpenSettings={() => setShowSettings(true)}
                         />
                       ) : currentView === "analytics" ? (
