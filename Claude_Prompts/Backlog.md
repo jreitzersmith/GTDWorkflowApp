@@ -1,11 +1,12 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#34** · Code Quality — **CQ#17** · Feature Requests — **FR#132**
+> **Last used numbers:** Known Issues — **Issue#35** · Code Quality — **CQ#17** · Feature Requests — **FR#144**
 
 ---
 
 ## Known issues / remaining work
 
+- [ ] Issue#35 [GH#168] (2026-05-29) — Orphaned custom enrichment after hard reset: enrichment attaches to blank record rather than re-synced Google contact
 
 ---
 
@@ -35,13 +36,23 @@
 
 #### Integrations / data
 
-- FR#132 [GH#156] (2026-05-28) — Contact Manager: Google Contacts two-way sync + personal CRM enrichment (notes, relationship tags, likes/gift ideas, promises linked to tasks); new `contacts` Supabase table + People API integration
-
 - FR#17 [GH#12] — Gmail financial detail capture → Google Sheet
   - `sheetsApi.js` API wrapper exists. Missing: (1) Settings UI to configure target Sheet ID, (2) a `→ACTION:append_sheet` coach action line handler in `useCallAI.js`, (3) coach prompt instruction to identify financial emails and emit the action. Pattern matches FR#46 (receipt pipeline) — these two could be implemented together.
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
 - FR#70 [GH#70] (2026-05-12) — Multiple Google account support
   - `useGoogleAuth.js` has a single token store (`gtd_google_token` in localStorage). Significant refactor required: token store must be keyed by account email, `user_settings.google_accounts` array in Supabase, account selector UI in Email and Calendar panels, and per-account scope management. High risk — touches auth flow throughout the app.
+
+#### Contacts enrichment
+
+- [ ] FR#144 [GH#169] (2026-05-29) — Contact detail identity footer: internal UUID + Google resource name at bottom of each record
+- FR#136 [GH#160] (2026-05-28) — Task picker in promises should filter to active tasks only (exclude Inbox History, done, archived)
+- FR#137 [GH#161] (2026-05-28) — Linked task title on promise: make it a clickable link to the task + add clear-link (×) button
+- FR#138 [GH#162] (2026-05-28) — "Create new Inbox task from promise": task title should include contact name for context (e.g. "Send X to Jessica Beatty")
+- FR#139 [GH#163] (2026-05-28) — AI coach integration for Contacts: natural-language operations (tag, note, promise via coach)
+- FR#140 [GH#164] (2026-05-28) — Settings panel for Contacts: manage global relationship tags list and likes/preferences categories (persisted in user_settings)
+- FR#141 [GH#165] (2026-05-28) — Situation-aware tag clouds for likes/preferences categories (e.g. Dietary Preferences → gluten-free, vegan chips); depends on FR#140
+- FR#142 [GH#166] (2026-05-28) — "Dislikes and Things to Avoid" section in Contact detail — mirrors Likes/Preferences; requires new `dislikes JSONB` column on contacts table
+- FR#143 [GH#167] (2026-05-28) — Clear (×) button on contact list filter text input
 
 #### Data model expansions
 

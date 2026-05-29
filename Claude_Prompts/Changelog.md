@@ -177,3 +177,8 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-27 | Feature      | FR#130   | GH#154 | Hierarchical export: effort and notes rendered as indented sub-rows at depth+1 using resolvedIndentUnit — tracks custom indent unit correctly | f16294d |
 | 2026-05-27 | Feature      | FR#46   | GH#42  | Receipt-to-Sheets pipeline — extractReceiptFields (claude-haiku), Log as receipt button in EmailInboxPanel, receiptSheetId setting, →ACTION:append-sheet handler in useCallAI | 0195f23 |
 | 2026-05-28 | Feature      | FR#131  | GH#155 | Mark email as spam — Mark as spam button in EmailInboxPanel, markAsSpam callback in App.jsx, →ACTION:mark-spam handler in useCallAI, constants.jsx prompt updated | 7a1488f |
+| 2026-05-28 | Feature      | FR#132  | GH#156 | Contact Manager — Google Contacts two-way sync + personal CRM enrichment (notes, relationship tags, likes/preferences, gift ideas, promises linked to tasks); new contacts Supabase table + People API integration | f5c7398, ade9528, 558193a, 9688781 |
+| 2026-05-29 | Feature      | FR#133  | GH#157 | Gift ideas: task link badge + GiftTaskPicker; given→task done sync (markTaskDone) | TBD |
+| 2026-05-29 | Feature      | FR#134  | GH#158 | "They promised" auto-creates Waiting For task via createInboxTask({isWaitingFor:true}) | TBD |
+| 2026-05-29 | Feature      | FR#135  | GH#159 | Promise done → linked task done sync via markTaskDone in onToggleDone wrapper | TBD |
+| 2026-05-29 | Feature      | FR#144  | GH#169 | Contact detail identity footer: UUID + Google resource name for record identification | TBD |

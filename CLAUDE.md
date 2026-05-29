@@ -10,9 +10,9 @@ A personal GTD task manager built as a React SPA with an AI coach powered by the
 
 - React (functional components + hooks only — no class components), inline styles throughout (no CSS files), shared design tokens in `COLORS`
 - Anthropic Claude API (`claude-sonnet-4-6`); local Ollama support for coach panel
-- Supabase: `tasks` + `user_settings` + `gmail_queue` tables; `useSupabaseAuth.js`, `src/api/supabase.js` (field mappers: `taskToDb`/`dbToTask`, `queueEntryToRow`/`rowToQueueEntry`); tasks table includes `drive_attachments` JSONB column
+- Supabase: `tasks` + `user_settings` + `gmail_queue` + `contacts` tables; `useSupabaseAuth.js`, `src/api/supabase.js` (field mappers: `taskToDb`/`dbToTask`, `queueEntryToRow`/`rowToQueueEntry`); tasks table includes `drive_attachments` JSONB column; contacts table includes Google fields + custom enrichment (relationship_tags, notes, likes_preferences, gift_ideas, promises JSONB)
 - Google OAuth 2.0 (PKCE flow) via `useGoogleAuth.js`; unified scope management for Gmail, Calendar, Drive, Docs, Sheets, Slides
-- Google API modules: `src/api/driveApi.js`, `docsApi.js`, `sheetsApi.js`, `slidesApi.js` (typed wrappers with 401 retry)
+- Google API modules: `src/api/driveApi.js`, `docsApi.js`, `sheetsApi.js`, `slidesApi.js`, `contactsApi.js` (typed wrappers with 401 retry); `contactsApi.js` wraps People API (listAllGoogleContacts, updateGoogleContact with etag guard)
 - Vite for local dev
 
 ---
@@ -65,6 +65,7 @@ GTDWorkflowApp/
 │   ├── features/
 │   │   ├── calendar/
 │   │   ├── coach/
+│   │   ├── contacts/
 │   │   ├── email/
 │   │   ├── settings/
 │   │   └── tasks/
@@ -112,6 +113,10 @@ Chat · Process · Weekly Review · Brain Dump · Project Review · Daily Review
 ### API
 
 `fetch` → `https://api.anthropic.com/v1/messages`. Chat mode uses lazy task context (compact summary + `get_task_context` tool); all other modes receive full task list. Claude + Ollama provider selector. Google Services settings panel: unified OAuth with per-service scope preferences.
+
+### Contacts (People API)
+
+Sidebar Tools section — 👤 Contacts panel (teal #4db6ac). Two-way sync with Google Contacts (People API write scope). Custom enrichment stored in Supabase `contacts` table: relationship tags (preset + custom, shared suggestions across contacts), freeform notes (auto-save on blur), personal likes/preferences (category + value), gift ideas (given toggle + date stamp), promises/commitments (Made/Received direction badge, done toggle, optional task link). Promises can link to or create Inbox tasks. State managed by `src/features/contacts/useContacts.js`; sync builds a `standardRow` with only Google-sourced columns so custom enrichment fields are never overwritten by `ON CONFLICT DO UPDATE SET`.
 
 ---
 
