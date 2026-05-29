@@ -515,7 +515,7 @@ export default function GTDManager() {
   });
 
   // Create an Inbox or Waiting For task from a contact; returns the new task id.
-  // options.isWaitingFor = true → places task in the project bucket with isWaitingFor flag (FR#134)
+  // options.isWaitingFor = true → places task in Inbox with isWaitingFor flag for GTD processing (FR#134, FR#146)
   const createInboxTask = useCallback((text, options = {}) => {
     const newId = genId();
     const baseTask = {
@@ -524,7 +524,7 @@ export default function GTDManager() {
       effort: null, actualEffort: null, deferUntil: null, notes: null,
     };
     if (options.isWaitingFor) {
-      setTasks(prev => [{ ...baseTask, bucket: 'project', isWaitingFor: true }, ...prev]);
+      setTasks(prev => [{ ...baseTask, bucket: 'inbox', isWaitingFor: true }, ...prev]);
     } else {
       setTasks(prev => [{ ...baseTask, bucket: 'inbox' }, ...prev]);
     }

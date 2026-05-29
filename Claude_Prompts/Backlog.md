@@ -1,6 +1,6 @@
 # GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#35** · Code Quality — **CQ#17** · Feature Requests — **FR#144**
+> **Last used numbers:** Known Issues — **Issue#35** · Code Quality — **CQ#17** · Feature Requests — **FR#148**
 
 ---
 
@@ -42,7 +42,10 @@
 
 #### Contacts enrichment
 
-- [ ] FR#144 [GH#169] (2026-05-29) — Contact detail identity footer: internal UUID + Google resource name at bottom of each record
+- FR#145 [GH#170] (2026-05-29) — Gift-task reverse sync: task done → mark gift as "given" (with givenDate); bidirectional undo
+- FR#146 [GH#171] (2026-05-29) — Received promise auto-task: route to Inbox (not Projects) retaining isWaitingFor flag; AI Process mode routes to Waiting For + suggests follow-up due date (Part 2 deferred to FR#139)
+- FR#147 [GH#172] (2026-05-29) — Made promise "new task" title format: "[text] — Promised to [ContactName]" instead of "[text] - [ContactName]"
+- FR#148 [GH#173] (2026-05-29) — Full bidirectional promise↔task sync: uncheck promise → unmark task; task done → promise done (reverse direction)
 - FR#136 [GH#160] (2026-05-28) — Task picker in promises should filter to active tasks only (exclude Inbox History, done, archived)
 - FR#137 [GH#161] (2026-05-28) — Linked task title on promise: make it a clickable link to the task + add clear-link (×) button
 - FR#138 [GH#162] (2026-05-28) — "Create new Inbox task from promise": task title should include contact name for context (e.g. "Send X to Jessica Beatty")

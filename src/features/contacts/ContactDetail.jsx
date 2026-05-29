@@ -619,7 +619,7 @@ function TaskLinkPicker({ tasks, promise, onLink, onClose, createInboxTask, cont
 
   const handleCreateNew = () => {
     const baseText = promise.text.replace(/^to\s+/i, '');
-    const title = contactDisplayName ? `${baseText} — ${contactDisplayName}` : baseText;
+    const title = contactDisplayName ? `${baseText} — Promised to ${contactDisplayName}` : baseText;
     const newId = createInboxTask(title);
     if (newId) onLink(newId);
   };
