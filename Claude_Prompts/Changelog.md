@@ -182,3 +182,4 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-29 | Feature      | FR#134  | GH#158 | "They promised" auto-creates Waiting For task via createInboxTask({isWaitingFor:true}) | 75024d0 |
 | 2026-05-29 | Feature      | FR#135  | GH#159 | Promise done → linked task done sync via markTaskDone in onToggleDone wrapper | 75024d0 |
 | 2026-05-29 | Feature      | FR#144  | GH#169 | Contact detail identity footer: UUID + Google resource name for record identification | 75024d0 |
+| 2026-05-29 | Bug Fix      | Issue#35 | GH#168 | Orphaned contact records: auto-sweep empty orphans at sync; OrphanBanner merge/delete UI; orphan indicator in contact list | 18fa3c6 |

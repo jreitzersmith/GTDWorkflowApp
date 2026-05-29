@@ -6,8 +6,6 @@
 
 ## Known issues / remaining work
 
-- [ ] Issue#35 [GH#168] (2026-05-29) — Orphaned custom enrichment after hard reset: enrichment attaches to blank record rather than re-synced Google contact
-
 ---
 
 ## Code quality
