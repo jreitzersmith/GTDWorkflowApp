@@ -35,6 +35,8 @@ function ContactsPanel({
   onNavigateToTask,
   markTaskDone,
   linkGiftToTask,
+  mergeOrphanIntoContact,
+  deleteOrphanContact,
   onOpenSettings,
 }) {
   const [searchText,      setSearchText]      = useState('');
