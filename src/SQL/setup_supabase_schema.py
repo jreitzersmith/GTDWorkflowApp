@@ -22,8 +22,26 @@ import urllib.error
 import json
 import os
 
-# Load from environment or hardcode for one-time use
-MGMT_TOKEN = os.environ.get("SUPABASE_MANAGEMENT_TOKEN", "sbp_REDACTED")
+# Load from .env or environment — never hardcode tokens in source files
+MGMT_TOKEN = os.environ.get("SUPABASE_MANAGEMENT_TOKEN")
+if not MGMT_TOKEN:
+    # Try loading from .env manually
+    try:
+        with open(".env") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("SUPABASE_MANAGEMENT_TOKEN="):
+                    MGMT_TOKEN = line.split("=", 1)[1].strip()
+                    break
+    except FileNotFoundError:
+        pass
+
+if not MGMT_TOKEN:
+    raise SystemExit(
+        "ERROR: SUPABASE_MANAGEMENT_TOKEN not found in environment or .env.\n"
+        "Add it to your .env file (see .env.example)."
+    )
+
 PROJECT_REF = "tudmteqljgpocffalssz"
 URL = f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query"
 
