@@ -489,6 +489,11 @@ export default function GTDManager() {
     handleConfirmMove();
   }, [pendingAction, googleToken, handleConfirmMove, setPendingAction, setMessages]);
 
+  // Ref-forwarded callback so useTaskCrud can notify contacts of task done/undo
+  // (contacts + togglers come from useContacts which is called after useTaskCrud)
+  const handleTaskDoneChangedRef = useRef(null);
+  const stableTaskDoneChanged = useCallback((...args) => handleTaskDoneChangedRef.current?.(...args), []);
+
   const {
     addTask, addAndProcess, addProjectTask,
     moveTask, deleteTask, confirmDelete,
@@ -512,6 +517,7 @@ export default function GTDManager() {
     setInboxSelectedIds, setSelectedTaskId,
     setRecurringAcknowledgedMap,
     askAIAboutTask,
+    onTaskDoneChanged: stableTaskDoneChanged,
   });
 
   // Create an Inbox or Waiting For task from a contact; returns the new task id.
@@ -545,6 +551,16 @@ export default function GTDManager() {
           mergeOrphanIntoContact,
           deleteOrphanContact,
   } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id, createTask: createInboxTask });
+
+  // Wire up the task-done→contact sync now that contacts + togglers are available (FR#148, FR#145)
+  handleTaskDoneChangedRef.current = (taskId, isDone) => {
+    contacts.forEach(contact => {
+      const promise = (contact.promises || []).find(p => p.taskId === taskId);
+      if (promise && Boolean(promise.done) !== isDone) togglePromiseDone(contact.id, promise.id);
+      const gift = (contact.giftIdeas || []).find(g => g.taskId === taskId);
+      if (gift && Boolean(gift.given) !== isDone) toggleGiftGiven(contact.id, gift.id);
+    });
+  };
 
   // Navigate to a specific task from the Contacts panel (promise task link).
   // Switches to the task's bucket view and opens the task detail panel.

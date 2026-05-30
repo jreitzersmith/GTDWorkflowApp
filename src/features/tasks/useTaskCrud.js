@@ -19,6 +19,7 @@ import { buildNextOccurrence } from './taskUtils.jsx';
  *   setInboxSelectedIds: Function, setSelectedTaskId: Function,
  *   setRecurringAcknowledgedMap: Function,
  *   askAIAboutTask: Function,
+ *   onTaskDoneChanged: Function,
  * }} params
  */
 function useTaskCrud({
@@ -35,6 +36,7 @@ function useTaskCrud({
   setInboxSelectedIds, setSelectedTaskId,
   setRecurringAcknowledgedMap,
   askAIAboutTask,
+  onTaskDoneChanged = null,
 }) {
   // ── Creation ────────────────────────────────────────────────────────────
 
@@ -200,8 +202,9 @@ function useTaskCrud({
         const mapped = prev.map(t => t.id === taskId ? { ...t, done: true, bucket: 'done', completedDate: new Date().toISOString().split('T')[0] } : t);
         return nextOcc ? [nextOcc, ...mapped] : mapped;
       });
+      onTaskDoneChanged?.(taskId, true);
     }
-  }, [tasks, setActualEffortPrompt, setTasks]);
+  }, [tasks, setActualEffortPrompt, setTasks, onTaskDoneChanged]);
 
   const archiveTask = useCallback((id, options = {}) => {
     const task = tasks.find(t => t.id === id);
@@ -237,13 +240,15 @@ function useTaskCrud({
         const mapped = prev.map(t => t.id === id ? { ...t, done: true, bucket: 'done', completedDate: new Date().toISOString().split('T')[0] } : t);
         return nextOcc ? [nextOcc, ...mapped] : mapped;
       });
+      onTaskDoneChanged?.(id, true);
     } else {
       setTasks(prev => prev.map(t => t.id === id
         ? { ...t, done: false, bucket: 'inbox', actualEffort: null, completedDate: null }
         : t
       ));
+      onTaskDoneChanged?.(id, false);
     }
-  }, [tasks, setPendingDeferCheck, setPendingRollup, setActualEffortPrompt, setTasks]);
+  }, [tasks, setPendingDeferCheck, setPendingRollup, setActualEffortPrompt, setTasks, onTaskDoneChanged]);
 
   const handleRollupConfirm = useCallback((heading) => {
     if (!pendingRollup) return;
