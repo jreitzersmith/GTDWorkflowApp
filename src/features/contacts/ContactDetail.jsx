@@ -91,6 +91,7 @@ function ContactDetail({
           createInboxTask={createInboxTask}
           contactDisplayName={contact.displayName}
           markTaskDone={markTaskDone}
+          contactId={contact.id}
         />
         <Divider />
         <PromisesSection
@@ -341,7 +342,7 @@ function LikesSection({ likes, onAdd, onDelete }) {
 
 // ── Gift ideas ────────────────────────────────────────────────────────────────
 
-function GiftIdeasSection({ gifts, tasks, onAdd, onToggleGiven, onDelete, onLinkTask, onNavigateToTask, createInboxTask, contactDisplayName, markTaskDone }) {
+function GiftIdeasSection({ gifts, tasks, onAdd, onToggleGiven, onDelete, onLinkTask, onNavigateToTask, createInboxTask, contactDisplayName, markTaskDone, contactId }) {
   const [text, setText] = useState('');
   const [giftPicker, setGiftPicker] = useState(null); // giftId being linked
 
@@ -410,6 +411,7 @@ function GiftIdeasSection({ gifts, tasks, onAdd, onToggleGiven, onDelete, onLink
                     onClose={() => setGiftPicker(null)}
                     createInboxTask={createInboxTask}
                     contactDisplayName={contactDisplayName}
+                    contactId={contactId}
                   />
                 )}
               </div>
@@ -431,7 +433,7 @@ function GiftIdeasSection({ gifts, tasks, onAdd, onToggleGiven, onDelete, onLink
   );
 }
 
-function GiftTaskPicker({ tasks, gift, onLink, onClose, createInboxTask, contactDisplayName }) {
+function GiftTaskPicker({ tasks, gift, onLink, onClose, createInboxTask, contactDisplayName, contactId }) {
   const [query, setQuery] = useState('');
   const INACTIVE_BUCKETS = new Set(['inbox_history', 'completed']);
   const activeTasks = (tasks || []).filter(t =>
@@ -442,7 +444,7 @@ function GiftTaskPicker({ tasks, gift, onLink, onClose, createInboxTask, contact
 
   const handleCreateNew = () => {
     const title = contactDisplayName ? gift.text + ' — ' + contactDisplayName : gift.text;
-    const newId = createInboxTask && createInboxTask(title);
+    const newId = createInboxTask && createInboxTask(title, { contactId });
     if (newId) onLink(newId);
   };
 
@@ -517,6 +519,7 @@ function PromisesSection({ promises, tasks, onAdd, onToggleDone, onLinkTask, onD
               createInboxTask={createInboxTask}
               onNavigateToTask={onNavigateToTask}
               contactDisplayName={contactDisplayName}
+              contactId={contactId}
             />
           ))}
         </div>
@@ -543,7 +546,7 @@ function PromisesSection({ promises, tasks, onAdd, onToggleDone, onLinkTask, onD
   );
 }
 
-function PromiseRow({ promise, tasks, onToggleDone, onDelete, onLinkTask, showPicker, onOpenPicker, onClosePicker, createInboxTask, onNavigateToTask, contactDisplayName }) {
+function PromiseRow({ promise, tasks, onToggleDone, onDelete, onLinkTask, showPicker, onOpenPicker, onClosePicker, createInboxTask, onNavigateToTask, contactDisplayName, contactId }) {
   const linkedTask = promise.taskId ? tasks.find(t => t.id === promise.taskId) : null;
 
   return (
@@ -602,13 +605,14 @@ function PromiseRow({ promise, tasks, onToggleDone, onDelete, onLinkTask, showPi
           onClose={onClosePicker}
           createInboxTask={createInboxTask}
           contactDisplayName={contactDisplayName}
+          contactId={contactId}
         />
       )}
     </div>
   );
 }
 
-function TaskLinkPicker({ tasks, promise, onLink, onClose, createInboxTask, contactDisplayName }) {
+function TaskLinkPicker({ tasks, promise, onLink, onClose, createInboxTask, contactDisplayName, contactId }) {
   const [query, setQuery] = useState('');
   const INACTIVE_BUCKETS = new Set(['inbox_history', 'completed']);
   const activeTasks = tasks.filter(t =>
@@ -620,7 +624,7 @@ function TaskLinkPicker({ tasks, promise, onLink, onClose, createInboxTask, cont
   const handleCreateNew = () => {
     const baseText = promise.text.replace(/^to\s+/i, '');
     const title = contactDisplayName ? `${baseText} — Promised to ${contactDisplayName}` : baseText;
-    const newId = createInboxTask(title);
+    const newId = createInboxTask(title, { contactId });
     if (newId) onLink(newId);
   };
 

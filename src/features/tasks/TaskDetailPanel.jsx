@@ -528,7 +528,7 @@ SlidesGenerator.propTypes = {
 
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
-function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, slidesEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, slidesEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style, contactName }) {
   const {
     titleDraft, setTitleDraft, saveTitle,
     notesDraft, setNotesDraft, saveNotes,
@@ -614,6 +614,14 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Bucket</span>
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
+
+          {/* Contact link (FR#149) */}
+          {contactName && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+              <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Contact</span>
+              <span style={{ color: COLORS.text }}>{contactName}</span>
+            </div>
+          )}
 
           {/* Type toggle — nodeType selector, visible in Projects and Next Actions views */}
           {(['project', 'next', 'waiting', 'someday', 'deferred'].includes(currentBucket)) && (
@@ -897,6 +905,7 @@ TaskDetailPanel.propTypes = {
   onSkipRecurrence:  PropTypes.func,
   onClose:           PropTypes.func.isRequired,
   style:             PropTypes.object,
+  contactName:       PropTypes.string,
 };
 
 export { TaskDetailPanel };

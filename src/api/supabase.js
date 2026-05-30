@@ -72,6 +72,7 @@ function taskToDb(task, userId) {
     is_someday:         task.isSomeday     ?? false,
     is_next_action:     task.isNextAction  ?? false,
     defer_count:        task.deferCount    ?? 0,
+    contact_id:         task.contactId     ?? null,
   };
 }
 
@@ -105,6 +106,7 @@ function dbToTask(row) {
   if (row.is_someday)     t.isSomeday     = true;
   if (row.is_next_action) t.isNextAction  = true;
   if (row.defer_count)   t.deferCount = row.defer_count;
+  if (row.contact_id)    t.contactId  = row.contact_id;
   return t;
 }
 

@@ -528,6 +528,7 @@ export default function GTDManager() {
       id: newId, text, done: false,
       created: Date.now(), priority: [], location: [], dueDate: null,
       effort: null, actualEffort: null, deferUntil: null, notes: null,
+      ...(options.contactId ? { contactId: options.contactId } : {}),
     };
     if (options.isWaitingFor) {
       setTasks(prev => [{ ...baseTask, bucket: 'inbox', isWaitingFor: true }, ...prev]);
@@ -1725,6 +1726,7 @@ export default function GTDManager() {
                     onSkipRecurrence={(id) => { skipRecurrence(id); setSelectedTaskId(null); }}
                     onClose={() => setSelectedTaskId(null)}
                     style={s.detailPanel}
+                    contactName={selTask.contactId ? (contacts.find(c => c.id === selTask.contactId)?.name || null) : null}
                   />
                 </>
               ) : null;
