@@ -36,6 +36,13 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-29 | Feature      | FR#142   | GH#166 | Dislikes & Things to Avoid section on contacts; dislikes JSONB column on contacts table | f6cc1e2 |
 | 2026-05-29 | Feature      | FR#140   | GH#164 | Settings panel for Contacts: manage global relationship tags and likes/preferences categories | 3aa9a81 |
 | 2026-05-29 | Feature      | FR#141   | GH#165 | Situation-aware tag clouds: custom categories from settings merged into LikesSection/DislikesSection dropdowns and relationship tag suggestions | 3aa9a81 |
+| 2026-05-30 | Bug Fix      | Issue#38 | GH#177 | Gift task Contact field missing in TaskDetailPanel — contacts.find(...)?.name → ?.displayName | afee2043 |
+| 2026-05-30 | Feature      | FR#150   | GH#179 | Sort custom likes/dislikes categories alphabetically in dropdown | afee2043 |
+| 2026-05-30 | Bug Fix      | FR#153   | GH#182 | Task pickers showed done/inboxHistory tasks — corrected INACTIVE_BUCKETS names ('completed'→'done', 'inbox_history'→'inboxHistory') | afee2043 |
+| 2026-05-30 | Feature      | FR#151   | GH#180 | Relationship tags added via contact auto-add to Settings list (onAddCustomTag callback threaded App→ContactsPanel→ContactDetail→RelationshipTagsSection) | 611bf116 |
+| 2026-05-30 | Feature      | FR#155   | GH#184 | Settings > Contacts full CRUD: count badges per tag/category, cascade rename/merge, delete with replace | 786e3ede, 81a2c8c2 |
+| 2026-05-30 | Feature      | FR#139   | GH#163 | AI Chat mode contact enrichment: auto-apply contact_promise/like/dislike/tag/note/gift actions from natural language | 9fd2f0a7, 81a2c8c2 |
+| 2026-05-30 | Bug Fix      | —        | —      | Contacts TDZ crash (contacts referenced in useCallAI before useContacts declaration) + Settings list not updating on tag/category rename or delete | 81a2c8c2 |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |
@@ -199,3 +206,6 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-29 | Feature      | FR#144  | GH#169 | Contact detail identity footer: UUID + Google resource name for record identification | 75024d0 |
 | 2026-05-29 | Bug Fix      | Issue#35 | GH#168 | Orphaned contact records: auto-sweep empty orphans at sync; OrphanBanner merge/delete UI; orphan indicator in contact list | 18fa3c6 |
 | 2026-05-29 | Bug Fix      | —        | GH#168 | ContactsPanel crash: mergeOrphanIntoContact + deleteOrphanContact missing from props destructure | fb5e29e |
+| 2026-05-30 | Feature      | FR#154  | GH#183 | Backfill contact relationship tags from existing contacts into Settings list on load; settingsReady gate prevents race condition | 06b9a64 |
+| 2026-05-30 | Feature      | FR#156  | GH#185 | CamelCase entry for contact relationship tags and likes categories; toContactTagCase() utility; PRESET_TAGS updated | 06b9a64 |
+| 2026-05-30 | Feature      | —       | GH#183 | Alphabetical sort for ContactTagManager and ContactCategoryManager; refactored to value-based edit state (editingTag/editingCat) | 06b9a64 |
