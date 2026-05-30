@@ -41,6 +41,7 @@ function ContactsPanel({
   deleteOrphanContact,
   onOpenSettings,
   contactRelationshipTags,
+  setContactRelationshipTags,
   contactLikesCategories,
 }) {
   const [searchText,      setSearchText]      = useState('');
@@ -211,6 +212,7 @@ function ContactsPanel({
             mergeOrphanIntoContact={mergeOrphanIntoContact}
             deleteOrphanContact={deleteOrphanContact}
             contactRelationshipTags={contactRelationshipTags}
+            setContactRelationshipTags={setContactRelationshipTags}
             contactLikesCategories={contactLikesCategories}
           />
         ) : (

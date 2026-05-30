@@ -40,6 +40,7 @@ function ContactDetail({
   mergeOrphanIntoContact,
   deleteOrphanContact,
   contactRelationshipTags,
+  setContactRelationshipTags,
   contactLikesCategories,
 }) {
   const initials = contactInitials(contact);
@@ -73,6 +74,7 @@ function ContactDetail({
           allContactTags={allContactTags || []}
           customTags={contactRelationshipTags || []}
           onChange={(tags) => updateCustomFields(contact.id, { relationshipTags: tags })}
+          onAddCustomTag={(tag) => setContactRelationshipTags && setContactRelationshipTags(prev => prev.includes(tag) ? prev : [...prev, tag])}
         />
         <Divider />
         <NotesSection
@@ -237,13 +239,14 @@ function StandardFieldsSection({ contact, onSave }) {
 
 // ── Relationship tags ─────────────────────────────────────────────────────────
 
-function RelationshipTagsSection({ tags, allContactTags, customTags, onChange }) {
+function RelationshipTagsSection({ tags, allContactTags, customTags, onChange, onAddCustomTag }) {
   const [newTag, setNewTag] = useState('');
 
   const addTag = (tag) => {
     const t = tag.trim().toLowerCase();
     if (!t || tags.includes(t)) return;
     onChange([...tags, t]);
+    if (onAddCustomTag && !PRESET_TAGS.includes(t) && !customTags?.includes(t)) onAddCustomTag(t);
     setNewTag('');
   };
 

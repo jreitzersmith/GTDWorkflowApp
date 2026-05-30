@@ -1566,6 +1566,7 @@ export default function GTDManager() {
                           deleteOrphanContact={deleteOrphanContact}
                           onOpenSettings={() => setShowSettings(true)}
                           contactRelationshipTags={contactRelationshipTags}
+                          setContactRelationshipTags={setContactRelationshipTags}
                           contactLikesCategories={contactLikesCategories}
                         />
                       ) : currentView === "analytics" ? (
