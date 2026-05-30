@@ -339,7 +339,7 @@ function LikesSection({ likes, onAdd, onDelete, extraCategories }) {
           style={{ padding: '5px 8px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text2, fontSize: 12, outline: 'none' }}
         >
           <option value="">Category</option>
-          {[...new Set([...LIKE_CATEGORIES, ...(extraCategories || [])])].map(c => <option key={c} value={c}>{c}</option>)}
+          {[...new Set([...LIKE_CATEGORIES, ...(extraCategories || [])])].sort().map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <input
           value={value}
@@ -387,7 +387,7 @@ function DislikesSection({ dislikes, onAdd, onDelete, extraCategories }) {
           style={{ padding: '5px 8px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text2, fontSize: 12, outline: 'none' }}
         >
           <option value="">Category</option>
-          {[...new Set([...DISLIKE_CATEGORIES, ...(extraCategories || [])])].map(c => <option key={c} value={c}>{c}</option>)}
+          {[...new Set([...DISLIKE_CATEGORIES, ...(extraCategories || [])])].sort().map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <input
           value={value}
@@ -497,7 +497,7 @@ function GiftIdeasSection({ gifts, tasks, onAdd, onToggleGiven, onDelete, onLink
 
 function GiftTaskPicker({ tasks, gift, onLink, onClose, createInboxTask, contactDisplayName, contactId }) {
   const [query, setQuery] = useState('');
-  const INACTIVE_BUCKETS = new Set(['inbox_history', 'completed']);
+  const INACTIVE_BUCKETS = new Set(['done', 'inboxHistory']);
   const activeTasks = (tasks || []).filter(t =>
     !t.done && !INACTIVE_BUCKETS.has(t.bucket) && (
       !query || t.text.toLowerCase().includes(query.toLowerCase())
@@ -676,7 +676,7 @@ function PromiseRow({ promise, tasks, onToggleDone, onDelete, onLinkTask, showPi
 
 function TaskLinkPicker({ tasks, promise, onLink, onClose, createInboxTask, contactDisplayName, contactId }) {
   const [query, setQuery] = useState('');
-  const INACTIVE_BUCKETS = new Set(['inbox_history', 'completed']);
+  const INACTIVE_BUCKETS = new Set(['done', 'inboxHistory']);
   const activeTasks = tasks.filter(t =>
     !t.done && !INACTIVE_BUCKETS.has(t.bucket) && (
       !query || t.text.toLowerCase().includes(query.toLowerCase())

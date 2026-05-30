@@ -1736,7 +1736,7 @@ export default function GTDManager() {
                     onSkipRecurrence={(id) => { skipRecurrence(id); setSelectedTaskId(null); }}
                     onClose={() => setSelectedTaskId(null)}
                     style={s.detailPanel}
-                    contactName={selTask.contactId ? (contacts.find(c => c.id === selTask.contactId)?.name || null) : null}
+                    contactName={selTask.contactId ? (contacts.find(c => c.id === selTask.contactId)?.displayName || null) : null}
                   />
                 </>
               ) : null;
