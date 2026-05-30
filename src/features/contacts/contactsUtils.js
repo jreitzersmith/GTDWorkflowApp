@@ -237,6 +237,10 @@ function contactPrimaryPhone(contact) {
       || '';
 }
 
+// Converts free-text tag input to PascalCase ("close friend" → "CloseFriend").
+// Applied on save for new tags/categories to keep the namespace consistent.
+const toContactTagCase = (str) => str.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+
 export {
   googlePersonToContact,
   contactToGooglePatch,
@@ -249,4 +253,5 @@ export {
   contactInitials,
   contactPrimaryEmail,
   contactPrimaryPhone,
+  toContactTagCase,
 };

@@ -5,13 +5,13 @@
 import { useState, useCallback } from 'react';
 import { COLORS } from '../../constants.jsx';
 import { Avatar } from './ContactsPanel.jsx';
-import { contactInitials, contactPrimaryEmail, makePromise, makeLike, makeGiftIdea } from './contactsUtils.js';
+import { contactInitials, contactPrimaryEmail, makePromise, makeLike, makeGiftIdea, toContactTagCase } from './contactsUtils.js';
 
 const CONTACT_COLOR   = '#4db6ac';
 const PROMISE_MADE    = '#d4a84a';
 const PROMISE_RECEIVED = '#5a8fd4';
 
-const PRESET_TAGS = ['family', 'close friend', 'colleague', 'mentor', 'client', 'neighbor', 'acquaintance'];
+const PRESET_TAGS = ['Family', 'CloseFriend', 'Colleague', 'Mentor', 'Client', 'Neighbor', 'Acquaintance'];
 const LIKE_CATEGORIES = ['Food', 'Hobbies', 'Music', 'Sport', 'Film/TV', 'Books', 'Travel', 'Other'];
 const DISLIKE_CATEGORIES = ['Food', 'Hobbies', 'Music', 'Sport', 'Film/TV', 'Books', 'Travel', 'Behaviour', 'Other'];
 
@@ -243,7 +243,7 @@ function RelationshipTagsSection({ tags, allContactTags, customTags, onChange, o
   const [newTag, setNewTag] = useState('');
 
   const addTag = (tag) => {
-    const t = tag.trim().toLowerCase();
+    const t = toContactTagCase(tag);
     if (!t || tags.includes(t)) return;
     onChange([...tags, t]);
     if (onAddCustomTag && !PRESET_TAGS.includes(t) && !customTags?.includes(t)) onAddCustomTag(t);

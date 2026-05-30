@@ -5,6 +5,7 @@ import { taskShape } from "../../contexts.js";
 import {
   effortAccuracyColor, effortToMinutes, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES,
 } from "../tasks/taskUtils.jsx";
+import { toContactTagCase } from "../contacts/contactsUtils.js";
 
 // ── TagDisplaySetting ─────────────────────────────────────────────────────────
 // Toggle between "below" (tags on new line) and "inline" (tags next to title).
@@ -620,7 +621,7 @@ ReviewConfigManager.propTypes = {
 const CONTACT_COLOR = "#4db6ac";
 function ContactTagManager({ tags, contacts, onAdd, onRename, onRemove }) {
   const [newTagText, setNewTagText] = useState("");
-  const [editingIdx, setEditingIdx] = useState(null);
+  const [editingTag, setEditingTag] = useState(null);
   const [editText, setEditText] = useState("");
   const [removingName, setRemovingName] = useState(null);
   const [replaceWith, setReplaceWith] = useState("");
@@ -628,22 +629,22 @@ function ContactTagManager({ tags, contacts, onAdd, onRename, onRemove }) {
   const usedByCount = (name) => (contacts || []).filter(c => (c.relationshipTags || []).includes(name)).length;
 
   const handleAdd = () => {
-    const trimmed = newTagText.trim();
+    const trimmed = toContactTagCase(newTagText);
     if (!trimmed) return;
     onAdd(trimmed);
     setNewTagText("");
   };
 
-  const startEdit = (idx) => {
-    setEditingIdx(idx);
-    setEditText((tags || [])[idx]);
+  const startEdit = (tag) => {
+    setEditingTag(tag);
+    setEditText(tag);
     setRemovingName(null);
   };
 
   const confirmEdit = () => {
-    if (editingIdx !== null) {
-      onRename((tags || [])[editingIdx], editText);
-      setEditingIdx(null);
+    if (editingTag !== null) {
+      onRename(editingTag, editText);
+      setEditingTag(null);
       setEditText("");
     }
   };
@@ -651,7 +652,7 @@ function ContactTagManager({ tags, contacts, onAdd, onRename, onRemove }) {
   const startRemove = (name) => {
     setRemovingName(name);
     setReplaceWith("");
-    setEditingIdx(null);
+    setEditingTag(null);
   };
 
   const confirmRemove = () => {
@@ -669,9 +670,9 @@ function ContactTagManager({ tags, contacts, onAdd, onRename, onRemove }) {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
-        {(tags || []).map((tag, idx) => {
+        {[...(tags || [])].sort((a, b) => a.localeCompare(b)).map((tag) => {
           const count = usedByCount(tag);
-          const isEditing = editingIdx === idx;
+          const isEditing = editingTag === tag;
           const isRemoving = removingName === tag;
 
           return (
@@ -683,7 +684,7 @@ function ContactTagManager({ tags, contacts, onAdd, onRename, onRemove }) {
                     autoFocus
                     value={editText}
                     onChange={e => setEditText(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditingIdx(null); }}
+                    onKeyDown={e => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditingTag(null); }}
                     style={{ flex: 1, background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 5, padding: "3px 7px", color: COLORS.text, fontFamily: "inherit", fontSize: 13, outline: "none" }}
                   />
                 ) : (
@@ -693,11 +694,11 @@ function ContactTagManager({ tags, contacts, onAdd, onRename, onRemove }) {
                 {isEditing ? (
                   <div style={{ display: "flex", gap: 4 }}>
                     <button onClick={confirmEdit} style={{ padding: "3px 9px", borderRadius: 5, border: `1px solid ${COLORS.next}55`, background: "transparent", color: COLORS.next, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>Save</button>
-                    <button onClick={() => setEditingIdx(null)} style={{ padding: "3px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕</button>
+                    <button onClick={() => setEditingTag(null)} style={{ padding: "3px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕</button>
                   </div>
                 ) : (
                   <div style={{ display: "flex", gap: 4 }}>
-                    <button onClick={() => startEdit(idx)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
+                    <button onClick={() => startEdit(tag)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
                     <button onClick={() => startRemove(tag)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid #d45a5a44`, background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
                   </div>
                 )}
@@ -772,7 +773,7 @@ ContactTagManager.propTypes = {
 // Full CRUD for contact likes/dislikes categories with cascade rename/remap.
 function ContactCategoryManager({ categories, contacts, onAdd, onRename, onRemove }) {
   const [newCatText, setNewCatText] = useState("");
-  const [editingIdx, setEditingIdx] = useState(null);
+  const [editingCat, setEditingCat] = useState(null);
   const [editText, setEditText] = useState("");
   const [removingName, setRemovingName] = useState(null);
   const [replaceWith, setReplaceWith] = useState("");
@@ -783,22 +784,22 @@ function ContactCategoryManager({ categories, contacts, onAdd, onRename, onRemov
   ).length;
 
   const handleAdd = () => {
-    const trimmed = newCatText.trim();
+    const trimmed = toContactTagCase(newCatText);
     if (!trimmed) return;
     onAdd(trimmed);
     setNewCatText("");
   };
 
-  const startEdit = (idx) => {
-    setEditingIdx(idx);
-    setEditText((categories || [])[idx]);
+  const startEdit = (cat) => {
+    setEditingCat(cat);
+    setEditText(cat);
     setRemovingName(null);
   };
 
   const confirmEdit = () => {
-    if (editingIdx !== null) {
-      onRename((categories || [])[editingIdx], editText);
-      setEditingIdx(null);
+    if (editingCat !== null) {
+      onRename(editingCat, editText);
+      setEditingCat(null);
       setEditText("");
     }
   };
@@ -806,7 +807,7 @@ function ContactCategoryManager({ categories, contacts, onAdd, onRename, onRemov
   const startRemove = (name) => {
     setRemovingName(name);
     setReplaceWith("");
-    setEditingIdx(null);
+    setEditingCat(null);
   };
 
   const confirmRemove = () => {
@@ -824,9 +825,9 @@ function ContactCategoryManager({ categories, contacts, onAdd, onRename, onRemov
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
-        {(categories || []).map((cat, idx) => {
+        {[...(categories || [])].sort((a, b) => a.localeCompare(b)).map((cat) => {
           const count = usedByCount(cat);
-          const isEditing = editingIdx === idx;
+          const isEditing = editingCat === cat;
           const isRemoving = removingName === cat;
 
           return (
@@ -838,7 +839,7 @@ function ContactCategoryManager({ categories, contacts, onAdd, onRename, onRemov
                     autoFocus
                     value={editText}
                     onChange={e => setEditText(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditingIdx(null); }}
+                    onKeyDown={e => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditingCat(null); }}
                     style={{ flex: 1, background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 5, padding: "3px 7px", color: COLORS.text, fontFamily: "inherit", fontSize: 13, outline: "none" }}
                   />
                 ) : (
@@ -848,11 +849,11 @@ function ContactCategoryManager({ categories, contacts, onAdd, onRename, onRemov
                 {isEditing ? (
                   <div style={{ display: "flex", gap: 4 }}>
                     <button onClick={confirmEdit} style={{ padding: "3px 9px", borderRadius: 5, border: `1px solid ${COLORS.next}55`, background: "transparent", color: COLORS.next, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>Save</button>
-                    <button onClick={() => setEditingIdx(null)} style={{ padding: "3px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕</button>
+                    <button onClick={() => setEditingCat(null)} style={{ padding: "3px 7px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕</button>
                   </div>
                 ) : (
                   <div style={{ display: "flex", gap: 4 }}>
-                    <button onClick={() => startEdit(idx)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
+                    <button onClick={() => startEdit(cat)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
                     <button onClick={() => startRemove(cat)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid #d45a5a44`, background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
                   </div>
                 )}

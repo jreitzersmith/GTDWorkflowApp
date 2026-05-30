@@ -114,7 +114,7 @@ export default function GTDManager() {
   // Stable ref so useInboxProcessing can call suggestProjectGroup without a TDZ forward-reference
   const suggestProjectGroupRef = useRef(null);
 
-  const { syncStatus, supabaseReady } = useSupabaseSync({
+  const { syncStatus, supabaseReady, settingsReady } = useSupabaseSync({
     authUser, tasks, setTasks,
     locations, efforts, calibrationOverrides, categories,
     skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
@@ -415,6 +415,7 @@ export default function GTDManager() {
     return `Today's date: ${today}\n\n${sections.join("\n\n")}${calSection}`;
   }, [tasks, calendarEnabled, calendarEvents]);
 
+  const contactActionsRef = useRef({});
   const { callAI, sendChat, sendChatWithText, fetchModels, lastInputLog, setEmailContext,
 } = useCallAI({
     tasks, efforts, calibrationOverrides,
@@ -444,13 +445,7 @@ export default function GTDManager() {
     driveBaseFolderId,
     receiptSheetId,
     onFocusSet: () => setCurrentView('focus'),
-    contacts,
-    addPromise,
-    addLike,
-    addDislike,
-    addGiftIdea,
-    updateCustomFields,
-    createInboxTask,
+    contactActionsRef,
   });
 
   const switchCoachMode = useCallback((mode, introMsg) => {
@@ -563,6 +558,19 @@ export default function GTDManager() {
           mergeOrphanIntoContact,
           deleteOrphanContact,
   } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id, createTask: createInboxTask });
+  contactActionsRef.current = { contacts, addPromise, addLike, addDislike, addGiftIdea, updateCustomFields, createInboxTask };
+
+  // FR#154: one-time backfill of contact tags already on contacts into the settings list
+  const contactTagsBackfilledRef = useRef(false);
+  useEffect(() => {
+    if (contactTagsBackfilledRef.current || !settingsReady || !contacts.length) return;
+    contactTagsBackfilledRef.current = true;
+    const allTagsSet = new Set(contacts.flatMap(c => c.relationshipTags || []));
+    const newTags = [...allTagsSet].filter(t => !contactRelationshipTags.includes(t));
+    if (newTags.length > 0) {
+      setContactRelationshipTags(prev => [...new Set([...prev, ...newTags])]);
+    }
+  }, [settingsReady, contacts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wire up the task-done→contact sync now that contacts + togglers are available (FR#148, FR#145)
   handleTaskDoneChangedRef.current = (taskId, isDone) => {

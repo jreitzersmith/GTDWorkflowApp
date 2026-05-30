@@ -44,6 +44,8 @@ function useSupabaseSync({
 }) {
   // true once the initial Supabase read (or migration) has completed
   const [supabaseReady, setSupabaseReady] = useState(false);
+  // true once user_settings have been loaded or migrated
+  const [settingsReady, setSettingsReady] = useState(false);
   // 'synced' | 'offline'
   const [syncStatus, setSyncStatus] = useState('synced');
   // tracks previous tasks snapshot for write-sync diffing
@@ -106,6 +108,7 @@ function useSupabaseSync({
         if (error && error.code !== 'PGRST116') {
           console.error('Settings load error:', error);
           settingsReadyRef.current = true;
+          setSettingsReady(true);
           return;
         }
         if (data) {
@@ -125,6 +128,7 @@ function useSupabaseSync({
           if (Array.isArray(data.contact_relationship_tags)) setContactRelationshipTags(data.contact_relationship_tags);
           if (Array.isArray(data.contact_likes_categories))  setContactLikesCategories(data.contact_likes_categories);
           settingsReadyRef.current = true;
+          setSettingsReady(true);
         } else {
           // Supabase empty — migrate from localStorage
           const localLocations = (() => { try { return JSON.parse(localStorage.getItem('gtd_locations') || 'null') || ['Home', 'Work', 'Phone', 'Computer']; } catch { return ['Home', 'Work', 'Phone', 'Computer']; } })();
@@ -143,6 +147,7 @@ function useSupabaseSync({
           }).then(({ error: e2 }) => {
             if (e2) console.error('Settings migration failed:', e2);
             settingsReadyRef.current = true;
+            setSettingsReady(true);
           });
         }
       });
@@ -313,7 +318,7 @@ function useSupabaseSync({
     });
   }, [authUser, supabaseReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { syncStatus, supabaseReady };
+  return { syncStatus, supabaseReady, settingsReady };
 }
 
 export { useSupabaseSync };
