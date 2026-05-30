@@ -551,6 +551,8 @@ export default function GTDManager() {
           addPromise, togglePromiseDone, linkPromiseToTask, deletePromise,
           addLike, deleteLike, addDislike, deleteDislike, addGiftIdea, toggleGiftGiven, deleteGiftIdea,
           linkGiftToTask,
+          renameContactRelationshipTag, removeContactRelationshipTag,
+          renameContactLikeCategory, removeContactLikeCategory,
           mergeOrphanIntoContact,
           deleteOrphanContact,
   } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id, createTask: createInboxTask });
@@ -1469,6 +1471,11 @@ export default function GTDManager() {
                           onSetContactRelationshipTags={setContactRelationshipTags}
                           contactLikesCategories={contactLikesCategories}
                           onSetContactLikesCategories={setContactLikesCategories}
+                          contacts={contacts}
+                          onRenameContactRelationshipTag={renameContactRelationshipTag}
+                          onRemoveContactRelationshipTag={removeContactRelationshipTag}
+                          onRenameContactLikeCategory={renameContactLikeCategory}
+                          onRemoveContactLikeCategory={removeContactLikeCategory}
                         />
                       ) : showUsage ? (
                         <UsagePanel

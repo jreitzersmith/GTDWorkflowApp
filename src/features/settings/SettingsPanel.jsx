@@ -4,7 +4,7 @@ import ExportTemplateEditor from "./ExportTemplateEditor.jsx";
 import { COLORS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { SettingsSection } from "./SettingsSection.jsx";
-import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager } from "./SettingsManagerComponents.jsx";
+import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager, ContactTagManager, ContactCategoryManager } from "./SettingsManagerComponents.jsx";
 import { DriveFolderPicker } from "./DriveFolderPicker.jsx";
 
 // ── Google Services section config ────────────────────────────────────────────
@@ -118,6 +118,8 @@ function SettingsPanel({
   exportTemplates, onExportTemplatesChange,
   contactRelationshipTags, onSetContactRelationshipTags,
   contactLikesCategories, onSetContactLikesCategories,
+  contacts, onRenameContactRelationshipTag, onRemoveContactRelationshipTag,
+  onRenameContactLikeCategory, onRemoveContactLikeCategory,
 }) {
   const fileInputRef = useRef(null);
   const [importMode, setImportMode] = useState("replace");
@@ -675,20 +677,20 @@ function SettingsPanel({
         </SettingsSection>
 
         <SettingsSection label="Contacts" storageKey="gtd_settings_contacts">
-          <SimpleTagList
-            label="Relationship Tags"
-            description="Global tag suggestions shown when editing contacts."
+          <ContactTagManager
             tags={contactRelationshipTags}
+            contacts={contacts || []}
             onAdd={(tag) => onSetContactRelationshipTags(prev => [...prev.filter(t => t !== tag), tag])}
-            onRemove={(tag) => onSetContactRelationshipTags(prev => prev.filter(t => t !== tag))}
+            onRename={onRenameContactRelationshipTag}
+            onRemove={onRemoveContactRelationshipTag}
           />
           <div style={{ height: 14 }} />
-          <SimpleTagList
-            label="Likes & Preferences Categories"
-            description="Category options shown in the Likes/Preferences and Dislikes sections."
-            tags={contactLikesCategories}
-            onAdd={(tag) => onSetContactLikesCategories(prev => [...prev.filter(t => t !== tag), tag])}
-            onRemove={(tag) => onSetContactLikesCategories(prev => prev.filter(t => t !== tag))}
+          <ContactCategoryManager
+            categories={contactLikesCategories}
+            contacts={contacts || []}
+            onAdd={(cat) => onSetContactLikesCategories(prev => [...prev.filter(c => c !== cat), cat])}
+            onRename={onRenameContactLikeCategory}
+            onRemove={onRemoveContactLikeCategory}
           />
         </SettingsSection>
       </div>
@@ -830,6 +832,11 @@ SettingsPanel.propTypes = {
   onSetContactRelationshipTags: PropTypes.func.isRequired,
   contactLikesCategories:     PropTypes.arrayOf(PropTypes.string),
   onSetContactLikesCategories: PropTypes.func.isRequired,
+  contacts:                          PropTypes.array,
+  onRenameContactRelationshipTag:    PropTypes.func.isRequired,
+  onRemoveContactRelationshipTag:    PropTypes.func.isRequired,
+  onRenameContactLikeCategory:       PropTypes.func.isRequired,
+  onRemoveContactLikeCategory:       PropTypes.func.isRequired,
 };
 
 export { SettingsPanel };

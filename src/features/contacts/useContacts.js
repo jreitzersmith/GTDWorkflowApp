@@ -376,6 +376,58 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     return updateCustomFields(contactId, { giftIdeas });
   }, [contacts, updateCustomFields]);
 
+  // FR#155: cascade rename/remove relationship tags across all contacts
+  const renameContactRelationshipTag = useCallback(async (oldTag, newTag) => {
+    const affected = contacts.filter(c => (c.relationshipTags || []).includes(oldTag));
+    for (const c of affected) {
+      const tags = c.relationshipTags.map(t => t === oldTag ? newTag : t);
+      const deduped = [...new Set(tags)];
+      await updateCustomFields(c.id, { relationshipTags: deduped });
+    }
+  }, [contacts, updateCustomFields]);
+
+  const removeContactRelationshipTag = useCallback(async (tag, replaceWith) => {
+    const affected = contacts.filter(c => (c.relationshipTags || []).includes(tag));
+    for (const c of affected) {
+      let tags = c.relationshipTags.filter(t => t !== tag);
+      if (replaceWith && !tags.includes(replaceWith)) tags = [...tags, replaceWith];
+      await updateCustomFields(c.id, { relationshipTags: tags });
+    }
+  }, [contacts, updateCustomFields]);
+
+  const renameContactLikeCategory = useCallback(async (oldCat, newCat) => {
+    const affected = contacts.filter(c =>
+      (c.likesPreferences || []).some(l => l.category === oldCat) ||
+      (c.dislikes || []).some(d => d.category === oldCat)
+    );
+    for (const c of affected) {
+      const likesPreferences = (c.likesPreferences || []).map(l =>
+        l.category === oldCat ? { ...l, category: newCat } : l
+      );
+      const dislikes = (c.dislikes || []).map(d =>
+        d.category === oldCat ? { ...d, category: newCat } : d
+      );
+      await updateCustomFields(c.id, { likesPreferences, dislikes });
+    }
+  }, [contacts, updateCustomFields]);
+
+  const removeContactLikeCategory = useCallback(async (cat, replaceWith) => {
+    if (!replaceWith) return; // remove-only: update settings list only, no data change
+    const affected = contacts.filter(c =>
+      (c.likesPreferences || []).some(l => l.category === cat) ||
+      (c.dislikes || []).some(d => d.category === cat)
+    );
+    for (const c of affected) {
+      const likesPreferences = (c.likesPreferences || []).map(l =>
+        l.category === cat ? { ...l, category: replaceWith } : l
+      );
+      const dislikes = (c.dislikes || []).map(d =>
+        d.category === cat ? { ...d, category: replaceWith } : d
+      );
+      await updateCustomFields(c.id, { likesPreferences, dislikes });
+    }
+  }, [contacts, updateCustomFields]);
+
   return {
     // State
     contacts,
@@ -406,6 +458,10 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     toggleGiftGiven,
     deleteGiftIdea,
     linkGiftToTask,
+    renameContactRelationshipTag,
+    removeContactRelationshipTag,
+    renameContactLikeCategory,
+    removeContactLikeCategory,
     // Orphan management
     mergeOrphanIntoContact,
     deleteOrphanContact,
