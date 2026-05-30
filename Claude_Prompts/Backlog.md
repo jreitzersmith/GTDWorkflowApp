@@ -46,14 +46,10 @@
 - FR#145 [GH#170] (2026-05-29) — Gift-task reverse sync: task done → mark gift as "given" (with givenDate); bidirectional undo
 - FR#146 [GH#171] (2026-05-29) — Received promise auto-task: route to Inbox (not Projects) retaining isWaitingFor flag; AI Process mode routes to Waiting For + suggests follow-up due date (Part 2 deferred to FR#139)
 - FR#148 [GH#173] (2026-05-29) — Full bidirectional promise↔task sync: uncheck promise → unmark task; task done → promise done (reverse direction)
-- FR#136 [GH#160] (2026-05-28) — Task picker in promises should filter to active tasks only (exclude Inbox History, done, archived)
-- FR#137 [GH#161] (2026-05-28) — Linked task title on promise: make it a clickable link to the task + add clear-link (×) button
-- FR#138 [GH#162] (2026-05-28) — "Create new Inbox task from promise": task title should include contact name for context (e.g. "Send X to Jessica Beatty")
 - FR#139 [GH#163] (2026-05-28) — AI coach integration for Contacts: natural-language operations (tag, note, promise via coach)
 - FR#140 [GH#164] (2026-05-28) — Settings panel for Contacts: manage global relationship tags list and likes/preferences categories (persisted in user_settings)
 - FR#141 [GH#165] (2026-05-28) — Situation-aware tag clouds for likes/preferences categories (e.g. Dietary Preferences → gluten-free, vegan chips); depends on FR#140
 - FR#142 [GH#166] (2026-05-28) — "Dislikes and Things to Avoid" section in Contact detail — mirrors Likes/Preferences; requires new `dislikes JSONB` column on contacts table
-- FR#143 [GH#167] (2026-05-28) — Clear (×) button on contact list filter text input
 
 #### Data model expansions
 

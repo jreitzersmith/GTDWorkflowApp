@@ -26,6 +26,10 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-29 | Feature      | FR#147   | GH#172 | Made promise "new task" title format: "[text] — Promised to [ContactName]" replaces "[text] - [ContactName]" | e557a83 |
 | 2026-05-29 | Bug Fix      | Issue#36 | GH#174 | Orphan merge data loss — updateCustomFields now re-throws on Supabase error; mergeOrphanIntoContact aborts early if enrichment write fails; orphan row preserved until target write succeeds | 7fb1ce8 |
 | 2026-05-29 | Bug Fix      | Issue#37 | GH#176 | contactToDb partial-object enrichment wipe — enrichment fields changed from ?? defaults to 'key' in contact presence checks; single-field saves no longer zero all other enrichment columns | 149fa9a |
+| 2026-05-29 | Feature      | FR#136   | GH#160 | Task picker in promises filters to active tasks only (excludes done/archived/inboxHistory) | 9b38dba |
+| 2026-05-29 | Feature      | FR#137   | GH#161 | Linked task title on promise: clickable link to task + clear-link (×) button | 9b38dba |
+| 2026-05-29 | Feature      | FR#138   | GH#162 | "Create new Inbox task" from promise includes contact name in title | 9b38dba |
+| 2026-05-29 | Feature      | FR#143   | GH#167 | Clear (×) button on contact list filter text input | 9b38dba |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |
