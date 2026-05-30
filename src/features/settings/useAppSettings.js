@@ -126,6 +126,16 @@ function useAppSettings() {
   const [receiptSheetId, setReceiptSheetId] = useState(() => localStorage.getItem('gtd_receipt_sheet_id') || '');
   useEffect(() => { localStorage.setItem('gtd_receipt_sheet_id', receiptSheetId); }, [receiptSheetId]);
 
+  const [contactRelationshipTags, setContactRelationshipTags] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_contact_relationship_tags') || 'null') || []; } catch { return []; }
+  });
+  useEffect(() => { localStorage.setItem('gtd_contact_relationship_tags', JSON.stringify(contactRelationshipTags)); }, [contactRelationshipTags]);
+
+  const [contactLikesCategories, setContactLikesCategories] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gtd_contact_likes_categories') || 'null') || []; } catch { return []; }
+  });
+  useEffect(() => { localStorage.setItem('gtd_contact_likes_categories', JSON.stringify(contactLikesCategories)); }, [contactLikesCategories]);
+
   return {
     locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides,
     tagDisplay, setTagDisplay, categories, setCategories,
@@ -154,6 +164,8 @@ function useAppSettings() {
     userName, setUserName,
     exportTemplates, setExportTemplates,
     receiptSheetId, setReceiptSheetId,
+    contactRelationshipTags, setContactRelationshipTags,
+    contactLikesCategories, setContactLikesCategories,
   };
 }
 

@@ -65,7 +65,7 @@ export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId} = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId, contactRelationshipTags, setContactRelationshipTags, contactLikesCategories, setContactLikesCategories} = useAppSettings();
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState(coachName);
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
@@ -124,6 +124,8 @@ export default function GTDManager() {
     setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
     setGmailQueue,
     exportTemplates, setExportTemplates,
+    contactRelationshipTags, setContactRelationshipTags,
+    contactLikesCategories, setContactLikesCategories,
   });
 
   const { dragId, dropTarget, setDropTarget, handleProjectDragStart, handleProjectDragOver, handleProjectDragEnd, handleProjectDrop } = useDragDrop({ setTasks });
@@ -1463,6 +1465,10 @@ export default function GTDManager() {
                           onSetUserName={setUserName}
                           receiptSheetId={receiptSheetId}
                           onSetReceiptSheetId={setReceiptSheetId}
+                          contactRelationshipTags={contactRelationshipTags}
+                          onSetContactRelationshipTags={setContactRelationshipTags}
+                          contactLikesCategories={contactLikesCategories}
+                          onSetContactLikesCategories={setContactLikesCategories}
                         />
                       ) : showUsage ? (
                         <UsagePanel
@@ -1559,6 +1565,8 @@ export default function GTDManager() {
                           mergeOrphanIntoContact={mergeOrphanIntoContact}
                           deleteOrphanContact={deleteOrphanContact}
                           onOpenSettings={() => setShowSettings(true)}
+                          contactRelationshipTags={contactRelationshipTags}
+                          contactLikesCategories={contactLikesCategories}
                         />
                       ) : currentView === "analytics" ? (
                         <TaskAnalyticsView

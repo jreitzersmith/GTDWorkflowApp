@@ -22,6 +22,8 @@ import { DEFAULT_EFFORTS } from '../features/settings/useAppSettings.js';
  *   setUncategorizedProjectId: Function,
  *   setGmailQueue: Function,
  *   exportTemplates: object, setExportTemplates: Function,
+ *   contactRelationshipTags: Array, setContactRelationshipTags: Function,
+ *   contactLikesCategories: Array, setContactLikesCategories: Function,
  * }} params
  * @returns {{ syncStatus: string, supabaseReady: boolean }}
  */
@@ -37,6 +39,8 @@ function useSupabaseSync({
   setUncategorizedProjectId,
   setGmailQueue,
   exportTemplates, setExportTemplates,
+  contactRelationshipTags, setContactRelationshipTags,
+  contactLikesCategories, setContactLikesCategories,
 }) {
   // true once the initial Supabase read (or migration) has completed
   const [supabaseReady, setSupabaseReady] = useState(false);
@@ -118,6 +122,8 @@ function useSupabaseSync({
           if (Array.isArray(data.review_node_types)) setReviewNodeTypes(data.review_node_types);
           if (data.uncategorized_project_id) setUncategorizedProjectId(data.uncategorized_project_id);
           if (data.export_templates && typeof data.export_templates === 'object') setExportTemplates(data.export_templates);
+          if (Array.isArray(data.contact_relationship_tags)) setContactRelationshipTags(data.contact_relationship_tags);
+          if (Array.isArray(data.contact_likes_categories))  setContactLikesCategories(data.contact_likes_categories);
           settingsReadyRef.current = true;
         } else {
           // Supabase empty — migrate from localStorage
@@ -206,6 +212,8 @@ function useSupabaseSync({
           review_node_types: reviewNodeTypes,
           uncategorized_project_id: uncategorizedProjectId,
           export_templates: exportTemplates,
+          contact_relationship_tags: contactRelationshipTags,
+          contact_likes_categories: contactLikesCategories,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         .then(({ error }) => {
@@ -214,7 +222,7 @@ function useSupabaseSync({
         });
     }, 1500);
     return () => clearTimeout(settingsDebounceRef.current);
-  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, reviewNodeTypes, uncategorizedProjectId, exportTemplates, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, reviewNodeTypes, uncategorizedProjectId, exportTemplates, contactRelationshipTags, contactLikesCategories, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fallback: keep localStorage in sync for unauthenticated sessions
   useEffect(() => {

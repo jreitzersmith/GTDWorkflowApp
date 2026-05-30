@@ -40,6 +40,8 @@ function ContactsPanel({
   mergeOrphanIntoContact,
   deleteOrphanContact,
   onOpenSettings,
+  contactRelationshipTags,
+  contactLikesCategories,
 }) {
   const [searchText,      setSearchText]      = useState('');
   const [activeTagFilter, setActiveTagFilter] = useState(null);
@@ -208,6 +210,8 @@ function ContactsPanel({
             allContacts={contacts}
             mergeOrphanIntoContact={mergeOrphanIntoContact}
             deleteOrphanContact={deleteOrphanContact}
+            contactRelationshipTags={contactRelationshipTags}
+            contactLikesCategories={contactLikesCategories}
           />
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.muted, flexDirection: 'column', gap: 8 }}>

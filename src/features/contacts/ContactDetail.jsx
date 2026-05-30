@@ -39,6 +39,8 @@ function ContactDetail({
   allContacts,
   mergeOrphanIntoContact,
   deleteOrphanContact,
+  contactRelationshipTags,
+  contactLikesCategories,
 }) {
   const initials = contactInitials(contact);
 
@@ -69,6 +71,7 @@ function ContactDetail({
         <RelationshipTagsSection
           tags={contact.relationshipTags || []}
           allContactTags={allContactTags || []}
+          customTags={contactRelationshipTags || []}
           onChange={(tags) => updateCustomFields(contact.id, { relationshipTags: tags })}
         />
         <Divider />
@@ -81,12 +84,14 @@ function ContactDetail({
           likes={contact.likesPreferences || []}
           onAdd={({ category, value }) => addLike(contact.id, { category, value })}
           onDelete={(id) => deleteLike(contact.id, id)}
+          extraCategories={contactLikesCategories || []}
         />
         <Divider />
         <DislikesSection
           dislikes={contact.dislikes || []}
           onAdd={({ category, value }) => addDislike(contact.id, { category, value })}
           onDelete={(id) => deleteDislike(contact.id, id)}
+          extraCategories={contactLikesCategories || []}
         />
         <Divider />
         <GiftIdeasSection
@@ -232,7 +237,7 @@ function StandardFieldsSection({ contact, onSave }) {
 
 // ── Relationship tags ─────────────────────────────────────────────────────────
 
-function RelationshipTagsSection({ tags, allContactTags, onChange }) {
+function RelationshipTagsSection({ tags, allContactTags, customTags, onChange }) {
   const [newTag, setNewTag] = useState('');
 
   const addTag = (tag) => {
@@ -257,7 +262,7 @@ function RelationshipTagsSection({ tags, allContactTags, onChange }) {
       </div>
       {/* Suggestion chips: presets + any custom tags used on other contacts */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
-        {[...new Set([...PRESET_TAGS, ...allContactTags])]
+        {[...new Set([...PRESET_TAGS, ...(customTags || []), ...allContactTags])]
           .filter(t => !tags.includes(t))
           .map(t => (
             <span key={t} onClick={() => addTag(t)} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: COLORS.surface2, color: COLORS.text2, border: `1px solid ${COLORS.border}`, cursor: 'pointer' }}>
@@ -303,7 +308,7 @@ function NotesSection({ notes, onSave }) {
 
 // ── Likes / preferences ───────────────────────────────────────────────────────
 
-function LikesSection({ likes, onAdd, onDelete }) {
+function LikesSection({ likes, onAdd, onDelete, extraCategories }) {
   const [category, setCategory] = useState('');
   const [value,    setValue]    = useState('');
 
@@ -334,7 +339,7 @@ function LikesSection({ likes, onAdd, onDelete }) {
           style={{ padding: '5px 8px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text2, fontSize: 12, outline: 'none' }}
         >
           <option value="">Category</option>
-          {LIKE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {[...new Set([...LIKE_CATEGORIES, ...(extraCategories || [])])].map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <input
           value={value}
@@ -351,7 +356,7 @@ function LikesSection({ likes, onAdd, onDelete }) {
 
 // ── Dislikes & things to avoid ───────────────────────────────────────────────
 
-function DislikesSection({ dislikes, onAdd, onDelete }) {
+function DislikesSection({ dislikes, onAdd, onDelete, extraCategories }) {
   const [category, setCategory] = useState('');
   const [value,    setValue]    = useState('');
 
@@ -382,7 +387,7 @@ function DislikesSection({ dislikes, onAdd, onDelete }) {
           style={{ padding: '5px 8px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text2, fontSize: 12, outline: 'none' }}
         >
           <option value="">Category</option>
-          {DISLIKE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {[...new Set([...DISLIKE_CATEGORIES, ...(extraCategories || [])])].map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <input
           value={value}

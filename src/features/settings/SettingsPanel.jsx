@@ -116,6 +116,8 @@ function SettingsPanel({
   userName, onSetUserName,
   exportSettings, onExportSettingsChange,
   exportTemplates, onExportTemplatesChange,
+  contactRelationshipTags, onSetContactRelationshipTags,
+  contactLikesCategories, onSetContactLikesCategories,
 }) {
   const fileInputRef = useRef(null);
   const [importMode, setImportMode] = useState("replace");
@@ -671,6 +673,62 @@ function SettingsPanel({
             </div>
           )}
         </SettingsSection>
+
+        <SettingsSection label="Contacts" storageKey="gtd_settings_contacts">
+          <SimpleTagList
+            label="Relationship Tags"
+            description="Global tag suggestions shown when editing contacts."
+            tags={contactRelationshipTags}
+            onAdd={(tag) => onSetContactRelationshipTags(prev => [...prev.filter(t => t !== tag), tag])}
+            onRemove={(tag) => onSetContactRelationshipTags(prev => prev.filter(t => t !== tag))}
+          />
+          <div style={{ height: 14 }} />
+          <SimpleTagList
+            label="Likes & Preferences Categories"
+            description="Category options shown in the Likes/Preferences and Dislikes sections."
+            tags={contactLikesCategories}
+            onAdd={(tag) => onSetContactLikesCategories(prev => [...prev.filter(t => t !== tag), tag])}
+            onRemove={(tag) => onSetContactLikesCategories(prev => prev.filter(t => t !== tag))}
+          />
+        </SettingsSection>
+      </div>
+    </div>
+  );
+}
+
+function SimpleTagList({ label, description, tags, onAdd, onRemove }) {
+  const [inputVal, setInputVal] = useState('');
+  const submit = () => {
+    const t = inputVal.trim();
+    if (!t) return;
+    onAdd(t);
+    setInputVal('');
+  };
+  return (
+    <div style={{ marginBottom: 4 }}>
+      {label && <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>{label}</div>}
+      {description && <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 8 }}>{description}</div>}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+        {(tags || []).map(tag => (
+          <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 10px', borderRadius: 12, background: COLORS.surface3, border: `1px solid ${COLORS.border}`, fontSize: 12, color: COLORS.text }}>
+            {tag}
+            <span onClick={() => onRemove(tag)} style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 11, lineHeight: 1, marginLeft: 2 }}>✕</span>
+          </span>
+        ))}
+        {(!tags || tags.length === 0) && <span style={{ fontSize: 11, color: COLORS.muted, fontStyle: 'italic' }}>No custom tags yet</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          value={inputVal}
+          onChange={e => setInputVal(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+          placeholder="Add tag…"
+          style={{ flex: 1, padding: '5px 9px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
+        />
+        <button
+          onClick={submit}
+          style={{ padding: '5px 12px', background: COLORS.surface3, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+        >Add</button>
       </div>
     </div>
   );
@@ -768,6 +826,10 @@ SettingsPanel.propTypes = {
   onSetUserName:              PropTypes.func,
   exportTemplates:            PropTypes.object,
   onExportTemplatesChange:    PropTypes.func,
+  contactRelationshipTags:    PropTypes.arrayOf(PropTypes.string),
+  onSetContactRelationshipTags: PropTypes.func.isRequired,
+  contactLikesCategories:     PropTypes.arrayOf(PropTypes.string),
+  onSetContactLikesCategories: PropTypes.func.isRequired,
 };
 
 export { SettingsPanel };
