@@ -547,7 +547,7 @@ export default function GTDManager() {
           contactsLoading, contactsSyncing, contactsError, lastSyncedAt,
           syncContacts, updateStandardFields, updateCustomFields,
           addPromise, togglePromiseDone, linkPromiseToTask, deletePromise,
-          addLike, deleteLike, addGiftIdea, toggleGiftGiven, deleteGiftIdea,
+          addLike, deleteLike, addDislike, deleteDislike, addGiftIdea, toggleGiftGiven, deleteGiftIdea,
           linkGiftToTask,
           mergeOrphanIntoContact,
           deleteOrphanContact,
@@ -1546,6 +1546,8 @@ export default function GTDManager() {
                           deletePromise={deletePromise}
                           addLike={addLike}
                           deleteLike={deleteLike}
+                          addDislike={addDislike}
+                          deleteDislike={deleteDislike}
                           addGiftIdea={addGiftIdea}
                           toggleGiftGiven={toggleGiftGiven}
                           deleteGiftIdea={deleteGiftIdea}

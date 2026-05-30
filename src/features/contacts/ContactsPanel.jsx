@@ -27,6 +27,8 @@ function ContactsPanel({
   deletePromise,
   addLike,
   deleteLike,
+  addDislike,
+  deleteDislike,
   addGiftIdea,
   toggleGiftGiven,
   deleteGiftIdea,
@@ -193,6 +195,8 @@ function ContactsPanel({
             deletePromise={deletePromise}
             addLike={addLike}
             deleteLike={deleteLike}
+            addDislike={addDislike}
+            deleteDislike={deleteDislike}
             addGiftIdea={addGiftIdea}
             toggleGiftGiven={toggleGiftGiven}
             deleteGiftIdea={deleteGiftIdea}

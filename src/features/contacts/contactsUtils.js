@@ -154,6 +154,7 @@ function contactToDb(contact) {
     ...('likesPreferences' in contact ? { likes_preferences: contact.likesPreferences } : {}),
     ...('giftIdeas'        in contact ? { gift_ideas:        contact.giftIdeas }        : {}),
     ...('promises'         in contact ? { promises:          contact.promises }          : {}),
+    ...('dislikes'         in contact ? { dislikes:          contact.dislikes }          : {}),
   };
 }
 
@@ -178,6 +179,7 @@ function dbToContact(row) {
     likesPreferences:     row.likes_preferences || [],
     giftIdeas:            row.gift_ideas        || [],
     promises:             row.promises          || [],
+    dislikes:             row.dislikes          || [],
     createdAt:            row.created_at,
     updatedAt:            row.updated_at,
   };
@@ -198,6 +200,10 @@ function makePromise({ text, direction }) {
 
 function makeLike({ category, value }) {
   return { id: genId(), category: category || '', value: value || '' };
+}
+
+function makeDislike({ category, value }) {
+  return { id: genId(), category: category || '', value: value || '', addedDate: new Date().toISOString() };
 }
 
 function makeGiftIdea({ text }) {
@@ -238,6 +244,7 @@ export {
   dbToContact,
   makePromise,
   makeLike,
+  makeDislike,
   makeGiftIdea,
   contactInitials,
   contactPrimaryEmail,

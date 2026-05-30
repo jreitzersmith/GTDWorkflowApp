@@ -24,6 +24,7 @@ import {
   dbToContact,
   makePromise,
   makeLike,
+  makeDislike,
   makeGiftIdea,
 } from './contactsUtils.js';
 
@@ -286,6 +287,20 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     return updateCustomFields(contactId, { likesPreferences });
   }, [contacts, updateCustomFields]);
 
+  const addDislike = useCallback((contactId, { category, value }) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) return;
+    const dislikes = [...(contact.dislikes || []), makeDislike({ category, value })];
+    return updateCustomFields(contactId, { dislikes });
+  }, [contacts, updateCustomFields]);
+
+  const deleteDislike = useCallback((contactId, dislikeId) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) return;
+    const dislikes = (contact.dislikes || []).filter(d => d.id !== dislikeId);
+    return updateCustomFields(contactId, { dislikes });
+  }, [contacts, updateCustomFields]);
+
   // ── Gift idea helpers ────────────────────────────────────────────────────────
 
   const addGiftIdea = useCallback((contactId, { text }) => {
@@ -384,6 +399,8 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     // Likes
     addLike,
     deleteLike,
+    addDislike,
+    deleteDislike,
     // Gifts
     addGiftIdea,
     toggleGiftGiven,

@@ -13,6 +13,7 @@ const PROMISE_RECEIVED = '#5a8fd4';
 
 const PRESET_TAGS = ['family', 'close friend', 'colleague', 'mentor', 'client', 'neighbor', 'acquaintance'];
 const LIKE_CATEGORIES = ['Food', 'Hobbies', 'Music', 'Sport', 'Film/TV', 'Books', 'Travel', 'Other'];
+const DISLIKE_CATEGORIES = ['Food', 'Hobbies', 'Music', 'Sport', 'Film/TV', 'Books', 'Travel', 'Behaviour', 'Other'];
 
 function ContactDetail({
   contact,
@@ -25,6 +26,8 @@ function ContactDetail({
   deletePromise,
   addLike,
   deleteLike,
+  addDislike,
+  deleteDislike,
   addGiftIdea,
   toggleGiftGiven,
   deleteGiftIdea,
@@ -78,6 +81,12 @@ function ContactDetail({
           likes={contact.likesPreferences || []}
           onAdd={({ category, value }) => addLike(contact.id, { category, value })}
           onDelete={(id) => deleteLike(contact.id, id)}
+        />
+        <Divider />
+        <DislikesSection
+          dislikes={contact.dislikes || []}
+          onAdd={({ category, value }) => addDislike(contact.id, { category, value })}
+          onDelete={(id) => deleteDislike(contact.id, id)}
         />
         <Divider />
         <GiftIdeasSection
@@ -332,6 +341,54 @@ function LikesSection({ likes, onAdd, onDelete }) {
           onChange={e => setValue(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') submit(); }}
           placeholder="e.g. Thai food, hiking…"
+          style={{ flex: 1, padding: '5px 9px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none' }}
+        />
+        <AddButton onClick={submit} />
+      </div>
+    </Section>
+  );
+}
+
+// ── Dislikes & things to avoid ───────────────────────────────────────────────
+
+function DislikesSection({ dislikes, onAdd, onDelete }) {
+  const [category, setCategory] = useState('');
+  const [value,    setValue]    = useState('');
+
+  const submit = () => {
+    const v = value.trim();
+    if (!v) return;
+    onAdd({ category: category || 'Other', value: v });
+    setValue('');
+  };
+
+  return (
+    <Section title="Dislikes & Things to Avoid">
+      {dislikes.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
+          {dislikes.map(d => (
+            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: COLORS.surface2, borderRadius: 5 }}>
+              {d.category && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: COLORS.surface3, color: COLORS.text2 }}>{d.category}</span>}
+              <span style={{ flex: 1, fontSize: 13, color: COLORS.text }}>{d.value}</span>
+              <span onClick={() => onDelete(d.id)} style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 12 }}>✕</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <select
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+          style={{ padding: '5px 8px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text2, fontSize: 12, outline: 'none' }}
+        >
+          <option value="">Category</option>
+          {DISLIKE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <input
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+          placeholder="e.g. spicy food, crowds…"
           style={{ flex: 1, padding: '5px 9px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none' }}
         />
         <AddButton onClick={submit} />
