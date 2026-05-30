@@ -310,6 +310,13 @@ function useCallAI({
   driveBaseFolderId,
   receiptSheetId,
   onFocusSet,
+  contacts,
+  addPromise: addContactPromise,
+  addLike: addContactLike,
+  addDislike: addContactDislike,
+  addGiftIdea: addContactGiftIdea,
+  updateCustomFields: updateContactCustomFields,
+  createInboxTask,
 }) {
   const fetchModels = useCallback(async () => {
     try {
@@ -731,7 +738,7 @@ function useCallAI({
         // so match each block until the first blank line (\n\n) which separates
         // action lines from the AI's subsequent prose response.
         const taskActionLines = [];
-        const actionRe = /→ACTION:(?:update|add|create|link_email|next|someday|waiting)\|(?:[^\n]|\n(?!\n)(?!→ACTION:))+/g;
+        const actionRe = /→ACTION:(?:update|add|create|link_email|next|someday|waiting|contact_promise|contact_like|contact_dislike|contact_tag|contact_note|contact_gift)\|(?:[^\n]|\n(?!\n)(?!→ACTION:))+/g;
         for (const am of reply.matchAll(actionRe)) {
           taskActionLines.push(am[0].trimEnd());
         }
@@ -959,6 +966,135 @@ function useCallAI({
                   workingTasks = [newTask, ...workingTasks];
                 }
                 chips.push({ taskName: title, fields: ['created in Waiting For'] });
+              }
+              continue;
+            }
+
+            // →ACTION:contact_promise|<contactName>|direction:made|text:<text>[|create_task:yes]
+            // →ACTION:contact_promise|<contactName>|direction:received|text:<text>
+            if (line.startsWith('→ACTION:contact_promise|')) {
+              const parts = line.slice('→ACTION:contact_promise|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
+              }
+              const direction = xtra.direction || 'made';
+              const text = xtra.text || '';
+              const doCreateTask = xtra.create_task === 'yes';
+              if (contactName && text && addContactPromise) {
+                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+                if (contact) {
+                  await addContactPromise(contact.id, { text, direction });
+                  if (direction === 'made' && doCreateTask && createInboxTask) {
+                    createInboxTask(text, { contactId: contact.id });
+                  }
+                  chips.push({ taskName: contactName, fields: [direction === 'made' ? 'promise recorded' : 'received promise recorded'] });
+                } else {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:contact_like|<contactName>|category:<cat>|value:<val>
+            if (line.startsWith('→ACTION:contact_like|')) {
+              const parts = line.slice('→ACTION:contact_like|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
+              }
+              if (contactName && xtra.value && addContactLike) {
+                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+                if (contact) {
+                  await addContactLike(contact.id, { category: xtra.category || 'General', value: xtra.value });
+                  chips.push({ taskName: contactName, fields: ['like added: ' + xtra.value] });
+                } else {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:contact_dislike|<contactName>|category:<cat>|value:<val>
+            if (line.startsWith('→ACTION:contact_dislike|')) {
+              const parts = line.slice('→ACTION:contact_dislike|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
+              }
+              if (contactName && xtra.value && addContactDislike) {
+                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+                if (contact) {
+                  await addContactDislike(contact.id, { category: xtra.category || 'General', value: xtra.value });
+                  chips.push({ taskName: contactName, fields: ['dislike added: ' + xtra.value] });
+                } else {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:contact_tag|<contactName>|tag:<tag>
+            if (line.startsWith('→ACTION:contact_tag|')) {
+              const parts = line.slice('→ACTION:contact_tag|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const tag = (parts[1] || '').replace(/^tag:/, '').trim();
+              if (contactName && tag && updateContactCustomFields) {
+                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+                if (contact) {
+                  const existing = contact.relationshipTags || [];
+                  if (!existing.includes(tag)) {
+                    await updateContactCustomFields(contact.id, { relationshipTags: [...existing, tag] });
+                  }
+                  chips.push({ taskName: contactName, fields: ['tag added: ' + tag] });
+                } else {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:contact_note|<contactName>|text:<text>
+            if (line.startsWith('→ACTION:contact_note|')) {
+              const parts = line.slice('→ACTION:contact_note|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const text = (parts[1] || '').replace(/^text:/, '').trim();
+              if (contactName && text && updateContactCustomFields) {
+                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+                if (contact) {
+                  const existing = contact.notes || '';
+                  const newNotes = existing ? existing + '\n' + text : text;
+                  await updateContactCustomFields(contact.id, { notes: newNotes });
+                  chips.push({ taskName: contactName, fields: ['note added'] });
+                } else {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:contact_gift|<contactName>|text:<text>
+            if (line.startsWith('→ACTION:contact_gift|')) {
+              const parts = line.slice('→ACTION:contact_gift|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const text = (parts[1] || '').replace(/^text:/, '').trim();
+              if (contactName && text && addContactGiftIdea) {
+                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+                if (contact) {
+                  await addContactGiftIdea(contact.id, { text });
+                  chips.push({ taskName: contactName, fields: ['gift idea added: ' + text] });
+                } else {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                }
               }
               continue;
             }

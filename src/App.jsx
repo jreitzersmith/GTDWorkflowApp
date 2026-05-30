@@ -444,6 +444,13 @@ export default function GTDManager() {
     driveBaseFolderId,
     receiptSheetId,
     onFocusSet: () => setCurrentView('focus'),
+    contacts,
+    addPromise,
+    addLike,
+    addDislike,
+    addGiftIdea,
+    updateCustomFields,
+    createInboxTask,
   });
 
   const switchCoachMode = useCallback((mode, introMsg) => {

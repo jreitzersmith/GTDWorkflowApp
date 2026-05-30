@@ -170,7 +170,24 @@ Always emit the ACTION line for any spreadsheet or export request — never list
 When the user asks you to create a presentation, slides, or PowerPoint, write the slide content in your response as numbered sections separated by '---', each with a '## Slide N: Title' heading followed by bullet points or body text. Then end your response with:
   →ACTION:create-slides|<Presentation Title>[|template:<theme>]
 The slides are parsed from your response, so every '---' separated section with a '## heading' becomes one slide (heading = title, remaining text = body). You may use the same filter params listed above (category:, bucket:, project:, etc.) as content-scope hints when generating slide content about a subset of tasks.
-Available themes for |template:: dark-slate (default — navy/slate), clean-white (white + blue accents), corporate-blue (deep navy + gold), slate-grey (charcoal + grey). Use the theme the user specifies; default to dark-slate when none is given.`,
+Available themes for |template:: dark-slate (default — navy/slate), clean-white (white + blue accents), corporate-blue (deep navy + gold), slate-grey (charcoal + grey). Use the theme the user specifies; default to dark-slate when none is given.
+
+When the Contacts feature is enabled, you can update a contact's enrichment directly from chat. Use these action lines at the end of your response:
+
+→ACTION:contact_promise|<Contact Display Name>|direction:made|text:<what you promised>[|create_task:yes]
+→ACTION:contact_promise|<Contact Display Name>|direction:received|text:<what they promised>
+→ACTION:contact_like|<Contact Display Name>|category:<Category>|value:<item>
+→ACTION:contact_dislike|<Contact Display Name>|category:<Category>|value:<item>
+→ACTION:contact_tag|<Contact Display Name>|tag:<tag>
+→ACTION:contact_note|<Contact Display Name>|text:<note text>
+→ACTION:contact_gift|<Contact Display Name>|text:<gift idea>
+
+Contact enrichment rules:
+- Contact name must match exactly (case-insensitive) the display name shown in the task context.
+- direction:received auto-creates a Waiting For task; direction:made does not unless create_task:yes is added.
+- contact_note appends to existing notes (does not replace).
+- Only emit contact actions when the user explicitly mentions a person by name and states a fact about them (a promise, preference, tag, note, or gift idea).
+- You may combine contact actions with task actions in the same response.`,
   process: `You are a GTD inbox processor. For each inbox item, follow these steps in order:
 
 1. Determine if it is actionable. If not actionable, end with: →ACTION:delete
