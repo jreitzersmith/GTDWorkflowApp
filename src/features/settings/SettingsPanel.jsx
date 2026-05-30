@@ -681,16 +681,28 @@ function SettingsPanel({
             tags={contactRelationshipTags}
             contacts={contacts || []}
             onAdd={(tag) => onSetContactRelationshipTags(prev => [...prev.filter(t => t !== tag), tag])}
-            onRename={onRenameContactRelationshipTag}
-            onRemove={onRemoveContactRelationshipTag}
+            onRename={(oldTag, newTag) => {
+              onSetContactRelationshipTags(prev => [...new Set(prev.map(t => t === oldTag ? newTag : t))]);
+              onRenameContactRelationshipTag(oldTag, newTag);
+            }}
+            onRemove={(tag, replaceWith) => {
+              onSetContactRelationshipTags(prev => prev.filter(t => t !== tag));
+              onRemoveContactRelationshipTag(tag, replaceWith);
+            }}
           />
           <div style={{ height: 14 }} />
           <ContactCategoryManager
             categories={contactLikesCategories}
             contacts={contacts || []}
             onAdd={(cat) => onSetContactLikesCategories(prev => [...prev.filter(c => c !== cat), cat])}
-            onRename={onRenameContactLikeCategory}
-            onRemove={onRemoveContactLikeCategory}
+            onRename={(oldCat, newCat) => {
+              onSetContactLikesCategories(prev => [...new Set(prev.map(c => c === oldCat ? newCat : c))]);
+              onRenameContactLikeCategory(oldCat, newCat);
+            }}
+            onRemove={(cat, replaceWith) => {
+              onSetContactLikesCategories(prev => prev.filter(c => c !== cat));
+              onRemoveContactLikeCategory(cat, replaceWith);
+            }}
           />
         </SettingsSection>
       </div>

@@ -310,13 +310,7 @@ function useCallAI({
   driveBaseFolderId,
   receiptSheetId,
   onFocusSet,
-  contacts,
-  addPromise: addContactPromise,
-  addLike: addContactLike,
-  addDislike: addContactDislike,
-  addGiftIdea: addContactGiftIdea,
-  updateCustomFields: updateContactCustomFields,
-  createInboxTask,
+  contactActionsRef,
 }) {
   const fetchModels = useCallback(async () => {
     try {
@@ -984,12 +978,12 @@ function useCallAI({
               const direction = xtra.direction || 'made';
               const text = xtra.text || '';
               const doCreateTask = xtra.create_task === 'yes';
-              if (contactName && text && addContactPromise) {
-                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+              if (contactName && text && contactActionsRef.current.addPromise) {
+                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
                 if (contact) {
-                  await addContactPromise(contact.id, { text, direction });
-                  if (direction === 'made' && doCreateTask && createInboxTask) {
-                    createInboxTask(text, { contactId: contact.id });
+                  await contactActionsRef.current.addPromise(contact.id, { text, direction });
+                  if (direction === 'made' && doCreateTask && contactActionsRef.current.createInboxTask) {
+                    contactActionsRef.current.createInboxTask(text, { contactId: contact.id });
                   }
                   chips.push({ taskName: contactName, fields: [direction === 'made' ? 'promise recorded' : 'received promise recorded'] });
                 } else {
@@ -1009,10 +1003,10 @@ function useCallAI({
                 if (ci < 0) continue;
                 xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
               }
-              if (contactName && xtra.value && addContactLike) {
-                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+              if (contactName && xtra.value && contactActionsRef.current.addLike) {
+                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
                 if (contact) {
-                  await addContactLike(contact.id, { category: xtra.category || 'General', value: xtra.value });
+                  await contactActionsRef.current.addLike(contact.id, { category: xtra.category || 'General', value: xtra.value });
                   chips.push({ taskName: contactName, fields: ['like added: ' + xtra.value] });
                 } else {
                   actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
@@ -1031,10 +1025,10 @@ function useCallAI({
                 if (ci < 0) continue;
                 xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
               }
-              if (contactName && xtra.value && addContactDislike) {
-                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+              if (contactName && xtra.value && contactActionsRef.current.addDislike) {
+                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
                 if (contact) {
-                  await addContactDislike(contact.id, { category: xtra.category || 'General', value: xtra.value });
+                  await contactActionsRef.current.addDislike(contact.id, { category: xtra.category || 'General', value: xtra.value });
                   chips.push({ taskName: contactName, fields: ['dislike added: ' + xtra.value] });
                 } else {
                   actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
@@ -1048,12 +1042,12 @@ function useCallAI({
               const parts = line.slice('→ACTION:contact_tag|'.length).split('|');
               const contactName = (parts[0] || '').trim();
               const tag = (parts[1] || '').replace(/^tag:/, '').trim();
-              if (contactName && tag && updateContactCustomFields) {
-                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+              if (contactName && tag && contactActionsRef.current.updateCustomFields) {
+                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
                 if (contact) {
                   const existing = contact.relationshipTags || [];
                   if (!existing.includes(tag)) {
-                    await updateContactCustomFields(contact.id, { relationshipTags: [...existing, tag] });
+                    await contactActionsRef.current.updateCustomFields(contact.id, { relationshipTags: [...existing, tag] });
                   }
                   chips.push({ taskName: contactName, fields: ['tag added: ' + tag] });
                 } else {
@@ -1068,12 +1062,12 @@ function useCallAI({
               const parts = line.slice('→ACTION:contact_note|'.length).split('|');
               const contactName = (parts[0] || '').trim();
               const text = (parts[1] || '').replace(/^text:/, '').trim();
-              if (contactName && text && updateContactCustomFields) {
-                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+              if (contactName && text && contactActionsRef.current.updateCustomFields) {
+                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
                 if (contact) {
                   const existing = contact.notes || '';
                   const newNotes = existing ? existing + '\n' + text : text;
-                  await updateContactCustomFields(contact.id, { notes: newNotes });
+                  await contactActionsRef.current.updateCustomFields(contact.id, { notes: newNotes });
                   chips.push({ taskName: contactName, fields: ['note added'] });
                 } else {
                   actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
@@ -1087,10 +1081,10 @@ function useCallAI({
               const parts = line.slice('→ACTION:contact_gift|'.length).split('|');
               const contactName = (parts[0] || '').trim();
               const text = (parts[1] || '').replace(/^text:/, '').trim();
-              if (contactName && text && addContactGiftIdea) {
-                const contact = (contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
+              if (contactName && text && contactActionsRef.current.addGiftIdea) {
+                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
                 if (contact) {
-                  await addContactGiftIdea(contact.id, { text });
+                  await contactActionsRef.current.addGiftIdea(contact.id, { text });
                   chips.push({ taskName: contactName, fields: ['gift idea added: ' + text] });
                 } else {
                   actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
