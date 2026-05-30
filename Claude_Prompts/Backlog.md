@@ -42,14 +42,8 @@
 
 #### Contacts enrichment
 
-- FR#149 [GH#175] (2026-05-29) — Contact link on task: display contact name (with link) in Task Detail Panel for tasks created from promises/gifts; requires new `contact_id` UUID column on tasks table + migration
-- FR#145 [GH#170] (2026-05-29) — Gift-task reverse sync: task done → mark gift as "given" (with givenDate); bidirectional undo
 - FR#146 [GH#171] (2026-05-29) — Received promise auto-task: route to Inbox (not Projects) retaining isWaitingFor flag; AI Process mode routes to Waiting For + suggests follow-up due date (Part 2 deferred to FR#139)
-- FR#148 [GH#173] (2026-05-29) — Full bidirectional promise↔task sync: uncheck promise → unmark task; task done → promise done (reverse direction)
 - FR#139 [GH#163] (2026-05-28) — AI coach integration for Contacts: natural-language operations (tag, note, promise via coach)
-- FR#140 [GH#164] (2026-05-28) — Settings panel for Contacts: manage global relationship tags list and likes/preferences categories (persisted in user_settings)
-- FR#141 [GH#165] (2026-05-28) — Situation-aware tag clouds for likes/preferences categories (e.g. Dietary Preferences → gluten-free, vegan chips); depends on FR#140
-- FR#142 [GH#166] (2026-05-28) — "Dislikes and Things to Avoid" section in Contact detail — mirrors Likes/Preferences; requires new `dislikes JSONB` column on contacts table
 
 #### Data model expansions
 

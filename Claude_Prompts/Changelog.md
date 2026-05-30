@@ -30,6 +30,12 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-29 | Feature      | FR#137   | GH#161 | Linked task title on promise: clickable link to task + clear-link (×) button | 9b38dba |
 | 2026-05-29 | Feature      | FR#138   | GH#162 | "Create new Inbox task" from promise includes contact name in title | 9b38dba |
 | 2026-05-29 | Feature      | FR#143   | GH#167 | Clear (×) button on contact list filter text input | 9b38dba |
+| 2026-05-29 | Feature      | FR#148   | GH#173 | Bidirectional task↔promise sync: task done/undo → promise.done toggle; onTaskDoneChanged callback in useTaskCrud | 02255a6 |
+| 2026-05-29 | Feature      | FR#145   | GH#170 | Gift-task reverse sync: task done/undo → gift.given toggle (bidirectional) | 02255a6 |
+| 2026-05-29 | Feature      | FR#149   | GH#175 | Contact link on task: contact_id FK on tasks; TaskDetailPanel shows Contact row; createInboxTask passes contactId | f4845ef |
+| 2026-05-29 | Feature      | FR#142   | GH#166 | Dislikes & Things to Avoid section on contacts; dislikes JSONB column on contacts table | f6cc1e2 |
+| 2026-05-29 | Feature      | FR#140   | GH#164 | Settings panel for Contacts: manage global relationship tags and likes/preferences categories | 3aa9a81 |
+| 2026-05-29 | Feature      | FR#141   | GH#165 | Situation-aware tag clouds: custom categories from settings merged into LikesSection/DislikesSection dropdowns and relationship tag suggestions | 3aa9a81 |
 |------------|--------------|---------|-------|-------------------------------------------------------------------|-------------------|
 | 2026-05-21 | Bug Fix | Issue#32 | GH#131 | Daily Review non-functional — nav away, blank chat, no focus-view post-MIT | e9f370e3 |
 | 2026-05-20 | Bug Fix | Issue#31 | GH#130 | Multiple →ACTION:create lines in one reply — only first task created; regex lookahead fix | ec641b9a |
