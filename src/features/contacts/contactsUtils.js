@@ -157,6 +157,7 @@ function contactToDb(contact) {
     ...('dislikes'         in contact ? { dislikes:          contact.dislikes }          : {}),
     ...('emailHistory'     in contact ? { email_history:     contact.emailHistory }      : {}),
     ...('driveAttachments' in contact ? { drive_attachments: contact.driveAttachments }  : {}),
+    ...('isFavorite'       in contact ? { is_favorite:       contact.isFavorite }       : {}),
   };
 }
 
@@ -184,6 +185,7 @@ function dbToContact(row) {
     dislikes:             row.dislikes          || [],
     emailHistory:         row.email_history     || [],
     driveAttachments:     row.drive_attachments || [],
+    isFavorite:           row.is_favorite      ?? false,
     createdAt:            row.created_at,
     updatedAt:            row.updated_at,
   };

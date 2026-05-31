@@ -163,7 +163,7 @@ async function upsertContact(contactRow) {
 async function updateContactCustomFields(contactId, fields) {
   const allowed = [
     'relationship_tags', 'notes', 'likes_preferences', 'gift_ideas', 'promises', 'dislikes',
-    'email_history', 'drive_attachments',
+    'email_history', 'drive_attachments', 'is_favorite',
   ];
   const update = Object.fromEntries(
     Object.entries(fields).filter(([k]) => allowed.includes(k))

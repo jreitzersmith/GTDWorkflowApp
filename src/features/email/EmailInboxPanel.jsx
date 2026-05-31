@@ -19,10 +19,18 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
   const [receiptStatus, setReceiptStatus] = useState(null); // null | 'loading' | 'ok' | error string
   const [spamStatus, setSpamStatus] = useState(null);   // null | 'loading' | 'ok' | error string
 
+  // FR#172: inbox search
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Task-link picker state
   const [showTaskPicker, setShowTaskPicker] = useState(false);
   const [linkedConfirm, setLinkedConfirm] = useState(null);
   const pickerRef = useRef(null);
+
+  // FR#174: link-to-contact picker
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [contactLinkedConfirm, setContactLinkedConfirm] = useState(null);
+  const contactPickerRef = useRef(null);
 
   // Load inbox on mount / when token changes
   useEffect(() => {
@@ -40,15 +48,17 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
       .finally(() => setDetailLoading(false));
   }, [selectedId, googleToken]);
 
-  // Reset task picker and receipt status when email changes
+  // Reset pickers and status when email changes
   useEffect(() => {
     setShowTaskPicker(false);
     setLinkedConfirm(null);
     setReceiptStatus(null);
     setSpamStatus(null);
+    setShowContactPicker(false);
+    setContactLinkedConfirm(null);
   }, [selectedId]);
 
-  // Close picker on outside click
+  // Close task picker on outside click
   useEffect(() => {
     if (!showTaskPicker) return;
     const handleClickOutside = (e) => {
@@ -59,6 +69,18 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showTaskPicker]);
+
+  // FR#174: close contact picker on outside click
+  useEffect(() => {
+    if (!showContactPicker) return;
+    const handler = (e) => {
+      if (contactPickerRef.current && !contactPickerRef.current.contains(e.target)) {
+        setShowContactPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showContactPicker]);
 
   const loadInbox = async (pageToken = null) => {
     setInboxLoading(true);
@@ -115,6 +137,16 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
     setTimeout(() => setLinkedConfirm(null), 4000);
   };
 
+  // FR#172: client-side inbox filter
+  const filteredEmails = searchQuery.trim()
+    ? inboxEmails.filter(e => {
+        const q = searchQuery.toLowerCase();
+        return (e.from || '').toLowerCase().includes(q)
+            || (e.subject || '').toLowerCase().includes(q)
+            || (e.snippet || '').toLowerCase().includes(q);
+      })
+    : inboxEmails;
+
   const allTasks = tasks || [];
   const isContainer = t => ['category', 'subcategory', 'project', 'subproject'].includes(t.nodeType);
   // All project-tree containers plus non-done next/project tasks for the link picker.
@@ -133,7 +165,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
           <span style={{ flex: 1, fontSize: 12, color: COLORS.muted }}>
             {inboxLoading ? 'Loading…' : inboxError ? `Error: ${inboxError}` : `${inboxEmails.length} messages${checkedIds.size ? ` · ${checkedIds.size} selected` : ''}`}
           </span>
-          <button style={gmailBtnSm} onClick={() => { setInboxNextPageToken(null); loadInbox(null); }} disabled={inboxLoading}>↻ Refresh</button>
+          <button style={gmailBtnSm} onClick={() => { setInboxNextPageToken(null); setSearchQuery(''); loadInbox(null); }} disabled={inboxLoading}>↻ Refresh</button>
           {checkedIds.size > 0 && (
             <>
               <button style={gmailBtnSmDanger} disabled={archiving} onClick={async () => {
@@ -159,6 +191,19 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
           )}
         </div>
 
+        {/* FR#172: search filter */}
+        <div style={{ padding: '6px 14px', borderBottom: `1px solid ${COLORS.border}`, background: COLORS.surface, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <input
+            type="text"
+            placeholder="Search sender, subject…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ flex: 1, padding: '5px 8px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
+          />
+          {searchQuery && (
+            <span onClick={() => setSearchQuery('')} style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 12, userSelect: 'none' }}>✕</span>
+          )}
+        </div>
         {/* List */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {inboxLoading && (
@@ -167,7 +212,10 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
           {!inboxLoading && inboxEmails.length === 0 && !inboxError && (
             <div style={{ padding: 24, textAlign: 'center', color: COLORS.muted, fontSize: 13 }}>Inbox is empty</div>
           )}
-          {inboxEmails.map(email => {
+          {filteredEmails.length === 0 && searchQuery && !inboxLoading && (
+            <div style={{ padding: 24, textAlign: 'center', color: COLORS.muted, fontSize: 13 }}>No emails match your search</div>
+          )}
+          {filteredEmails.map(email => {
             const isSelected = selectedId === email.id;
             const isChecked = checkedIds.has(email.id);
             const av = avatarColor(email.fromName);
@@ -317,6 +365,44 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                   </div>
                 )}
 
+                {/* FR#174: link email to contact */}
+                {contacts && contacts.length > 0 && addContactEmail && (
+                  <div>
+                    {contactLinkedConfirm ? (
+                      <div style={{ fontSize: 11, color: '#4db6ac', padding: '4px 0' }}>✓ Linked to "{contactLinkedConfirm}"</div>
+                    ) : (
+                      <div ref={contactPickerRef} style={{ position: 'relative' }}>
+                        <button
+                          onClick={() => setShowContactPicker(p => !p)}
+                          style={{ ...gmailBtn(), textAlign: 'left', width: '100%', color: COLORS.text2 }}
+                        >
+                          👤 Link to contact
+                        </button>
+                        {showContactPicker && (
+                          <div style={{ position: 'absolute', bottom: 'calc(100% + 2px)', left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 6, zIndex: 50, maxHeight: 240, overflowY: 'auto', boxShadow: '0 -4px 16px rgba(0,0,0,0.4)' }}>
+                            <ContactPickerInline
+                              contacts={contacts}
+                              onSelect={(contact) => {
+                                addContactEmail(contact.id, {
+                                  messageId: emailDetail.id,
+                                  threadId:  emailDetail.threadId || emailDetail.id,
+                                  subject:   emailDetail.subject  || '',
+                                  snippet:   emailDetail.snippet  || '',
+                                  date:      emailDetail.date     || new Date().toISOString(),
+                                  direction: 'received',
+                                });
+                                setShowContactPicker(false);
+                                setContactLinkedConfirm(contact.displayName || contact.givenName || 'Contact');
+                                setTimeout(() => setContactLinkedConfirm(null), 4000);
+                              }}
+                              onClose={() => setShowContactPicker(false)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button style={{ ...gmailBtn(), textAlign: 'left' }}
                   disabled={archiving}
                   onClick={async () => {
@@ -383,5 +469,49 @@ EmailInboxPanel.propTypes = {
   logEmailAsReceipt:  PropTypes.func,
   markAsSpam:         PropTypes.func,
 };
+
+// FR#174: inline contact picker for email detail panel
+function ContactPickerInline({ contacts, onSelect, onClose }) {
+  const [query, setQuery] = useState('');
+  const filtered = (contacts || [])
+    .filter(c => {
+      if (!query) return true;
+      const q = query.toLowerCase();
+      return (c.displayName || '').toLowerCase().includes(q)
+          || (c.givenName   || '').toLowerCase().includes(q)
+          || (c.familyName  || '').toLowerCase().includes(q);
+    })
+    .slice(0, 10);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+        <span style={{ fontSize: 11, color: COLORS.text2 }}>Link to contact</span>
+        <span onClick={onClose} style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 11 }}>✕</span>
+      </div>
+      <input
+        autoFocus
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder="Search contacts…"
+        style={{ width: '100%', boxSizing: 'border-box', padding: '4px 8px', marginBottom: 5, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
+      />
+      {filtered.length === 0 && <div style={{ fontSize: 11, color: COLORS.muted, padding: '3px 0' }}>No contacts match</div>}
+      {filtered.map(c => (
+        <div
+          key={c.id}
+          onClick={() => onSelect(c)}
+          style={{ padding: '5px 6px', borderRadius: 4, cursor: 'pointer', fontSize: 12, color: COLORS.text, display: 'flex', alignItems: 'center', gap: 6 }}
+          onMouseEnter={e => e.currentTarget.style.background = COLORS.surface}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.displayName || c.givenName || '(no name)'}</span>
+          {c.isFavorite && <span style={{ color: '#f0c040', fontSize: 11 }}>★</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 export { EmailInboxPanel };

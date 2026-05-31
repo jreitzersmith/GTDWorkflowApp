@@ -429,6 +429,14 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
   }, [contacts, updateCustomFields]);
 
 
+
+  // FR#173: toggle favorite flag
+  const toggleFavorite = useCallback((contactId) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) return;
+    return updateCustomFields(contactId, { isFavorite: !contact.isFavorite });
+  }, [contacts, updateCustomFields]);
+
   // FR#159: append an email to a contact's email_history (dedup by messageId)
   const addContactEmail = useCallback(async (contactId, entry) => {
     const contact = contacts.find(c => c.id === contactId);
@@ -498,6 +506,8 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     // Orphan management
     mergeOrphanIntoContact,
     deleteOrphanContact,
+    // Favorites (FR#173)
+    toggleFavorite,
     // Email history (FR#159)
     addContactEmail,
     // Drive attachments (FR#164)

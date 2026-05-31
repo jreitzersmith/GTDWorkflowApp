@@ -48,6 +48,8 @@ function ContactsPanel({
   removeDriveAttachment,
   googleToken,
   driveEnabled,
+  // FR#173: favorites
+  toggleFavorite,
 }) {
   const [searchText,      setSearchText]      = useState('');
   const [activeTagFilter, setActiveTagFilter] = useState(null);
@@ -164,6 +166,28 @@ function ContactsPanel({
 
         {/* Contact list */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
+          {/* FR#173: Favorites section */}
+          {(() => {
+            const favs = contacts.filter(ct => ct.isFavorite);
+            if (!favs.length) return null;
+            return (
+              <div>
+                <div style={{ padding: '6px 12px 3px', fontSize: 10, fontWeight: 600, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: `1px solid ${COLORS.border}` }}>
+                  Favorites ({favs.length})
+                </div>
+                {favs.map(contact => (
+                  <ContactRow
+                    key={'fav-' + contact.id}
+                    contact={contact}
+                    selected={contact.id === selectedContactId}
+                    onClick={() => setSelectedContactId(contact.id === selectedContactId ? null : contact.id)}
+                    toggleFavorite={toggleFavorite}
+                  />
+                ))}
+                <div style={{ height: 1, background: COLORS.border, margin: '4px 0' }} />
+              </div>
+            );
+          })()}
           {contactsLoading && contacts.length === 0 ? (
             <div style={{ padding: 20, textAlign: 'center', color: COLORS.muted, fontSize: 13 }}>Loading…</div>
           ) : filteredContacts.length === 0 ? (
@@ -177,6 +201,7 @@ function ContactsPanel({
                 contact={contact}
                 selected={contact.id === selectedContactId}
                 onClick={() => setSelectedContactId(contact.id === selectedContactId ? null : contact.id)}
+                toggleFavorite={toggleFavorite}
               />
             ))
           )}
@@ -237,46 +262,94 @@ function ContactsPanel({
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function ContactRow({ contact, selected, onClick }) {
-  const initials = contactInitials(contact);
-  const email    = contactPrimaryEmail(contact);
+function ContactRow({ contact, selected, onClick, toggleFavorite }) {
+  const [hovered, setHovered] = useState(false);
+  const initials    = contactInitials(contact);
+  const email       = contactPrimaryEmail(contact);
+  const emailCount  = (contact.emailHistory || []).length;
+  const openPromises = (contact.promises || []).filter(p => !p.done).length;
+  const giftCount   = (contact.giftIdeas  || []).filter(g => !g.given).length;
+  const linkedTasks = (contact.promises || []).filter(p => p.taskId).length;
+  const lastEmail   = emailCount > 0
+    ? [...(contact.emailHistory || [])].sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+    : null;
+  const showHoverDetail = hovered && !selected && (openPromises > 0 || giftCount > 0 || linkedTasks > 0 || lastEmail);
 
   return (
     <div
       onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+        display: 'flex', flexDirection: 'column', padding: '9px 12px',
         cursor: 'pointer',
-        background: selected ? COLORS.surface3 : 'transparent',
+        background: selected ? COLORS.surface3 : hovered ? COLORS.surface2 : 'transparent',
         borderLeft: `3px solid ${selected ? CONTACT_COLOR : 'transparent'}`,
         borderBottom: `1px solid ${COLORS.border}`,
+        transition: 'background 0.1s',
       }}
-      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = COLORS.surface2; }}
-      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
     >
-      <Avatar initials={initials} photoUrl={contact.photoUrl} size={34} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, color: COLORS.text, fontWeight: selected ? 500 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {!contact.googleResourceName && (
-            <span title="Orphaned record — no Google contact linked" style={{ color: '#d4a84a', marginRight: 4, fontSize: 11 }}>⚠</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Avatar initials={initials} photoUrl={contact.photoUrl} size={34} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, color: COLORS.text, fontWeight: selected ? 500 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {!contact.googleResourceName && (
+              <span title="Orphaned record — no Google contact linked" style={{ color: '#d4a84a', marginRight: 4, fontSize: 11 }}>⚠</span>
+            )}
+            {contact.displayName || '(no name)'}
+          </div>
+          {email && (
+            <div style={{ fontSize: 11, color: COLORS.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {email}
+            </div>
           )}
-          {contact.displayName || '(no name)'}
+          {contact.relationshipTags?.length > 0 && (
+            <div style={{ display: 'flex', gap: 3, marginTop: 2, flexWrap: 'wrap' }}>
+              {contact.relationshipTags.slice(0, 3).map(tag => (
+                <span key={tag} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 8, background: CONTACT_COLOR + '22', color: CONTACT_COLOR }}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-        {email && (
-          <div style={{ fontSize: 11, color: COLORS.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {email}
-          </div>
-        )}
-        {contact.relationshipTags?.length > 0 && (
-          <div style={{ display: 'flex', gap: 3, marginTop: 2, flexWrap: 'wrap' }}>
-            {contact.relationshipTags.slice(0, 3).map(tag => (
-              <span key={tag} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 8, background: CONTACT_COLOR + '22', color: CONTACT_COLOR }}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Right-side badges */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          {emailCount > 0 && (
+            <span title={`${emailCount} linked email${emailCount !== 1 ? 's' : ''}`} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 8, background: '#5a8fd422', color: '#5a8fd4' }}>
+              ✉ {emailCount}
+            </span>
+          )}
+          {toggleFavorite && (
+            <span
+              onClick={e => { e.stopPropagation(); toggleFavorite(contact.id); }}
+              title={contact.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              style={{ fontSize: 14, cursor: 'pointer', color: contact.isFavorite ? '#f0c040' : COLORS.muted, lineHeight: 1, userSelect: 'none' }}
+            >
+              {contact.isFavorite ? '★' : '☆'}
+            </span>
+          )}
+        </div>
       </div>
+      {/* FR#171: hover enrichment expansion */}
+      {showHoverDetail && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 5, paddingLeft: 44, flexWrap: 'wrap' }}>
+          {openPromises > 0 && (
+            <span style={{ fontSize: 10, color: COLORS.text2 }}>{openPromises} open promise{openPromises !== 1 ? 's' : ''}</span>
+          )}
+          {giftCount > 0 && (
+            <span style={{ fontSize: 10, color: COLORS.text2 }}>{giftCount} gift idea{giftCount !== 1 ? 's' : ''}</span>
+          )}
+          {linkedTasks > 0 && (
+            <span style={{ fontSize: 10, color: COLORS.text2 }}>{linkedTasks} linked task{linkedTasks !== 1 ? 's' : ''}</span>
+          )}
+          {lastEmail && (
+            <span style={{ fontSize: 10, color: COLORS.muted }}>
+              Last email {new Date(lastEmail.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

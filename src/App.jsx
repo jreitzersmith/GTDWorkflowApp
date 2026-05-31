@@ -560,6 +560,7 @@ export default function GTDManager() {
     addContactEmail,
     addDriveAttachment,
     removeDriveAttachment,
+    toggleFavorite,
   } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id, createTask: createInboxTask });
   contactActionsRef.current = { contacts, addPromise, addLike, addDislike, addGiftIdea, updateCustomFields, createInboxTask };
 
@@ -1622,6 +1623,7 @@ export default function GTDManager() {
                           removeDriveAttachment={removeDriveAttachment}
                           googleToken={googleToken}
                           driveEnabled={driveEnabled}
+                          toggleFavorite={toggleFavorite}
                         />
                       ) : currentView === "analytics" ? (
                         <AnalyticsArea
