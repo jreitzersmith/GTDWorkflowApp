@@ -6,6 +6,18 @@ One row per item: date · type · # · GH# · name · commit hash(es).
 When an item is resolved, **remove** it from `Backlog.md` and add a full row here. Close the corresponding GitHub issue via the GitHub MCP.
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
+| 2026-05-31 | Feature | FR#159 | GH#190 | Contact email history: schema + data layer (email_history JSONB column, supabase.js, contactsUtils.js mappers, addContactEmail with dedup) | 538f41d |
+| 2026-05-31 | Feature | FR#160 | GH#191 | Contact email history: EmailHistorySection in ContactDetail — direction badge, subject, date, snippet, click opens Gmail thread | 538f41d |
+| 2026-05-31 | Feature | FR#161 | GH#192 | Contact email history: auto-link on processEmailWithAI — sender matched to contact by email address, silent background operation | 97ffd1f |
+| 2026-05-31 | Feature | FR#162 | GH#193 | Contact email history: passive auto-link on EmailInboxPanel inbox load | 97ffd1f |
+| 2026-05-31 | Feature | FR#163 | GH#194 | Contact email linking mode setting — radio group (both/onProcess/onLoad/off) in Settings > Contacts via useAppSettings + SettingsManagerComponents | 538f41d |
+| 2026-05-31 | Feature | FR#164 | GH#195 | Contact Drive file attachments — drive_attachments JSONB column, DriveFilesSection with Google Picker; multi-file batch fix | 538f41d, 31a8174 |
+| 2026-05-31 | Feature | FR#165 | GH#196 | Contact analytics: AnalyticsArea tab bar (Tasks/Contacts); ContactAnalyticsView scaffold; contactAnalyticsConfig; contactAnalyticsUtils | 97ffd1f |
+| 2026-05-31 | Feature | FR#166 | GH#197 | Contact analytics: Network Overview section — contact count, tag distribution bars, enrichment coverage chips | 97ffd1f |
+| 2026-05-31 | Feature | FR#167 | GH#198 | Contact analytics: Promise Health section — open/overdue cross-contact promises, configurable threshold | 97ffd1f |
+| 2026-05-31 | Feature | FR#168 | GH#199 | Contact analytics: Promise Completion Rate section — made/received bars, you-owe/they-owe top-5 lists | 97ffd1f |
+| 2026-05-31 | Feature | FR#169 | GH#200 | Contact analytics: Interaction Recency section — at-risk contacts, recently active, volume chart; empty state pre-email-history | 97ffd1f |
+| 2026-05-31 | Feature | FR#170 | GH#201 | Contact analytics: Gift Pipeline section — ungiven gifts grouped by contact, navigate-to-contact; 16 unit tests for all analytics util functions | 97ffd1f |
 | 2026-05-22 | Feature      | FR#116  | GH#132 | Process inbox: emit action immediately, remove OK confirmation step | f21eb22 |
 | 2026-05-22 | Feature/Fix  | —       | —     | Coach mode improvements: action alignment (next/someday/waiting), weekly review auto-apply + batch capture, metadata parsing, MITPicker two-phase UI, SoD urgency note hidden from bubble | 6b0bb21, ce93de2 |
 | 2026-05-22 | Bug Fix      | —       | —     | MITPicker — remove up/down reorder feature, add 32px bottom padding so Continue button is always visible | 1cbfa0a |
