@@ -33,7 +33,7 @@ export function defaultLayout() {
   return SECTION_DEFS.map(s => ({ id: s.id, visible: true, collapsed: false }));
 }
 
-export function SectionManager({ layout, onChange }) {
+export function SectionManager({ layout, onChange, sectionDefs }) {
   function setVisible(id, v) {
     onChange(layout.map(s => s.id === id ? { ...s, visible: v } : s));
   }
@@ -44,7 +44,8 @@ export function SectionManager({ layout, onChange }) {
     [next[idx], next[swap]] = [next[swap], next[idx]];
     onChange(next);
   }
-  const labelMap = Object.fromEntries(SECTION_DEFS.map(s => [s.id, s.label]));
+  const defs = sectionDefs || SECTION_DEFS;
+  const labelMap = Object.fromEntries(defs.map(s => [s.id, s.label]));
   return (
     <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
@@ -84,6 +85,7 @@ export function SectionManager({ layout, onChange }) {
 }
 
 SectionManager.propTypes = {
-  layout:   PropTypes.arrayOf(PropTypes.shape({ id: PropTypes.string, visible: PropTypes.bool, collapsed: PropTypes.bool })).isRequired,
-  onChange: PropTypes.func.isRequired,
+  layout:      PropTypes.arrayOf(PropTypes.shape({ id: PropTypes.string, visible: PropTypes.bool, collapsed: PropTypes.bool })).isRequired,
+  onChange:    PropTypes.func.isRequired,
+  sectionDefs: PropTypes.array,
 };

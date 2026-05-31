@@ -6,7 +6,7 @@ import { doGmailFetchInbox, doGmailGetMessageBody, doGmailBatchLabel } from "./g
 import { avatarInitials, avatarColor, formatEmailDate, gmailBtn, gmailBtnPrimary, gmailBtnSm, gmailBtnSmDanger } from "./emailUtils.js";
 
 // Inbox list with checkboxes, avatar chips, pagination, and a detail slide-out panel.
-function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachEmailToTask, tasks, logEmailAsReceipt, markAsSpam }) {
+function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachEmailToTask, tasks, logEmailAsReceipt, markAsSpam, contacts, addContactEmail, contactEmailLinkingMode }) {
   const [inboxEmails, setInboxEmails] = useState([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError] = useState(null);
@@ -67,6 +67,27 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
       const { emails, nextPageToken } = await doGmailFetchInbox(googleToken, pageToken);
       setInboxEmails(prev => pageToken ? [...prev, ...emails] : emails);
       setInboxNextPageToken(nextPageToken);
+      // FR#162: passive contact auto-linking on inbox load
+      if (contacts && addContactEmail && (contactEmailLinkingMode === 'onLoad' || contactEmailLinkingMode === 'both')) {
+        emails.forEach(email => {
+          const rawFrom = email.from || '';
+          const senderEmail = (/<([^>]+)>/.exec(rawFrom)?.[1] || rawFrom).trim().toLowerCase();
+          if (!senderEmail) return;
+          const match = contacts.find(ct =>
+            (ct.emails || []).some(e => (e.value || '').toLowerCase() === senderEmail)
+          );
+          if (match) {
+            addContactEmail(match.id, {
+              messageId: email.id,
+              threadId:  email.threadId || email.id,
+              subject:   email.subject  || '',
+              snippet:   email.snippet  || '',
+              date:      email.date     || new Date().toISOString(),
+              direction: 'received',
+            });
+          }
+        });
+      }
     }
     catch (e) { setInboxError(e.message); }
     finally { setInboxLoading(false); }

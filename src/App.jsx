@@ -14,7 +14,7 @@ import { AuthGate } from "./shared/AuthGate.jsx";
 import { AppSidebar } from "./shared/AppSidebar.jsx";
 import { SearchModal } from "./shared/SearchModal.jsx";
 import { TaskBucketView } from "./features/tasks/TaskBucketView.jsx";
-import { TaskAnalyticsView } from "./features/tasks/TaskAnalyticsView.jsx";
+import { AnalyticsArea } from "./features/tasks/AnalyticsArea.jsx";
 import { CoachPanel } from "./features/coach/CoachPanel.jsx";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth.js";
 import { useGoogleAuth } from "./hooks/useGoogleAuth.js";
@@ -65,7 +65,7 @@ export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId, contactRelationshipTags, setContactRelationshipTags, contactLikesCategories, setContactLikesCategories} = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId, contactRelationshipTags, setContactRelationshipTags, contactLikesCategories, setContactLikesCategories, contactEmailLinkingMode, setContactEmailLinkingMode} = useAppSettings();
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState(coachName);
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
@@ -557,6 +557,9 @@ export default function GTDManager() {
           renameContactLikeCategory, removeContactLikeCategory,
           mergeOrphanIntoContact,
           deleteOrphanContact,
+    addContactEmail,
+    addDriveAttachment,
+    removeDriveAttachment,
   } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id, createTask: createInboxTask });
   contactActionsRef.current = { contacts, addPromise, addLike, addDislike, addGiftIdea, updateCustomFields, createInboxTask };
 
@@ -748,6 +751,26 @@ export default function GTDManager() {
       ``,
       body,
     ].join('\n');
+    // FR#161: auto-link email to matching contact if setting allows
+    if (contactEmailLinkingMode === 'onProcess' || contactEmailLinkingMode === 'both') {
+      const rawFrom = email.from || '';
+      const senderEmail = (/<([^>]+)>/.exec(rawFrom)?.[1] || rawFrom).trim().toLowerCase();
+      if (senderEmail) {
+        const matchedContact = contacts.find(ct =>
+          (ct.emails || []).some(e => (e.value || '').toLowerCase() === senderEmail)
+        );
+        if (matchedContact) {
+          addContactEmail(matchedContact.id, {
+            messageId: email.id,
+            threadId:  email.threadId || email.id,
+            subject:   email.subject  || '',
+            snippet:   email.snippet  || (email.body ? email.body.slice(0, 120) : ''),
+            date:      email.date     || new Date().toISOString(),
+            direction: 'received',
+          });
+        }
+      }
+    }
     preEmailTaskIdsRef.current = new Set(tasks.map(t => t.id));
     setPendingEmailContext({ id: email.id, subject: email.subject });
     setEmailContext({ id: email.id, subject: email.subject });
@@ -755,7 +778,7 @@ export default function GTDManager() {
     setChatInput("");
     setMessages(prev => [...prev, { role: "user", text: prompt }]);
     callAI(prompt, "chat", chatHistory, { emailContext: { id: email.id, subject: email.subject } });
-  }, [setCoachMode, setChatInput, setMessages, callAI, chatHistory]);
+  }, [setCoachMode, setChatInput, setMessages, callAI, chatHistory, contacts, addContactEmail, contactEmailLinkingMode]);
 
   // Attach an email as a driveAttachments entry on a task (FR#40)
   const attachEmailToTask = useCallback((taskId, emailAttachment) => {
@@ -1491,6 +1514,8 @@ export default function GTDManager() {
                           onRemoveContactRelationshipTag={removeContactRelationshipTag}
                           onRenameContactLikeCategory={renameContactLikeCategory}
                           onRemoveContactLikeCategory={removeContactLikeCategory}
+                          contactEmailLinkingMode={contactEmailLinkingMode}
+                          onSetContactEmailLinkingMode={setContactEmailLinkingMode}
                         />
                       ) : showUsage ? (
                         <UsagePanel
@@ -1510,6 +1535,9 @@ export default function GTDManager() {
                           processEmailWithAI={processEmailWithAI}
                           attachEmailToTask={attachEmailToTask}
                           tasks={tasks}
+                          contacts={contacts}
+                          addContactEmail={addContactEmail}
+                          contactEmailLinkingMode={contactEmailLinkingMode}
                           openCoachChat={openCoachChat}
                           authUser={authUser}
                           logEmailAsReceipt={logEmailAsReceipt}
@@ -1590,11 +1618,16 @@ export default function GTDManager() {
                           contactRelationshipTags={contactRelationshipTags}
                           setContactRelationshipTags={setContactRelationshipTags}
                           contactLikesCategories={contactLikesCategories}
+                          addDriveAttachment={addDriveAttachment}
+                          removeDriveAttachment={removeDriveAttachment}
+                          googleToken={googleToken}
+                          driveEnabled={driveEnabled}
                         />
                       ) : currentView === "analytics" ? (
-                        <TaskAnalyticsView
+                        <AnalyticsArea
                           tasks={tasks}
-                          efforts={efforts}
+                          contacts={contacts}
+                          onNavigateToContact={(id) => { setCurrentView('contacts'); setSelectedContactId(id); }}
                         />
                       ) : (
                         <TaskBucketView
