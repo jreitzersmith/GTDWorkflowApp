@@ -136,6 +136,12 @@ function useAppSettings() {
   });
   useEffect(() => { localStorage.setItem('gtd_contact_likes_categories', JSON.stringify(contactLikesCategories)); }, [contactLikesCategories]);
 
+  // FR#163: contact email auto-linking mode
+  const [contactEmailLinkingMode, setContactEmailLinkingMode] = useState(() =>
+    localStorage.getItem('gtd_contact_email_linking') || 'both'
+  );
+  useEffect(() => { localStorage.setItem('gtd_contact_email_linking', contactEmailLinkingMode); }, [contactEmailLinkingMode]);
+
   return {
     locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides,
     tagDisplay, setTagDisplay, categories, setCategories,
@@ -166,6 +172,7 @@ function useAppSettings() {
     receiptSheetId, setReceiptSheetId,
     contactRelationshipTags, setContactRelationshipTags,
     contactLikesCategories, setContactLikesCategories,
+    contactEmailLinkingMode, setContactEmailLinkingMode,
   };
 }
 

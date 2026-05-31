@@ -42,6 +42,12 @@ function ContactDetail({
   contactRelationshipTags,
   setContactRelationshipTags,
   contactLikesCategories,
+  // FR#159/160: email history
+  // FR#164: Drive file attachments
+  addDriveAttachment,
+  removeDriveAttachment,
+  googleToken,
+  driveEnabled,
 }) {
   const initials = contactInitials(contact);
 
@@ -125,6 +131,16 @@ function ContactDetail({
           contactId={contact.id}
           onNavigateToTask={onNavigateToTask}
           contactDisplayName={contact.displayName}
+        />
+        <Divider />
+        <EmailHistorySection emailHistory={contact.emailHistory || []} />
+        <Divider />
+        <DriveFilesSection
+          driveAttachments={contact.driveAttachments || []}
+          googleToken={googleToken}
+          driveEnabled={driveEnabled}
+          onAdd={(fileEntry) => addDriveAttachment && addDriveAttachment(contact.id, fileEntry)}
+          onRemove={(fileId) => removeDriveAttachment && removeDriveAttachment(contact.id, fileId)}
         />
         <ContactIdentityFooter contact={contact} />
       </div>
@@ -883,5 +899,123 @@ function ContactIdentityFooter({ contact }) {
 function Divider() {
   return <div style={{ height: 1, background: COLORS.border, margin: '6px 20px' }} />;
 }
+
+// ── Email history (FR#159/160) ────────────────────────────────────────────────
+
+const EMAIL_RECEIVED_COLOR = '#5a8fd4';
+const EMAIL_SENT_COLOR     = '#4db6ac';
+
+function EmailHistorySection({ emailHistory }) {
+  const sorted = [...emailHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+  return (
+    <Section title="Email History">
+      {sorted.length === 0 ? (
+        <div style={{ fontSize: 12, color: COLORS.muted, padding: '4px 0' }}>No emails linked yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {sorted.map(entry => (
+            <div
+              key={entry.id}
+              onClick={() => window.open(`https://mail.google.com/mail/#all/${entry.threadId || entry.messageId}`, '_blank')}
+              style={{ padding: '6px 8px', background: COLORS.surface2, borderRadius: 5, cursor: 'pointer', borderLeft: `3px solid ${entry.direction === 'sent' ? EMAIL_SENT_COLOR : EMAIL_RECEIVED_COLOR}` }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: (entry.direction === 'sent' ? EMAIL_SENT_COLOR : EMAIL_RECEIVED_COLOR) + '22', color: entry.direction === 'sent' ? EMAIL_SENT_COLOR : EMAIL_RECEIVED_COLOR }}>
+                  {entry.direction === 'sent' ? '↗ Sent' : '↙ Received'}
+                </span>
+                <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {entry.subject || '(no subject)'}
+                </span>
+                <span style={{ fontSize: 10, color: COLORS.muted, flexShrink: 0 }}>
+                  {entry.date ? new Date(entry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                </span>
+              </div>
+              {entry.snippet && (
+                <div style={{ fontSize: 11, color: COLORS.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {entry.snippet}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+// ── Drive file attachments (FR#164) ───────────────────────────────────────────
+
+function DriveFilesSection({ driveAttachments, googleToken, driveEnabled, onAdd, onRemove }) {
+  const pickerLoadingRef = { current: false };
+
+  function ensureGapi(cb) {
+    if (window.gapi && window.gapi.load) { cb(); return; }
+    if (pickerLoadingRef.current) return;
+    pickerLoadingRef.current = true;
+    const script = document.createElement('script');
+    script.src = 'https://apis.google.com/js/api.js';
+    script.onload = () => { pickerLoadingRef.current = false; cb(); };
+    document.head.appendChild(script);
+  }
+
+  function openPicker() {
+    if (!googleToken || !driveEnabled) return;
+    ensureGapi(() => {
+      window.gapi.load('picker', () => {
+        const devKey = import.meta.env.VITE_GOOGLE_BROWSER_API_KEY;
+        const picker = new window.google.picker.PickerBuilder()
+          .addView(new window.google.picker.DocsView().setIncludeFolders(false).setSelectFolderEnabled(false))
+          .addView(new window.google.picker.DocsView(window.google.picker.ViewId.RECENTLY_PICKED))
+          .enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED)
+          .setOAuthToken(googleToken)
+          .setDeveloperKey(devKey)
+          .setCallback((data) => {
+            if (data.action !== 'picked') return;
+            (data.docs || []).forEach(d => {
+              if (!(driveAttachments || []).find(a => a.fileId === d.id)) {
+                onAdd({ fileId: d.id, fileName: d.name, mimeType: d.mimeType, iconLink: d.iconUrl || '', webViewLink: d.url || '' });
+              }
+            });
+          })
+          .build();
+        picker.setVisible(true);
+      });
+    });
+  }
+
+  return (
+    <Section title="Drive Files">
+      {(driveAttachments || []).length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+          {driveAttachments.map(f => (
+            <div key={f.fileId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', background: COLORS.surface2, borderRadius: 5 }}>
+              {f.iconLink && <img src={f.iconLink} alt="" style={{ width: 16, height: 16, flexShrink: 0 }} />}
+              <a
+                href={f.webViewLink}
+                target="_blank"
+                rel="noreferrer"
+                style={{ flex: 1, fontSize: 12, color: COLORS.next, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {f.fileName}
+              </a>
+              <span onClick={() => onRemove(f.fileId)} style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 12, flexShrink: 0 }}>✕</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {driveEnabled && googleToken ? (
+        <button
+          onClick={openPicker}
+          style={{ fontSize: 12, padding: '4px 10px', background: CONTACT_COLOR + '22', color: CONTACT_COLOR, border: `1px solid ${CONTACT_COLOR}44`, borderRadius: 5, cursor: 'pointer' }}
+        >
+          Attach file
+        </button>
+      ) : (
+        <div style={{ fontSize: 11, color: COLORS.muted }}>Connect Google Drive in Settings to attach files.</div>
+      )}
+    </Section>
+  );
+}
+
 
 export { ContactDetail };

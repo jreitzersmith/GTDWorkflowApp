@@ -43,6 +43,11 @@ function ContactsPanel({
   contactRelationshipTags,
   setContactRelationshipTags,
   contactLikesCategories,
+  // FR#164: Drive attachments + FR#160: email history
+  addDriveAttachment,
+  removeDriveAttachment,
+  googleToken,
+  driveEnabled,
 }) {
   const [searchText,      setSearchText]      = useState('');
   const [activeTagFilter, setActiveTagFilter] = useState(null);
@@ -214,6 +219,10 @@ function ContactsPanel({
             contactRelationshipTags={contactRelationshipTags}
             setContactRelationshipTags={setContactRelationshipTags}
             contactLikesCategories={contactLikesCategories}
+            addDriveAttachment={addDriveAttachment}
+            removeDriveAttachment={removeDriveAttachment}
+            googleToken={googleToken}
+            driveEnabled={driveEnabled}
           />
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.muted, flexDirection: 'column', gap: 8 }}>

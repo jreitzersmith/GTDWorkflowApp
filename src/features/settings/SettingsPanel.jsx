@@ -4,7 +4,7 @@ import ExportTemplateEditor from "./ExportTemplateEditor.jsx";
 import { COLORS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { SettingsSection } from "./SettingsSection.jsx";
-import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager, ContactTagManager, ContactCategoryManager } from "./SettingsManagerComponents.jsx";
+import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager, ContactTagManager, ContactCategoryManager, ContactEmailLinkingModeSetting } from "./SettingsManagerComponents.jsx";
 import { DriveFolderPicker } from "./DriveFolderPicker.jsx";
 
 // ── Google Services section config ────────────────────────────────────────────
@@ -120,6 +120,7 @@ function SettingsPanel({
   contactLikesCategories, onSetContactLikesCategories,
   contacts, onRenameContactRelationshipTag, onRemoveContactRelationshipTag,
   onRenameContactLikeCategory, onRemoveContactLikeCategory,
+  contactEmailLinkingMode, onSetContactEmailLinkingMode,
 }) {
   const fileInputRef = useRef(null);
   const [importMode, setImportMode] = useState("replace");
@@ -704,6 +705,12 @@ function SettingsPanel({
               onRemoveContactLikeCategory(cat, replaceWith);
             }}
           />
+          <div style={{ height: 14 }} />
+          <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 8 }}>Email auto-linking</div>
+          <ContactEmailLinkingModeSetting
+            value={contactEmailLinkingMode || 'both'}
+            onChange={onSetContactEmailLinkingMode}
+          />
         </SettingsSection>
       </div>
     </div>
@@ -849,6 +856,8 @@ SettingsPanel.propTypes = {
   onRemoveContactRelationshipTag:    PropTypes.func.isRequired,
   onRenameContactLikeCategory:       PropTypes.func.isRequired,
   onRemoveContactLikeCategory:       PropTypes.func.isRequired,
+  contactEmailLinkingMode:           PropTypes.string.isRequired,
+  onSetContactEmailLinkingMode:      PropTypes.func.isRequired,
 };
 
 export { SettingsPanel };

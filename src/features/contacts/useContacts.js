@@ -428,6 +428,39 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     }
   }, [contacts, updateCustomFields]);
 
+
+  // FR#159: append an email to a contact's email_history (dedup by messageId)
+  const addContactEmail = useCallback(async (contactId, entry) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) return;
+    const existing = contact.emailHistory || [];
+    if (existing.some(e => e.messageId === entry.messageId)) return; // dedup
+    const newEntry = { id: crypto.randomUUID(), ...entry, linkedDate: new Date().toISOString() };
+    const emailHistory = [...existing, newEntry];
+    setContacts(cs => cs.map(c => c.id === contactId ? { ...c, emailHistory } : c));
+    try {
+      await updateCustomFields(contactId, { emailHistory });
+    } catch (err) {
+      setContacts(cs => cs.map(c => c.id === contactId ? contact : c));
+      console.error('addContactEmail failed:', err);
+    }
+  }, [contacts, updateCustomFields]);
+
+  // FR#164: Drive file attachment helpers
+  const addDriveAttachment = useCallback((contactId, fileEntry) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) return;
+    const driveAttachments = [...(contact.driveAttachments || []), { ...fileEntry, addedDate: new Date().toISOString() }];
+    return updateCustomFields(contactId, { driveAttachments });
+  }, [contacts, updateCustomFields]);
+
+  const removeDriveAttachment = useCallback((contactId, fileId) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) return;
+    const driveAttachments = (contact.driveAttachments || []).filter(f => f.fileId !== fileId);
+    return updateCustomFields(contactId, { driveAttachments });
+  }, [contacts, updateCustomFields]);
+
   return {
     // State
     contacts,
@@ -465,6 +498,11 @@ function useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogl
     // Orphan management
     mergeOrphanIntoContact,
     deleteOrphanContact,
+    // Email history (FR#159)
+    addContactEmail,
+    // Drive attachments (FR#164)
+    addDriveAttachment,
+    removeDriveAttachment,
   };
 }
 

@@ -155,6 +155,8 @@ function contactToDb(contact) {
     ...('giftIdeas'        in contact ? { gift_ideas:        contact.giftIdeas }        : {}),
     ...('promises'         in contact ? { promises:          contact.promises }          : {}),
     ...('dislikes'         in contact ? { dislikes:          contact.dislikes }          : {}),
+    ...('emailHistory'     in contact ? { email_history:     contact.emailHistory }      : {}),
+    ...('driveAttachments' in contact ? { drive_attachments: contact.driveAttachments }  : {}),
   };
 }
 
@@ -180,6 +182,8 @@ function dbToContact(row) {
     giftIdeas:            row.gift_ideas        || [],
     promises:             row.promises          || [],
     dislikes:             row.dislikes          || [],
+    emailHistory:         row.email_history     || [],
+    driveAttachments:     row.drive_attachments || [],
     createdAt:            row.created_at,
     updatedAt:            row.updated_at,
   };

@@ -924,4 +924,45 @@ ContactCategoryManager.propTypes = {
   onRemove:   PropTypes.func.isRequired,
 };
 
-export { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager, ContactTagManager, ContactCategoryManager };
+// ── ContactEmailLinkingModeSetting (FR#163) ───────────────────────────────────
+function ContactEmailLinkingModeSetting({ value, onChange }) {
+  const opts = [
+    { key: 'both',      label: 'Both (recommended)', desc: 'Link when processing emails with AI and when inbox loads' },
+    { key: 'onProcess', label: 'On email processing', desc: 'Only link when you process an email with the AI coach' },
+    { key: 'onLoad',    label: 'On inbox load',        desc: 'Only link when the inbox panel loads emails' },
+    { key: 'off',       label: 'Off',                  desc: 'Never auto-link emails to contacts' },
+  ];
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
+        Controls when emails are automatically linked to matching contacts based on sender address.
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {opts.map(opt => {
+          const active = value === opt.key;
+          return (
+            <div
+              key={opt.key}
+              onClick={() => onChange(opt.key)}
+              style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', borderRadius: 7, border: `1px solid ${active ? '#4db6ac' : COLORS.border}`, background: active ? '#4db6ac22' : COLORS.surface2, cursor: 'pointer' }}
+            >
+              <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${active ? '#4db6ac' : COLORS.border}`, background: active ? '#4db6ac' : 'transparent', flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: active ? '#4db6ac' : COLORS.text }}>{opt.label}</div>
+                <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1 }}>{opt.desc}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+ContactEmailLinkingModeSetting.propTypes = {
+  value:    PropTypes.string.isRequired,
+  onChange: PropTypes.func.isRequired,
+};
+
+
+export { TagDisplaySetting, ContactEmailLinkingModeSetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager, ContactTagManager, ContactCategoryManager };
