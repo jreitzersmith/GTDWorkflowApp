@@ -209,3 +209,4 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-30 | Feature      | FR#154  | GH#183 | Backfill contact relationship tags from existing contacts into Settings list on load; settingsReady gate prevents race condition | 06b9a64 |
 | 2026-05-30 | Feature      | FR#156  | GH#185 | CamelCase entry for contact relationship tags and likes categories; toContactTagCase() utility; PRESET_TAGS updated | 06b9a64 |
 | 2026-05-30 | Feature      | —       | GH#183 | Alphabetical sort for ContactTagManager and ContactCategoryManager; refactored to value-based edit state (editingTag/editingCat) | 06b9a64 |
+| 2026-05-31 | Bug Fix      | Issue#41 | GH#189 | contacts_lookup tool now merges Supabase enrichment (dislikes, likes, notes, tags, gifts, promises) into People API results via googleResourceName join | e69d9a4 |
