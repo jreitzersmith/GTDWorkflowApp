@@ -139,7 +139,12 @@ function ContactDetail({
           driveAttachments={contact.driveAttachments || []}
           googleToken={googleToken}
           driveEnabled={driveEnabled}
-          onAdd={(fileEntry) => addDriveAttachment && addDriveAttachment(contact.id, fileEntry)}
+          onAdd={(newFiles) => {
+            const arr = Array.isArray(newFiles) ? newFiles : [newFiles];
+            const existing = contact.driveAttachments || [];
+            const merged = [...existing, ...arr];
+            updateCustomFields(contact.id, { driveAttachments: merged });
+          }}
           onRemove={(fileId) => removeDriveAttachment && removeDriveAttachment(contact.id, fileId)}
         />
         <ContactIdentityFooter contact={contact} />
@@ -971,11 +976,10 @@ function DriveFilesSection({ driveAttachments, googleToken, driveEnabled, onAdd,
           .setDeveloperKey(devKey)
           .setCallback((data) => {
             if (data.action !== 'picked') return;
-            (data.docs || []).forEach(d => {
-              if (!(driveAttachments || []).find(a => a.fileId === d.id)) {
-                onAdd({ fileId: d.id, fileName: d.name, mimeType: d.mimeType, iconLink: d.iconUrl || '', webViewLink: d.url || '' });
-              }
-            });
+            const newFiles = (data.docs || [])
+              .filter(d => !(driveAttachments || []).find(a => a.fileId === d.id))
+              .map(d => ({ fileId: d.id, fileName: d.name, mimeType: d.mimeType, iconLink: d.iconUrl || '', webViewLink: d.url || '', addedDate: new Date().toISOString() }));
+            if (newFiles.length) onAdd(newFiles);
           })
           .build();
         picker.setVisible(true);
