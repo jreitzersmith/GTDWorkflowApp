@@ -6,6 +6,10 @@ One row per item: date · type · # · GH# · name · commit hash(es).
 When an item is resolved, **remove** it from `Backlog.md` and add a full row here. Close the corresponding GitHub issue via the GitHub MCP.
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
+| 2026-05-31 | Feature | FR#171 | GH#202 | Contact list row: ✉ email count badge + hover enrichment expansion (open promises, gift ideas, linked tasks, last email date) | 2620897 |
+| 2026-05-31 | Feature | FR#172 | GH#203 | Email inbox search/filter — client-side filter over loaded emails by from/subject/snippet; clear button; empty state | 2620897 |
+| 2026-05-31 | Feature | FR#173 | GH#204 | Contact favorites — is_favorite BOOLEAN column; ★ toggle on ContactRow; Favorites section at top of contact list; toggleFavorite in useContacts | 2620897, 7e01f80 |
+| 2026-05-31 | Feature | FR#174 | GH#205 | Email pane: manual link-to-contact button; ContactPickerInline component; calls addContactEmail; confirmation flash; dedup by messageId | 2620897, 7e01f80 |
 | 2026-05-31 | Feature | FR#159 | GH#190 | Contact email history: schema + data layer (email_history JSONB column, supabase.js, contactsUtils.js mappers, addContactEmail with dedup) | 538f41d |
 | 2026-05-31 | Feature | FR#160 | GH#191 | Contact email history: EmailHistorySection in ContactDetail — direction badge, subject, date, snippet, click opens Gmail thread | 538f41d |
 | 2026-05-31 | Feature | FR#161 | GH#192 | Contact email history: auto-link on processEmailWithAI — sender matched to contact by email address, silent background operation | 97ffd1f |
