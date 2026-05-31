@@ -320,15 +320,13 @@ function ContactRow({ contact, selected, onClick, toggleFavorite }) {
               ✉ {emailCount}
             </span>
           )}
-          {toggleFavorite && (
-            <span
-              onClick={e => { e.stopPropagation(); toggleFavorite(contact.id); }}
+          <span
+              onClick={e => { e.stopPropagation(); toggleFavorite && toggleFavorite(contact.id); }}
               title={contact.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-              style={{ fontSize: 14, cursor: 'pointer', color: contact.isFavorite ? '#f0c040' : COLORS.muted, lineHeight: 1, userSelect: 'none' }}
+              style={{ fontSize: 14, cursor: 'pointer', color: contact.isFavorite ? '#f0c040' : COLORS.text2, lineHeight: 1, userSelect: 'none', opacity: contact.isFavorite ? 1 : 0.5 }}
             >
               {contact.isFavorite ? '★' : '☆'}
             </span>
-          )}
         </div>
       </div>
       {/* FR#171: hover enrichment expansion */}
