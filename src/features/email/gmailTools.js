@@ -478,9 +478,9 @@ function extractGmailPlainText(payload) {
 
 // Fetch inbox messages as structured objects (for the Email Management inbox tab)
 // Returns { emails, nextPageToken } — pass pageToken to load the next page
-async function doGmailFetchInbox(token, pageToken = null) {
+async function doGmailFetchInbox(token, pageToken = null, searchQuery = '') {
   const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
-  url.searchParams.set('q', 'in:inbox');
+  url.searchParams.set('q', searchQuery.trim() ? `in:inbox ${searchQuery.trim()}` : 'in:inbox');
   url.searchParams.set('maxResults', '50');
   if (pageToken) url.searchParams.set('pageToken', pageToken);
   const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });

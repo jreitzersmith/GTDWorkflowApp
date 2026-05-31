@@ -19,8 +19,9 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
   const [receiptStatus, setReceiptStatus] = useState(null); // null | 'loading' | 'ok' | error string
   const [spamStatus, setSpamStatus] = useState(null);   // null | 'loading' | 'ok' | error string
 
-  // FR#172: inbox search
+  // FR#172: inbox search + FR#175: server-side search
   const [searchQuery, setSearchQuery] = useState('');
+  const [serverSearchActive, setServerSearchActive] = useState(false);
 
   // Task-link picker state
   const [showTaskPicker, setShowTaskPicker] = useState(false);
@@ -82,11 +83,11 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
     return () => document.removeEventListener("mousedown", handler);
   }, [showContactPicker]);
 
-  const loadInbox = async (pageToken = null) => {
+  const loadInbox = async (pageToken = null, queryOverride = null) => {
     setInboxLoading(true);
     if (!pageToken) setInboxError(null);
     try {
-      const { emails, nextPageToken } = await doGmailFetchInbox(googleToken, pageToken);
+      const { emails, nextPageToken } = await doGmailFetchInbox(googleToken, pageToken, queryOverride ?? '');
       setInboxEmails(prev => pageToken ? [...prev, ...emails] : emails);
       setInboxNextPageToken(nextPageToken);
       // FR#162: passive contact auto-linking on inbox load
@@ -163,9 +164,15 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
         {/* Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0, background: COLORS.surface }}>
           <span style={{ flex: 1, fontSize: 12, color: COLORS.muted }}>
-            {inboxLoading ? 'Loading…' : inboxError ? `Error: ${inboxError}` : `${inboxEmails.length} messages${checkedIds.size ? ` · ${checkedIds.size} selected` : ''}`}
+            {inboxLoading
+              ? (serverSearchActive ? 'Searching Gmail…' : 'Loading…')
+              : inboxError
+                ? `Error: ${inboxError}`
+                : serverSearchActive && searchQuery
+                  ? `${filteredEmails.length} result${filteredEmails.length !== 1 ? 's' : ''} for "${searchQuery}"${checkedIds.size ? ` · ${checkedIds.size} selected` : ''}`
+                  : `${inboxEmails.length} messages${checkedIds.size ? ` · ${checkedIds.size} selected` : ''}`}
           </span>
-          <button style={gmailBtnSm} onClick={() => { setInboxNextPageToken(null); setSearchQuery(''); loadInbox(null); }} disabled={inboxLoading}>↻ Refresh</button>
+          <button style={gmailBtnSm} onClick={() => { setInboxNextPageToken(null); setSearchQuery(''); setServerSearchActive(false); loadInbox(null, ''); }} disabled={inboxLoading}>↻ Refresh</button>
           {checkedIds.size > 0 && (
             <>
               <button style={gmailBtnSmDanger} disabled={archiving} onClick={async () => {
@@ -191,17 +198,32 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
           )}
         </div>
 
-        {/* FR#172: search filter */}
-        <div style={{ padding: '6px 14px', borderBottom: `1px solid ${COLORS.border}`, background: COLORS.surface, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <input
-            type="text"
-            placeholder="Search sender, subject…"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            style={{ flex: 1, padding: '5px 8px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
-          />
-          {searchQuery && (
-            <span onClick={() => setSearchQuery('')} style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 12, userSelect: 'none' }}>✕</span>
+        {/* FR#172 + FR#175: search filter + server-side Gmail search */}
+        <div style={{ padding: '6px 14px 4px', borderBottom: `1px solid ${COLORS.border}`, background: COLORS.surface, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="text"
+              placeholder="Search sender, subject… (Enter to search all)"
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); if (!e.target.value.trim()) { setServerSearchActive(false); loadInbox(null, ''); } }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && searchQuery.trim()) {
+                  setServerSearchActive(true);
+                  setInboxNextPageToken(null);
+                  loadInbox(null, searchQuery);
+                }
+              }}
+              style={{ flex: 1, padding: '5px 8px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
+            />
+            {searchQuery && (
+              <span
+                onClick={() => { setSearchQuery(''); setServerSearchActive(false); loadInbox(null, ''); }}
+                style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 12, userSelect: 'none' }}
+              >✕</span>
+            )}
+          </div>
+          {searchQuery && !serverSearchActive && (
+            <div style={{ fontSize: 10, color: COLORS.muted, marginTop: 3 }}>↵ Press Enter to search all mail</div>
           )}
         </div>
         {/* List */}
