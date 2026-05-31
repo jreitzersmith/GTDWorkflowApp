@@ -92,7 +92,7 @@ const GET_WEATHER_TOOL = {
 // Contacts lookup tool — available in chat mode when Contacts is connected (FR#115)
 const CONTACTS_LOOKUP_TOOL = {
   name: 'contacts_lookup',
-  description: "Search the user's Google Contacts by name or email address. Returns matching contacts with names, email addresses, and phone numbers. Use when the user asks to find someone's contact info, or when composing an email to a person by name.",
+  description: "Search the user's contacts by name or email. Returns matching contacts with names, emails, phones, and any saved enrichment data (relationship tags, notes, dietary likes/dislikes, gift ideas, promises). Use when the user mentions a person by name, asks about someone's preferences or dietary needs, or needs contact info.",
   input_schema: {
     type: 'object',
     properties: {
@@ -653,7 +653,20 @@ function useCallAI({
                 setMessages(prev => [...prev, { role: 'assistant', text: `👤 Searching contacts: "${contactsQuery}"`, isSearchChip: true }]);
                 try {
                   const results = await peopleSearchContacts({ token: googleToken, query: contactsQuery, maxResults: contactsMax });
-                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(results) });
+                  const localContacts = (contactActionsRef.current && contactActionsRef.current.contacts) || [];
+                  const enriched = results.map(r => {
+                    const local = localContacts.find(c => c.googleResourceName === r.resourceName);
+                    if (!local) return r;
+                    const extra = {};
+                    if (local.relationshipTags && local.relationshipTags.length) extra.relationshipTags = local.relationshipTags;
+                    if (local.notes && local.notes.trim()) extra.notes = local.notes;
+                    if (local.likesPreferences && local.likesPreferences.length) extra.likesPreferences = local.likesPreferences;
+                    if (local.dislikes && local.dislikes.length) extra.dislikes = local.dislikes;
+                    if (local.giftIdeas && local.giftIdeas.length) extra.giftIdeas = local.giftIdeas;
+                    if (local.promises && local.promises.length) extra.promises = local.promises;
+                    return { ...r, ...extra };
+                  });
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(enriched) });
                 } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               }
             }
