@@ -12,23 +12,37 @@ Two distinct failure modes:
 
 ---
 
-## Preferred method — desktop-commander file tools (host-side)
+## Preferred method — by file type
 
-`mcp__desktop-commander__read_file` and `mcp__desktop-commander__write_file` run natively on the Windows host, bypassing the FUSE layer entirely. Always fresh — no cache issue.
+### .md files (Backlog.md, Changelog.md, Claude_Prompts/*.md)
 
-- **Reading:** `mcp__desktop-commander__read_file` with the Windows path — works for committed and uncommitted files
-- **Writing:** `mcp__desktop-commander__write_file` — writes directly to Windows filesystem
-- **Do not use `mcp__desktop-commander__edit_block`** — treat same as the Edit tool until proven otherwise
-- **After any write:** verify with `mcp__desktop-commander__get_file_info` or `wc -c` to confirm byte count
+**Always use PowerShell `WriteAllText` via `mcp__desktop-commander__start_process`.**
+`write_file`, `edit_block`, and Python `open(path,'w')` all leave null bytes when new content is shorter than the old cached file size on this FUSE mount — empirically confirmed. PowerShell writes from the Windows host and truncates correctly.
+
+```powershell
+$content = [System.IO.File]::ReadAllText("C:\path\to\file.md", [System.Text.Encoding]::UTF8)
+$content = $content.Replace($old, $new)   # targeted edits
+[System.IO.File]::WriteAllText("C:\path\to\file.md", $content, [System.Text.Encoding]::UTF8)
+```
+
+Verify after every write: `(Get-Item 'C:\path\to\file.md').Length`
+
+### .js / .jsx files
+
+- **New files:** `mcp__desktop-commander__write_file` in chunks
+- **Edits:** Python `str.replace()` via bash sandbox, write via `open(path, 'w')` — safe when content does not shrink
+- **Never** use the Cowork Edit or Write tools — template literals get corrupted
+- **Do not use `mcp__desktop-commander__edit_block`** — treat same as the Edit tool
+- **After any write:** verify with `wc -c`
 
 ---
 
-## Fallback method — git show + Python 'w' mode
+## Fallback method — git show + Python 'w' mode (.js/.jsx only)
 
-Use if desktop-commander file tools are unavailable or fail.
+Use if desktop-commander file tools are unavailable or fail. **Not safe for .md files** — `open(path,'w')` does not reliably truncate on this FUSE mount.
 
-- **Reading for edits:** `subprocess.run(['git','show','HEAD:path'])` — reads from git's ext4 object store, bypasses FUSE cache entirely. Always fresh for committed content. Does NOT reflect uncommitted changes.
-- **Writing:** `open(path, 'w')` — `O_TRUNC` punches through FUSE to Windows
+- **Reading for edits:** `subprocess.run(['git','show','HEAD:path'])` — reads from git's ext4 object store, bypasses FUSE cache. Always fresh for committed content. Does NOT reflect uncommitted changes.
+- **Writing (.js/.jsx only):** `open(path, 'w')` — safe when content does not shrink
 - **Never `open(path, 'a')`** — append mode seeks to the cached (stale) EOF offset
 - **Never `open(path, 'r')` or the Read tool** for files being edited — subject to stale cache
 - Use `str.replace(old, new)` — never regex on JSX

@@ -104,19 +104,35 @@ Add/edit/delete/move across buckets. Priority tags, location tags, due dates, ef
 
 ### AI Coach (6 modes)
 
-Chat · Process · Weekly Review · Brain Dump · Project Review · Daily Review. Action lines: `→ACTION:update`, `→ACTION:add`, `→ACTION:create`.
+Chat · Process · Weekly Review · Brain Dump · Project Review · Daily Review.
+
+Action lines: `→ACTION:update`, `→ACTION:add`, `→ACTION:create`, `→ACTION:next`, `→ACTION:someday`, `→ACTION:waiting`, `→ACTION:contact_promise`, `→ACTION:contact_like`, `→ACTION:contact_dislike`, `→ACTION:contact_tag`, `→ACTION:contact_note`, `→ACTION:contact_gift`, `→ACTION:attach_drive`, `→ACTION:calendar_create`, `→ACTION:calendar_update`, `→ACTION:calendar_delete`, `→ACTION:create-doc`, `→ACTION:create-sheet`, `→ACTION:create-slides`.
 
 - **Chat** — lazy task context: compact bucket-count summary + `get_task_context` tool on demand; other modes receive full task list
 - **Process** — `→ACTION:add|<title>|parent:<id>` places tasks under existing projects; code-level question guard prevents auto-confirm when AI response contains a clarifying question; duplicate detection via expanded context (Next Actions + Waiting For visible to AI)
 - **Brain Dump** — each captured item auto-added to Inbox via `→ACTION:create|<text>|bucket:inbox`
 
+Contact name resolution in action handlers uses fuzzy/substring matching via `resolveContactByName()` — exact match first, substring fallback on displayName/givenName/familyName.
+
+`→ACTION:attach_drive|<task_id>|fileId:<id>|name:<name>|mimeType:<type>|url:<url>` — attaches a Drive file (found via `drive_search`) directly to a task without the Picker UI.
+
+Email→Drive tools (available in Chat mode when Drive + Gmail modify/compose/send scope active): `gmail_save_attachment_to_drive` downloads a MIME attachment and uploads it to Drive; `gmail_save_email_to_doc` saves the email body as a new Google Doc.
+
+`processEmailWithAI` prompt workflow: Tasks → Calendar (detect scheduling info, offer `→ACTION:calendar_create`) → Contact note (offer `→ACTION:contact_note` if sender matches a contact) → Similar emails → Filter/label → Archive.
+
 ### API
 
 `fetch` → `https://api.anthropic.com/v1/messages`. Chat mode uses lazy task context (compact summary + `get_task_context` tool); all other modes receive full task list. Claude + Ollama provider selector. Google Services settings panel: unified OAuth with per-service scope preferences.
 
+### Email Management
+
+Email Management view (4 tabs): **Inbox** (list + detail panel, AI processing, task/contact linking, archive/spam), **Cleanup** (bulk action queue), **Rules** (Gmail filter management), **Contacts** (date-filtered inbox grouped by matching contact, expand/collapse per contact, unknown senders section).
+
 ### Contacts (People API)
 
 Sidebar Tools section — 👤 Contacts panel (teal #4db6ac). Two-way sync with Google Contacts (People API write scope). Custom enrichment stored in Supabase `contacts` table: relationship tags (preset + custom, shared suggestions across contacts), freeform notes (auto-save on blur), personal likes/preferences (category + value), gift ideas (given toggle + date stamp), promises/commitments (Made/Received direction badge, done toggle, optional task link). Promises can link to or create Inbox tasks. State managed by `src/features/contacts/useContacts.js`; sync builds a `standardRow` with only Google-sourced columns so custom enrichment fields are never overwritten by `ON CONFLICT DO UPDATE SET`.
+
+ContactRow shows a 📬 inbox-color badge when the contact's primary email appears in the currently loaded Email inbox (`inboxSenderEmails` state in App.jsx, populated via `onInboxLoaded` callback from EmailInboxPanel). Badge clears when Gmail disconnects or inbox reloads without that sender.
 
 ---
 
@@ -220,18 +236,4 @@ Update the Last used numbers line at the top of the file.
 
 **File write rules (enforced every time — no exceptions):**
 - `.md` files (Backlog.md, Changelog.md, any Claude_Prompts/*.md): always use PowerShell `[System.IO.File]::WriteAllText(path, content, UTF8)` — for both targeted edits and full rewrites. Never Python `open(path,'w')`, `mcp__desktop-commander__write_file`, or `mcp__desktop-commander__edit_block` — all write through the FUSE layer and leave null bytes on this Windows mount.
-- `.js` / `.jsx` files: edits → Python `str.replace()` via bash sandbox (never the Cowork Edit or Write tools — template literals get corrupted on the FUSE mount). New files → `mcp__desktop-commander__write_file` in chunks.
-
-**Pre-delivery checklist (before committing any code):**
-- [ ] Every component has a single, describable responsibility
-- [ ] No logic is duplicated
-- [ ] All hooks have correct dependency arrays
-- [ ] All lists have stable key props
-- [ ] All async operations handle loading/success/error
-- [ ] No commented-out code or stale TODOs
-- [ ] Folder/file structure follows feature-based organization
-- [ ] Props are typed or have PropTypes defined
-- [ ] No console.logs left in the code
-- [ ] New pure functions and hooks have test candidates identified and proposed
-- [ ] Approved tests are written, passing, and co-located in the feature folder
-- [ ] If this resolves a tracked issue or FR, it will be logged in Changelog.md after commit
+- `.js` / `.jsx` files: edits → Python `str.replace()` via bash sandbox (never the Cowork Edit or Write tools — template literals get corrupted on the FUSE mount). New files → `mcp__desktop-commander__write_file` in

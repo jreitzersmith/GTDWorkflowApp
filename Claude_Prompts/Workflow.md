@@ -192,7 +192,7 @@ After committing:
 5. Confirm the Last used numbers line at the top of `Backlog.md` is current.
 6. If any checklist items were submitted as Skip, move them to the **Deferred Testing Scenarios** section of `Backlog.md` now (if not already done in Phase 5). Format: `- [FR# or Issue#] <item description> — needs: <condition>`.
 
-Push: `git -C "C:\Programming_Projects\GTDWorkflowApp" push origin main`
+Push: `git -C "C:\Programming_Projects\GTDWorkflowApp" push origin develop`
 
 ### With Worker (Sonnet + Qwen)
 
@@ -203,11 +203,17 @@ Commits are made by the worker during overnight execution using the commit messa
 ## Phase 8 — Documentation
 
 **CLAUDE.md review (do this first)**
-Before updating Product_Summary/, check whether this cycle changed anything CLAUDE.md describes:
-- Did `package.json` change? → Review and update the Tech stack section.
-- Did a new coach mode, bucket, major feature, or API integration land? → Review and update the Current app state section.
+Before updating Product_Summary/, check the diff against these specific triggers:
+- `package.json` changed → update Tech stack section
+- New `→ACTION:` line added → update AI Coach section
+- New AI tool (`tool_use`) added → update AI Coach section
+- New tab added to any panel → update Current app state
+- New contact enrichment type → update Contacts section
+- `processEmailWithAI` workflow steps changed → update AI Coach section
+- New Supabase table or column → update Tech stack
+- Any change a user would notice as a new visible feature → review Current app state
 
-This is a lightweight check — most cycles won't require changes. If nothing relevant changed, proceed to HTML docs.
+If none apply, skip. If any apply, update CLAUDE.md before HTML docs.
 
 Update `Product_Summary/project-summary.html`, `project-snippets.html`, and `project-commits.html` only after John has confirmed the feature works in Phase 6. Do not update docs speculatively.
 
@@ -233,8 +239,9 @@ See `Claude_Prompts/Work_Order.md` for the full morning review protocol and work
 See `Claude_Prompts/File_Editing_Rules.md` for the full protocol. Summary:
 
 - Never use the Edit tool — corrupts files on this Windows FUSE mount
-- **Preferred:** `mcp__desktop-commander__read_file` / `write_file` — host-side, bypasses FUSE entirely
-- **Fallback:** read via `git show HEAD:path` (never `open(path,'r')`), write via `open(path,'w')`
+- **For .md files:** PowerShell `[System.IO.File]::WriteAllText()` only — `write_file`, `edit_block`, and Python `open(w)` all leave null bytes when file shrinks on this FUSE mount
+- **For .js/.jsx files:** Python `str.replace()` via bash + `open(path,'w')`, or `write_file` for new files
+- **Reading:** `mcp__desktop-commander__read_file` always; never `open(path,'r')` or the Read tool for files being edited
 - Use `str.replace(old, new)` — never regex on JSX
 - Verify each replacement succeeded before writing
 - After write, confirm size with `wc -c`
