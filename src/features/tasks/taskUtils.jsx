@@ -179,6 +179,7 @@ function extractAddAction(text) {
     if (key === 'dueTime') fields.dueTime = val;
     if (key === 'someday')    fields.isSomeday    = val === 'true';
     if (key === 'waitingFor') fields.isWaitingFor = val === 'true';
+    if (key === 'nodeType')   fields.nodeType     = val;
   });
   if (!fields.parentId || !title) return null;
   return { title, ...fields };

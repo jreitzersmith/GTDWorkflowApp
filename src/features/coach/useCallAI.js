@@ -802,6 +802,7 @@ function useCallAI({
                   actualEffort: null, deferUntil, notes: add.notes || null, recurrence,
                   category: category || parent.category || null,
                   ...(addIsNext ? { isNextAction: true } : {}),
+                  ...(add.nodeType ? { nodeType: add.nodeType } : {}),
                 };
                 workingTasks = [
                   ...workingTasks.map(t => t.id === parent.id
