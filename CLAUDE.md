@@ -1,4 +1,4 @@
-# GTD Manager — Project Brief for Claude
+﻿# GTD Manager — Project Brief for Claude
 
 ## What this project is
 
@@ -219,7 +219,7 @@ Update the Last used numbers line at the top of the file.
 - Supabase migrations: confirm John is ready, then run using the Management API directly (project ref `tudmteqljgpocffalssz`, token in `.env` as `SUPABASE_MANAGEMENT_TOKEN`). Verify with an `information_schema.columns` query before proceeding to testing. Never hand copy-paste SQL steps to John.
 
 **File write rules (enforced every time — no exceptions):**
-- `.md` files (Backlog.md, Changelog.md, any Claude_Prompts/*.md): targeted edits → `mcp__desktop-commander__edit_block`; full rewrites → PowerShell `[System.IO.File]::WriteAllText(path, content, UTF8)`. Never Python `open(path,'w')` or `mcp__desktop-commander__write_file` — both leave null bytes when new content is shorter than the cached file size on this FUSE mount.
+- `.md` files (Backlog.md, Changelog.md, any Claude_Prompts/*.md): always use PowerShell `[System.IO.File]::WriteAllText(path, content, UTF8)` — for both targeted edits and full rewrites. Never Python `open(path,'w')`, `mcp__desktop-commander__write_file`, or `mcp__desktop-commander__edit_block` — all write through the FUSE layer and leave null bytes on this Windows mount.
 - `.js` / `.jsx` files: edits → Python `str.replace()` via bash sandbox (never the Cowork Edit or Write tools — template literals get corrupted on the FUSE mount). New files → `mcp__desktop-commander__write_file` in chunks.
 
 **Pre-delivery checklist (before committing any code):**
@@ -235,4 +235,3 @@ Update the Last used numbers line at the top of the file.
 - [ ] New pure functions and hooks have test candidates identified and proposed
 - [ ] Approved tests are written, passing, and co-located in the feature folder
 - [ ] If this resolves a tracked issue or FR, it will be logged in Changelog.md after commit
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
