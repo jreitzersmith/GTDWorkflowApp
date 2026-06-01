@@ -50,6 +50,8 @@ function ContactsPanel({
   driveEnabled,
   // FR#173: favorites
   toggleFavorite,
+  // FR#176: inbox sender indicator
+  inboxSenderEmails,
 }) {
   const [searchText,      setSearchText]      = useState('');
   const [activeTagFilter, setActiveTagFilter] = useState(null);
@@ -182,6 +184,7 @@ function ContactsPanel({
                     selected={contact.id === selectedContactId}
                     onClick={() => setSelectedContactId(contact.id === selectedContactId ? null : contact.id)}
                     toggleFavorite={toggleFavorite}
+                    inboxSenderEmails={inboxSenderEmails}
                   />
                 ))}
                 <div style={{ height: 1, background: COLORS.border, margin: '4px 0' }} />
@@ -202,6 +205,7 @@ function ContactsPanel({
                 selected={contact.id === selectedContactId}
                 onClick={() => setSelectedContactId(contact.id === selectedContactId ? null : contact.id)}
                 toggleFavorite={toggleFavorite}
+                inboxSenderEmails={inboxSenderEmails}
               />
             ))
           )}
@@ -262,7 +266,7 @@ function ContactsPanel({
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function ContactRow({ contact, selected, onClick, toggleFavorite }) {
+function ContactRow({ contact, selected, onClick, toggleFavorite, inboxSenderEmails }) {
   const [hovered, setHovered] = useState(false);
   const initials    = contactInitials(contact);
   const email       = contactPrimaryEmail(contact);
@@ -273,6 +277,8 @@ function ContactRow({ contact, selected, onClick, toggleFavorite }) {
   const lastEmail   = emailCount > 0
     ? [...(contact.emailHistory || [])].sort((a, b) => new Date(b.date) - new Date(a.date))[0]
     : null;
+  const primaryEmail  = contactPrimaryEmail(contact).toLowerCase();
+  const hasInboxEmail = primaryEmail && (inboxSenderEmails || new Set()).has(primaryEmail);
   const showHoverDetail = hovered && !selected && (openPromises > 0 || giftCount > 0 || linkedTasks > 0 || lastEmail);
 
   return (
@@ -319,6 +325,9 @@ function ContactRow({ contact, selected, onClick, toggleFavorite }) {
             <span title={`${emailCount} linked email${emailCount !== 1 ? 's' : ''}`} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 8, background: '#5a8fd422', color: '#5a8fd4' }}>
               ✉ {emailCount}
             </span>
+          )}
+          {hasInboxEmail && (
+            <span title="Email in inbox" style={{ fontSize: 9, padding: '1px 5px', borderRadius: 8, background: COLORS.inboxBg, color: COLORS.inbox, fontWeight: 500 }}>📬</span>
           )}
           <span
               onClick={e => { e.stopPropagation(); toggleFavorite && toggleFavorite(contact.id); }}

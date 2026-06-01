@@ -69,6 +69,7 @@ export default function GTDManager() {
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState(coachName);
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
+  const [inboxSenderEmails, setInboxSenderEmails] = useState(new Set()); // FR#176
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
   const { googleToken, googleScope, calendarEnabled, driveEnabled, docsEnabled,
           sheetsEnabled, slidesEnabled, contactsEnabled, gmailError, scopePrefs,
@@ -141,7 +142,7 @@ export default function GTDManager() {
   // Fetch unread inbox count whenever the Gmail token changes
   // Use labels/INBOX endpoint — messagesUnread is exact; resultSizeEstimate on messages.list is unreliable
   useEffect(() => {
-    if (!googleToken) { setGmailUnreadCount(null); return; }
+    if (!googleToken) { setGmailUnreadCount(null); setInboxSenderEmails(new Set()); return; }
     fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX', {
       headers: { Authorization: `Bearer ${googleToken}` },
     })
@@ -738,6 +739,10 @@ export default function GTDManager() {
       `  - Effort estimate and any relevant location`,
       `Once confirmed, create the task with full metadata (category, effort, location, project). The email will be automatically linked.`,
       ``,
+      `**Calendar:** Check if this email contains any scheduling information, meeting requests, invitations, or appointment details. If found, summarise the proposed time/date and offer to create a calendar event. Wait for confirmation before emitting →ACTION:calendar_create.`,
+      ``,
+      `**Contact note:** If the sender matches a contact in your enrichment context, offer to add a brief note summarising the key communication. Use →ACTION:contact_note if the user confirms.`,
+      ``,
       `**Similar emails:** After tasks are confirmed, search Gmail for other emails from this sender or with a similar subject — report briefly.`,
       ``,
       `**Filter / label:** Ask whether I'd like a Gmail filter + label for future emails like this. If yes, create the label then the filter.`,
@@ -751,6 +756,11 @@ export default function GTDManager() {
       `Gmail-ID: ${email.id}`,
       ``,
       body,
+      ...(email.attachments && email.attachments.length > 0 ? [
+        ``,
+        `Attachments: ${email.attachments.map(a => `${a.filename} (${a.mimeType})`).join(', ')}`,
+        `Attachment IDs for tool use: ${JSON.stringify(email.attachments)}`,
+      ] : []),
     ].join('\n');
     // FR#161: auto-link email to matching contact if setting allows
     if (contactEmailLinkingMode === 'onProcess' || contactEmailLinkingMode === 'both') {
@@ -1543,6 +1553,7 @@ export default function GTDManager() {
                           authUser={authUser}
                           logEmailAsReceipt={logEmailAsReceipt}
                           markAsSpam={markAsSpam}
+                          onInboxLoaded={setInboxSenderEmails}
                         />
                       ) : currentView === "calendar" ? (
                         <CalendarManagementView
@@ -1624,6 +1635,7 @@ export default function GTDManager() {
                           googleToken={googleToken}
                           driveEnabled={driveEnabled}
                           toggleFavorite={toggleFavorite}
+                          inboxSenderEmails={inboxSenderEmails}
                         />
                       ) : currentView === "analytics" ? (
                         <AnalyticsArea

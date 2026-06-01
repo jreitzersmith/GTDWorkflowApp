@@ -6,7 +6,7 @@ import { doGmailFetchInbox, doGmailGetMessageBody, doGmailBatchLabel } from "./g
 import { avatarInitials, avatarColor, formatEmailDate, gmailBtn, gmailBtnPrimary, gmailBtnSm, gmailBtnSmDanger } from "./emailUtils.js";
 
 // Inbox list with checkboxes, avatar chips, pagination, and a detail slide-out panel.
-function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachEmailToTask, tasks, logEmailAsReceipt, markAsSpam, contacts, addContactEmail, contactEmailLinkingMode }) {
+function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachEmailToTask, tasks, logEmailAsReceipt, markAsSpam, contacts, addContactEmail, contactEmailLinkingMode, onInboxLoaded }) {
   const [inboxEmails, setInboxEmails] = useState([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError] = useState(null);
@@ -58,6 +58,13 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
     setShowContactPicker(false);
     setContactLinkedConfirm(null);
   }, [selectedId]);
+
+  // FR#176: notify parent of current inbox sender emails whenever inboxEmails changes
+  useEffect(() => {
+    if (!onInboxLoaded) return;
+    const senderSet = new Set(inboxEmails.map(e => (e.fromEmail || '').toLowerCase()).filter(Boolean));
+    onInboxLoaded(senderSet);
+  }, [inboxEmails, onInboxLoaded]);
 
   // Close task picker on outside click
   useEffect(() => {
