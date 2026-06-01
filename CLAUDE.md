@@ -221,4 +221,18 @@ Update the Last used numbers line at the top of the file.
 **File write rules (enforced every time — no exceptions):**
 - `.md` files (Backlog.md, Changelog.md, any Claude_Prompts/*.md): targeted edits → `mcp__desktop-commander__edit_block`; full rewrites → PowerShell `[System.IO.File]::WriteAllText(path, content, UTF8)`. Never Python `open(path,'w')` or `mcp__desktop-commander__write_file` — both leave null bytes when new content is shorter than the cached file size on this FUSE mount.
 - `.js` / `.jsx` files: edits → Python `str.replace()` via bash sandbox (never the Cowork Edit or Write tools — template literals get corrupted on the FUSE mount). New files → `mcp__desktop-commander__write_file` in chunks.
+
+**Pre-delivery checklist (before committing any code):**
+- [ ] Every component has a single, describable responsibility
+- [ ] No logic is duplicated
+- [ ] All hooks have correct dependency arrays
+- [ ] All lists have stable key props
+- [ ] All async operations handle loading/success/error
+- [ ] No commented-out code or stale TODOs
+- [ ] Folder/file structure follows feature-based organization
+- [ ] Props are typed or have PropTypes defined
+- [ ] No console.logs left in the code
+- [ ] New pure functions and hooks have test candidates identified and proposed
+- [ ] Approved tests are written, passing, and co-located in the feature folder
+- [ ] If this resolves a tracked issue or FR, it will be logged in Changelog.md after commit
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
