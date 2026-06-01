@@ -228,3 +228,8 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-05-30 | Feature      | FR#156  | GH#185 | CamelCase entry for contact relationship tags and likes categories; toContactTagCase() utility; PRESET_TAGS updated | 06b9a64 |
 | 2026-05-30 | Feature      | —       | GH#183 | Alphabetical sort for ContactTagManager and ContactCategoryManager; refactored to value-based edit state (editingTag/editingCat) | 06b9a64 |
 | 2026-05-31 | Bug Fix      | Issue#41 | GH#189 | contacts_lookup tool now merges Supabase enrichment (dislikes, likes, notes, tags, gifts, promises) into People API results via googleResourceName join | e69d9a4 |
+| 2026-06-01 | Feature | FR#158 | GH#187 | Contact name fuzzy/partial matching in action handlers — resolveContactByName() helper, substring fallback, ambiguous-match error | 753c2e77 |
+| 2026-06-01 | Feature | FR#176 | GH#207 | Contact row inbox indicator — onInboxLoaded callback, inboxSenderEmails state, 📬 badge in ContactRow | 5739db4c |
+| 2026-06-01 | Feature | FR#177 | GH#208 | Email > Contacts tab — EmailContactsPanel with date filter, contact grouping, expand/collapse, unknown senders | 0c0ee0da |
+| 2026-06-01 | Feature | FR#157 | GH#186 | contact_promise system prompt: no auto-emit tasks; suggest + confirm flow; Drive sharing + contact note hints (FR#182) | c302510a |
+| 2026-06-01 | Feature | FR#178/179/180/181/182 | GH#209/211/212/213/214 | email→Drive tools (attachment + email-to-Doc), →ACTION:attach_drive, processEmailWithAI calendar + contact note steps | 1d3ded27 |
