@@ -289,8 +289,15 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
           {emailDetail?.error && <div style={{ padding: 16, color: '#e05555', fontSize: 12 }}>Error: {emailDetail.error}</div>}
           {emailDetail && !emailDetail.error && (
             <>
-              <div style={{ padding: '12px 14px 10px', borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, marginBottom: 8, color: COLORS.text }}>{emailDetail.subject || '(no subject)'}</div>
+              <div style={{ padding: '12px 14px 10px', borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0, position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, color: COLORS.text, flex: 1, minWidth: 0 }}>{emailDetail.subject || '(no subject)'}</div>
+                  <span
+                    onClick={() => setSelectedId(null)}
+                    title="Close"
+                    style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 14, lineHeight: 1, flexShrink: 0, padding: '0 2px', userSelect: 'none' }}
+                  >✕</span>
+                </div>
                 <div style={{ fontSize: 11, color: COLORS.text2, lineHeight: 1.7 }}>
                   <div><span style={{ color: COLORS.muted }}>From: </span>{emailDetail.from}</div>
                   {emailDetail.to && <div><span style={{ color: COLORS.muted }}>To: </span>{emailDetail.to}</div>}
@@ -305,37 +312,6 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                   onClick={() => processEmailWithAI(emailDetail)}>
                   Process with AI ↗
                 </button>
-
-                {/* Log as receipt */}
-                {logEmailAsReceipt && (
-                  <div>
-                    {receiptStatus === 'ok' ? (
-                      <div style={{ fontSize: 11, color: COLORS.project, padding: '4px 0' }}>✓ Logged to receipt sheet</div>
-                    ) : (
-                      <>
-                        <button
-                          style={{ ...gmailBtn(), textAlign: 'left', width: '100%', color: COLORS.text2 }}
-                          disabled={receiptStatus === 'loading'}
-                          onClick={async () => {
-                            setReceiptStatus('loading');
-                            try {
-                              await logEmailAsReceipt(emailDetail);
-                              setReceiptStatus('ok');
-                              setTimeout(() => setReceiptStatus(null), 5000);
-                            } catch (e) {
-                              setReceiptStatus(e.message);
-                            }
-                          }}
-                        >
-                          {receiptStatus === 'loading' ? 'Logging…' : '📈 Log as receipt'}
-                        </button>
-                        {receiptStatus && receiptStatus !== 'loading' && receiptStatus !== 'ok' && (
-                          <div style={{ fontSize: 11, color: '#e05555', marginTop: 2, lineHeight: 1.4 }}>{receiptStatus}</div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
 
                 {/* Link to task */}
                 {attachEmailToTask && (
@@ -353,10 +329,10 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                             display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left',
                           }}
                         >
-                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: COLORS.muted }}>
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: COLORS.text2 }}>
                             📎 Link to task
                           </span>
-                          <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>{showTaskPicker ? '▴' : '▾'}</span>
+                          <span style={{ color: COLORS.text2, fontSize: 10, flexShrink: 0 }}>{showTaskPicker ? '▴' : '▾'}</span>
                         </button>
                         {showTaskPicker && (
                           <div style={{
@@ -387,7 +363,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                   </div>
                 )}
 
-                {/* FR#174: link email to contact */}
+                {/* Link to contact */}
                 {contacts && contacts.length > 0 && addContactEmail && (
                   <div>
                     {contactLinkedConfirm ? (
@@ -403,10 +379,10 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                             display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left',
                           }}
                         >
-                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: COLORS.muted }}>
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: COLORS.text2 }}>
                             👤 Link to contact
                           </span>
-                          <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>{showContactPicker ? '▴' : '▾'}</span>
+                          <span style={{ color: COLORS.text2, fontSize: 10, flexShrink: 0 }}>{showContactPicker ? '▴' : '▾'}</span>
                         </button>
                         {showContactPicker && (
                           <div style={{ position: 'absolute', bottom: 'calc(100% + 2px)', left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 6, zIndex: 50, maxHeight: 240, overflowY: 'auto', boxShadow: '0 -4px 16px rgba(0,0,0,0.4)' }}>
@@ -433,23 +409,38 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                     )}
                   </div>
                 )}
-                <button style={{ ...gmailBtn(), textAlign: 'left' }}
-                  disabled={archiving}
-                  onClick={async () => {
-                    if (googleScope !== 'full') { setInboxError('Archive requires Gmail write access — reconnect in Settings.'); return; }
-                    setArchiving(true);
-                    try {
-                      await doGmailBatchLabel([selectedId], [], ['INBOX'], googleToken);
-                      setInboxEmails(prev => prev.filter(e => e.id !== selectedId));
-                      setSelectedId(null);
-                    } catch (e) {
-                      setInboxError(`Archive failed: ${e.message}`);
-                    } finally {
-                      setArchiving(false);
-                    }
-                  }}>
-                  {archiving ? 'Archiving…' : 'Archive'}
-                </button>
+
+                {/* Log as receipt — green, moved below link pickers */}
+                {logEmailAsReceipt && (
+                  <div>
+                    {receiptStatus === 'ok' ? (
+                      <div style={{ fontSize: 11, color: '#4caf50', padding: '4px 0' }}>✓ Logged to receipt sheet</div>
+                    ) : (
+                      <>
+                        <button
+                          style={{ ...gmailBtn(), textAlign: 'left', width: '100%', color: '#4caf50' }}
+                          disabled={receiptStatus === 'loading'}
+                          onClick={async () => {
+                            setReceiptStatus('loading');
+                            try {
+                              await logEmailAsReceipt(emailDetail);
+                              setReceiptStatus('ok');
+                              setTimeout(() => setReceiptStatus(null), 5000);
+                            } catch (e) {
+                              setReceiptStatus(e.message);
+                            }
+                          }}
+                        >
+                          {receiptStatus === 'loading' ? 'Logging…' : '📈 Log as receipt'}
+                        </button>
+                        {receiptStatus && receiptStatus !== 'loading' && receiptStatus !== 'ok' && (
+                          <div style={{ fontSize: 11, color: '#e05555', marginTop: 2, lineHeight: 1.4 }}>{receiptStatus}</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* Mark as spam */}
                 {markAsSpam && (
                   <div>
@@ -480,7 +471,25 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                     )}
                   </div>
                 )}
-                <button style={{ ...gmailBtn(), textAlign: 'left', color: COLORS.muted }} onClick={() => setSelectedId(null)}>Close</button>
+
+                {/* Archive — moved after spam */}
+                <button style={{ ...gmailBtn(), textAlign: 'left' }}
+                  disabled={archiving}
+                  onClick={async () => {
+                    if (googleScope !== 'full') { setInboxError('Archive requires Gmail write access — reconnect in Settings.'); return; }
+                    setArchiving(true);
+                    try {
+                      await doGmailBatchLabel([selectedId], [], ['INBOX'], googleToken);
+                      setInboxEmails(prev => prev.filter(e => e.id !== selectedId));
+                      setSelectedId(null);
+                    } catch (e) {
+                      setInboxError(`Archive failed: ${e.message}`);
+                    } finally {
+                      setArchiving(false);
+                    }
+                  }}>
+                  {archiving ? 'Archiving…' : 'Archive'}
+                </button>
               </div>
             </>
           )}
