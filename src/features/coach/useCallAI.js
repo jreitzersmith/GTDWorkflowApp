@@ -42,7 +42,7 @@ const GET_TASK_CONTEXT_TOOL = {
 // Drive search tool — available in chat mode when Drive is connected (FR#59/FR#99)
 const DRIVE_SEARCH_TOOL = {
   name: 'drive_search',
-  description: "Search Google Drive for files and folders by name or content. Returns matching items with IDs, names, MIME types, and view links. Use before get_drive_file or any operation that needs a file/folder ID. IMPORTANT: query must use Drive query syntax — e.g. \"name contains 'LeanIX'\" or \"fullText contains 'LeanIX'\". To find a folder add: and mimeType='application/vnd.google-apps.folder'. Searches include Shared Drives and shared-with-me items automatically. If a name search returns no results, try a shorter name fragment. Plain text keywords without an operator will be rejected by the API.",
+  description: "Search Google Drive for files and folders by name or content. Returns matching items with IDs, names, MIME types, and view links. Use before get_drive_file or any operation that needs a file/folder ID. IMPORTANT: query must use Drive query syntax — e.g. \"name contains 'LeanIX'\" or \"fullText contains 'LeanIX'\". To find a folder add: and mimeType='application/vnd.google-apps.folder'. Searches include Shared Drives and shared-with-me items automatically. If a name search returns no results, try a shorter name fragment. If search still returns no results for a known folder, ask the user to provide the folder URL from their browser — extract the folder ID from the URL path (the long alphanumeric segment after /folders/) and use that ID directly. Plain text keywords without an operator will be rejected by the API.",
   input_schema: {
     type: 'object',
     properties: {
