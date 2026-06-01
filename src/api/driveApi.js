@@ -36,7 +36,8 @@ async function driveListFiles({
   pageSize = 20,
   onTokenRefresh,
 } = {}) {
-  const params = new URLSearchParams({ q, fields, pageSize });
+  const params = new URLSearchParams({ q, fields, pageSize,
+    supportsAllDrives: 'true', includeItemsFromAllDrives: 'true' });
   if (pageToken) params.set('pageToken', pageToken);
   const res = await driveRequest(`${DRIVE_BASE}/files?${params}`, { token }, onTokenRefresh);
   if (!res.ok) throw new Error(`Drive list failed: ${res.status} ${await res.text()}`);
