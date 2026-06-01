@@ -699,9 +699,9 @@ function useCallAI({
                     '',
                     emailData.body || emailData.snippet || '',
                   ].join('\n');
-                  const doc = await docsCreateDocument(googleToken, title);
-                  await docsAppendText(googleToken, doc.documentId, docBody);
-                  if (folder_id) await docsMoveToFolder(googleToken, doc.documentId, folder_id);
+                  const doc = await docsCreateDocument({ token: googleToken, title });
+                  await docsAppendText({ token: googleToken, documentId: doc.documentId, text: docBody });
+                  if (folder_id) await docsMoveToFolder({ token: googleToken, documentId: doc.documentId, newParentId: folder_id });
                   toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: `Saved as Google Doc "${title}": https://docs.google.com/document/d/${doc.documentId}/edit` });
                 } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === 'contacts_lookup') {
@@ -797,6 +797,8 @@ function useCallAI({
       // Apply →ACTION lines when in chat or dump mode — supports multiple actions per response
       let updateChip = null;
       let actionError = null;
+      // Declare at this scope so the calendar section below can also reference it
+      let workingTasks = [...tasks];
       if (mode === 'chat' || mode === 'dump' || mode === 'daily' || mode === 'review') {
         // Extract →ACTION lines — notes values may span multiple non-blank lines,
         // so match each block until the first blank line (\n\n) which separates
@@ -807,7 +809,7 @@ function useCallAI({
           taskActionLines.push(am[0].trimEnd());
         }
 
-        let workingTasks = [...tasks];
+        workingTasks = [...tasks];
         if (taskActionLines.length > 0) {
           // Process all actions against a local working copy so parent lookups
           // work across the batch (e.g. create parent then add children in same response)

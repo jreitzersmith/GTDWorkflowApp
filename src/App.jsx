@@ -29,7 +29,7 @@ import { createEmptyUsageStats } from "./features/settings/useAIUsageTracking.js
 
 import { parseRRULE, calEventStart, isAllDayEvent, genId } from "./features/calendar/calendarApi.js";
 import { driveUploadFile } from "./api/driveApi.js";
-import { doGmailSend, doGmailLabel } from "./features/email/gmailTools.js";
+import { doGmailSend, doGmailLabel, doGmailGetMessageBody } from "./features/email/gmailTools.js";
 import { sheetsAppendRows } from './api/sheetsApi.js';
 import { extractReceiptFields } from './features/email/receiptUtils.js';
 import { todayStr, isDeferred, buildNextOccurrence, extractSuggestions, extractMetadata, getOrderedChildren, useResizer, effortToMinutes } from "./features/tasks/taskUtils.jsx";
@@ -728,8 +728,15 @@ export default function GTDManager() {
   };
 
   // Prefill the coach chat with email content so the user can process it into tasks
-  const processEmailWithAI = useCallback((email) => {
-    const body = email.body ? email.body.slice(0, 4000) : email.snippet;
+  const processEmailWithAI = useCallback(async (email) => {
+    // When triggered from toolbar (not detail panel) the email object has no body or attachments.
+    // Fetch the full message so attachment metadata is available to the AI.
+    let fullEmail = email;
+    if (!email.body && email.id && googleToken) {
+      try { fullEmail = await doGmailGetMessageBody(email.id, googleToken); }
+      catch { /* fall back to metadata-only */ }
+    }
+    const body = fullEmail.body ? fullEmail.body.slice(0, 4000) : email.snippet;
     const prompt = [
       `Please review this email and handle it completely using this workflow:`,
       ``,
@@ -750,16 +757,16 @@ export default function GTDManager() {
       `**Archive:** Once ALL other steps are complete, archive this email via gmail_batch_label with message_ids: ["${email.id}"] and remove_label_ids: ["INBOX"]. Confirm when done.`,
       ``,
       `Email:`,
-      `From: ${email.from}`,
-      `Subject: ${email.subject}`,
-      `Date: ${email.date}`,
+      `From: ${fullEmail.from || email.from}`,
+      `Subject: ${fullEmail.subject || email.subject}`,
+      `Date: ${fullEmail.date || email.date}`,
       `Gmail-ID: ${email.id}`,
       ``,
       body,
-      ...(email.attachments && email.attachments.length > 0 ? [
+      ...(fullEmail.attachments && fullEmail.attachments.length > 0 ? [
         ``,
-        `Attachments: ${email.attachments.map(a => `${a.filename} (${a.mimeType})`).join(', ')}`,
-        `Attachment IDs for tool use: ${JSON.stringify(email.attachments)}`,
+        `Attachments: ${fullEmail.attachments.map(a => `${a.filename} (${a.mimeType})`).join(', ')}`,
+        `Attachment IDs for tool use: ${JSON.stringify(fullEmail.attachments)}`,
       ] : []),
     ].join('\n');
     // FR#161: auto-link email to matching contact if setting allows

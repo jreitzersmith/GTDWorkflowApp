@@ -33,20 +33,39 @@ function EmailContactsPanel({ googleToken, contacts }) {
   const [toDate, setToDate]           = useState(defaultTo);
   const [expandedKeys, setExpandedKeys] = useState(new Set());
   const [showUnknown, setShowUnknown] = useState(false);
+  const [nextPageToken, setNextPageToken] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const loadEmails = async () => {
     if (!googleToken) return;
     setLoading(true);
     setError(null);
+    setNextPageToken(null);
     try {
       const q = buildDateQuery(fromDate, toDate);
-      const { emails: fetched } = await doGmailFetchInbox(googleToken, null, q);
+      const { emails: fetched, nextPageToken: npt } = await doGmailFetchInbox(googleToken, null, q);
       setEmails(fetched);
+      setNextPageToken(npt || null);
       setExpandedKeys(new Set());
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (!googleToken || !nextPageToken) return;
+    setLoadingMore(true);
+    try {
+      const q = buildDateQuery(fromDate, toDate);
+      const { emails: more, nextPageToken: npt } = await doGmailFetchInbox(googleToken, nextPageToken, q);
+      setEmails(prev => [...prev, ...more]);
+      setNextPageToken(npt || null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -166,6 +185,15 @@ function EmailContactsPanel({ googleToken, contacts }) {
           </div>
         )}
       </div>
+
+      {/* Load more */}
+      {nextPageToken && (
+        <div style={{ padding: '10px 14px', borderBottom: `1px solid ${COLORS.border}`, textAlign: 'center', flexShrink: 0 }}>
+          <button style={{ ...gmailBtnSm, fontSize: 12 }} onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? 'Loading…' : 'Load more emails'}
+          </button>
+        </div>
+      )}
 
       {/* Footer */}
       {emails.length > 0 && (
