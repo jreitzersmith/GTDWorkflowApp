@@ -233,3 +233,5 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-06-01 | Feature | FR#177 | GH#208 | Email > Contacts tab — EmailContactsPanel with date filter, contact grouping, expand/collapse, unknown senders | 0c0ee0da |
 | 2026-06-01 | Feature | FR#157 | GH#186 | contact_promise system prompt: no auto-emit tasks; suggest + confirm flow; Drive sharing + contact note hints (FR#182) | c302510a |
 | 2026-06-01 | Feature | FR#178/179/180/181/182 | GH#209/211/212/213/214 | email→Drive tools (attachment + email-to-Doc), →ACTION:attach_drive, processEmailWithAI calendar + contact note steps | 1d3ded27 |
+| 2026-06-01 | Bug Fix | Issue#43/FR#181/179/178/177 | GH#215 | workingTasks scope fix; docsApi named params; processEmailWithAI full-body fetch; EmailContactsPanel load-more pagination | 912e3cf2 |
+| 2026-06-01 | Bug Fix | — | — | drive_search includes Shared Drives (supportsAllDrives + includeItemsFromAllDrives); DRIVE_SEARCH_TOOL folder-search guidance | 344913ab |
