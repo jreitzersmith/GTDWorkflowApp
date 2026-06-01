@@ -396,9 +396,17 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                       <div ref={contactPickerRef} style={{ position: 'relative' }}>
                         <button
                           onClick={() => setShowContactPicker(p => !p)}
-                          style={{ ...gmailBtn(), textAlign: 'left', width: '100%', color: COLORS.text2 }}
+                          style={{
+                            width: '100%', background: COLORS.surface2, border: `1px solid ${COLORS.border}`,
+                            borderRadius: 6, padding: '5px 8px', color: COLORS.text, fontFamily: 'inherit',
+                            fontSize: 12, outline: 'none', boxSizing: 'border-box', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left',
+                          }}
                         >
-                          👤 Link to contact
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: COLORS.muted }}>
+                            👤 Link to contact
+                          </span>
+                          <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>{showContactPicker ? '▴' : '▾'}</span>
                         </button>
                         {showContactPicker && (
                           <div style={{ position: 'absolute', bottom: 'calc(100% + 2px)', left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 6, zIndex: 50, maxHeight: 240, overflowY: 'auto', boxShadow: '0 -4px 16px rgba(0,0,0,0.4)' }}>
