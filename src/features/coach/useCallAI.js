@@ -264,6 +264,28 @@ function applyTaskFilters(parts, tasks) {
   return result;
 }
 
+// Resolve a contact by name with fuzzy/partial matching fallback.
+// Returns { contact, ambiguous, candidates } where:
+//   contact    — matched contact object, or null
+//   ambiguous  — true when multiple contacts match (user must be more specific)
+//   candidates — display names of all partial matches (only when ambiguous)
+function resolveContactByName(contacts, name) {
+  const q = (name || '').toLowerCase().trim();
+  if (!q) return { contact: null, ambiguous: false };
+  // Exact case-insensitive match on displayName
+  const exact = contacts.find(c => (c.displayName || '').toLowerCase() === q);
+  if (exact) return { contact: exact, ambiguous: false };
+  // Substring fallback across displayName, givenName, familyName
+  const partials = contacts.filter(c =>
+    (c.displayName || '').toLowerCase().includes(q) ||
+    (c.givenName   || '').toLowerCase().includes(q) ||
+    (c.familyName  || '').toLowerCase().includes(q)
+  );
+  if (partials.length === 1) return { contact: partials[0], ambiguous: false };
+  if (partials.length > 1)  return { contact: null, ambiguous: true, candidates: partials.map(c => c.displayName || '(no name)') };
+  return { contact: null, ambiguous: false };
+}
+
 /**
  * Owns the AI fetch loop, all tool-dispatch branches, action-line parsing,
  * the Ollama model list fetcher, and the sendChat convenience wrapper.
@@ -403,6 +425,11 @@ function useCallAI({
             if (googleToken && driveEnabled) {
               availableTools.push(DRIVE_SEARCH_TOOL);
               availableTools.push(GET_DRIVE_FILE_TOOL);
+              // FR#178/179: attachment + email→Doc tools (need both gmail + drive)
+              if (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send') {
+                availableTools.push(GMAIL_SAVE_ATTACHMENT_TOOL);
+                availableTools.push(GMAIL_SAVE_EMAIL_TO_DOC_TOOL);
+              }
             }
             if (googleToken && contactsEnabled) availableTools.push(CONTACTS_LOOKUP_TOOL);
             if (import.meta.env.VITE_OPENWEATHERMAP_API_KEY) availableTools.push(GET_WEATHER_TOOL);
@@ -647,6 +674,34 @@ function useCallAI({
                     toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result) });
                   } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: 'Weather fetch failed: ' + e.message }); }
                 }
+              } else if (toolUse.name === 'gmail_save_attachment_to_drive') {
+                setMessages(prev => [...prev, { role: 'assistant', text: '📎 Saving attachment to Drive…', isSearchChip: true }]);
+                try {
+                  const { message_id, attachment_id, file_name, folder_id } = toolUse.input;
+                  const result = await doGmailSaveAttachmentToDrive(message_id, attachment_id, file_name, folder_id || null, googleToken);
+                  const msg = result.webViewLink
+                    ? `Saved "${result.name}" to Drive: ${result.webViewLink}`
+                    : 'Error saving attachment to Drive.';
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: msg });
+                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === 'gmail_save_email_to_doc') {
+                setMessages(prev => [...prev, { role: 'assistant', text: '📄 Saving email as Google Doc…', isSearchChip: true }]);
+                try {
+                  const { message_id, title, folder_id } = toolUse.input;
+                  const emailData = await doGmailGetMessageBody(message_id, googleToken);
+                  const docBody = [
+                    `From: ${emailData.from}`,
+                    `To: ${emailData.to || ''}`,
+                    `Date: ${emailData.date}`,
+                    `Subject: ${emailData.subject}`,
+                    '',
+                    emailData.body || emailData.snippet || '',
+                  ].join('\n');
+                  const doc = await docsCreateDocument(googleToken, title);
+                  await docsAppendText(googleToken, doc.documentId, docBody);
+                  if (folder_id) await docsMoveToFolder(googleToken, doc.documentId, folder_id);
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: `Saved as Google Doc "${title}": https://docs.google.com/document/d/${doc.documentId}/edit` });
+                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === 'contacts_lookup') {
                 const contactsQuery = toolUse.input.query;
                 const contactsMax = Math.min(toolUse.input.max_results || 5, 30);
@@ -745,7 +800,7 @@ function useCallAI({
         // so match each block until the first blank line (\n\n) which separates
         // action lines from the AI's subsequent prose response.
         const taskActionLines = [];
-        const actionRe = /→ACTION:(?:update|add|create|link_email|next|someday|waiting|contact_promise|contact_like|contact_dislike|contact_tag|contact_note|contact_gift)\|(?:[^\n]|\n(?!\n)(?!→ACTION:))+/g;
+        const actionRe = /→ACTION:(?:update|add|create|link_email|next|someday|waiting|contact_promise|contact_like|contact_dislike|contact_tag|contact_note|contact_gift|attach_drive)\|(?:[^\n]|\n(?!\n)(?!→ACTION:))+/g;
         for (const am of reply.matchAll(actionRe)) {
           taskActionLines.push(am[0].trimEnd());
         }
@@ -993,15 +1048,17 @@ function useCallAI({
               const text = xtra.text || '';
               const doCreateTask = xtra.create_task === 'yes';
               if (contactName && text && contactActionsRef.current.addPromise) {
-                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
-                if (contact) {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
                   await contactActionsRef.current.addPromise(contact.id, { text, direction });
                   if (direction === 'made' && doCreateTask && contactActionsRef.current.createInboxTask) {
                     contactActionsRef.current.createInboxTask(text, { contactId: contact.id });
                   }
-                  chips.push({ taskName: contactName, fields: [direction === 'made' ? 'promise recorded' : 'received promise recorded'] });
-                } else {
-                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                  chips.push({ taskName: contact.displayName || contactName, fields: [direction === 'made' ? 'promise recorded' : 'received promise recorded'] });
                 }
               }
               continue;
@@ -1018,12 +1075,14 @@ function useCallAI({
                 xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
               }
               if (contactName && xtra.value && contactActionsRef.current.addLike) {
-                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
-                if (contact) {
-                  await contactActionsRef.current.addLike(contact.id, { category: xtra.category || 'General', value: xtra.value });
-                  chips.push({ taskName: contactName, fields: ['like added: ' + xtra.value] });
-                } else {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
                   actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
+                  await contactActionsRef.current.addLike(contact.id, { category: xtra.category || 'General', value: xtra.value });
+                  chips.push({ taskName: contact.displayName || contactName, fields: ['like added: ' + xtra.value] });
                 }
               }
               continue;
@@ -1040,12 +1099,14 @@ function useCallAI({
                 xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
               }
               if (contactName && xtra.value && contactActionsRef.current.addDislike) {
-                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
-                if (contact) {
-                  await contactActionsRef.current.addDislike(contact.id, { category: xtra.category || 'General', value: xtra.value });
-                  chips.push({ taskName: contactName, fields: ['dislike added: ' + xtra.value] });
-                } else {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
                   actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
+                  await contactActionsRef.current.addDislike(contact.id, { category: xtra.category || 'General', value: xtra.value });
+                  chips.push({ taskName: contact.displayName || contactName, fields: ['dislike added: ' + xtra.value] });
                 }
               }
               continue;
@@ -1057,15 +1118,17 @@ function useCallAI({
               const contactName = (parts[0] || '').trim();
               const tag = (parts[1] || '').replace(/^tag:/, '').trim();
               if (contactName && tag && contactActionsRef.current.updateCustomFields) {
-                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
-                if (contact) {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
                   const existing = contact.relationshipTags || [];
                   if (!existing.includes(tag)) {
                     await contactActionsRef.current.updateCustomFields(contact.id, { relationshipTags: [...existing, tag] });
                   }
-                  chips.push({ taskName: contactName, fields: ['tag added: ' + tag] });
-                } else {
-                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                  chips.push({ taskName: contact.displayName || contactName, fields: ['tag added: ' + tag] });
                 }
               }
               continue;
@@ -1077,14 +1140,16 @@ function useCallAI({
               const contactName = (parts[0] || '').trim();
               const text = (parts[1] || '').replace(/^text:/, '').trim();
               if (contactName && text && contactActionsRef.current.updateCustomFields) {
-                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
-                if (contact) {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
                   const existing = contact.notes || '';
                   const newNotes = existing ? existing + '\n' + text : text;
                   await contactActionsRef.current.updateCustomFields(contact.id, { notes: newNotes });
-                  chips.push({ taskName: contactName, fields: ['note added'] });
-                } else {
-                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                  chips.push({ taskName: contact.displayName || contactName, fields: ['note added'] });
                 }
               }
               continue;
@@ -1096,13 +1161,43 @@ function useCallAI({
               const contactName = (parts[0] || '').trim();
               const text = (parts[1] || '').replace(/^text:/, '').trim();
               if (contactName && text && contactActionsRef.current.addGiftIdea) {
-                const contact = (contactActionsRef.current.contacts || []).find(c => (c.displayName || '').toLowerCase() === contactName.toLowerCase());
-                if (contact) {
-                  await contactActionsRef.current.addGiftIdea(contact.id, { text });
-                  chips.push({ taskName: contactName, fields: ['gift idea added: ' + text] });
-                } else {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
                   actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
+                  await contactActionsRef.current.addGiftIdea(contact.id, { text });
+                  chips.push({ taskName: contact.displayName || contactName, fields: ['gift idea added: ' + text] });
                 }
+              }
+              continue;
+            }
+
+            // →ACTION:attach_drive|<task_id>|fileId:<id>|name:<name>|mimeType:<type>|url:<url> (FR#180)
+            if (line.startsWith('→ACTION:attach_drive|')) {
+              const parts = line.slice('→ACTION:attach_drive|'.length).split('|');
+              const taskId = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci >= 0) xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
+              }
+              if (taskId && xtra.fileId) {
+                const attachment = {
+                  id:       xtra.fileId,
+                  name:     xtra.name     || 'Drive file',
+                  mimeType: xtra.mimeType || 'application/octet-stream',
+                  url:      xtra.url      || `https://drive.google.com/file/d/${xtra.fileId}/view`,
+                };
+                workingTasks = workingTasks.map(t => {
+                  if (t.id !== taskId) return t;
+                  const existing = t.driveAttachments || [];
+                  if (existing.some(a => a.id === attachment.id)) return t;
+                  return { ...t, driveAttachments: [...existing, attachment] };
+                });
+                const taskName = (workingTasks.find(t => t.id === taskId) || {}).text || taskId;
+                chips.push({ taskName, fields: ['Drive file attached: ' + attachment.name] });
               }
               continue;
             }
