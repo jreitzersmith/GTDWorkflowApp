@@ -6,6 +6,7 @@ One row per item: date · type · # · GH# · name · commit hash(es).
 When an item is resolved, **remove** it from `Backlog.md` and add a full row here. Close the corresponding GitHub issue via the GitHub MCP.
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
+| 2026-05-31 | Feature | FR#175 | GH#206 | Email inbox server-side Gmail search on Enter — doGmailFetchInbox searchQuery param; serverSearchActive state; Enter triggers API call; hint, toolbar result count, ↻/✕ reset | 00063ce |
 | 2026-05-31 | Feature | FR#171 | GH#202 | Contact list row: ✉ email count badge + hover enrichment expansion (open promises, gift ideas, linked tasks, last email date) | 2620897 |
 | 2026-05-31 | Feature | FR#172 | GH#203 | Email inbox search/filter — client-side filter over loaded emails by from/subject/snippet; clear button; empty state | 2620897 |
 | 2026-05-31 | Feature | FR#173 | GH#204 | Contact favorites — is_favorite BOOLEAN column; ★ toggle on ContactRow; Favorites section at top of contact list; toggleFavorite in useContacts | 2620897, 7e01f80 |
