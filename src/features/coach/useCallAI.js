@@ -5,9 +5,11 @@ import { GMAIL_SEARCH_TOOL, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL,
   GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL,
   GMAIL_LIST_FILTERS_TOOL, GMAIL_CREATE_FILTER_TOOL, GMAIL_DELETE_FILTER_TOOL,
   GMAIL_BULK_ACTION_TOOL, GMAIL_QUEUE_ADD_TOOL,
+  GMAIL_SAVE_ATTACHMENT_TOOL, GMAIL_SAVE_EMAIL_TO_DOC_TOOL,
   doGmailSearch, doGmailListLabels, doGmailCreateLabel,
   doGmailListFilters, doGmailCreateFilter, doGmailDeleteFilter, doGmailBatchLabel,
-  doGmailBulkAction, doGmailLabel, doGmailCompose, doGmailSend } from '../email/gmailTools.js';
+  doGmailBulkAction, doGmailLabel, doGmailCompose, doGmailSend,
+  doGmailSaveAttachmentToDrive, doGmailGetMessageBody } from '../email/gmailTools.js';
 import { doCalendarCreateEvent, doCalendarUpdateEvent, doCalendarDeleteEvent,
   genId } from '../calendar/calendarApi.js';
 import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateAction, extractAddAction,
