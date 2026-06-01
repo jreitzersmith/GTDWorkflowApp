@@ -431,7 +431,7 @@ function EmailInboxPanel({ googleToken, googleScope, processEmailWithAI, attachE
                             }
                           }}
                         >
-                          {receiptStatus === 'loading' ? 'Logging…' : '📈 Log as receipt'}
+                          {receiptStatus === 'loading' ? 'Logging…' : '🧾 Log as receipt'}
                         </button>
                         {receiptStatus && receiptStatus !== 'loading' && receiptStatus !== 'ok' && (
                           <div style={{ fontSize: 11, color: '#e05555', marginTop: 2, lineHeight: 1.4 }}>{receiptStatus}</div>
