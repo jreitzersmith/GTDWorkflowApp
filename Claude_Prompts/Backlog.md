@@ -1,13 +1,13 @@
 ﻿# GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#185**
+> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#187**
 
 ---
 
 ## Known issues / remaining work
 
 - Issue#43 [GH#215] (2026-06-01) — Chat mode duplicate task: action handler auto-creates task immediately + metadata panel also creates on accept; need to surface task ID to pending action state so panel patches instead of posts
-- Issue#39 [GH#178] (2026-05-30) — AI processing breaks gift/promise task link — when AI Process mode moves original task to inboxHistory and creates a new task, gift/promise taskId links go stale; deferred pending architectural decision
+
 - Issue#40 [GH#188] (2026-05-30) — Inbox processing auto-starts after AI Skip in contact enrichment — after Skip, coach immediately transitions to inbox processing mode instead of awaiting next input; likely post-action flow in useCallAI.js
 
 ---
@@ -37,6 +37,8 @@
 
 #### Integrations / data
 
+- FR#186 [GH#219] (2026-06-02) — Task completion appends summary to linked contact's notes — when task with contactId marked done, append "[date] Completed: <title> + notes" to contact.notes; opt-in setting in Settings > Contacts
+- FR#187 [GH#220] (2026-06-02) — Health monitoring panel — medications/supplements tracker, medical appointment calendar integration, AI-summarised Drive documents; new health_items Supabase table; deferred to dedicated phase
 - FR#185 [GH#218] (2026-06-02) — Android SMS contact tracking — companion app reads device SMS via content://sms/, syncs to new sms_messages Supabase table, surfaces threads in Contacts panel alongside email; deferred to Android app phase. See GH#218 for full architecture, schema, and design decisions.
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
 - FR#70 [GH#70] (2026-05-12) — Multiple Google account support
@@ -76,6 +78,7 @@ Test cases that could not be executed during their cycle due to a missing condit
 - [FR#176 GH#207] Inbox indicator badge appears on ContactRow when contact's email is in loaded inbox — needs Email inbox loaded during test
 - [FR#176 GH#207] Inbox indicator clears when inbox refreshes without that sender — needs Email inbox loaded
 - [FR#176 GH#207] Inbox indicator clears when Gmail disconnected — needs Gmail connected
+- [Issue#39 GH#178] Gift given→task done bidirectional sync after re-link — g2: marking re-linked task done did not flip gift.given toggle; re-link itself confirmed working (g1 passed); likely test-timing fluke; retest with deliberate pause between processing and done-toggle
 - [FR#180 GH#212] Ask coach to attach a Drive file to a task via drive_search + →ACTION:attach_drive; verify badge in Task Detail — needs Drive connected
 - [FR#181 GH#213] Process a scheduling email; confirm Calendar step offers →ACTION:calendar_create — needs an email with scheduling/meeting info
 - [FR#182 GH#214] Process email from a contact; confirm AI offers contact_note step — needs email from a known contact
