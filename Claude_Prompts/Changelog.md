@@ -239,3 +239,8 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-06-02 | Feature | FR#183 | GH#216 | Contact-task linking — LinkedTasksSection, contact picker in TaskDetail, contact:<name> action syntax, resolve in handlers; empty state always shown | 74b8553 |
 | 2026-06-02 | Bug Fix | — | GH#216 | TaskDetailPanel: missing task.id in onUpdate calls for contact picker (crash fix) | 25e45f9 |
 | 2026-06-02 | Feature | FR#184 | GH#217 | drive_search empty-result scope hint; Settings Drive scope description updated | 7f721a6 |
+| 2026-06-02 | Bug Fix | Issue#39 | GH#178 | Gift/promise task links re-linked after inbox processing — onTaskReplaced callback in useInboxProcessing transfers contactId to new task and updates contact giftIdeas/promises taskId via relinkTaskContactsRef | TBD | |
+| 2026-06-02 | Feature | FR#183/184 | GH#216/217 | Contact-task linking (LinkedTasksSection, contact picker, contact:<name> syntax, resolve in action handlers); Drive scope empty-result hint | 7f721a64 |
+| 2026-06-02 | Feature | FR#183 | GH#216 | Contact-task linking — LinkedTasksSection, contact picker in TaskDetail, contact:<name> action syntax, resolve in handlers; empty state always shown | 74b8553 |
+| 2026-06-02 | Bug Fix | — | GH#216 | TaskDetailPanel: missing task.id in onUpdate calls for contact picker (crash fix) | 25e45f9 |
+| 2026-06-02 | Feature | FR#184 | GH#217 | drive_search empty-result scope hint; Settings Drive scope description updated | 7f721a6 |

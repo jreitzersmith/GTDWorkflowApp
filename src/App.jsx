@@ -114,6 +114,8 @@ export default function GTDManager() {
   const skippedInSessionIds = useRef(new Set());
   // Stable ref so useInboxProcessing can call suggestProjectGroup without a TDZ forward-reference
   const suggestProjectGroupRef = useRef(null);
+  // Stable ref so useInboxProcessing can re-link contact gifts/promises after task replacement (Issue#39)
+  const relinkTaskContactsRef = useRef(null);
 
   const { syncStatus, supabaseReady, settingsReady } = useSupabaseSync({
     authUser, tasks, setTasks,
@@ -477,6 +479,7 @@ export default function GTDManager() {
     setPendingAction,
     callAI, switchCoachMode,
     onSessionTasksCreated: (ids, titles) => suggestProjectGroupRef.current?.(ids, titles),
+    onTaskReplaced: (oldId, newId) => relinkTaskContactsRef.current?.(oldId, newId),
   });
 
   // Intercepts gmail_send before delegating to the inbox-processing confirm handler.
@@ -585,6 +588,16 @@ export default function GTDManager() {
       if (promise && Boolean(promise.done) !== isDone) togglePromiseDone(contact.id, promise.id);
       const gift = (contact.giftIdeas || []).find(g => g.taskId === taskId);
       if (gift && Boolean(gift.given) !== isDone) toggleGiftGiven(contact.id, gift.id);
+    });
+  };
+
+  // Re-link contact gifts/promises when inbox processing replaces a task (Issue#39)
+  relinkTaskContactsRef.current = (oldId, newId) => {
+    contacts.forEach(contact => {
+      const linkedGifts = (contact.giftIdeas || []).filter(g => g.taskId === oldId);
+      linkedGifts.forEach(gift => linkGiftToTask(contact.id, gift.id, newId));
+      const linkedPromises = (contact.promises || []).filter(p => p.taskId === oldId);
+      linkedPromises.forEach(promise => linkPromiseToTask(contact.id, promise.id, newId));
     });
   };
 

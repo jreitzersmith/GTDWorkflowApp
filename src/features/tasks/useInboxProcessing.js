@@ -36,6 +36,7 @@ function useInboxProcessing({
   setPendingAction,
   callAI, switchCoachMode,
   onSessionTasksCreated,
+  onTaskReplaced,
 }) {
   // Tracks tasks created during this processing session (for FR#8 group suggestion).
   const sessionCreatedTasksRef = useRef([]);
@@ -75,7 +76,7 @@ function useInboxProcessing({
     // Create new tasks based on action type, applying any AI-suggested dates
     if (type === 'next') {
       const newId = genId();
-      const newTask = { id: newId, text: title || current?.text || '', bucket: 'project', isNextAction: true, done: false, created: Date.now(), priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || null, reviewed: true, ...(aiSomeday ? { isSomeday: true } : {}), ...(aiWaitingFor ? { isWaitingFor: true } : {}), ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
+      const newTask = { id: newId, text: title || current?.text || '', bucket: 'project', isNextAction: true, done: false, created: Date.now(), priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || null, reviewed: true, ...(aiSomeday ? { isSomeday: true } : {}), ...(aiWaitingFor ? { isWaitingFor: true } : {}), ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}), ...(current?.contactId ? { contactId: current.contactId } : {}) };
       sessionCreatedTasksRef.current.push({ id: newId, text: newTask.text });
       setTasks(prev => {
         if (uncategorizedProjectId) {
@@ -83,6 +84,7 @@ function useInboxProcessing({
         }
         return [newTask, ...prev];
       });
+      if (hasInboxContext) onTaskReplaced?.(current.id, newId);
     } else if (type === 'project') {
       const projectId = genId();
       const actionId = genId();
@@ -91,33 +93,36 @@ function useInboxProcessing({
         ? (tasks.find(t => t.id === parentRef) || tasks.find(t => t.text.toLowerCase() === (parentRef || '').toLowerCase()))
         : null;
       setTasks(prev => [
-        { id: projectId, text: title || current?.text || '', bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || parentNode?.category || null, reviewed: true, ...(aiSomeday ? { isSomeday: true } : {}), ...(aiWaitingFor ? { isWaitingFor: true } : {}), ...(parentNode ? { parentId: parentNode.id } : {}) },
+        { id: projectId, text: title || current?.text || '', bucket: 'project', done: false, created: Date.now(), childIds: [actionId], priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || parentNode?.category || null, reviewed: true, ...(aiSomeday ? { isSomeday: true } : {}), ...(aiWaitingFor ? { isWaitingFor: true } : {}), ...(parentNode ? { parentId: parentNode.id } : {}), ...(current?.contactId ? { contactId: current.contactId } : {}) },
         { id: actionId, text: nextAction || title, bucket: 'project', isNextAction: true, done: false, created: Date.now(), parentId: projectId, priority: aiPriority || [], location: aiLocation || [], dueDate: null, effort: null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: aiNotes || null, category: null, reviewed: true },
         ...prev.map(t => t.id === parentNode?.id ? { ...t, childIds: [...(t.childIds || []), projectId] } : t),
       ]);
+      if (hasInboxContext) onTaskReplaced?.(current.id, projectId);
       // type === 'project' already has its own project structure — omit from group suggestion
     } else if (type === 'someday') {
       const newId = genId();
       const taskText = title || current.text;
       sessionCreatedTasksRef.current.push({ id: newId, text: taskText });
       setTasks(prev => {
-        const newTask = { id: newId, text: taskText, bucket: 'project', isSomeday: true, done: false, created: Date.now(), priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || null, reviewed: true, ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
+        const newTask = { id: newId, text: taskText, bucket: 'project', isSomeday: true, done: false, created: Date.now(), priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || null, reviewed: true, ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}), ...(current?.contactId ? { contactId: current.contactId } : {}) };
         if (uncategorizedProjectId) {
           return [newTask, ...prev.map(t => t.id === uncategorizedProjectId ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
         }
         return [newTask, ...prev];
       });
+      if (hasInboxContext) onTaskReplaced?.(current.id, newId);
     } else if (type === 'waiting') {
       const newId = genId();
       const taskText = title || current.text;
       sessionCreatedTasksRef.current.push({ id: newId, text: taskText });
       setTasks(prev => {
-        const newTask = { id: newId, text: taskText, bucket: 'project', isWaitingFor: true, done: false, created: Date.now(), priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: aiNotes || null, category: aiCategory || null, reviewed: true, ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
+        const newTask = { id: newId, text: taskText, bucket: 'project', isWaitingFor: true, done: false, created: Date.now(), priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null, actualEffort: null, deferUntil: aiDefer || null, recurrence: null, notes: aiNotes || null, category: aiCategory || null, reviewed: true, ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}), ...(current?.contactId ? { contactId: current.contactId } : {}) };
         if (uncategorizedProjectId) {
           return [newTask, ...prev.map(t => t.id === uncategorizedProjectId ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
         }
         return [newTask, ...prev];
       });
+      if (hasInboxContext) onTaskReplaced?.(current.id, newId);
     } else if (type === 'add') {
       // Add as child of existing project (ID or title lookup)
       // Do NOT push to sessionCreatedTasksRef — add-type tasks already have a parent
@@ -134,14 +139,14 @@ function useInboxProcessing({
           { id: childId, text: taskText, bucket: 'project', isNextAction: true, done: false, created: Date.now(),
             parentId: parent.id, priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null,
             actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null,
-            category: aiCategory || parent.category || null, reviewed: true },
+            category: aiCategory || parent.category || null, reviewed: true, ...(current?.contactId ? { contactId: current.contactId } : {}) },
         ]);
       } else {
         // Parent not found — fall back to UnCategorized project
         const fallbackTask = { id: childId, text: taskText, bucket: 'project', isNextAction: true, done: false,
           created: Date.now(), priority: aiPriority || [], location: aiLocation || [], dueDate: aiDue || null, effort: normalizeEffort(aiEffort, efforts) || null,
           actualEffort: null, deferUntil: aiDefer || null, recurrence: aiRecurrence || null, notes: aiNotes || null, category: aiCategory || null, reviewed: true,
-          ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}) };
+          ...(uncategorizedProjectId ? { parentId: uncategorizedProjectId } : {}), ...(current?.contactId ? { contactId: current.contactId } : {}) };
         setTasks(prev => {
           if (uncategorizedProjectId) {
             return [fallbackTask, ...prev.map(t => t.id === uncategorizedProjectId ? { ...t, childIds: [...(t.childIds || []), childId] } : t)];
@@ -149,6 +154,7 @@ function useInboxProcessing({
           return [fallbackTask, ...prev];
         });
       }
+      if (hasInboxContext) onTaskReplaced?.(current.id, childId);
     } else if (type === 'update') {
       // Direct field update — used by review mode to mark tasks done, change bucket flags, etc.
       const { taskId, changes } = pendingAction;
@@ -190,7 +196,7 @@ function useInboxProcessing({
       setMessages(prev => [...prev, { role: 'assistant', text: '🎉 **All items processed.** Your inbox is clear — well done.' }]);
     }
   }, [pendingAction, tasks, processingTaskId, skippedInSessionIds, singleTaskMode,
-      setTasks, setPendingAction, setMessages, processNextInboxItem, onSessionTasksCreated]);
+      setTasks, setPendingAction, setMessages, processNextInboxItem, onSessionTasksCreated, onTaskReplaced]);
 
   const handleSkipPendingAction = useCallback(() => {
     const current = tasks.find(t => t.id === processingTaskId.current);
