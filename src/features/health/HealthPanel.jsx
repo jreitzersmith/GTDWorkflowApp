@@ -323,12 +323,13 @@ function ApptRow({ item, onEdit, onRemove, fromCalendar }) {
           </a>
         )}
       </div>
-      {!fromCalendar && (
-        <>
-          <button onClick={() => onEdit(item)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>Edit</button>
-          <button onClick={() => onRemove(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>✕</button>
-        </>
-      )}
+      {fromCalendar
+        ? <button onClick={() => onIgnore && onIgnore(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>Ignore</button>
+        : <>
+            <button onClick={() => onEdit(item)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>Edit</button>
+            <button onClick={() => onRemove(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>✕</button>
+          </>
+      }
     </div>
   );
 }
@@ -374,6 +375,17 @@ function HealthPanel({
   const [tab, setTab]           = useState(0);
   const [adding, setAdding]     = useState(false);
   const [editItem, setEditItem] = useState(null);
+  const [ignoredCalIds, setIgnoredCalIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('gtd_health_ignored_cal') || '[]')); } catch { return new Set(); }
+  });
+  const [calWindowDays, setCalWindowDays] = useState(() =>
+    parseInt(localStorage.getItem('gtd_health_cal_window') || '90', 10)
+  );
+  const ignoreCalEvent = (id) => setIgnoredCalIds(prev => {
+    const next = new Set(prev); next.add(id);
+    localStorage.setItem('gtd_health_ignored_cal', JSON.stringify([...next])); return next;
+  });
+  const resetIgnored = () => { setIgnoredCalIds(new Set()); localStorage.removeItem('gtd_health_ignored_cal'); };
 
   const meds  = (healthItems || []).filter(i => i.type === 'medication' || i.type === 'supplement');
   const appts = (healthItems || []).filter(i => i.type === 'appointment').sort((a, b) => {
@@ -383,13 +395,19 @@ function HealthPanel({
   });
   const docs  = (healthItems || []).filter(i => i.type === 'document');
 
-  // FR#191 — pull matching calendar events
+  // FR#191 — pull matching calendar events, filtered by window + ignore list
+  const calToday = new Date(); calToday.setHours(0, 0, 0, 0);
+  const calWindowEnd = new Date(calToday.getTime() + calWindowDays * 86400000);
   const calAppts = (calendarEnabled && calendarEvents)
-    ? calendarEvents.filter(isMedicalEvent).sort((a, b) => {
-        const aS = a.start?.dateTime || a.start?.date || '';
-        const bS = b.start?.dateTime || b.start?.date || '';
-        return aS.localeCompare(bS);
-      })
+    ? calendarEvents
+        .filter(isMedicalEvent)
+        .filter(ev => !ignoredCalIds.has(ev.id))
+        .filter(ev => { const d = new Date(ev.start?.dateTime || ev.start?.date || 0); return d >= calToday && d <= calWindowEnd; })
+        .sort((a, b) => {
+          const aS = a.start?.dateTime || a.start?.date || '';
+          const bS = b.start?.dateTime || b.start?.date || '';
+          return aS.localeCompare(bS);
+        })
     : [];
 
   const handleSave = async (form) => {
@@ -479,12 +497,28 @@ function HealthPanel({
         {tab === 1 && (
           <>
             {/* FR#191 pull — calendar events matching medical keywords */}
-            {calAppts.length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>From your calendar</div>
-                {calAppts.map(ev => (
-                  <ApptRow key={ev.id} item={ev} onEdit={() => {}} onRemove={() => {}} fromCalendar />
-                ))}
+            {calendarEnabled && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1 }}>From your calendar</span>
+                  <select value={calWindowDays} onChange={e => { const v = parseInt(e.target.value, 10); setCalWindowDays(v); localStorage.setItem('gtd_health_cal_window', String(v)); }}
+                    style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: `1px solid ${COLORS.border}`, background: COLORS.bg, color: COLORS.text2, cursor: 'pointer' }}>
+                    <option value={30}>Next 30 days</option>
+                    <option value={60}>Next 60 days</option>
+                    <option value={90}>Next 90 days</option>
+                    <option value={180}>Next 6 months</option>
+                    <option value={365}>Next year</option>
+                  </select>
+                  {ignoredCalIds.size > 0 && (
+                    <button onClick={resetIgnored} style={{ fontSize: 11, background: 'none', border: 'none', color: COLORS.muted, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
+                      Reset ignored ({ignoredCalIds.size})
+                    </button>
+                  )}
+                </div>
+                {calAppts.length === 0
+                  ? <div style={{ fontSize: 12, color: COLORS.muted, fontStyle: 'italic' }}>No medical events found in this window. Expand the range or check that Calendar is loaded.</div>
+                  : calAppts.map(ev => <ApptRow key={ev.id} item={ev} onEdit={() => {}} onRemove={() => {}} fromCalendar onIgnore={ignoreCalEvent} />)
+                }
               </div>
             )}
             {(appts.length > 0 || adding) && calAppts.length > 0 && (
