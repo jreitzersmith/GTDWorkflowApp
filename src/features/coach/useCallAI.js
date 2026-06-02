@@ -17,7 +17,7 @@ import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateA
   extractCalendarDeleteAction } from '../tasks/taskUtils.jsx';
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
 import { docsCreateDocument, docsAppendText, docsAppendMarkdown, docsMoveToFolder } from '../../api/docsApi.js';
-import { driveListFiles, driveGetFile, driveDownloadFile, driveExportFile } from '../../api/driveApi.js';
+import { driveListFiles, driveGetFile, driveDownloadFile, driveDownloadFileAsBase64, driveExportFile } from '../../api/driveApi.js';
 import { sheetsCreateSpreadsheet, sheetsAppendRows, sheetsBatchUpdate, sheetsMoveToFolder } from '../../api/sheetsApi.js';
 import { createAndUploadPptx, PPTX_MIME } from '../../api/pptxApi.js';
 import { peopleSearchContacts } from '../../api/peopleApi.js';
@@ -334,6 +334,8 @@ function useCallAI({
   driveBaseFolderId,
   receiptSheetId,
   healthItems,
+  pendingPdfRef,
+  clearPendingPdf,
   onFocusSet,
   contactActionsRef,
   refreshGoogleToken,
@@ -650,15 +652,24 @@ function useCallAI({
                 try {
                   const meta = await driveGetFile({ token: googleToken, fileId: driveFileId });
                   const fileMime = meta.mimeType || '';
-                  let fileContent;
-                  if (fileMime.startsWith('application/vnd.google-apps.')) {
-                    const exportMime = toolUse.input.mime_type || (fileMime.includes('spreadsheet') ? 'text/csv' : 'text/plain');
-                    fileContent = await driveExportFile({ token: googleToken, fileId: driveFileId, mimeType: exportMime });
+                  if (fileMime === 'application/pdf') {
+                    setMessages(prev => [...prev, { role: 'assistant', text: '\u{1F4C4} Downloading PDF...', isSearchChip: true }]);
+                    const pdfBase64 = await driveDownloadFileAsBase64({ token: googleToken, fileId: driveFileId, onTokenRefresh: refreshGoogleToken });
+                    toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: [
+                      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+                      { type: 'text', text: 'File: ' + meta.name },
+                    ] });
                   } else {
-                    fileContent = await driveDownloadFile({ token: googleToken, fileId: driveFileId });
+                    let fileContent;
+                    if (fileMime.startsWith('application/vnd.google-apps.')) {
+                      const exportMime = toolUse.input.mime_type || (fileMime.includes('spreadsheet') ? 'text/csv' : 'text/plain');
+                      fileContent = await driveExportFile({ token: googleToken, fileId: driveFileId, mimeType: exportMime });
+                    } else {
+                      fileContent = await driveDownloadFile({ token: googleToken, fileId: driveFileId });
+                    }
+                    if (fileContent.length > 50000) fileContent = fileContent.slice(0, 50000) + '\n[content truncated at 50,000 chars]';
+                    toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: fileContent });
                   }
-                  if (fileContent.length > 50000) fileContent = fileContent.slice(0, 50000) + '\n[content truncated at 50,000 chars]';
-                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: fileContent });
                 } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === 'get_weather') {
                 const weatherCity = toolUse.input.city || userCity;
@@ -1617,11 +1628,20 @@ function useCallAI({
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
-    if (!text || loading) return;
+    const pdf = pendingPdfRef ? pendingPdfRef.current : null;
+    if ((!text && !pdf) || loading) return;
     setChatInput('');
-    setMessages(prev => [...prev, { role: 'user', text }]);
-    await callAI(text, coachMode, chatHistory, { emailContext: emailContextRef.current });
-  }, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages]);
+    if (clearPendingPdf) clearPendingPdf();
+    const displayText = text || ('📎 ' + pdf.name);
+    setMessages(prev => [...prev, { role: 'user', text: displayText, attachedPdf: pdf ? pdf.name : null }]);
+    const userContent = (pdf && provider === 'claude')
+      ? [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf.data } },
+          { type: 'text', text: text || 'Please read and summarize this document.' },
+        ]
+      : text || (pdf ? '[PDF: ' + pdf.name + '] Please summarize this document.' : '');
+    await callAI(userContent, coachMode, chatHistory, { emailContext: emailContextRef.current });
+  }, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages, provider]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Quick-reply variant: sends a fixed string without touching chatInput state.
   // Used by CoachPanel's OK button to confirm Step 3a interpretations.

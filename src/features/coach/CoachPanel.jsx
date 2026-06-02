@@ -42,6 +42,9 @@ function CoachPanel({
   chatInputRef,
   sessionUsage,
   onSendChat,
+  pendingPdf,
+  onPdfAttach,
+  onPdfClear,
   onConfirmMove,
   onDismissPendingAction,
   onDeleteInboxItem,
@@ -227,20 +230,55 @@ function CoachPanel({
 
       {/* Chat input */}
       <ResizeHandle onMouseDown={chatInputDragDown} direction="v" />
-      <div style={{ display: "flex", gap: 6, padding: "8px 12px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, alignItems: "flex-end" }}>
-        <textarea
-          ref={chatInputRef}
-          value={chatInput}
-          onChange={e => setChatInput(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSendChat(); } }}
-          placeholder="Ask the coach anything…"
-          style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none", resize: "none", height: chatInputHeight, minHeight: 36 }}
-        />
-        <button
-          onClick={onSendChat}
-          disabled={loading}
-          style={{ width: 34, height: 34, background: loading ? COLORS.surface3 : COLORS.inbox, color: "#111", border: "none", borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-        >↑</button>
+      <div style={{ padding: "0 12px 0", flexShrink: 0 }}>
+        {/* PDF attachment chip */}
+        {pendingPdf && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: COLORS.surface3, borderRadius: 8, marginBottom: 4, border: `1px solid ${COLORS.border}` }}>
+            <span style={{ fontSize: 14 }}>📄</span>
+            <span style={{ fontSize: 12, color: COLORS.text2, flex: 1 }}>{pendingPdf.name}</span>
+            <button onClick={onPdfClear} style={{ background: 'none', border: 'none', color: COLORS.muted, cursor: 'pointer', fontSize: 13, lineHeight: 1 }}>✕</button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 6, paddingBottom: 8, borderTop: pendingPdf ? 'none' : `1px solid ${COLORS.border}`, paddingTop: pendingPdf ? 0 : 8, alignItems: "flex-end" }}>
+          {/* Hidden PDF file input */}
+          <input
+            type="file" accept="application/pdf" style={{ display: 'none' }}
+            ref={el => { if (el) el._pdfInput = true; }}
+            id="coach-pdf-input"
+            onChange={async (e) => {
+              const file = e.target.files[0];
+              if (!file || !onPdfAttach) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                const base64 = reader.result.split(',')[1];
+                onPdfAttach({ name: file.name, data: base64, size: file.size });
+              };
+              reader.readAsDataURL(file);
+              e.target.value = '';
+            }}
+          />
+          {/* PDF attach button */}
+          {onPdfAttach && (
+            <button
+              onClick={() => document.getElementById('coach-pdf-input')?.click()}
+              title="Attach PDF"
+              style={{ width: 34, height: 34, background: pendingPdf ? COLORS.inbox : COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            >📎</button>
+          )}
+          <textarea
+            ref={chatInputRef}
+            value={chatInput}
+            onChange={e => setChatInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSendChat(); } }}
+            placeholder="Ask the coach anything…"
+            style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none", resize: "none", height: chatInputHeight, minHeight: 36 }}
+          />
+          <button
+            onClick={onSendChat}
+            disabled={loading}
+            style={{ width: 34, height: 34, background: loading ? COLORS.surface3 : COLORS.inbox, color: "#111", border: "none", borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >↑</button>
+        </div>
       </div>
 
       {/* Usage footer */}
@@ -281,6 +319,9 @@ CoachPanel.propTypes = {
   chatInputRef:           PropTypes.object.isRequired,
   sessionUsage:           PropTypes.object.isRequired,
   onSendChat:             PropTypes.func.isRequired,
+  pendingPdf:             PropTypes.object,
+  onPdfAttach:            PropTypes.func,
+  onPdfClear:             PropTypes.func,
   onConfirmMove:          PropTypes.func.isRequired,
   onDismissPendingAction: PropTypes.func.isRequired,
   onDeleteInboxItem:      PropTypes.func.isRequired,

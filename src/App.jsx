@@ -116,6 +116,10 @@ export default function GTDManager() {
   const skippedInSessionIds = useRef(new Set());
   // Stable ref so useInboxProcessing can call suggestProjectGroup without a TDZ forward-reference
   const suggestProjectGroupRef = useRef(null);
+  // PDF attachment pending in the coach chat input (Option 1 PDF reading)
+  const [pendingPdf, setPendingPdf] = useState(null);
+  const pendingPdfRef = useRef(null);
+  pendingPdfRef.current = pendingPdf;
   // Stable ref so useInboxProcessing can re-link contact gifts/promises after task replacement (Issue#39)
   const relinkTaskContactsRef = useRef(null);
 
@@ -452,6 +456,8 @@ export default function GTDManager() {
     driveBaseFolderId,
     receiptSheetId,
     healthItems,
+    pendingPdfRef,
+    clearPendingPdf: () => setPendingPdf(null),
     onFocusSet: () => setCurrentView('focus'),
     contactActionsRef,
     refreshGoogleToken,
@@ -1797,6 +1803,9 @@ export default function GTDManager() {
                 chatInputRef={chatInputRef}
                 sessionUsage={sessionUsage}
                 onSendChat={sendChat}
+                pendingPdf={pendingPdf}
+                onPdfAttach={setPendingPdf}
+                onPdfClear={() => setPendingPdf(null)}
                 onConfirmMove={handleConfirmMoveWithSend}
                 onDismissPendingAction={handleSkipPendingAction}
                 onDeleteInboxItem={handleDeleteInboxItem}

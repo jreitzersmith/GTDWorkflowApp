@@ -70,6 +70,11 @@ function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubm
         <div style={{ padding: "8px 11px", borderRadius: 11, fontSize: 13, lineHeight: 1.55, background: isUser ? COLORS.surface3 : COLORS.surface2, color: isUser ? COLORS.text2 : COLORS.text, borderTopLeftRadius: isUser ? 11 : 3, borderTopRightRadius: isUser ? 3 : 11 }}>
           {formatBubble(msg.text)}
         </div>
+        {msg.attachedPdf && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, background: COLORS.surface3, border: `1px solid ${COLORS.border}`, fontSize: 11, color: COLORS.text2, alignSelf: 'flex-end' }}>
+            <span>📄</span><span>{msg.attachedPdf}</span>
+          </div>
+        )}
         {msg.updateChip && (
           <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 20, background: COLORS.surface3, border: `1px solid ${COLORS.border}`, fontSize: 11, color: COLORS.text2, alignSelf: "flex-start" }}>
             <span>✏️</span>
