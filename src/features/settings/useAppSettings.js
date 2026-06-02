@@ -142,6 +142,12 @@ function useAppSettings() {
   );
   useEffect(() => { localStorage.setItem('gtd_contact_email_linking', contactEmailLinkingMode); }, [contactEmailLinkingMode]);
 
+  // FR#186: append task completion summary to linked contact's notes
+  const [taskCompletionToContactNotes, setTaskCompletionToContactNotes] = useState(() =>
+    localStorage.getItem('gtd_task_completion_notes') === 'true'
+  );
+  useEffect(() => { localStorage.setItem('gtd_task_completion_notes', String(taskCompletionToContactNotes)); }, [taskCompletionToContactNotes]);
+
   return {
     locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides,
     tagDisplay, setTagDisplay, categories, setCategories,
@@ -173,6 +179,7 @@ function useAppSettings() {
     contactRelationshipTags, setContactRelationshipTags,
     contactLikesCategories, setContactLikesCategories,
     contactEmailLinkingMode, setContactEmailLinkingMode,
+    taskCompletionToContactNotes, setTaskCompletionToContactNotes,
   };
 }
 

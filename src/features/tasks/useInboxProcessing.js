@@ -200,17 +200,25 @@ function useInboxProcessing({
 
   const handleSkipPendingAction = useCallback(() => {
     const current = tasks.find(t => t.id === processingTaskId.current);
-    skippedInSessionIds.current.add(processingTaskId.current);
-    const nextItem = tasks.filter(t => t.bucket === 'inbox' && t.id !== processingTaskId.current && !skippedInSessionIds.current.has(t.id))[0];
+    // Only treat as inbox context when processingTaskId points to a task actively
+    // in the inbox bucket. If it is stale (from a prior session) or this dismiss
+    // came from a non-inbox pending action (e.g. contact enrichment), skip auto-advance.
+    const hasInboxContext = !!current && current.bucket === 'inbox';
+    if (hasInboxContext) {
+      skippedInSessionIds.current.add(processingTaskId.current);
+    }
+    const nextItem = hasInboxContext
+      ? tasks.filter(t => t.bucket === 'inbox' && t.id !== processingTaskId.current && !skippedInSessionIds.current.has(t.id))[0]
+      : null;
     setPendingAction(null);
-    if (current) {
+    if (hasInboxContext && current) {
       setMessages(prev => [...prev, { role: 'assistant', text: `⏭ Skipping **"${current.text}"** — it stays in your inbox for later.` }]);
     }
     if (nextItem && !singleTaskMode.current) {
       setTimeout(() => processNextInboxItem(nextItem), 300);
-    } else if (singleTaskMode.current) {
+    } else if (hasInboxContext && singleTaskMode.current) {
       singleTaskMode.current = false;
-    } else {
+    } else if (hasInboxContext) {
       setMessages(prev => [...prev, { role: 'assistant', text: '🎉 **All caught up!** Any skipped items remain in your inbox.' }]);
     }
   }, [tasks, processingTaskId, skippedInSessionIds, singleTaskMode,

@@ -121,6 +121,7 @@ function SettingsPanel({
   contacts, onRenameContactRelationshipTag, onRemoveContactRelationshipTag,
   onRenameContactLikeCategory, onRemoveContactLikeCategory,
   contactEmailLinkingMode, onSetContactEmailLinkingMode,
+  taskCompletionToContactNotes, onSetTaskCompletionToContactNotes,
 }) {
   const fileInputRef = useRef(null);
   const [importMode, setImportMode] = useState("replace");
@@ -711,6 +712,13 @@ function SettingsPanel({
             value={contactEmailLinkingMode || 'both'}
             onChange={onSetContactEmailLinkingMode}
           />
+          <div style={{ height: 14 }} />
+          <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Task completion notes</div>
+          <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 8 }}>When a task linked to a contact is marked done, append a completion entry to that contact&apos;s notes.</div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type='checkbox' checked={!!taskCompletionToContactNotes} onChange={e => onSetTaskCompletionToContactNotes(e.target.checked)} />
+            <span style={{ fontSize: 13, color: COLORS.text }}>Append to contact notes on completion</span>
+          </label>
         </SettingsSection>
       </div>
     </div>
@@ -858,6 +866,8 @@ SettingsPanel.propTypes = {
   onRemoveContactLikeCategory:       PropTypes.func.isRequired,
   contactEmailLinkingMode:           PropTypes.string.isRequired,
   onSetContactEmailLinkingMode:      PropTypes.func.isRequired,
+  taskCompletionToContactNotes:      PropTypes.bool.isRequired,
+  onSetTaskCompletionToContactNotes: PropTypes.func.isRequired,
 };
 
 export { SettingsPanel };

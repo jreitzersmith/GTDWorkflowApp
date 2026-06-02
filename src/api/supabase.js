@@ -211,11 +211,44 @@ async function deleteContact(contactId) {
   if (error) throw new Error(`deleteContact: ${error.message}`);
 }
 
+
+// ── Health items (FR#187) ────────────────────────────────────────────────────
+
+async function fetchHealthItems() {
+  const { data, error } = await supabase
+    .from('health_items')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`fetchHealthItems: ${error.message}`);
+  return data || [];
+}
+
+async function upsertHealthItem(item) {
+  const { data, error } = await supabase
+    .from('health_items')
+    .upsert(item, { onConflict: 'id' })
+    .select()
+    .single();
+  if (error) throw new Error(`upsertHealthItem: ${error.message}`);
+  return data;
+}
+
+async function deleteHealthItem(id) {
+  const { error } = await supabase
+    .from('health_items')
+    .delete()
+    .eq('id', id);
+  if (error) throw new Error(`deleteHealthItem: ${error.message}`);
+}
+
 export {
   fetchContacts,
   upsertContact,
   updateContactCustomFields,
   updateContactStandardFields,
   deleteContact,
+  fetchHealthItems,
+  upsertHealthItem,
+  deleteHealthItem,
 };
 

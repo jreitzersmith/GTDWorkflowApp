@@ -19,6 +19,7 @@ function AppSidebar({
   onSelectCalendar,
   onSelectAnalytics,
   onSelectContacts,
+  onSelectHealth,
   onToggleSettings,
   onToggleUsage,
   onDailyReview,
@@ -123,6 +124,19 @@ function AppSidebar({
         </div>
 
         <div
+          onClick={onSelectHealth}
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "health" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "health" ? "#e57373" : "transparent"}`, transition: "background 0.1s" }}
+          onMouseEnter={e => { if (currentView !== "health") { e.currentTarget.style.background = COLORS.surface2; } }}
+          onMouseLeave={e => { if (currentView !== "health") { e.currentTarget.style.background = "transparent"; } }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#e57373", flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "health" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>💊</span>
+            Health
+          </span>
+        </div>
+
+        <div
           onClick={onSelectAnalytics}
           accessKey="a"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "analytics" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "analytics" ? COLORS.accent : "transparent"}`, transition: "background 0.1s" }}
@@ -183,6 +197,7 @@ AppSidebar.propTypes = {
   onSelectCalendar: PropTypes.func.isRequired,
   onSelectAnalytics:  PropTypes.func.isRequired,
   onSelectContacts:   PropTypes.func.isRequired,
+  onSelectHealth:     PropTypes.func.isRequired,
   onToggleSettings: PropTypes.func.isRequired,
   onToggleUsage:   PropTypes.func.isRequired,
   onDailyReview:   PropTypes.func.isRequired,

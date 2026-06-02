@@ -40,6 +40,8 @@ import { useInboxProcessing } from "./features/tasks/useInboxProcessing.js";
 import { useTaskCrud } from "./features/tasks/useTaskCrud.js";
 import { ContactsPanel } from "./features/contacts/ContactsPanel.jsx";
 import { useContacts } from "./features/contacts/useContacts.js";
+import { HealthPanel } from "./features/health/HealthPanel.jsx";
+import { useHealth } from "./features/health/useHealth.js";
 import { useSettings } from "./features/settings/useSettings.js";
 
 
@@ -65,7 +67,7 @@ export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId, contactRelationshipTags, setContactRelationshipTags, contactLikesCategories, setContactLikesCategories, contactEmailLinkingMode, setContactEmailLinkingMode} = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId, contactRelationshipTags, setContactRelationshipTags, contactLikesCategories, setContactLikesCategories, contactEmailLinkingMode, setContactEmailLinkingMode, taskCompletionToContactNotes, setTaskCompletionToContactNotes} = useAppSettings();
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState(coachName);
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
@@ -569,6 +571,8 @@ export default function GTDManager() {
   } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id, createTask: createInboxTask });
   contactActionsRef.current = { contacts, addPromise, addLike, addDislike, addGiftIdea, updateCustomFields, createInboxTask };
 
+  const { healthItems, healthLoading, addHealthItem, updateHealthItem, removeHealthItem } = useHealth({ supabaseReady, userId: authUser?.id });
+
   // FR#154: one-time backfill of contact tags already on contacts into the settings list
   const contactTagsBackfilledRef = useRef(false);
   useEffect(() => {
@@ -589,6 +593,19 @@ export default function GTDManager() {
       const gift = (contact.giftIdeas || []).find(g => g.taskId === taskId);
       if (gift && Boolean(gift.given) !== isDone) toggleGiftGiven(contact.id, gift.id);
     });
+    // FR#186: when a contact-linked task is marked done, append a completion entry to that contact's notes
+    if (isDone && taskCompletionToContactNotes) {
+      const task = tasks.find(t => t.id === taskId);
+      if (task?.contactId) {
+        const contact = contacts.find(c => c.id === task.contactId);
+        if (contact) {
+          const date = new Date().toISOString().slice(0, 10);
+          const entry = `[${date}] Completed: ${task.text}` + (task.notes ? `\n${task.notes}` : '');
+          const existing = contact.notes ? contact.notes.trim() : '';
+          updateCustomFields(task.contactId, { notes: existing ? `${existing}\n\n${entry}` : entry });
+        }
+      }
+    }
   };
 
   // Re-link contact gifts/promises when inbox processing replaces a task (Issue#39)
@@ -1420,6 +1437,7 @@ export default function GTDManager() {
           onSelectAnalytics={() => { setCurrentView("analytics"); setShowSettings(false); setSelectedTaskId(null); }}
           contactsEnabled={contactsEnabled}
           onSelectContacts={() => { setCurrentView("contacts"); setShowSettings(false); setSelectedTaskId(null); }}
+          onSelectHealth={() => { setCurrentView("health"); setShowSettings(false); setSelectedTaskId(null); }}
           onToggleSettings={() => { setShowSettings(v => !v); setShowUsage(false); }}
           onToggleUsage={() => { setShowUsage(v => !v); setShowSettings(false); }}
           onDailyReview={startDailyReview}
@@ -1548,6 +1566,8 @@ export default function GTDManager() {
                           onRemoveContactLikeCategory={removeContactLikeCategory}
                           contactEmailLinkingMode={contactEmailLinkingMode}
                           onSetContactEmailLinkingMode={setContactEmailLinkingMode}
+                          taskCompletionToContactNotes={taskCompletionToContactNotes}
+                          onSetTaskCompletionToContactNotes={setTaskCompletionToContactNotes}
                         />
                       ) : showUsage ? (
                         <UsagePanel
@@ -1615,6 +1635,14 @@ export default function GTDManager() {
                           docsEnabled={docsEnabled}
                           driveConversationExportFolderId={driveConversationExportFolderId}
                           exportTemplates={exportTemplates}
+                        />
+                      ) : currentView === "health" ? (
+                        <HealthPanel
+                          healthItems={healthItems}
+                          healthLoading={healthLoading}
+                          addHealthItem={addHealthItem}
+                          updateHealthItem={updateHealthItem}
+                          removeHealthItem={removeHealthItem}
                         />
                       ) : currentView === "contacts" ? (
                         <ContactsPanel
