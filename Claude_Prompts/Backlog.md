@@ -1,6 +1,6 @@
 ﻿# GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#187**
+> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#191**
 
 ---
 
@@ -35,8 +35,10 @@
 
 #### Integrations / data
 
-- FR#186 [GH#219] (2026-06-02) — Task completion appends summary to linked contact's notes — implemented; deferred test: verify note appended and setting toggle works
-- FR#187 [GH#220] (2026-06-02) — Health monitoring panel — MVP implemented (medications, supplements, appointments, documents tabs); future: calendar auto-pull for appointments, AI-summary workflow from Drive
+- FR#188 [GH#221] (2026-06-02) — Health panel: date/time picker UX — replace native OS date inputs with consistent styled pickers; consider shared DatePicker component
+- FR#189 [GH#222] (2026-06-02) — Health panel: Google Drive file picker for document/appointment attachments — reuse existing Picker integration from driveApi.js
+- FR#190 [GH#223] (2026-06-02) — Health panel: AI document summarization + future Paperless NGX — Summarize button calls get_drive_file tool; Phase 2 Paperless NGX deferred until connector exists
+- FR#191 [GH#224] (2026-06-02) — Health panel: Appointments ↔ Calendar two-way sync — scan calendarEvents for medical keywords (pull); offer calendar event creation on save (push)
 - FR#185 [GH#218] (2026-06-02) — Android SMS contact tracking — companion app reads device SMS via content://sms/, syncs to new sms_messages Supabase table, surfaces threads in Contacts panel alongside email; deferred to Android app phase. See GH#218 for full architecture, schema, and design decisions.
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
 - FR#70 [GH#70] (2026-05-12) — Multiple Google account support
@@ -77,6 +79,8 @@ Test cases that could not be executed during their cycle due to a missing condit
 - [FR#176 GH#207] Inbox indicator clears when inbox refreshes without that sender — needs Email inbox loaded
 - [FR#176 GH#207] Inbox indicator clears when Gmail disconnected — needs Gmail connected
 - [Issue#39 GH#178] Gift given→task done bidirectional sync after re-link — g2: marking re-linked task done did not flip gift.given toggle; re-link itself confirmed working (g1 passed); likely test-timing fluke; retest with deliberate pause between processing and done-toggle
+- [Issue#40 GH#188] Skip in contact enrichment — fix committed 0bc12fb; needs live test: dismiss a pending action from contact enrichment mode, confirm inbox processing does NOT auto-start
+- [Issue#43 GH#215] Chat mode duplicate task — fix committed 0bc12fb; needs live test: ask coach to create a task in chat mode, confirm exactly one task created, no pending action bar
 - [FR#180 GH#212] Ask coach to attach a Drive file to a task via drive_search + →ACTION:attach_drive; verify badge in Task Detail — needs Drive connected
 - [FR#181 GH#213] Process a scheduling email; confirm Calendar step offers →ACTION:calendar_create — needs an email with scheduling/meeting info
 - [FR#182 GH#214] Process email from a contact; confirm AI offers contact_note step — needs email from a known contact

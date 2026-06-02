@@ -243,7 +243,8 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-06-02 | Bug Fix | Issue#40 | GH#188 | handleSkipPendingAction: hasInboxContext guard (current.bucket==='inbox') prevents non-inbox pending action dismissals from auto-starting inbox processing | 0bc12fb |
 | 2026-06-02 | Bug Fix | Issue#43 | GH#215 | useCallAI: wrap extractAction/setPendingAction in mode!==chat/dump/daily guard — chat mode already applies actions directly, preventing duplicate task creation | 0bc12fb |
 | 2026-06-02 | Feature | FR#186 | GH#219 | Task completion appends to contact notes — taskCompletionToContactNotes setting; handleTaskDoneChangedRef appends [date] Completed entry when isDone+contactId+setting | 0bc12fb |
-| 2026-06-02 | Feature | FR#187 | GH#220 | Health monitoring panel MVP — health_items Supabase table+RLS; useHealth.js CRUD hook; HealthPanel.jsx (Medications/Supplements/Appointments/Documents tabs); sidebar button | 0bc12fb | |
+| 2026-06-02 | Feature | FR#187 | GH#220 | Health monitoring panel MVP — health_items Supabase table+RLS; useHealth.js CRUD hook; HealthPanel.jsx (Medications/Supplements/Appointments/Documents tabs); sidebar button | 0bc12fb |
+| 2026-06-02 | Bug Fix | — | GH#220 | useHealth.js: crypto.randomUUID() replaces genHealthId() — non-UUID strings failed Postgres UUID column constraint, causing optimistic rollback and items disappearing on save | 835a4a4 | |
 | 2026-06-02 | Feature | FR#183/184 | GH#216/217 | Contact-task linking (LinkedTasksSection, contact picker, contact:<name> syntax, resolve in action handlers); Drive scope empty-result hint | 7f721a64 |
 | 2026-06-02 | Feature | FR#183 | GH#216 | Contact-task linking — LinkedTasksSection, contact picker in TaskDetail, contact:<name> action syntax, resolve in handlers; empty state always shown | 74b8553 |
 | 2026-06-02 | Bug Fix | — | GH#216 | TaskDetailPanel: missing task.id in onUpdate calls for contact picker (crash fix) | 25e45f9 |
