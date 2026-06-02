@@ -35,10 +35,7 @@
 
 #### Integrations / data
 
-- FR#188 [GH#221] (2026-06-02) — Health panel: date/time picker UX — replace native OS date inputs with consistent styled pickers; consider shared DatePicker component
-- FR#189 [GH#222] (2026-06-02) — Health panel: Google Drive file picker for document/appointment attachments — reuse existing Picker integration from driveApi.js
-- FR#190 [GH#223] (2026-06-02) — Health panel: AI document summarization + future Paperless NGX — Summarize button calls get_drive_file tool; Phase 2 Paperless NGX deferred until connector exists
-- FR#191 [GH#224] (2026-06-02) — Health panel: Appointments ↔ Calendar two-way sync — scan calendarEvents for medical keywords (pull); offer calendar event creation on save (push)
+- FR#190 [GH#223] (2026-06-02) — Health panel: Paperless NGX Phase 2 — deferred until Paperless NGX MCP/connector exists; Phase 1 (AI coach summarization) already implemented
 - FR#185 [GH#218] (2026-06-02) — Android SMS contact tracking — companion app reads device SMS via content://sms/, syncs to new sms_messages Supabase table, surfaces threads in Contacts panel alongside email; deferred to Android app phase. See GH#218 for full architecture, schema, and design decisions.
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
 - FR#70 [GH#70] (2026-05-12) — Multiple Google account support
