@@ -13,6 +13,9 @@ const MEDICAL_KEYWORDS = [
   'referral','medical','surgery','GP','cardiolog','dermatolog','ophthalmolog',
   'oncolog','psychiatr','psycholog','neurolog','urolog','orthopaed',
   'endocrinolog','rheumatolog','optom','audiolog','patholog','podiat',
+  'dr ','dr.','nurse','lab ','mri','ct ','x-ray','xray','scan','vaccine',
+  'injection','checkup','check-up','flu shot','blood draw','smear','biopsy',
+  'ultrasound','ecg','ekg','colonoscopy','mammogram','eye test',
 ];
 
 function isMedicalEvent(ev) {
@@ -399,6 +402,10 @@ function HealthPanel({
         provider: form.provider || null, type: form.type,
       };
       await updateHealthItem(editItem.id, mapped);
+      // FR#191 push on edit — create calendar event if newly requested
+      if (form.createCalEvent && form.appointmentDate && onCreateCalendarEvent) {
+        onCreateCalendarEvent(form);
+      }
       setEditItem(null);
     } else {
       await addHealthItem({
@@ -497,7 +504,7 @@ function HealthPanel({
           <>
             <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
               Attach Drive files and store AI summaries.{driveEnabled ? '' : ' Connect Drive in Settings to use the file picker.'}
-              {' '}Use <em>Summarize ✦</em> to ask the AI coach to read and summarise a linked file.
+              {' '}Use <em>Summarize ✦</em> to ask the AI coach to summarise a linked file. Works best with Google Docs/Sheets/Slides. For PDFs, ask the coach to describe what it can see or paste the text manually.
             </div>
             {docs.length === 0 && !adding && <div style={{ color: COLORS.muted, fontSize: 13 }}>No documents logged yet.</div>}
             {docs.map(item =>
