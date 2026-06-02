@@ -333,6 +333,7 @@ function useCallAI({
   driveSlideDeckFolderId,
   driveBaseFolderId,
   receiptSheetId,
+  healthItems,
   onFocusSet,
   contactActionsRef,
   refreshGoogleToken,
@@ -385,7 +386,27 @@ function useCallAI({
       coachName ? 'Your name is ' + coachName + '.' : null,
       userName ? "The user's name is " + userName + "." : null,
     ].filter(Boolean).join(' ');
-    const systemPrompt = (personalizationCtx ? personalizationCtx + '\n\n' : '') + SYSTEM_PROMPTS[mode] + calibCtx + locationCtx + taskContextPart;
+    // Build compact health context for chat mode when health items exist
+    let healthCtx = '';
+    if (healthItems && healthItems.length > 0) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const past90 = new Date(today.getTime() - 90 * 86400000);
+      const meds = healthItems.filter(i => (i.type === 'medication' || i.type === 'supplement') && i.status === 'active');
+      const upcoming = healthItems
+        .filter(i => i.type === 'appointment' && i.appointment_date && new Date(i.appointment_date) >= today)
+        .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date))
+        .slice(0, 5);
+      const past = healthItems
+        .filter(i => i.type === 'appointment' && i.appointment_date && new Date(i.appointment_date) < today && new Date(i.appointment_date) >= past90)
+        .sort((a, b) => b.appointment_date.localeCompare(a.appointment_date))
+        .slice(0, 5);
+      const parts = [];
+      if (meds.length) parts.push('Medications/supplements: ' + meds.map(m => [m.name, m.dose, m.frequency].filter(Boolean).join(' ')).join('; '));
+      if (upcoming.length) parts.push('Upcoming appointments: ' + upcoming.map(a => [a.name, a.appointment_date ? new Date(a.appointment_date).toLocaleDateString([], {dateStyle:'medium'}) : null, a.provider && 'with ' + a.provider].filter(Boolean).join(' · ')).join(' | '));
+      if (past.length) parts.push('Recent appointments (last 90 days): ' + past.map(a => [a.name, a.appointment_date ? new Date(a.appointment_date).toLocaleDateString([], {dateStyle:'medium'}) : null, a.provider && 'with ' + a.provider].filter(Boolean).join(' · ')).join(' | '));
+      if (parts.length) healthCtx = '\n\n[Health context]\n' + parts.join('\n');
+    }
+    const systemPrompt = (personalizationCtx ? personalizationCtx + '\n\n' : '') + SYSTEM_PROMPTS[mode] + calibCtx + locationCtx + healthCtx + taskContextPart;
     let inputLogSet = false;
     const newHistory = [...history, { role: 'user', content: userMsg }];
 

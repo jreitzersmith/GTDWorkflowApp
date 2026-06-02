@@ -326,7 +326,7 @@ function ApptRow({ item, onEdit, onRemove, fromCalendar, onIgnore, onAddFromCale
       {fromCalendar
         ? <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
             <button onClick={() => onAddFromCalendar && onAddFromCalendar(item)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, border: `1px solid ${COLORS.accent}`, background: 'transparent', color: COLORS.accent, cursor: 'pointer' }}>+ Add</button>
-            <button onClick={() => onIgnore && onIgnore(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 11, cursor: 'pointer' }}>Ignore</button>
+            <button onClick={() => onIgnore && onIgnore(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 11, cursor: 'pointer', opacity: 0.45 }}>Ignore</button>
           </div>
         : <>
             <button onClick={() => onEdit(item)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>Edit</button>

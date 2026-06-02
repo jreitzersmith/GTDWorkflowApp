@@ -449,6 +449,7 @@ export default function GTDManager() {
     driveSlideDeckFolderId,
     driveBaseFolderId,
     receiptSheetId,
+    healthItems,
     onFocusSet: () => setCurrentView('focus'),
     contactActionsRef,
     refreshGoogleToken,
