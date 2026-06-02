@@ -1320,7 +1320,19 @@ function useCallAI({
             const taskRef = (parts.find(p => p.startsWith('task:')) || '').replace('task:', '').trim();
             const docFolderParam = (parts.find(p => p.startsWith('folder:')) || '').replace('folder:', '').trim();
             const doc = await docsCreateDocument({ token: googleToken, title: docTitle });
-            const bodyText = reply.replace(/\u2192ACTION:[^\n]*/g, '').trim();
+            // Strip ACTION lines, then trim conversational framing:
+            // - leading prose before the first markdown heading
+            // - trailing prose after the last standalone --- divider
+            var bodyText = reply.replace(/\u2192ACTION:[^\n]*/g, '').trim();
+            var firstHeadingIdx = bodyText.search(/^#{1,6}\s/m);
+            if (firstHeadingIdx > 0) bodyText = bodyText.slice(firstHeadingIdx).trim();
+            var lastDivIdx = bodyText.lastIndexOf('\n---');
+            if (lastDivIdx !== -1) {
+              var afterDiv = bodyText.slice(lastDivIdx + 4).trim();
+              if (afterDiv && !/^[#*\->\|`]/.test(afterDiv)) {
+                bodyText = bodyText.slice(0, lastDivIdx + 4).trim();
+              }
+            }
             if (bodyText) {
               const fmt = exportFormat || 'rtf';
               if (fmt === 'markdown') {

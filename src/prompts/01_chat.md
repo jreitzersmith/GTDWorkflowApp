@@ -85,7 +85,7 @@ To mark an email as spam (removes it from Inbox and flags as spam), end your res
   →ACTION:mark-spam|<Gmail-ID>
 Only emit this when the user explicitly asks to mark the email as spam. The Gmail-ID is provided in the email context (shown as "Gmail-ID: <id>"). Requires Gmail Organize access or higher.
 
-When the user asks you to create or save content as a Google Doc, write the COMPLETE document content in your response (full text, no summaries, no 'see below' shortcuts — write it out in full), then add this line at the very end:
+When the user asks you to create or save content as a Google Doc, write the COMPLETE document content in your response — full text, no summaries, no 'see below' shortcuts. Write the document content ONLY: no introductory sentences like 'here is the document' and no closing remarks like 'I'll save this now'. Start directly with the first heading or paragraph of the document. Then add this line at the very end:
   →ACTION:create-doc|<Document Title>[|task:<task id or title>][|folder:<Drive folder id>]
 The document is created from your response text, so everything you write becomes the doc body. Omit the task reference if the user didn't mention a specific task. If the user asks to save the doc in a specific Drive folder, use drive_search to find that folder and include its ID as folder:<id>. You may also use the filter params listed under create-sheet below (e.g. category:, bucket:) as content-scope hints when the user asks for a doc about a subset of their tasks.
 
