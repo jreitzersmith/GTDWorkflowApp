@@ -335,6 +335,7 @@ function useCallAI({
   receiptSheetId,
   onFocusSet,
   contactActionsRef,
+  refreshGoogleToken,
 }) {
   const fetchModels = useCallback(async () => {
     try {
@@ -1317,6 +1318,7 @@ function useCallAI({
             const docDateStr = new Date().toISOString().slice(0, 10);
             const docTitle = modeDocLabel + ' — ' + (parts[0] || 'Coach Output').trim() + ' — ' + docDateStr;
             const taskRef = (parts.find(p => p.startsWith('task:')) || '').replace('task:', '').trim();
+            const docFolderParam = (parts.find(p => p.startsWith('folder:')) || '').replace('folder:', '').trim();
             const doc = await docsCreateDocument({ token: googleToken, title: docTitle });
             const bodyText = reply.replace(/\u2192ACTION:[^\n]*/g, '').trim();
             if (bodyText) {
@@ -1340,7 +1342,7 @@ function useCallAI({
                   : t));
               }
             }
-            const docTargetFolder = driveDocumentFolderId || driveBaseFolderId || null;
+            const docTargetFolder = docFolderParam || driveDocumentFolderId || driveBaseFolderId || null;
             if (docTargetFolder) {
               await docsMoveToFolder({ token: googleToken, documentId: doc.documentId, newParentId: docTargetFolder, onTokenRefresh: refreshGoogleToken });
             }
@@ -1356,6 +1358,7 @@ function useCallAI({
           try {
             const sheetParts = sheetLine.slice('\u2192ACTION:create-sheet|'.length).split('|');
             const sheetTitle = (sheetParts[0] || 'Coach Spreadsheet').trim();
+            const sheetFolderParam = (sheetParts.find(p => p.startsWith('folder:')) || '').replace('folder:', '').trim();
             const sheetTabs = parseSheetTabs(sheetParts);
             const sheet = await sheetsCreateSpreadsheet({ token: googleToken, title: sheetTitle });
             const sheetId = sheet.spreadsheetId;
@@ -1377,7 +1380,7 @@ function useCallAI({
               await sheetsAppendRows({ token: googleToken, spreadsheetId: sheetId, range: tab.name, values: tabValues });
             }
             var tabsLabel = sheetTabs.length > 1 ? sheetTabs.length + ' tabs, ' + totalRows + ' tasks' : totalRows + ' tasks';
-            const sheetTargetFolder = driveSpreadsheetFolderId || driveBaseFolderId || null;
+            const sheetTargetFolder = sheetFolderParam || driveSpreadsheetFolderId || driveBaseFolderId || null;
             if (sheetTargetFolder) {
               await sheetsMoveToFolder({ token: googleToken, spreadsheetId: sheetId, newParentId: sheetTargetFolder, onTokenRefresh: refreshGoogleToken });
             }
@@ -1431,6 +1434,7 @@ function useCallAI({
             const slidesParts = slidesLine.slice('\u2192ACTION:create-slides|'.length).split('|');
             const slidesTitle = (slidesParts[0] || 'Coach Presentation').trim();
             const slidesTheme = (slidesParts.find(function(p) { return p.startsWith('template:'); }) || '').replace('template:', '').trim() || 'dark-slate';
+            const slidesFolderParam = (slidesParts.find(function(p) { return p.startsWith('folder:'); }) || '').replace('folder:', '').trim();
             // Parse slide sections: split on --- dividers, ## heading = title, rest = body
             const parsedSlides = reply.split(/\n?---\n?/)
               .map(function(section) {
@@ -1443,7 +1447,7 @@ function useCallAI({
               })
               .filter(Boolean);
             const slideCount = parsedSlides.length;
-            const slidesTargetFolder = driveSlideDeckFolderId || driveBaseFolderId || undefined;
+            const slidesTargetFolder = slidesFolderParam || driveSlideDeckFolderId || driveBaseFolderId || undefined;
             const result = await createAndUploadPptx({
               token: googleToken,
               title: slidesTitle,

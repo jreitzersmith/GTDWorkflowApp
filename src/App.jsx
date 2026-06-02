@@ -447,6 +447,7 @@ export default function GTDManager() {
     receiptSheetId,
     onFocusSet: () => setCurrentView('focus'),
     contactActionsRef,
+    refreshGoogleToken,
   });
 
   const switchCoachMode = useCallback((mode, introMsg) => {
