@@ -1,4 +1,4 @@
-# GTD Workflow App — Resolved Issues & Feature Requests
+﻿# GTD Workflow App — Resolved Issues & Feature Requests
 
 Log every resolved known issue or completed feature request here immediately after committing.
 One row per item: date · type · # · GH# · name · commit hash(es).
@@ -235,3 +235,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-06-01 | Feature | FR#178/179/180/181/182 | GH#209/211/212/213/214 | email→Drive tools (attachment + email-to-Doc), →ACTION:attach_drive, processEmailWithAI calendar + contact note steps | 1d3ded27 |
 | 2026-06-01 | Bug Fix | Issue#43/FR#181/179/178/177 | GH#215 | workingTasks scope fix; docsApi named params; processEmailWithAI full-body fetch; EmailContactsPanel load-more pagination | 912e3cf2 |
 | 2026-06-01 | Bug Fix | — | — | drive_search includes Shared Drives (supportsAllDrives + includeItemsFromAllDrives); DRIVE_SEARCH_TOOL folder-search guidance | 344913ab |
+| 2026-06-02 | Feature | FR#183/184 | GH#216/217 | Contact-task linking (LinkedTasksSection, contact picker, contact:<name> syntax, resolve in action handlers); Drive scope empty-result hint | 7f721a64 |
+| 2026-06-02 | Feature | FR#183 | GH#216 | Contact-task linking — LinkedTasksSection, contact picker in TaskDetail, contact:<name> action syntax, resolve in handlers; empty state always shown | 74b8553 |
+| 2026-06-02 | Bug Fix | — | GH#216 | TaskDetailPanel: missing task.id in onUpdate calls for contact picker (crash fix) | 25e45f9 |
+| 2026-06-02 | Feature | FR#184 | GH#217 | drive_search empty-result scope hint; Settings Drive scope description updated | 7f721a6 |

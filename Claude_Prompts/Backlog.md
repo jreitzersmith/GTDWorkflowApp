@@ -47,8 +47,7 @@
 
 #### Contacts enrichment
 
-- FR#183 [GH#216] (2026-06-02) — Contact-task linking (Option A) — contactId + contactName fields on tasks; Linked Tasks section in ContactDetail (mutually exclusive with Promises — task appears in only one); contact picker in Task Detail; contact:<name> AI action syntax. Files: supabase.js, SQL/, constants.jsx, useCallAI.js, TaskDetail, ContactDetail.
-- FR#184 [GH#217] (2026-06-02) — Settings: detect missing drive.readonly scope and prompt Drive reconnect — drive_search empty-result hint + Drive settings warning chip when token lacks drive.readonly. Files: useCallAI.js, settings UI, useGoogleAuth.js.
+
 
 
 
