@@ -248,7 +248,9 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-06-02 | Feature | FR#188 | GH#221 | Health panel: StyledDateInput with colorScheme:dark for consistent date/time pickers | 17b8b39 |
 | 2026-06-02 | Feature | FR#189 | GH#222 | Health panel: DriveFilePicker component in ApptForm + DocForm; file name badge; falls back to text input when Drive disconnected | 17b8b39 |
 | 2026-06-02 | Feature | FR#190 | GH#223 | Health panel: Summarize ✦ button on DocRow; opens coach chat with pre-filled get_drive_file prompt (Phase 1) | 17b8b39 |
-| 2026-06-02 | Feature | FR#191 | GH#224 | Health panel: Calendar pull (MEDICAL_KEYWORDS scan, From your calendar section); Calendar push (checkbox → doCalendarCreateEvent, 30-min default) | 17b8b39 | |
+| 2026-06-02 | Feature | FR#191 | GH#224 | Health panel: Calendar pull (MEDICAL_KEYWORDS scan, From your calendar section); Calendar push (checkbox → doCalendarCreateEvent, 30-min default) | 17b8b39 |
+| 2026-06-02 | Bug Fix | — | GH#221 | Health panel calendar: expanded MEDICAL_KEYWORDS (dr./dr , nurse, lab, mri, ct, x-ray, scan, vaccine, etc.); calendar push on edit path | c92f136 |
+| 2026-06-02 | Feature | — | GH#224 | Health panel calendar: ignore/dismiss list (localStorage); date window dropdown (30d–1y, default 90d); empty-state message; past events filtered out by default | b237b5f | |
 | 2026-06-02 | Feature | FR#183/184 | GH#216/217 | Contact-task linking (LinkedTasksSection, contact picker, contact:<name> syntax, resolve in action handlers); Drive scope empty-result hint | 7f721a64 |
 | 2026-06-02 | Feature | FR#183 | GH#216 | Contact-task linking — LinkedTasksSection, contact picker in TaskDetail, contact:<name> action syntax, resolve in handlers; empty state always shown | 74b8553 |
 | 2026-06-02 | Bug Fix | — | GH#216 | TaskDetailPanel: missing task.id in onUpdate calls for contact picker (crash fix) | 25e45f9 |
