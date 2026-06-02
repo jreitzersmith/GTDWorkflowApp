@@ -626,7 +626,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
                   title="Go to contact"
                 >{contactName}</span>
                 <span
-                  onClick={() => onUpdate({ contactId: null })}
+                  onClick={() => onUpdate(task.id, { contactId: null })}
                   title="Remove contact link"
                   style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 11, flexShrink: 0, userSelect: 'none' }}
                 >✕</span>
@@ -634,7 +634,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             ) : (
               <ContactPickerInline
                 contacts={contacts || []}
-                onSelect={(ct) => onUpdate({ contactId: ct.id })}
+                onSelect={(ct) => onUpdate(task.id, { contactId: ct.id })}
               />
             )}
           </div>
