@@ -604,14 +604,10 @@ function useCallAI({
               } else if (toolUse.name === 'drive_search') {
                 const driveQuery = toolUse.input.query;
                 const driveMax = Math.min(toolUse.input.max_results || 10, 50);
-                // Normalize plain-text keywords to valid Drive query syntax.
-                // The Drive API rejects bare keywords (e.g. "LeanIX") with 400 Invalid Value;
-                // they must be wrapped in a contains operator.
-                let normalizedQuery = driveQuery;
-                if (!/(contains|!=|=|in\s|has\s|>\s|<\s|\s+and\s+|\s+or\s+|\s+not\s+)/i.test(driveQuery)) {
-                  const escaped = driveQuery.replace(/'/g, "\\'");
-                  normalizedQuery = "name contains '" + escaped + "' or fullText contains '" + escaped + "'";
-                }
+                // Pass query through unchanged. Prior normalization regex had \b
+                // stored as \x08 (backspace) so it always fired, double-wrapping
+                // valid queries. The tool description requires proper Drive syntax.
+                const normalizedQuery = driveQuery;
                 setMessages(prev => [...prev, {
                   role: 'assistant', text: '🔍 Searching Drive: "' + driveQuery + '"', isSearchChip: true,
                 }]);
