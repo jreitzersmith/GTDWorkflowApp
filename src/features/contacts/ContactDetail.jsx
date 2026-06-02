@@ -587,9 +587,11 @@ function LinkedTasksSection({ tasks, promises, contactId, onNavigateToTask }) {
   // (those appear inside the Promises section). Mutually exclusive.
   const promiseTaskIds = new Set((promises || []).map(p => p.taskId).filter(Boolean));
   const linked = (tasks || []).filter(t => t.contactId === contactId && !promiseTaskIds.has(t.id));
-  if (!linked.length) return null;
   return (
     <Section title="Linked Tasks">
+      {linked.length === 0 && (
+        <div style={{ fontSize: 12, color: COLORS.muted, padding: '4px 0' }}>No tasks linked to this contact yet.</div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {linked.map(task => (
           <div
