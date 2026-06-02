@@ -420,6 +420,8 @@ export default function GTDManager() {
     return `Today's date: ${today}\n\n${sections.join("\n\n")}${calSection}`;
   }, [tasks, calendarEnabled, calendarEvents]);
 
+  const { healthItems, healthLoading, addHealthItem, updateHealthItem, removeHealthItem } = useHealth({ supabaseReady, userId: authUser?.id });
+
   const contactActionsRef = useRef({});
   const { callAI, sendChat, sendChatWithText, fetchModels, lastInputLog, setEmailContext,
 } = useCallAI({
@@ -572,7 +574,6 @@ export default function GTDManager() {
   } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id, createTask: createInboxTask });
   contactActionsRef.current = { contacts, addPromise, addLike, addDislike, addGiftIdea, updateCustomFields, createInboxTask };
 
-  const { healthItems, healthLoading, addHealthItem, updateHealthItem, removeHealthItem } = useHealth({ supabaseReady, userId: authUser?.id });
 
   // FR#154: one-time backfill of contact tags already on contacts into the settings list
   const contactTagsBackfilledRef = useRef(false);
