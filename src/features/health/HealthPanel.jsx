@@ -299,7 +299,7 @@ function MedRow({ item, onEdit, onRemove }) {
 
 // ── ApptRow ───────────────────────────────────────────────────────────────────
 
-function ApptRow({ item, onEdit, onRemove, fromCalendar }) {
+function ApptRow({ item, onEdit, onRemove, fromCalendar, onIgnore, onAddFromCalendar }) {
   const dateStr = item.appointment_date
     ? new Date(item.appointment_date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
     : (item.start?.dateTime
@@ -324,7 +324,10 @@ function ApptRow({ item, onEdit, onRemove, fromCalendar }) {
         )}
       </div>
       {fromCalendar
-        ? <button onClick={() => onIgnore && onIgnore(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>Ignore</button>
+        ? <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+            <button onClick={() => onAddFromCalendar && onAddFromCalendar(item)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, border: `1px solid ${COLORS.accent}`, background: 'transparent', color: COLORS.accent, cursor: 'pointer' }}>+ Add</button>
+            <button onClick={() => onIgnore && onIgnore(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 11, cursor: 'pointer' }}>Ignore</button>
+          </div>
         : <>
             <button onClick={() => onEdit(item)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>Edit</button>
             <button onClick={() => onRemove(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>✕</button>
@@ -386,6 +389,17 @@ function HealthPanel({
     localStorage.setItem('gtd_health_ignored_cal', JSON.stringify([...next])); return next;
   });
   const resetIgnored = () => { setIgnoredCalIds(new Set()); localStorage.removeItem('gtd_health_ignored_cal'); };
+  const [calSectionOpen, setCalSectionOpen] = useState(true);
+  const addFromCalendar = async (ev) => {
+    await addHealthItem({
+      type: 'appointment',
+      name: ev.summary || '(Untitled)',
+      appointmentDate: ev.start?.dateTime || (ev.start?.date ? ev.start.date + 'T00:00:00' : null),
+      provider: '', notes: ev.description || '',
+      driveFileId: '', driveFileName: '', status: 'active',
+    });
+    ignoreCalEvent(ev.id); // hide from calendar section once logged
+  };
 
   const meds  = (healthItems || []).filter(i => i.type === 'medication' || i.type === 'supplement');
   const appts = (healthItems || []).filter(i => i.type === 'appointment').sort((a, b) => {
@@ -499,8 +513,12 @@ function HealthPanel({
             {/* FR#191 pull — calendar events matching medical keywords */}
             {calendarEnabled && (
               <div style={{ marginBottom: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1 }}>From your calendar</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: calSectionOpen ? 6 : 0 }}>
+                  <button onClick={() => setCalSectionOpen(o => !o)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flex: 1 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>From your calendar</span>
+                    <span style={{ fontSize: 10, color: COLORS.muted }}>{calSectionOpen ? '▲' : '▼'}</span>
+                    {!calSectionOpen && calAppts.length > 0 && <span style={{ fontSize: 10, color: COLORS.muted }}>({calAppts.length})</span>}
+                  </button>
                   <select value={calWindowDays} onChange={e => { const v = parseInt(e.target.value, 10); setCalWindowDays(v); localStorage.setItem('gtd_health_cal_window', String(v)); }}
                     style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: `1px solid ${COLORS.border}`, background: COLORS.bg, color: COLORS.text2, cursor: 'pointer' }}>
                     <option value={30}>Next 30 days</option>
@@ -515,10 +533,10 @@ function HealthPanel({
                     </button>
                   )}
                 </div>
-                {calAppts.length === 0
+                {calSectionOpen && (calAppts.length === 0
                   ? <div style={{ fontSize: 12, color: COLORS.muted, fontStyle: 'italic' }}>No medical events found in this window. Expand the range or check that Calendar is loaded.</div>
-                  : calAppts.map(ev => <ApptRow key={ev.id} item={ev} onEdit={() => {}} onRemove={() => {}} fromCalendar onIgnore={ignoreCalEvent} />)
-                }
+                  : calAppts.map(ev => <ApptRow key={ev.id} item={ev} onEdit={() => {}} onRemove={() => {}} fromCalendar onIgnore={ignoreCalEvent} onAddFromCalendar={addFromCalendar} />)
+                )}
               </div>
             )}
             {(appts.length > 0 || adding) && calAppts.length > 0 && (
