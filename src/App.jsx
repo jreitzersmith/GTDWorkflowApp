@@ -27,7 +27,7 @@ import { useAICoachState } from "./features/coach/useAICoachState.js";
 import { useTaskUIState } from "./features/tasks/useTaskUIState.js";
 import { createEmptyUsageStats } from "./features/settings/useAIUsageTracking.js";
 
-import { parseRRULE, calEventStart, isAllDayEvent, genId } from "./features/calendar/calendarApi.js";
+import { parseRRULE, calEventStart, isAllDayEvent, genId, doCalendarCreateEvent } from "./features/calendar/calendarApi.js";
 import { driveUploadFile } from "./api/driveApi.js";
 import { doGmailSend, doGmailLabel, doGmailGetMessageBody } from "./features/email/gmailTools.js";
 import { sheetsAppendRows } from './api/sheetsApi.js';
@@ -1643,6 +1643,26 @@ export default function GTDManager() {
                           addHealthItem={addHealthItem}
                           updateHealthItem={updateHealthItem}
                           removeHealthItem={removeHealthItem}
+                          googleToken={googleToken}
+                          driveEnabled={driveEnabled}
+                          calendarEnabled={calendarEnabled}
+                          calendarEvents={calendarEvents}
+                          onSummarizeDoc={(item) => {
+                            setCurrentView("gtd");
+                            openCoachChat(`Please summarize this medical document from Drive (file ID: ${item.drive_file_id}, name: "${item.name}"). Use the get_drive_file tool to read it, then write a brief plain-language summary I can save to my health records.`);
+                          }}
+                          onCreateCalendarEvent={async (form) => {
+                            if (!googleToken || !form.appointmentDate) return;
+                            try {
+                              const dt = new Date(form.appointmentDate);
+                              const date = dt.toISOString().slice(0, 10);
+                              const startTime = dt.toTimeString().slice(0, 5);
+                              const endTime = new Date(dt.getTime() + 30 * 60000).toTimeString().slice(0, 5);
+                              const desc = [form.provider && `Provider: ${form.provider}`, form.notes].filter(Boolean).join("\n");
+                              const ev = await doCalendarCreateEvent(googleToken, { summary: form.name, description: desc, date, startTime, endTime, reminderMinutes: calendarReminderMinutes ?? 10 });
+                              setCalendarEvents(prev => [...prev, ev]);
+                            } catch { /* health item saved regardless */ }
+                          }}
                         />
                       ) : currentView === "contacts" ? (
                         <ContactsPanel

@@ -1,10 +1,24 @@
 // src/features/health/HealthPanel.jsx
-// Health monitoring panel — medications, supplements, appointments (FR#187).
+// Health monitoring panel — FR#187 (MVP) + FR#188–191 enhancements.
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { COLORS } from '../../constants.jsx';
 
 const TABS = ['Medications & Supplements', 'Appointments', 'Documents'];
+
+// FR#191 — keywords for pulling medical events from Calendar
+const MEDICAL_KEYWORDS = [
+  'doctor','dentist','specialist','physio','therapy','therapist','hospital',
+  'clinic','appointment','consult','screening','blood test','radiology',
+  'referral','medical','surgery','GP','cardiolog','dermatolog','ophthalmolog',
+  'oncolog','psychiatr','psycholog','neurolog','urolog','orthopaed',
+  'endocrinolog','rheumatolog','optom','audiolog','patholog','podiat',
+];
+
+function isMedicalEvent(ev) {
+  const text = ((ev.summary || '') + ' ' + (ev.description || '')).toLowerCase();
+  return MEDICAL_KEYWORDS.some(k => text.includes(k));
+}
 
 const STATUS_COLORS = {
   active:  { bg: '#e8f5e9', color: '#2e7d32' },
@@ -27,26 +41,123 @@ function blankMed() {
   return { type: 'medication', name: '', dose: '', frequency: '', status: 'active', startDate: '', endDate: '', notes: '' };
 }
 function blankAppt() {
-  return { type: 'appointment', name: '', appointmentDate: '', provider: '', notes: '', driveFileId: '', driveFileName: '' };
+  return { type: 'appointment', name: '', appointmentDate: '', provider: '', notes: '', driveFileId: '', driveFileName: '', createCalEvent: false };
 }
 function blankDoc() {
   return { type: 'document', name: '', notes: '', driveFileId: '', driveFileName: '' };
 }
 
-// ── Inline form component ─────────────────────────────────────────────────────
+// ── Shared input style ────────────────────────────────────────────────────────
+
+function inputStyle(width) {
+  return {
+    fontSize: 13, padding: '4px 8px', borderRadius: 5,
+    border: `1px solid ${COLORS.border}`, background: COLORS.bg,
+    color: COLORS.text, width: width || '100%',
+  };
+}
+
+// ── FR#188: styled date input with dark-mode colorScheme override ─────────────
+
+function StyledDateInput({ type = 'date', value, onChange, style }) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      style={{ ...inputStyle(), colorScheme: 'dark', width: type === 'datetime-local' ? 200 : 150, ...style }}
+    />
+  );
+}
+
+// ── FR#189: Google Drive single-file picker ───────────────────────────────────
+
+function DriveFilePicker({ driveEnabled, googleToken, fileId, fileName, onPick, onClear }) {
+  const gapiLoadingRef = useRef(false);
+
+  function ensureGapi(cb) {
+    if (window.gapi && window.gapi.load) { cb(); return; }
+    if (gapiLoadingRef.current) return;
+    gapiLoadingRef.current = true;
+    const s = document.createElement('script');
+    s.src = 'https://apis.google.com/js/api.js';
+    s.onload = () => { gapiLoadingRef.current = false; cb(); };
+    document.head.appendChild(s);
+  }
+
+  function openPicker() {
+    if (!googleToken) return;
+    ensureGapi(() => {
+      window.gapi.load('picker', () => {
+        const devKey = import.meta.env.VITE_GOOGLE_BROWSER_API_KEY;
+        const picker = new window.google.picker.PickerBuilder()
+          .addView(new window.google.picker.DocsView().setIncludeFolders(false).setSelectFolderEnabled(false))
+          .addView(new window.google.picker.DocsView(window.google.picker.ViewId.RECENTLY_PICKED))
+          .setOAuthToken(googleToken)
+          .setDeveloperKey(devKey)
+          .setCallback(data => {
+            if (data.action !== 'picked') return;
+            const f = (data.docs || [])[0];
+            if (f) onPick({ id: f.id, name: f.name, mimeType: f.mimeType, url: f.url });
+          })
+          .build();
+        picker.setVisible(true);
+      });
+    });
+  }
+
+  if (!driveEnabled) {
+    return (
+      <input
+        value={fileId}
+        onChange={e => onPick({ id: e.target.value, name: e.target.value })}
+        placeholder="Paste Drive file ID"
+        style={inputStyle()}
+      />
+    );
+  }
+
+  if (fileId && fileName) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 12, color: COLORS.accent }}>📎</span>
+        <span style={{ fontSize: 12, color: COLORS.text, flex: 1 }}>{fileName}</span>
+        <button onClick={onClear} style={{ background: 'none', border: 'none', color: COLORS.muted, cursor: 'pointer', fontSize: 11 }}>✕</button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={openPicker}
+      style={{ fontSize: 12, padding: '4px 12px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, cursor: 'pointer' }}
+    >
+      📎 Choose from Drive
+    </button>
+  );
+}
+
+// ── Field row layout ──────────────────────────────────────────────────────────
 
 function FieldRow({ label, children }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-      <span style={{ width: 90, fontSize: 12, color: COLORS.text2, flexShrink: 0 }}>{label}</span>
+      <span style={{ width: 100, fontSize: 12, color: COLORS.text2, flexShrink: 0 }}>{label}</span>
       {children}
     </div>
   );
 }
 
-function inputStyle(width) {
-  return { fontSize: 13, padding: '4px 8px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: COLORS.bg, color: COLORS.text, width: width || '100%' };
+function FormActions({ onCancel, onSave }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+      <button onClick={onCancel} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, cursor: 'pointer' }}>Cancel</button>
+      <button onClick={onSave} style={{ fontSize: 12, padding: '4px 14px', borderRadius: 5, border: `1px solid ${COLORS.accent}`, background: COLORS.accent, color: '#fff', cursor: 'pointer' }}>Save</button>
+    </div>
+  );
 }
+
+// ── MedForm ───────────────────────────────────────────────────────────────────
 
 function MedForm({ initial, onSave, onCancel }) {
   const [form, setForm] = useState(initial || blankMed());
@@ -76,23 +187,22 @@ function MedForm({ initial, onSave, onCancel }) {
         </select>
       </FieldRow>
       <FieldRow label="Start date">
-        <input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} style={inputStyle(150)} />
+        <StyledDateInput value={form.startDate} onChange={e => set('startDate', e.target.value)} />
       </FieldRow>
       <FieldRow label="End date">
-        <input type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} style={inputStyle(150)} />
+        <StyledDateInput value={form.endDate} onChange={e => set('endDate', e.target.value)} />
       </FieldRow>
       <FieldRow label="Notes">
         <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={2} style={{ ...inputStyle(), resize: 'vertical' }} />
       </FieldRow>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-        <button onClick={onCancel} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, cursor: 'pointer' }}>Cancel</button>
-        <button onClick={() => form.name.trim() && onSave(form)} style={{ fontSize: 12, padding: '4px 14px', borderRadius: 5, border: `1px solid ${COLORS.accent}`, background: COLORS.accent, color: '#fff', cursor: 'pointer' }}>Save</button>
-      </div>
+      <FormActions onCancel={onCancel} onSave={() => form.name.trim() && onSave(form)} />
     </div>
   );
 }
 
-function ApptForm({ initial, onSave, onCancel }) {
+// ── ApptForm ──────────────────────────────────────────────────────────────────
+
+function ApptForm({ initial, onSave, onCancel, driveEnabled, googleToken, calendarEnabled }) {
   const [form, setForm] = useState(initial || blankAppt());
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   return (
@@ -101,7 +211,7 @@ function ApptForm({ initial, onSave, onCancel }) {
         <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Annual physical" style={inputStyle()} />
       </FieldRow>
       <FieldRow label="Date / time">
-        <input type="datetime-local" value={form.appointmentDate} onChange={e => set('appointmentDate', e.target.value)} style={inputStyle(200)} />
+        <StyledDateInput type="datetime-local" value={form.appointmentDate} onChange={e => set('appointmentDate', e.target.value)} />
       </FieldRow>
       <FieldRow label="Provider">
         <input value={form.provider} onChange={e => set('provider', e.target.value)} placeholder="e.g. Dr. Smith" style={inputStyle()} />
@@ -109,18 +219,30 @@ function ApptForm({ initial, onSave, onCancel }) {
       <FieldRow label="Notes">
         <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={2} style={{ ...inputStyle(), resize: 'vertical' }} />
       </FieldRow>
-      <FieldRow label="Drive file ID">
-        <input value={form.driveFileId} onChange={e => set('driveFileId', e.target.value)} placeholder="optional" style={inputStyle()} />
+      <FieldRow label="Drive file">
+        <DriveFilePicker
+          driveEnabled={driveEnabled}
+          googleToken={googleToken}
+          fileId={form.driveFileId}
+          fileName={form.driveFileName}
+          onPick={f => { set('driveFileId', f.id); set('driveFileName', f.name || f.id); }}
+          onClear={() => { set('driveFileId', ''); set('driveFileName', ''); }}
+        />
       </FieldRow>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-        <button onClick={onCancel} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, cursor: 'pointer' }}>Cancel</button>
-        <button onClick={() => form.name.trim() && onSave(form)} style={{ fontSize: 12, padding: '4px 14px', borderRadius: 5, border: `1px solid ${COLORS.accent}`, background: COLORS.accent, color: '#fff', cursor: 'pointer' }}>Save</button>
-      </div>
+      {calendarEnabled && form.appointmentDate && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: COLORS.text2, marginBottom: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={!!form.createCalEvent} onChange={e => set('createCalEvent', e.target.checked)} />
+          Also create Google Calendar event
+        </label>
+      )}
+      <FormActions onCancel={onCancel} onSave={() => form.name.trim() && onSave(form)} />
     </div>
   );
 }
 
-function DocForm({ initial, onSave, onCancel }) {
+// ── DocForm ───────────────────────────────────────────────────────────────────
+
+function DocForm({ initial, onSave, onCancel, driveEnabled, googleToken }) {
   const [form, setForm] = useState(initial || blankDoc());
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   return (
@@ -128,21 +250,25 @@ function DocForm({ initial, onSave, onCancel }) {
       <FieldRow label="Title *">
         <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Blood test results May 2026" style={inputStyle()} />
       </FieldRow>
-      <FieldRow label="Drive file ID">
-        <input value={form.driveFileId} onChange={e => set('driveFileId', e.target.value)} placeholder="Paste Google Drive file ID" style={inputStyle()} />
+      <FieldRow label="Drive file">
+        <DriveFilePicker
+          driveEnabled={driveEnabled}
+          googleToken={googleToken}
+          fileId={form.driveFileId}
+          fileName={form.driveFileName}
+          onPick={f => { set('driveFileId', f.id); set('driveFileName', f.name || f.id); }}
+          onClear={() => { set('driveFileId', ''); set('driveFileName', ''); }}
+        />
       </FieldRow>
       <FieldRow label="Summary / notes">
         <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} placeholder="Paste AI summary or your own notes here" style={{ ...inputStyle(), resize: 'vertical' }} />
       </FieldRow>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-        <button onClick={onCancel} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, cursor: 'pointer' }}>Cancel</button>
-        <button onClick={() => form.name.trim() && onSave(form)} style={{ fontSize: 12, padding: '4px 14px', borderRadius: 5, border: `1px solid ${COLORS.accent}`, background: COLORS.accent, color: '#fff', cursor: 'pointer' }}>Save</button>
-      </div>
+      <FormActions onCancel={onCancel} onSave={() => form.name.trim() && onSave(form)} />
     </div>
   );
 }
 
-// ── Medication/Supplement row ─────────────────────────────────────────────────
+// ── MedRow ────────────────────────────────────────────────────────────────────
 
 function MedRow({ item, onEdit, onRemove }) {
   const [expanded, setExpanded] = useState(false);
@@ -168,16 +294,21 @@ function MedRow({ item, onEdit, onRemove }) {
   );
 }
 
-// ── Appointment row ───────────────────────────────────────────────────────────
+// ── ApptRow ───────────────────────────────────────────────────────────────────
 
-function ApptRow({ item, onEdit, onRemove }) {
+function ApptRow({ item, onEdit, onRemove, fromCalendar }) {
   const dateStr = item.appointment_date
     ? new Date(item.appointment_date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-    : '(no date)';
+    : (item.start?.dateTime
+        ? new Date(item.start.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+        : (item.start?.date || '(no date)'));
   return (
-    <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: '10px 0', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+    <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: '10px 0', display: 'flex', alignItems: 'flex-start', gap: 10, opacity: fromCalendar ? 0.8 : 1 }}>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, color: COLORS.text, fontWeight: 500 }}>{item.name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {fromCalendar && <span style={{ fontSize: 10, background: COLORS.surface2, color: COLORS.muted, padding: '1px 6px', borderRadius: 8, fontWeight: 500 }}>📅 Calendar</span>}
+          <span style={{ fontSize: 14, color: COLORS.text, fontWeight: 500 }}>{item.name || item.summary}</span>
+        </div>
         <div style={{ fontSize: 12, color: COLORS.text2, marginTop: 2 }}>
           {dateStr}
           {item.provider && <span style={{ marginLeft: 10, color: COLORS.muted }}>· {item.provider}</span>}
@@ -189,15 +320,19 @@ function ApptRow({ item, onEdit, onRemove }) {
           </a>
         )}
       </div>
-      <button onClick={() => onEdit(item)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>Edit</button>
-      <button onClick={() => onRemove(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>✕</button>
+      {!fromCalendar && (
+        <>
+          <button onClick={() => onEdit(item)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>Edit</button>
+          <button onClick={() => onRemove(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>✕</button>
+        </>
+      )}
     </div>
   );
 }
 
-// ── Document row ──────────────────────────────────────────────────────────────
+// ── DocRow ────────────────────────────────────────────────────────────────────
 
-function DocRow({ item, onEdit, onRemove }) {
+function DocRow({ item, onEdit, onRemove, onSummarize }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: '10px 0' }}>
@@ -205,6 +340,11 @@ function DocRow({ item, onEdit, onRemove }) {
         <span style={{ flex: 1, fontSize: 14, color: COLORS.text, fontWeight: 500 }}>{item.name}</span>
         {item.drive_file_id && (
           <a href={`https://drive.google.com/file/d/${item.drive_file_id}/view`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: COLORS.accent }}>Open ↗</a>
+        )}
+        {item.drive_file_id && onSummarize && (
+          <button onClick={() => onSummarize(item)} style={{ background: 'none', border: `1px solid ${COLORS.border}`, color: COLORS.accent, fontSize: 11, cursor: 'pointer', borderRadius: 4, padding: '2px 8px' }}>
+            Summarize ✦
+          </button>
         )}
         {item.notes && <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>{expanded ? 'Hide' : 'Summary'}</button>}
         <button onClick={() => onEdit(item)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>Edit</button>
@@ -221,7 +361,13 @@ function DocRow({ item, onEdit, onRemove }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-function HealthPanel({ healthItems, healthLoading, addHealthItem, updateHealthItem, removeHealthItem }) {
+function HealthPanel({
+  healthItems, healthLoading,
+  addHealthItem, updateHealthItem, removeHealthItem,
+  googleToken, driveEnabled,
+  calendarEnabled, calendarEvents,
+  onSummarizeDoc, onCreateCalendarEvent,
+}) {
   const [tab, setTab]           = useState(0);
   const [adding, setAdding]     = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -233,6 +379,15 @@ function HealthPanel({ healthItems, healthLoading, addHealthItem, updateHealthIt
     return a.appointment_date.localeCompare(b.appointment_date);
   });
   const docs  = (healthItems || []).filter(i => i.type === 'document');
+
+  // FR#191 — pull matching calendar events
+  const calAppts = (calendarEnabled && calendarEvents)
+    ? calendarEvents.filter(isMedicalEvent).sort((a, b) => {
+        const aS = a.start?.dateTime || a.start?.date || '';
+        const bS = b.start?.dateTime || b.start?.date || '';
+        return aS.localeCompare(bS);
+      })
+    : [];
 
   const handleSave = async (form) => {
     if (editItem) {
@@ -253,20 +408,21 @@ function HealthPanel({ healthItems, healthLoading, addHealthItem, updateHealthIt
         appointmentDate: form.appointmentDate ? new Date(form.appointmentDate).toISOString() : null,
         provider: form.provider,
       });
+      // FR#191 push — create calendar event if requested
+      if (form.createCalEvent && form.appointmentDate && onCreateCalendarEvent) {
+        onCreateCalendarEvent(form);
+      }
       setAdding(false);
     }
   };
 
-  const editInitial = (item) => {
-    if (!item) return null;
-    return {
-      type: item.type, name: item.name, dose: item.dose || '', frequency: item.frequency || '',
-      status: item.status || 'active', startDate: item.start_date || '', endDate: item.end_date || '',
-      notes: item.notes || '', driveFileId: item.drive_file_id || '', driveFileName: item.drive_file_name || '',
-      appointmentDate: item.appointment_date ? item.appointment_date.slice(0, 16) : '',
-      provider: item.provider || '',
-    };
-  };
+  const editInitial = (item) => ({
+    type: item.type, name: item.name || '', dose: item.dose || '', frequency: item.frequency || '',
+    status: item.status || 'active', startDate: item.start_date || '', endDate: item.end_date || '',
+    notes: item.notes || '', driveFileId: item.drive_file_id || '', driveFileName: item.drive_file_name || '',
+    appointmentDate: item.appointment_date ? item.appointment_date.slice(0, 16) : '',
+    provider: item.provider || '', createCalEvent: false,
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: COLORS.bg }}>
@@ -283,14 +439,8 @@ function HealthPanel({ healthItems, healthLoading, addHealthItem, updateHealthIt
         </div>
         <div style={{ display: 'flex', gap: 0 }}>
           {TABS.map((t, i) => (
-            <button
-              key={t}
-              onClick={() => { setTab(i); setAdding(false); setEditItem(null); }}
-              style={{
-                fontSize: 12, padding: '6px 14px', border: 'none', borderBottom: tab === i ? `2px solid ${COLORS.accent}` : '2px solid transparent',
-                background: 'transparent', color: tab === i ? COLORS.accent : COLORS.text2, cursor: 'pointer', fontWeight: tab === i ? 600 : 400,
-              }}
-            >
+            <button key={t} onClick={() => { setTab(i); setAdding(false); setEditItem(null); }}
+              style={{ fontSize: 12, padding: '6px 14px', border: 'none', borderBottom: tab === i ? `2px solid ${COLORS.accent}` : '2px solid transparent', background: 'transparent', color: tab === i ? COLORS.accent : COLORS.text2, cursor: 'pointer', fontWeight: tab === i ? 600 : 400 }}>
               {t}
             </button>
           ))}
@@ -301,17 +451,15 @@ function HealthPanel({ healthItems, healthLoading, addHealthItem, updateHealthIt
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
         {healthLoading && <div style={{ color: COLORS.muted, fontSize: 13 }}>Loading…</div>}
 
-        {/* Add form */}
+        {/* Add forms */}
         {adding && !editItem && tab === 0 && <MedForm onSave={handleSave} onCancel={() => setAdding(false)} />}
-        {adding && !editItem && tab === 1 && <ApptForm onSave={handleSave} onCancel={() => setAdding(false)} />}
-        {adding && !editItem && tab === 2 && <DocForm onSave={handleSave} onCancel={() => setAdding(false)} />}
+        {adding && !editItem && tab === 1 && <ApptForm onSave={handleSave} onCancel={() => setAdding(false)} driveEnabled={driveEnabled} googleToken={googleToken} calendarEnabled={calendarEnabled} />}
+        {adding && !editItem && tab === 2 && <DocForm onSave={handleSave} onCancel={() => setAdding(false)} driveEnabled={driveEnabled} googleToken={googleToken} />}
 
         {/* Medications & Supplements */}
         {tab === 0 && (
           <>
-            {meds.length === 0 && !adding && (
-              <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 8 }}>No medications or supplements logged yet.</div>
-            )}
+            {meds.length === 0 && !adding && <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 8 }}>No medications or supplements logged yet.</div>}
             {meds.map(item =>
               editItem?.id === item.id
                 ? <MedForm key={item.id} initial={editInitial(item)} onSave={handleSave} onCancel={() => setEditItem(null)} />
@@ -323,12 +471,22 @@ function HealthPanel({ healthItems, healthLoading, addHealthItem, updateHealthIt
         {/* Appointments */}
         {tab === 1 && (
           <>
-            {appts.length === 0 && !adding && (
-              <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 8 }}>No appointments logged yet.</div>
+            {/* FR#191 pull — calendar events matching medical keywords */}
+            {calAppts.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>From your calendar</div>
+                {calAppts.map(ev => (
+                  <ApptRow key={ev.id} item={ev} onEdit={() => {}} onRemove={() => {}} fromCalendar />
+                ))}
+              </div>
             )}
+            {(appts.length > 0 || adding) && calAppts.length > 0 && (
+              <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Logged appointments</div>
+            )}
+            {appts.length === 0 && !adding && calAppts.length === 0 && <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 8 }}>No appointments logged yet.</div>}
             {appts.map(item =>
               editItem?.id === item.id
-                ? <ApptForm key={item.id} initial={editInitial(item)} onSave={handleSave} onCancel={() => setEditItem(null)} />
+                ? <ApptForm key={item.id} initial={editInitial(item)} onSave={handleSave} onCancel={() => setEditItem(null)} driveEnabled={driveEnabled} googleToken={googleToken} calendarEnabled={calendarEnabled} />
                 : <ApptRow key={item.id} item={item} onEdit={setEditItem} onRemove={removeHealthItem} />
             )}
           </>
@@ -338,15 +496,14 @@ function HealthPanel({ healthItems, healthLoading, addHealthItem, updateHealthIt
         {tab === 2 && (
           <>
             <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
-              Store references to medical documents in Drive. Use the AI coach to ask it to summarise a file via <code>get_drive_file</code>, then paste the summary into the notes field.
+              Attach Drive files and store AI summaries.{driveEnabled ? '' : ' Connect Drive in Settings to use the file picker.'}
+              {' '}Use <em>Summarize ✦</em> to ask the AI coach to read and summarise a linked file.
             </div>
-            {docs.length === 0 && !adding && (
-              <div style={{ color: COLORS.muted, fontSize: 13 }}>No documents logged yet.</div>
-            )}
+            {docs.length === 0 && !adding && <div style={{ color: COLORS.muted, fontSize: 13 }}>No documents logged yet.</div>}
             {docs.map(item =>
               editItem?.id === item.id
-                ? <DocForm key={item.id} initial={editInitial(item)} onSave={handleSave} onCancel={() => setEditItem(null)} />
-                : <DocRow key={item.id} item={item} onEdit={setEditItem} onRemove={removeHealthItem} />
+                ? <DocForm key={item.id} initial={editInitial(item)} onSave={handleSave} onCancel={() => setEditItem(null)} driveEnabled={driveEnabled} googleToken={googleToken} />
+                : <DocRow key={item.id} item={item} onEdit={setEditItem} onRemove={removeHealthItem} onSummarize={onSummarizeDoc} />
             )}
           </>
         )}
