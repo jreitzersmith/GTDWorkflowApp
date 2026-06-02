@@ -1,6 +1,6 @@
 ﻿# GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#182**
+> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#184**
 
 ---
 
@@ -47,6 +47,9 @@
 
 #### Contacts enrichment
 
+- FR#183 [GH#216] (2026-06-02) — Contact-task linking (Option A) — contactId + contactName fields on tasks; Linked Tasks section in ContactDetail (mutually exclusive with Promises — task appears in only one); contact picker in Task Detail; contact:<name> AI action syntax. Files: supabase.js, SQL/, constants.jsx, useCallAI.js, TaskDetail, ContactDetail.
+- FR#184 [GH#217] (2026-06-02) — Settings: detect missing drive.readonly scope and prompt Drive reconnect — drive_search empty-result hint + Drive settings warning chip when token lacks drive.readonly. Files: useCallAI.js, settings UI, useGoogleAuth.js.
+
 
 
 
@@ -74,3 +77,10 @@ Test cases that could not be executed during their cycle due to a missing condit
 
 - [FR#128 GH#149] Dismissing the send action bar does not also dismiss the draft — needs a live Gmail thread to test
 - [FR#139 GH#163] Received promise (contact promises to call Enterhealth) → Waiting For task created automatically — needs a contact enrichment test with direction:received to verify task is placed in Waiting For
+- [FR#176 GH#207] Inbox indicator badge appears on ContactRow when contact's email is in loaded inbox — needs Email inbox loaded during test
+- [FR#176 GH#207] Inbox indicator clears when inbox refreshes without that sender — needs Email inbox loaded
+- [FR#176 GH#207] Inbox indicator clears when Gmail disconnected — needs Gmail connected
+- [FR#180 GH#212] Ask coach to attach a Drive file to a task via drive_search + →ACTION:attach_drive; verify badge in Task Detail — needs Drive connected
+- [FR#181 GH#213] Process a scheduling email; confirm Calendar step offers →ACTION:calendar_create — needs an email with scheduling/meeting info
+- [FR#182 GH#214] Process email from a contact; confirm AI offers contact_note step — needs email from a known contact
+- [FR#182 GH#214] Ask coach to share a Drive file via email (drive_search + gmail_compose) — needs Drive + Gmail both connected
