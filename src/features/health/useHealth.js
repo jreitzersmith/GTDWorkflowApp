@@ -5,9 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchHealthItems, upsertHealthItem, deleteHealthItem } from '../../api/supabase.js';
 
-function genHealthId() {
-  return 'h' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
+// crypto.randomUUID() produces valid UUIDs required by the health_items Supabase column (UUID type)
 
 /**
  * @param {{ supabaseReady: boolean, userId: string|null }} opts
@@ -28,7 +26,7 @@ function useHealth({ supabaseReady, userId }) {
 
   const addHealthItem = useCallback(async (fields) => {
     const item = {
-      id:         genHealthId(),
+      id:         crypto.randomUUID(),
       user_id:    userId,
       type:       fields.type || 'medication',
       name:       fields.name,
