@@ -133,6 +133,13 @@ function ContactDetail({
           contactDisplayName={contact.displayName}
         />
         <Divider />
+        <LinkedTasksSection
+          tasks={tasks}
+          promises={contact.promises || []}
+          contactId={contact.id}
+          onNavigateToTask={onNavigateToTask}
+        />
+        <Divider />
         <EmailHistorySection emailHistory={contact.emailHistory || []} />
         <Divider />
         <DriveFilesSection
@@ -570,6 +577,38 @@ function GiftTaskPicker({ tasks, gift, onLink, onClose, createInboxTask, contact
         + Create new Inbox task
       </button>
     </div>
+  );
+}
+
+// ── Linked Tasks (FR#183) ────────────────────────────────────────────────────
+
+function LinkedTasksSection({ tasks, promises, contactId, onNavigateToTask }) {
+  // Tasks linked to this contact that are NOT already linked to a specific promise
+  // (those appear inside the Promises section). Mutually exclusive.
+  const promiseTaskIds = new Set((promises || []).map(p => p.taskId).filter(Boolean));
+  const linked = (tasks || []).filter(t => t.contactId === contactId && !promiseTaskIds.has(t.id));
+  if (!linked.length) return null;
+  return (
+    <Section title="Linked Tasks">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {linked.map(task => (
+          <div
+            key={task.id}
+            onClick={() => onNavigateToTask && onNavigateToTask(task.id)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6, cursor: onNavigateToTask ? 'pointer' : 'default', background: 'transparent', transition: 'background 0.1s' }}
+            onMouseEnter={e => { if (onNavigateToTask) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <span style={{ fontSize: 11, color: task.done ? COLORS.muted : COLORS.next, fontWeight: 500, flexShrink: 0 }}>
+              {task.done ? '✓' : '›'}
+            </span>
+            <span style={{ fontSize: 13, color: task.done ? COLORS.muted : COLORS.text, textDecoration: task.done ? 'line-through' : 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {task.text}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }
 

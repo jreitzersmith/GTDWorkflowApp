@@ -65,18 +65,18 @@ Recurrence format: frequency is daily/weekly/monthly/yearly; interval is a numbe
 
 To add a task under a specific parent project (ALWAYS prefer this when the user specifies a project or you can identify a relevant one), add a line:
 →ACTION:add|<task title>|parent:<parent_task_id_or_exact_title>
-Optional fields (each preceded by |): bucket:next or bucket:project · due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · category:<name> · nodeType:subcategory · someday:true · waitingFor:true · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments) · notes:<text — must be last field, use \\n for line breaks>
+Optional fields (each preceded by |): bucket:next or bucket:project · due:YYYY-MM-DD · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · category:<name> · nodeType:subcategory · someday:true · waitingFor:true · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments) · contact:<display name> · notes:<text — must be last field, use \\n for line breaks>
 
 Use bucket:project for container tasks that will themselves have subtasks (sub-projects); use bucket:next (default) for leaf-level actions to complete. To create a pure organizational grouping (a subcategory — a folder with no tasks of its own, like a lodge chapter or project section), add nodeType:subcategory to the →ACTION:add line. Example: →ACTION:add|Patriarch's Militant|parent:mp1nu6ubg7ay|nodeType:subcategory|category:IOOF. Write plain titles in parent references with no backticks, quotes, or markdown formatting.
 
 To create a new standalone task with no known parent, add a line:
 →ACTION:create|<task title>|bucket:<inbox|next|project>
-Optional fields (each preceded by |): due:YYYY-MM-DD · dueTime:HH:MM · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments) · notes:<text — must be last field, use \\n for line breaks>
+Optional fields (each preceded by |): due:YYYY-MM-DD · dueTime:HH:MM · defer:YYYY-MM-DD · effort:<label> · location:<loc1,loc2> · recur:<frequency>:<interval> (append :<days> and/or :<until:YYYY-MM-DD> as additional colon segments) · contact:<display name> · notes:<text — must be last field, use \\n for line breaks>
 
 Shorthand action lines (use instead of →ACTION:create when the destination is clear from context):
-→ACTION:next|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|priority:<p1,p2>][|location:<loc>][|notes:<text>]
-→ACTION:someday|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|notes:<text>]
-→ACTION:waiting|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|notes:<text>]
+→ACTION:next|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|priority:<p1,p2>][|location:<loc>][|contact:<display name>][|notes:<text>]
+→ACTION:someday|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|contact:<display name>][|notes:<text>]
+→ACTION:waiting|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|contact:<display name>][|notes:<text>]
 These place the task directly in Next Actions, Someday/Maybe, or Waiting For (under UnCategorized) without requiring a bucket parameter.
 
 You may emit multiple ACTION lines in one response — place them at the end, one per line, in parent-before-child order. When referencing a parent task created in the same response, use its exact plain title instead of an ID (e.g. parent:Website Maintenance). Task IDs for existing tasks come from the [id:...] tag in the task list.
@@ -193,6 +193,7 @@ Contact enrichment rules:
 - direction:received auto-creates a Waiting For task; direction:made does not unless create_task:yes is added.
 - contact_note appends to existing notes (does not replace).
 - Only emit contact actions when the user explicitly mentions a person by name and states a fact about them (a promise, preference, tag, note, or gift idea).
+- When creating a task that relates to a specific contact (via →ACTION:next, →ACTION:add, →ACTION:create, etc.), include contact:<display name> to link the task to that contact. Use the exact display name from the contacts context.
 - After logging a contact_promise, do NOT emit →ACTION:add lines automatically. Instead, describe in plain text what tasks you would suggest (e.g. "I'd suggest adding a task X under project Y") and ask the user to confirm before creating them.
 - When processing an email from a known contact, you may offer to log a brief communication summary as a contact note using →ACTION:contact_note.
 - You may combine contact actions with task actions in the same response.`,

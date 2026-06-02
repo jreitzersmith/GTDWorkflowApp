@@ -528,7 +528,7 @@ SlidesGenerator.propTypes = {
 
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
-function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, slidesEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style, contactName }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, slidesEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style, contactName, contacts, onNavigateToContact }) {
   const {
     titleDraft, setTitleDraft, saveTitle,
     notesDraft, setNotesDraft, saveNotes,
@@ -615,13 +615,29 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
 
-          {/* Contact link (FR#149) */}
-          {contactName && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-              <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Contact</span>
-              <span style={{ color: COLORS.text }}>{contactName}</span>
-            </div>
-          )}
+          {/* Contact link (FR#183) */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Contact</span>
+            {contactName ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
+                <span
+                  onClick={() => onNavigateToContact && onNavigateToContact(task.contactId)}
+                  style={{ color: '#4db6ac', cursor: onNavigateToContact ? 'pointer' : 'default', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title="Go to contact"
+                >{contactName}</span>
+                <span
+                  onClick={() => onUpdate({ contactId: null })}
+                  title="Remove contact link"
+                  style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 11, flexShrink: 0, userSelect: 'none' }}
+                >✕</span>
+              </div>
+            ) : (
+              <ContactPickerInline
+                contacts={contacts || []}
+                onSelect={(ct) => onUpdate({ contactId: ct.id })}
+              />
+            )}
+          </div>
 
           {/* Type toggle — nodeType selector, visible in Projects and Next Actions views */}
           {(['project', 'next', 'waiting', 'someday', 'deferred'].includes(currentBucket)) && (
@@ -906,6 +922,45 @@ TaskDetailPanel.propTypes = {
   onClose:           PropTypes.func.isRequired,
   style:             PropTypes.object,
   contactName:       PropTypes.string,
+  contacts:          PropTypes.array,
+  onNavigateToContact: PropTypes.func,
 };
+
+// Inline contact picker for TaskDetailPanel (FR#183)
+function ContactPickerInline({ contacts, onSelect }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen]   = useState(false);
+  const filtered = (contacts || [])
+    .filter(c => !query || (c.displayName || '').toLowerCase().includes(query.toLowerCase()))
+    .slice(0, 8);
+  if (!contacts || contacts.length === 0) return null;
+  return (
+    <div style={{ position: 'relative', flex: 1 }}>
+      <input
+        placeholder="Link a contact…"
+        value={query}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        style={{ width: '100%', boxSizing: 'border-box', padding: '3px 6px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
+      />
+      {open && filtered.length > 0 && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, zIndex: 50, maxHeight: 200, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+          {filtered.map(ct => (
+            <div
+              key={ct.id}
+              onMouseDown={() => { onSelect(ct); setQuery(''); setOpen(false); }}
+              style={{ padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: COLORS.text }}
+              onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              {ct.displayName || ct.givenName || '(no name)'}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export { TaskDetailPanel };

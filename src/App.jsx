@@ -1814,6 +1814,8 @@ export default function GTDManager() {
                     onClose={() => setSelectedTaskId(null)}
                     style={s.detailPanel}
                     contactName={selTask.contactId ? (contacts.find(c => c.id === selTask.contactId)?.displayName || null) : null}
+                    contacts={contacts}
+                    onNavigateToContact={(contactId) => { setCurrentView('contacts'); setSelectedContactId(contactId); }}
                   />
                 </>
               ) : null;

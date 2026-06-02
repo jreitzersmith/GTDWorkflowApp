@@ -620,7 +620,9 @@ function useCallAI({
                   const files = (result.files || []).map(function(f) {
                     return { id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, webViewLink: f.webViewLink };
                   });
-                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(files) });
+                  let driveResult = JSON.stringify(files);
+                  if (files.length === 0) driveResult += '\n\nNote: No files found. If searching for a pre-existing file or folder, the Drive connection may lack read access to existing files. Inform the user and suggest they reconnect Drive in Settings, or ask them to share the folder URL so you can extract the ID directly.';
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: driveResult });
                 } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === 'get_drive_file') {
                 const driveFileId = toolUse.input.file_id;
@@ -939,6 +941,11 @@ function useCallAI({
                 if (k === 'notes')    xtra.notes      = v;
                 if (k === 'location') xtra.location   = v.split(',').map(s => s.trim()).filter(Boolean);
                 if (k === 'priority') xtra.priority   = v.split(',').map(s => s.trim()).filter(Boolean);
+                if (k === 'contact') xtra.contact   = v;
+              }
+              if (xtra.contact && contactActionsRef.current.contacts) {
+                const { contact: ct } = resolveContactByName(contactActionsRef.current.contacts, xtra.contact);
+                if (ct) xtra.contactId = ct.id;
               }
               if (title) {
                 const newId = genId();
@@ -949,6 +956,7 @@ function useCallAI({
                   dueDate: xtra.dueDate || null, effort: xtra.effort || null, actualEffort: null,
                   deferUntil: xtra.deferUntil || null, notes: xtra.notes || null,
                   recurrence: null, isNextAction: true,
+                  ...(xtra.contactId ? { contactId: xtra.contactId } : {}),
                   ...(parentId ? { parentId } : {}),
                 };
                 if (parentId) {
@@ -978,6 +986,11 @@ function useCallAI({
                 if (k === 'notes')    xtra.notes      = v;
                 if (k === 'location') xtra.location   = v.split(',').map(s => s.trim()).filter(Boolean);
                 if (k === 'priority') xtra.priority   = v.split(',').map(s => s.trim()).filter(Boolean);
+                if (k === 'contact') xtra.contact   = v;
+              }
+              if (xtra.contact && contactActionsRef.current.contacts) {
+                const { contact: ct } = resolveContactByName(contactActionsRef.current.contacts, xtra.contact);
+                if (ct) xtra.contactId = ct.id;
               }
               if (title) {
                 const newId = genId();
@@ -988,6 +1001,7 @@ function useCallAI({
                   dueDate: xtra.dueDate || null, effort: xtra.effort || null, actualEffort: null,
                   deferUntil: xtra.deferUntil || null, notes: xtra.notes || null,
                   recurrence: null, isSomeday: true,
+                  ...(xtra.contactId ? { contactId: xtra.contactId } : {}),
                   ...(parentId ? { parentId } : {}),
                 };
                 if (parentId) {
@@ -1011,9 +1025,14 @@ function useCallAI({
                 if (ci < 0) continue;
                 const k = parts[i].slice(0, ci).trim();
                 const v = parts[i].slice(ci + 1).trim();
-                if (k === 'due')   xtra.dueDate    = v;
-                if (k === 'defer') xtra.deferUntil = v;
-                if (k === 'notes') xtra.notes      = v;
+                if (k === 'due')     xtra.dueDate    = v;
+                if (k === 'defer')   xtra.deferUntil = v;
+                if (k === 'notes')   xtra.notes      = v;
+                if (k === 'contact') xtra.contact    = v;
+              }
+              if (xtra.contact && contactActionsRef.current.contacts) {
+                const { contact: ct } = resolveContactByName(contactActionsRef.current.contacts, xtra.contact);
+                if (ct) xtra.contactId = ct.id;
               }
               if (title) {
                 const newId = genId();
@@ -1024,6 +1043,7 @@ function useCallAI({
                   dueDate: xtra.dueDate || null, effort: null, actualEffort: null,
                   deferUntil: xtra.deferUntil || null, notes: xtra.notes || null,
                   recurrence: null, isWaitingFor: true,
+                  ...(xtra.contactId ? { contactId: xtra.contactId } : {}),
                   ...(parentId ? { parentId } : {}),
                 };
                 if (parentId) {

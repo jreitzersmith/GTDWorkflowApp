@@ -22,7 +22,7 @@ const GOOGLE_SERVICES = [
   {
     id: 'drive', icon: '💾', name: 'Drive',
     scopes: [
-      { key: 'standard', label: 'Standard', desc: 'Browse, attach & upload files' },
+      { key: 'standard', label: 'Standard', desc: 'Browse, attach & upload files. Includes search across all Drive files — reconnect if searching pre-existing folders fails.' },
       { key: 'full',     label: 'Full',     desc: '+ manage all Drive content' },
     ],
   },
