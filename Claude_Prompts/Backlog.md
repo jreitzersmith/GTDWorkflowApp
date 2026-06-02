@@ -6,9 +6,7 @@
 
 ## Known issues / remaining work
 
-- Issue#43 [GH#215] (2026-06-01) — Chat mode duplicate task: action handler auto-creates task immediately + metadata panel also creates on accept; need to surface task ID to pending action state so panel patches instead of posts
 
-- Issue#40 [GH#188] (2026-05-30) — Inbox processing auto-starts after AI Skip in contact enrichment — after Skip, coach immediately transitions to inbox processing mode instead of awaiting next input; likely post-action flow in useCallAI.js
 
 ---
 
@@ -37,8 +35,8 @@
 
 #### Integrations / data
 
-- FR#186 [GH#219] (2026-06-02) — Task completion appends summary to linked contact's notes — when task with contactId marked done, append "[date] Completed: <title> + notes" to contact.notes; opt-in setting in Settings > Contacts
-- FR#187 [GH#220] (2026-06-02) — Health monitoring panel — medications/supplements tracker, medical appointment calendar integration, AI-summarised Drive documents; new health_items Supabase table; deferred to dedicated phase
+- FR#186 [GH#219] (2026-06-02) — Task completion appends summary to linked contact's notes — implemented; deferred test: verify note appended and setting toggle works
+- FR#187 [GH#220] (2026-06-02) — Health monitoring panel — MVP implemented (medications, supplements, appointments, documents tabs); future: calendar auto-pull for appointments, AI-summary workflow from Drive
 - FR#185 [GH#218] (2026-06-02) — Android SMS contact tracking — companion app reads device SMS via content://sms/, syncs to new sms_messages Supabase table, surfaces threads in Contacts panel alongside email; deferred to Android app phase. See GH#218 for full architecture, schema, and design decisions.
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
 - FR#70 [GH#70] (2026-05-12) — Multiple Google account support
