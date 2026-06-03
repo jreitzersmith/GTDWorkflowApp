@@ -1,6 +1,6 @@
 ﻿# GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#192**
+> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#198**
 
 ---
 
@@ -30,7 +30,6 @@
 
 
 
-
 #### Inbox / processing improvements
 
 #### Integrations / data
@@ -42,8 +41,6 @@
   - `useGoogleAuth.js` has a single token store (`gtd_google_token` in localStorage). Significant refactor required: token store must be keyed by account email, `user_settings.google_accounts` array in Supabase, account selector UI in Email and Calendar panels, and per-account scope management. High risk — touches auth flow throughout the app.
 
 #### Contacts enrichment
-
-
 
 
 
@@ -82,3 +79,7 @@ Test cases that could not be executed during their cycle due to a missing condit
 - [FR#181 GH#213] Process a scheduling email; confirm Calendar step offers →ACTION:calendar_create — needs an email with scheduling/meeting info
 - [FR#182 GH#214] Process email from a contact; confirm AI offers contact_note step — needs email from a known contact
 - [FR#182 GH#214] Ask coach to share a Drive file via email (drive_search + gmail_compose) — needs Drive + Gmail both connected
+- [FR#196 GH#229] Energy ecology panel: entries from multiple weeks appear newest first — needs energy_audit entries across 2+ different weeks
+- [FR#196 GH#229] Energy ecology panel: empty drain or regenerate field shows "—" placeholder — needs an energy entry with only one of drain/regenerate filled
+- [FR#198 GH#231] Score vs throughput: empty state shows "Start logging habits and completing tasks…" — needs a state with zero habits logged and zero completed tasks with completedDate
+- [FR#198 GH#231] Score vs throughput: legend note "No task completion dates logged yet" visible when tasks lack completedDate — needs tasks with done=true but no completedDate set
