@@ -28,7 +28,7 @@ import { useTaskUIState } from "./features/tasks/useTaskUIState.js";
 import { createEmptyUsageStats } from "./features/settings/useAIUsageTracking.js";
 
 import { parseRRULE, calEventStart, isAllDayEvent, genId, doCalendarCreateEvent } from "./features/calendar/calendarApi.js";
-import { driveUploadFile, driveExportFile } from "./api/driveApi.js";
+import { driveUploadFile, driveExportFile, driveDownloadFileAsBase64 } from "./api/driveApi.js";
 import { doGmailSend, doGmailLabel, doGmailGetMessageBody } from "./features/email/gmailTools.js";
 import { sheetsAppendRows } from './api/sheetsApi.js';
 import { extractReceiptFields } from './features/email/receiptUtils.js';
@@ -1342,33 +1342,40 @@ export default function GTDManager() {
     });
   }, [googleToken, tasks, locations, efforts, categories, driveBackupFolderId]);
 
-  // Health > Documents: background summarize → write to notes (used in 'on_add' mode)
+  // Health > Documents: background summarize → write to notes (used in 'on_add' mode and Summarize button)
+  // Tries text export first (Google Docs/Sheets/Slides), falls back to base64 PDF for other files.
   const onAutoSummarizeDoc = useCallback(async (item) => {
     if (!googleToken || !item.drive_file_id) return;
+    let messageContent;
     try {
-      const content = await driveExportFile({ token: googleToken, fileId: item.drive_file_id });
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1024,
-          messages: [{
-            role: 'user',
-            content: `Summarize the following medical document in plain language. Be concise and focus on key findings, values, or recommendations.\n\nDocument: "${item.name}"\n\n${content}`,
-          }],
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error?.message || `API error ${res.status}`);
-      const summary = data.content?.[0]?.text || '';
-      if (summary) await updateHealthItem(item.id, { notes: summary });
-    } catch (err) { throw err; }
+      const text = await driveExportFile({ token: googleToken, fileId: item.drive_file_id });
+      messageContent = `Summarize the following medical document in plain language. Be concise and focus on key findings, values, or recommendations.\n\nDocument: "${item.name}"\n\n${text}`;
+    } catch {
+      // Not a Google Workspace file — download as base64 and send as a PDF document block
+      const b64 = await driveDownloadFileAsBase64({ token: googleToken, fileId: item.drive_file_id });
+      messageContent = [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
+        { type: 'text', text: `Summarize this medical document ("${item.name}") in plain language. Be concise and focus on key findings, values, or recommendations.` },
+      ];
+    }
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: messageContent }],
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || `API error ${res.status}`);
+    const summary = data.content?.[0]?.text || '';
+    if (summary) await updateHealthItem(item.id, { notes: summary });
   }, [googleToken, updateHealthItem]);
 
   // "deferred" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
