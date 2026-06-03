@@ -341,6 +341,11 @@ function ApptRow({ item, onEdit, onRemove, fromCalendar, onIgnore, onAddFromCale
 
 function DocRow({ item, onEdit, onRemove, onSummarize, summarizeMode }) {
   const [expanded, setExpanded] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+  async function handleSummarize() {
+    setSummarizing(true);
+    try { await onSummarize(item); } finally { setSummarizing(false); }
+  }
   return (
     <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: '10px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -349,8 +354,8 @@ function DocRow({ item, onEdit, onRemove, onSummarize, summarizeMode }) {
           <a href={`https://drive.google.com/file/d/${item.drive_file_id}/view`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: COLORS.accent }}>Open ↗</a>
         )}
         {item.drive_file_id && onSummarize && (summarizeMode || 'on_request') === 'on_request' && (
-          <button onClick={() => onSummarize(item)} style={{ background: 'none', border: `1px solid ${COLORS.border}`, color: COLORS.accent, fontSize: 11, cursor: 'pointer', borderRadius: 4, padding: '2px 8px' }}>
-            Summarize ✦
+          <button onClick={handleSummarize} disabled={summarizing} style={{ background: 'none', border: `1px solid ${COLORS.border}`, color: summarizing ? COLORS.muted : COLORS.accent, fontSize: 11, cursor: summarizing ? 'default' : 'pointer', borderRadius: 4, padding: '2px 8px' }}>
+            {summarizing ? 'Summarizing…' : 'Summarize ✦'}
           </button>
         )}
         {item.notes && <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>{expanded ? 'Hide' : 'Summary'}</button>}
