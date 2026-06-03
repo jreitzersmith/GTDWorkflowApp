@@ -1364,11 +1364,11 @@ export default function GTDManager() {
           }],
         }),
       });
-      if (!res.ok) return;
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || `API error ${res.status}`);
       const summary = data.content?.[0]?.text || '';
       if (summary) await updateHealthItem(item.id, { notes: summary });
-    } catch { /* item already saved — summary is best-effort */ }
+    } catch (err) { throw err; }
   }, [googleToken, updateHealthItem]);
 
   // "deferred" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.

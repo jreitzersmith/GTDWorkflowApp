@@ -342,9 +342,11 @@ function ApptRow({ item, onEdit, onRemove, fromCalendar, onIgnore, onAddFromCale
 function DocRow({ item, onEdit, onRemove, onSummarize, summarizeMode }) {
   const [expanded, setExpanded] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  const [summarizeError, setSummarizeError] = useState('');
   async function handleSummarize() {
     setSummarizing(true);
-    try { await onSummarize(item); } finally { setSummarizing(false); }
+    setSummarizeError('');
+    try { await onSummarize(item); } catch (err) { setSummarizeError(err.message || 'Summarize failed'); } finally { setSummarizing(false); }
   }
   return (
     <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: '10px 0' }}>
@@ -358,6 +360,7 @@ function DocRow({ item, onEdit, onRemove, onSummarize, summarizeMode }) {
             {summarizing ? 'Summarizing…' : 'Summarize ✦'}
           </button>
         )}
+        {summarizeError && <span style={{ fontSize: 11, color: '#c62828' }} title={summarizeError}>⚠ Failed</span>}
         {item.notes && <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>{expanded ? 'Hide' : 'Summary'}</button>}
         <button onClick={() => onEdit(item)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>Edit</button>
         <button onClick={() => onRemove(item.id)} style={{ background: 'none', border: 'none', color: COLORS.muted, fontSize: 12, cursor: 'pointer' }}>✕</button>
