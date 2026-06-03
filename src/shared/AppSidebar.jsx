@@ -20,6 +20,7 @@ function AppSidebar({
   onSelectAnalytics,
   onSelectContacts,
   onSelectHealth,
+  onSelectHabits,
   onToggleSettings,
   onToggleUsage,
   onDailyReview,
@@ -137,6 +138,19 @@ function AppSidebar({
         </div>
 
         <div
+          onClick={onSelectHabits}
+          style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 16px', cursor: 'pointer', background: currentView === 'habits' ? COLORS.surface2 : 'transparent', borderLeft: `3px solid ${currentView === 'habits' ? '#a5d6a7' : 'transparent'}`, transition: 'background 0.1s' }}
+          onMouseEnter={e => { if (currentView !== 'habits') { e.currentTarget.style.background = COLORS.surface2; } }}
+          onMouseLeave={e => { if (currentView !== 'habits') { e.currentTarget.style.background = 'transparent'; } }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#a5d6a7', flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: currentView === 'habits' ? COLORS.text : COLORS.text2, display: 'flex', alignItems: 'center' }}>
+            <span style={{ display: 'inline-block', width: '1.4em', textAlign: 'center', flexShrink: 0 }}>🌱</span>
+            Habits
+          </span>
+        </div>
+
+        <div
           onClick={onSelectAnalytics}
           accessKey="a"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "analytics" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "analytics" ? COLORS.accent : "transparent"}`, transition: "background 0.1s" }}
@@ -198,6 +212,7 @@ AppSidebar.propTypes = {
   onSelectAnalytics:  PropTypes.func.isRequired,
   onSelectContacts:   PropTypes.func.isRequired,
   onSelectHealth:     PropTypes.func.isRequired,
+  onSelectHabits:     PropTypes.func.isRequired,
   onToggleSettings: PropTypes.func.isRequired,
   onToggleUsage:   PropTypes.func.isRequired,
   onDailyReview:   PropTypes.func.isRequired,

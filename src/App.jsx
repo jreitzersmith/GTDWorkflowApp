@@ -41,6 +41,7 @@ import { useTaskCrud } from "./features/tasks/useTaskCrud.js";
 import { ContactsPanel } from "./features/contacts/ContactsPanel.jsx";
 import { useContacts } from "./features/contacts/useContacts.js";
 import { HealthPanel } from "./features/health/HealthPanel.jsx";
+import { HabitsPanel } from "./features/habits/HabitsPanel.jsx";
 import { useHealth } from "./features/health/useHealth.js";
 import { useSettings } from "./features/settings/useSettings.js";
 
@@ -1482,6 +1483,7 @@ export default function GTDManager() {
           contactsEnabled={contactsEnabled}
           onSelectContacts={() => { setCurrentView("contacts"); setShowSettings(false); setSelectedTaskId(null); }}
           onSelectHealth={() => { setCurrentView("health"); setShowSettings(false); setSelectedTaskId(null); }}
+          onSelectHabits={() => { setCurrentView("habits"); setShowSettings(false); setSelectedTaskId(null); }}
           onToggleSettings={() => { setShowSettings(v => !v); setShowUsage(false); }}
           onToggleUsage={() => { setShowUsage(v => !v); setShowSettings(false); }}
           onDailyReview={startDailyReview}
@@ -1708,6 +1710,11 @@ export default function GTDManager() {
                               setCalendarEvents(prev => [...prev, ev]);
                             } catch { /* health item saved regardless */ }
                           }}
+                        />
+                      ) : currentView === "habits" ? (
+                        <HabitsPanel
+                          supabaseReady={supabaseReady}
+                          tasks={tasks}
                         />
                       ) : currentView === "contacts" ? (
                         <ContactsPanel

@@ -241,6 +241,68 @@ async function deleteHealthItem(id) {
   if (error) throw new Error(`deleteHealthItem: ${error.message}`);
 }
 
+
+// ── Habit entries ─────────────────────────────────────────────────────────────
+
+async function fetchHabitEntries() {
+  const { data, error } = await supabase
+    .from('habit_entries')
+    .select('*')
+    .order('entry_date', { ascending: false });
+  if (error) throw new Error(`fetchHabitEntries: ${error.message}`);
+  return data;
+}
+
+async function saveHabitEntry({ habitId, entryDate, content, replace = false, editId = null }) {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) throw new Error('saveHabitEntry: no authenticated user');
+
+  if (editId) {
+    // Editing a specific past entry — delete it before inserting the updated version
+    const { error: delErr } = await supabase.from('habit_entries').delete().eq('id', editId);
+    if (delErr) throw new Error(`saveHabitEntry delete: ${delErr.message}`);
+  } else if (replace) {
+    // One-per-period habit — replace any existing entry for this date
+    await supabase.from('habit_entries').delete()
+      .eq('user_id', userId).eq('habit_id', habitId).eq('entry_date', entryDate);
+  }
+
+  const { data, error } = await supabase
+    .from('habit_entries')
+    .insert({ user_id: userId, habit_id: habitId, entry_date: entryDate, content, updated_at: new Date().toISOString() })
+    .select()
+    .single();
+  if (error) throw new Error(`saveHabitEntry: ${error.message}`);
+  return data;
+}
+
+async function deleteHabitEntry(id) {
+  const { error } = await supabase.from('habit_entries').delete().eq('id', id);
+  if (error) throw new Error(`deleteHabitEntry: ${error.message}`);
+}
+
+async function fetchHabitsConfig() {
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('habits_config')
+    .single();
+  if (error && error.code !== 'PGRST116') throw new Error(`fetchHabitsConfig: ${error.message}`);
+  return data?.habits_config ?? {};
+}
+
+async function updateHabitsConfig(patch) {
+  const current = await fetchHabitsConfig();
+  const merged = { ...current, ...patch };
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) throw new Error('updateHabitsConfig: no authenticated user');
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert({ user_id: userId, habits_config: merged }, { onConflict: 'user_id' });
+  if (error) throw new Error(`updateHabitsConfig: ${error.message}`);
+  return merged;
+}
 export {
   fetchContacts,
   upsertContact,
@@ -250,5 +312,10 @@ export {
   fetchHealthItems,
   upsertHealthItem,
   deleteHealthItem,
+  fetchHabitEntries,
+  saveHabitEntry,
+  deleteHabitEntry,
+  fetchHabitsConfig,
+  updateHabitsConfig,
 };
 
