@@ -148,6 +148,12 @@ function useAppSettings() {
   );
   useEffect(() => { localStorage.setItem('gtd_task_completion_notes', String(taskCompletionToContactNotes)); }, [taskCompletionToContactNotes]);
 
+  // Health > Documents summarize mode: 'on_request' | 'on_add'
+  const [healthDocSummarizeMode, setHealthDocSummarizeMode] = useState(() =>
+    localStorage.getItem('gtd_health_doc_summarize_mode') || 'on_request'
+  );
+  useEffect(() => { localStorage.setItem('gtd_health_doc_summarize_mode', healthDocSummarizeMode); }, [healthDocSummarizeMode]);
+
   return {
     locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides,
     tagDisplay, setTagDisplay, categories, setCategories,
@@ -180,6 +186,7 @@ function useAppSettings() {
     contactLikesCategories, setContactLikesCategories,
     contactEmailLinkingMode, setContactEmailLinkingMode,
     taskCompletionToContactNotes, setTaskCompletionToContactNotes,
+    healthDocSummarizeMode, setHealthDocSummarizeMode,
   };
 }
 

@@ -339,7 +339,7 @@ function ApptRow({ item, onEdit, onRemove, fromCalendar, onIgnore, onAddFromCale
 
 // ── DocRow ────────────────────────────────────────────────────────────────────
 
-function DocRow({ item, onEdit, onRemove, onSummarize }) {
+function DocRow({ item, onEdit, onRemove, onSummarize, summarizeMode }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div style={{ borderBottom: `1px solid ${COLORS.border}`, padding: '10px 0' }}>
@@ -348,7 +348,7 @@ function DocRow({ item, onEdit, onRemove, onSummarize }) {
         {item.drive_file_id && (
           <a href={`https://drive.google.com/file/d/${item.drive_file_id}/view`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: COLORS.accent }}>Open ↗</a>
         )}
-        {item.drive_file_id && onSummarize && (
+        {item.drive_file_id && onSummarize && (summarizeMode || 'on_request') === 'on_request' && (
           <button onClick={() => onSummarize(item)} style={{ background: 'none', border: `1px solid ${COLORS.border}`, color: COLORS.accent, fontSize: 11, cursor: 'pointer', borderRadius: 4, padding: '2px 8px' }}>
             Summarize ✦
           </button>
@@ -374,6 +374,7 @@ function HealthPanel({
   googleToken, driveEnabled,
   calendarEnabled, calendarEvents,
   onSummarizeDoc, onCreateCalendarEvent,
+  healthDocSummarizeMode, onAutoSummarizeDoc,
 }) {
   const [tab, setTab]           = useState(0);
   const [adding, setAdding]     = useState(false);
@@ -440,7 +441,7 @@ function HealthPanel({
       }
       setEditItem(null);
     } else {
-      await addHealthItem({
+      const savedId = await addHealthItem({
         type: form.type, name: form.name, dose: form.dose, frequency: form.frequency,
         status: form.status, startDate: form.startDate, endDate: form.endDate,
         notes: form.notes, driveFileId: form.driveFileId, driveFileName: form.driveFileName,
@@ -450,6 +451,10 @@ function HealthPanel({
       // FR#191 push — create calendar event if requested
       if (form.createCalEvent && form.appointmentDate && onCreateCalendarEvent) {
         onCreateCalendarEvent(form);
+      }
+      // Auto-summarize on add — fire-and-forget; result saved to notes via updateHealthItem
+      if (savedId && form.type === 'document' && form.driveFileId && healthDocSummarizeMode === 'on_add' && onAutoSummarizeDoc) {
+        onAutoSummarizeDoc({ id: savedId, name: form.name, drive_file_id: form.driveFileId });
       }
       setAdding(false);
     }
@@ -562,7 +567,7 @@ function HealthPanel({
             {docs.map(item =>
               editItem?.id === item.id
                 ? <DocForm key={item.id} initial={editInitial(item)} onSave={handleSave} onCancel={() => setEditItem(null)} driveEnabled={driveEnabled} googleToken={googleToken} />
-                : <DocRow key={item.id} item={item} onEdit={setEditItem} onRemove={removeHealthItem} onSummarize={onSummarizeDoc} />
+                : <DocRow key={item.id} item={item} onEdit={setEditItem} onRemove={removeHealthItem} onSummarize={onSummarizeDoc} summarizeMode={healthDocSummarizeMode} />
             )}
           </>
         )}

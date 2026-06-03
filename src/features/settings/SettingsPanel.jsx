@@ -122,6 +122,7 @@ function SettingsPanel({
   onRenameContactLikeCategory, onRemoveContactLikeCategory,
   contactEmailLinkingMode, onSetContactEmailLinkingMode,
   taskCompletionToContactNotes, onSetTaskCompletionToContactNotes,
+  healthDocSummarizeMode, onSetHealthDocSummarizeMode,
 }) {
   const fileInputRef = useRef(null);
   const [importMode, setImportMode] = useState("replace");
@@ -719,6 +720,23 @@ function SettingsPanel({
             <input type='checkbox' checked={!!taskCompletionToContactNotes} onChange={e => onSetTaskCompletionToContactNotes(e.target.checked)} />
             <span style={{ fontSize: 13, color: COLORS.text }}>Append to contact notes on completion</span>
           </label>
+        </SettingsSection>
+
+        <SettingsSection label="Health" storageKey="gtd_settings_health">
+          <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Document summarization</div>
+          <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 8 }}>Choose when AI summaries are generated for linked Drive documents.</div>
+          {[
+            ['on_request', 'Summarize on request', 'Show the Summarize button on each document row — click to open the AI coach.'],
+            ['on_add', 'Summarize on document add', 'Automatically summarize when a document with a Drive file is saved, and write the result to the notes field.'],
+          ].map(([val, label, desc]) => (
+            <label key={val} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
+              <input type="radio" name="healthDocSummarizeMode" value={val} checked={(healthDocSummarizeMode || 'on_request') === val} onChange={() => onSetHealthDocSummarizeMode(val)} style={{ marginTop: 2 }} />
+              <div>
+                <div style={{ fontSize: 13, color: COLORS.text }}>{label}</div>
+                <div style={{ fontSize: 11, color: COLORS.text2 }}>{desc}</div>
+              </div>
+            </label>
+          ))}
         </SettingsSection>
       </div>
     </div>

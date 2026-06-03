@@ -28,7 +28,7 @@ import { useTaskUIState } from "./features/tasks/useTaskUIState.js";
 import { createEmptyUsageStats } from "./features/settings/useAIUsageTracking.js";
 
 import { parseRRULE, calEventStart, isAllDayEvent, genId, doCalendarCreateEvent } from "./features/calendar/calendarApi.js";
-import { driveUploadFile } from "./api/driveApi.js";
+import { driveUploadFile, driveExportFile } from "./api/driveApi.js";
 import { doGmailSend, doGmailLabel, doGmailGetMessageBody } from "./features/email/gmailTools.js";
 import { sheetsAppendRows } from './api/sheetsApi.js';
 import { extractReceiptFields } from './features/email/receiptUtils.js';
@@ -67,7 +67,7 @@ export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId, contactRelationshipTags, setContactRelationshipTags, contactLikesCategories, setContactLikesCategories, contactEmailLinkingMode, setContactEmailLinkingMode, taskCompletionToContactNotes, setTaskCompletionToContactNotes} = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId, contactRelationshipTags, setContactRelationshipTags, contactLikesCategories, setContactLikesCategories, contactEmailLinkingMode, setContactEmailLinkingMode, taskCompletionToContactNotes, setTaskCompletionToContactNotes, healthDocSummarizeMode, setHealthDocSummarizeMode} = useAppSettings();
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState(coachName);
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
@@ -1342,6 +1342,35 @@ export default function GTDManager() {
     });
   }, [googleToken, tasks, locations, efforts, categories, driveBackupFolderId]);
 
+  // Health > Documents: background summarize → write to notes (used in 'on_add' mode)
+  const onAutoSummarizeDoc = useCallback(async (item) => {
+    if (!googleToken || !item.drive_file_id) return;
+    try {
+      const content = await driveExportFile({ token: googleToken, fileId: item.drive_file_id });
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
+          messages: [{
+            role: 'user',
+            content: `Summarize the following medical document in plain language. Be concise and focus on key findings, values, or recommendations.\n\nDocument: "${item.name}"\n\n${content}`,
+          }],
+        }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const summary = data.content?.[0]?.text || '';
+      if (summary) await updateHealthItem(item.id, { notes: summary });
+    } catch { /* item already saved — summary is best-effort */ }
+  }, [googleToken, updateHealthItem]);
+
   // "deferred" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
   const bucketTasks = currentBucket === "deferred"
     ? tasks.filter(t => isDeferred(t) && !t.done).sort((a, b) => (a.deferUntil > b.deferUntil ? 1 : -1))
@@ -1576,6 +1605,8 @@ export default function GTDManager() {
                           onSetContactEmailLinkingMode={setContactEmailLinkingMode}
                           taskCompletionToContactNotes={taskCompletionToContactNotes}
                           onSetTaskCompletionToContactNotes={setTaskCompletionToContactNotes}
+                          healthDocSummarizeMode={healthDocSummarizeMode}
+                          onSetHealthDocSummarizeMode={setHealthDocSummarizeMode}
                         />
                       ) : showUsage ? (
                         <UsagePanel
@@ -1659,6 +1690,8 @@ export default function GTDManager() {
                             setCurrentView("gtd");
                             openCoachChat(`Please summarize this medical document from Drive (file ID: ${item.drive_file_id}, name: "${item.name}"). Use the get_drive_file tool to read it, then write a brief plain-language summary I can save to my health records.`);
                           }}
+                          healthDocSummarizeMode={healthDocSummarizeMode}
+                          onAutoSummarizeDoc={onAutoSummarizeDoc}
                           onCreateCalendarEvent={async (form) => {
                             if (!googleToken || !form.appointmentDate) return;
                             try {
