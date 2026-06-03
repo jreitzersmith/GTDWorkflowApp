@@ -42,10 +42,7 @@ function ScoreTrend({ entries, today }) {
 
   return (
     <div style={{ padding: '16px 12px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, color: COLORS.text2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Weekly Score Trend
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', marginBottom: 12 }}>
         <div style={{ fontSize: 11, color: COLORS.text2 }}>
           Avg: <span style={{ color: LINE_COLOR, fontWeight: 500 }}>{avg.toFixed(1)}</span> / 5 over {NUM_WEEKS} weeks
         </div>

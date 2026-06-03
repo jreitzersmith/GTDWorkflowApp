@@ -1714,7 +1714,6 @@ export default function GTDManager() {
                       ) : currentView === "habits" ? (
                         <HabitsPanel
                           supabaseReady={supabaseReady}
-                          tasks={tasks}
                         />
                       ) : currentView === "contacts" ? (
                         <ContactsPanel
@@ -1763,6 +1762,7 @@ export default function GTDManager() {
                           tasks={tasks}
                           contacts={contacts}
                           onNavigateToContact={(id) => { setCurrentView('contacts'); setSelectedContactId(id); }}
+                          supabaseReady={supabaseReady}
                         />
                       ) : (
                         <TaskBucketView

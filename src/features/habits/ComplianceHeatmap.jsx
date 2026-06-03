@@ -30,10 +30,6 @@ function ComplianceHeatmap({ entries, today }) {
 
   return (
     <div style={{ padding: '16px 12px' }}>
-      <div style={{ fontSize: 12, fontWeight: 500, color: COLORS.text2, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        12-Week Compliance
-      </div>
-
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', overflowX: 'auto' }}>
         {/* Row labels */}
         <div style={{ flexShrink: 0, width: labelW }}>

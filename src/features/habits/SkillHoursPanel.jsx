@@ -129,9 +129,6 @@ function SkillHoursPanel({ entries, habitsConfig, today }) {
 
   return (
     <div style={{ padding: '16px 12px' }}>
-      <div style={{ fontSize: 12, fontWeight: 500, color: COLORS.text2, marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        Skill Hours — {MILESTONE_HOURS}h Milestone
-      </div>
       {skills.map(skill => (
         <SkillRow
           key={skill}

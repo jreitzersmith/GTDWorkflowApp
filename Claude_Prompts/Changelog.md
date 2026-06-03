@@ -259,3 +259,5 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 | 2026-06-03 | feat | FR#192 | GH#225 | Health Documents: auto-summarize on add setting | 741bf5d |
 | 2026-06-03 | Feature | FR#193 | GH#226 | Habits panel — SOrg habit tracking: 5 habits (Friction Audit, Skill Hour, Evidence Journal, Strategic Review, Energy Audit), streak/periodic tracking, 90-day heatmap, per-habit entry forms, Supabase habit_entries table | 8aa1e5b |
 | 2026-06-03 | Feature | FR#194-198 | GH#227-231 | Habits analytics tab — compliance heatmap (12-week), Skill Hour cumulative tracker (250h milestone + sparkline), Energy ecology panel, weekly score trend (0–5 SVG line chart), habits score vs task throughput overlay chart; analyticsUtils.js pure functions with 28 unit tests | b37af28 |
+
+| 2026-06-03 | Feature | FR#199 | GH#232 | Move Habits Analytics to Analytics area as third tab — HabitsAnalyticsView (collapsible/configurable), habitsAnalyticsConfig, AnalyticsArea Habits tab, stripped internal chart titles, removed HabitsAnalytics.jsx sub-tab | HASH199 |

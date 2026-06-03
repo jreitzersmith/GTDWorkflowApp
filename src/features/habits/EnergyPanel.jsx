@@ -25,10 +25,6 @@ function EnergyPanel({ entries, today }) {
 
   return (
     <div style={{ padding: '16px 12px' }}>
-      <div style={{ fontSize: 12, fontWeight: 500, color: COLORS.text2, marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        Energy Ecology — Rolling {NUM_WEEKS} Weeks
-      </div>
-
       {/* Column headers */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>

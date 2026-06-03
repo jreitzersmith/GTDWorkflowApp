@@ -70,11 +70,8 @@ function ScoreVsThroughput({ entries, tasks, today }) {
   return (
     <div style={{ padding: '16px 12px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, color: COLORS.text2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Score vs Task Throughput
-        </div>
-        {correlation !== null && (
+      {correlation !== null && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', marginBottom: 12 }}>
           <div style={{ fontSize: 11, color: COLORS.text2 }}>
             r = <span style={{ color: Math.abs(correlation) > 0.4 ? SCORE_COLOR : COLORS.muted, fontWeight: 500 }}>
               {correlation.toFixed(2)}
@@ -83,8 +80,8 @@ function ScoreVsThroughput({ entries, tasks, today }) {
               ({Math.abs(correlation) > 0.6 ? 'strong' : Math.abs(correlation) > 0.3 ? 'moderate' : 'weak'}{correlation >= 0 ? ' positive' : ' negative'})
             </span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: '100%', maxWidth: SVG_W, height: SVG_H, display: 'block' }}>
         {/* Score section Y axis label */}

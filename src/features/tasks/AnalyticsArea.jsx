@@ -1,18 +1,20 @@
 // src/features/tasks/AnalyticsArea.jsx
-// Tab bar wrapper: Tasks analytics | Contacts analytics (FR#165).
+// Tab bar wrapper: Tasks | Contacts | Habits analytics (FR#165, FR#199).
 
 import PropTypes from 'prop-types';
 import { useState } from 'react';
 import { COLORS } from '../../constants.jsx';
 import { TaskAnalyticsView } from './TaskAnalyticsView.jsx';
 import { ContactAnalyticsView } from '../contacts/ContactAnalyticsView.jsx';
+import { HabitsAnalyticsView } from '../habits/HabitsAnalyticsView.jsx';
 
 const TABS = [
   { id: 'tasks',    label: 'Tasks' },
   { id: 'contacts', label: 'Contacts' },
+  { id: 'habits',   label: 'Habits' },
 ];
 
-function AnalyticsArea({ tasks, contacts, onNavigateToContact }) {
+function AnalyticsArea({ tasks, contacts, onNavigateToContact, supabaseReady }) {
   const [tab, setTab] = useState('tasks');
 
   return (
@@ -44,10 +46,9 @@ function AnalyticsArea({ tasks, contacts, onNavigateToContact }) {
       </div>
 
       {/* Content */}
-      {tab === 'tasks'
-        ? <TaskAnalyticsView tasks={tasks} />
-        : <ContactAnalyticsView contacts={contacts || []} onNavigateToContact={onNavigateToContact} />
-      }
+      {tab === 'tasks'    && <TaskAnalyticsView tasks={tasks} />}
+      {tab === 'contacts' && <ContactAnalyticsView contacts={contacts || []} onNavigateToContact={onNavigateToContact} />}
+      {tab === 'habits'   && <HabitsAnalyticsView supabaseReady={supabaseReady} tasks={tasks} />}
     </div>
   );
 }
@@ -56,6 +57,7 @@ AnalyticsArea.propTypes = {
   tasks:               PropTypes.array.isRequired,
   contacts:            PropTypes.array,
   onNavigateToContact: PropTypes.func,
+  supabaseReady:       PropTypes.bool,
 };
 
 export { AnalyticsArea };
