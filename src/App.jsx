@@ -1687,7 +1687,6 @@ export default function GTDManager() {
                           calendarEnabled={calendarEnabled}
                           calendarEvents={calendarEvents}
                           onSummarizeDoc={(item) => {
-                            setCurrentView("gtd");
                             openCoachChat(`Please summarize this medical document from Drive (file ID: ${item.drive_file_id}, name: "${item.name}"). Use the get_drive_file tool to read it, then write a brief plain-language summary I can save to my health records.`);
                           }}
                           healthDocSummarizeMode={healthDocSummarizeMode}
