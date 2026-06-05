@@ -33,8 +33,8 @@ function AppSidebar({
     <div style={{ width: sidebarWidth, background: COLORS.surface, display: "flex", flexDirection: "column", flexShrink: 0 }}>
       <div style={{ padding: "18px 16px 14px", borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 300, color: COLORS.text }}>
-            GTD <em style={{ fontStyle: "italic", color: COLORS.inbox }}>Manager</em>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 300, fontStyle: "italic", color: COLORS.text }}>
+            <span style={{ color: COLORS.inbox }}>A</span><span style={{ color: COLORS.inbox }}>.</span><span style={{ color: COLORS.inbox }}>I</span><span style={{ color: COLORS.inbox }}>.</span><span>D</span><span style={{ color: COLORS.inbox }}>.</span><span>A</span><span style={{ color: COLORS.inbox }}>.</span>
           </div>
           {supabaseReady && (
             <div title={syncStatus === "synced" ? "Synced to cloud" : "Offline — changes queued"}
@@ -47,7 +47,7 @@ function AppSidebar({
             </div>
           )}
         </div>
-        <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 3 }}>Knowledge Worker Edition</div>
+        <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 3 }}>AI Daily Assistant</div>
       </div>
 
       <div style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
