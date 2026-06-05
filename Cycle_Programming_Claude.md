@@ -195,4 +195,20 @@ Update the Last used numbers line at the top of the file.
 
 **On resolution:** Delete the line from `Backlog.md`. Append a row to `Changelog.md` (date · type · # · GH# · name · commit hash). Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
 
-**Triage on report:** Categorize immediately when John reports an issue or request. Ask one clarifying question if category is ambiguou
+**Triage on report:** Categorize immediately when John reports an issue or request. Ask one clarifying question if category is ambiguous. Do not begin investigation until the item is logged.
+
+**Defer during active testing:** If a new issue arrives during Phases 5–6 of an open cycle, log it and acknowledge it, but do not investigate or propose changes until the current cycle is confirmed and committed.
+
+---
+
+## Key remembered preferences
+
+- Run commands directly — do not hand copy-paste steps
+- No emoji in responses unless asked
+- Use `mcp__git__git_commit` for commits, not bash git (avoids HEAD.lock on Windows mount)
+- Use `git -C "path" push origin develop` for push, not `cd && git push` (PowerShell `&&` is invalid)
+- Supabase migrations: confirm John is ready, then run using the Management API directly (project ref `tudmteqljgpocffalssz`, token in `.env` as `SUPABASE_MANAGEMENT_TOKEN`). Verify with an `information_schema.columns` query before proceeding to testing. Never hand copy-paste SQL steps to John.
+
+**File write rules (enforced every time — no exceptions):**
+- `.md` files (Backlog.md, Changelog.md, any Claude_Prompts/*.md): always use PowerShell `[System.IO.File]::WriteAllText(path, content, UTF8)` — for both targeted edits and full rewrites. Never Python `open(path,'w')`, `mcp__desktop-commander__write_file`, or `mcp__desktop-commander__edit_block` — all write through the FUSE layer and leave null bytes on this Windows mount.
+- `.js` / `.jsx` files: edits → Python `str.replace()` via bash sandbox (never the Cowork Edit or Write tools — template literals get corrupted on the FUSE mount). New files → `mcp__desktop-commander__write_file` in chunks.

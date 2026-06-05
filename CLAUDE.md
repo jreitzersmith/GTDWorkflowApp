@@ -236,4 +236,4 @@ Update the Last used numbers line at the top of the file.
 
 **File write rules (enforced every time — no exceptions):**
 - `.md` files (Backlog.md, Changelog.md, any Claude_Prompts/*.md): always use PowerShell `[System.IO.File]::WriteAllText(path, content, UTF8)` — for both targeted edits and full rewrites. Never Python `open(path,'w')`, `mcp__desktop-commander__write_file`, or `mcp__desktop-commander__edit_block` — all write through the FUSE layer and leave null bytes on this Windows mount.
-- `.js` / `.jsx` files: edits → Python `str.replace()` via bash sandbox (never the Cowork Edit or Write tools — template literals get corrupted on the FUSE mount). New files → `mcp__desktop-commander__write_file` in
+- `.js` / `.jsx` files: edits → Python `str.replace()` via bash sandbox (never the Cowork Edit or Write tools — template literals get corrupted on the FUSE mount). New files → `mcp__desktop-commander__write_file` in chunks.
