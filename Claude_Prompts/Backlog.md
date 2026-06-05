@@ -1,6 +1,6 @@
 ﻿# GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#199**
+> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#200**
 
 ---
 
@@ -58,6 +58,7 @@
 - [ ] FR#93 [GH#98] (2026-05-15) — Admin panel for user management — list/ban/delete users, usage metrics, impersonation; Supabase Dashboard is sufficient until user count demands it
 - [ ] FR#94 [GH#99] (2026-05-15) — Organisation support and team management — shared workspaces, roles (Owner/Admin/Member/Viewer), invite flow, billing hooks; major architectural change, post-single-user-validation only
 
+- FR#200 [GH#233] (2026-06-04) — Android app preparation: storage abstraction (replace localStorage with swappable useStorage hook), Anthropic API proxy (protect key from APK extraction), Google OAuth refactor (browser PKCE flow incompatible with native Android); items 1–2 are approach-independent; item 3 deferred until Capacitor vs. React Native decision is made
 - FR#9 [GH#18] — Todoist export / two-way sync (previously Issue#4 / GH#3)
 - FR#20 [GH#19] — Mobile layout (significant; requires media queries throughout)
 
