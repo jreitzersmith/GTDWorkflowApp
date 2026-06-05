@@ -22,7 +22,7 @@ A personal GTD task manager built as a React SPA with an AI coach powered by the
 | Trigger | File |
 |---|---|
 | Every session | `Claude_Prompts/Workflow.md` |
-| Writing or reviewing any code | `Claude_Prompts/Code_Standards.md` |
+| Writing or reviewing any code | `Claude_Prompts/Standards_Code_React.md` |
 | Planning or triaging | `Claude_Prompts/Backlog.md` |
 | After resolving items | `Claude_Prompts/Changelog.md` |
 | Updating HTML docs | `Claude_Prompts/Project_Summary.md` |
@@ -46,7 +46,7 @@ GTDWorkflowApp/
 ├── Claude_Prompts/
 │   ├── Claude.md.backup   ← this file
 │   ├── Workflow.md
-│   ├── Code_Standards.md
+│   ├── Standards_Code_React.md
 │   ├── User_Process.md
 │   ├── Backlog.md
 │   ├── Changelog.md

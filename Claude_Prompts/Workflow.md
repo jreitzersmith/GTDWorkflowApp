@@ -2,7 +2,7 @@
 
 **Project:** `C:\Programming_Projects\GTDWorkflowApp`
 
-Read `CLAUDE.md` at session start. Read `Claude_Prompts/Code_Standards.md` before writing or reviewing any code.
+Read `CLAUDE.md` at session start. Read `Claude_Prompts/Standards_Code_React.md` before writing or reviewing any code.
 
 Also read the memory index at `...\memory\MEMORY.md` and any `feedback_*.md` files listed there before starting any session.
 

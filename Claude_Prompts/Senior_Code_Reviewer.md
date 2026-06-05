@@ -3,7 +3,7 @@
 ## Before you begin
 
 1. Read `CLAUDE.md` for the project brief, tech stack, and branching model.
-2. Read `Claude_Prompts/Code_Standards.md` for the coding standards this project is held to.
+2. Read `Claude_Prompts/Standards_Code_React.md` for the coding standards this project is held to.
 3. Run `npx vitest run` and note the test count and pass/fail state — include this in the Project Health section.
 
 ## Known project conventions (not deviations from standard)
