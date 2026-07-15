@@ -1,4 +1,4 @@
-# GTD Workflow App — AI Pair Programming Process
+﻿# GTD Workflow App — AI Pair Programming Process
 
 **Project:** `C:\Programming_Projects\GTDWorkflowApp`
 
@@ -197,6 +197,44 @@ Push: `git -C "C:\Programming_Projects\GTDWorkflowApp" push origin develop`
 ### With Worker (Sonnet + Qwen)
 
 Commits are made by the worker during overnight execution using the commit message templates from the work order. The morning review session verifies commits are correct before doing the post-commit housekeeping (Known_Issues, Resolved_Issues, GitHub issue closure). Do not close GitHub issues until the morning review has confirmed the change is correct.
+
+---
+
+## Deployment to Production (gtd.reitzersmith.com)
+
+The app now runs in two places: local dev (`npm run dev`, localhost:5173) and the deployed production build on the AWS Lightsail edge server (see the Infrastructure repo). A commit landing on `develop` does not automatically reach production - deploy explicitly when the change should go live.
+
+1. Build the production bundle:
+   ```
+   npx vite build --outDir /tmp/gtd-dist --emptyOutDir
+   ```
+2. Copy the build to the server from a real Windows PowerShell session (not the bash sandbox):
+   ```
+   scp -i C:\Programming_Projects\SecurityKeys\GTDWorkflow.pem -r /tmp/gtd-dist/* ubuntu@3.134.160.32:/tmp/gtd-dist/
+   ```
+3. On the server, sync into place (via John's own Royal TS session - see the remote execution note below):
+   ```
+   sudo rsync -a --delete /tmp/gtd-dist/ /var/www/gtd/
+   ```
+4. Confirm the live site reflects the change: `curl -sI https://gtd.reitzersmith.com`.
+
+**Remote execution note:** Automated SSH (desktop-commander PowerShell + ssh.exe, or computer-use driving PuTTY) has proven unreliable in this environment - commands silently fail or GUI automation gets stuck on window focus. The reliable path is to hand John the exact commands to run in his own Royal TS session and read back the pasted output. Default to handing over commands; only attempt automated SSH/PuTTY if John asks for it.
+
+## Testing across environments
+
+For any change touching auth, API routing (`claudeApi.js`), or anything server-facing, the Phase 5 testing checklist must include both environments as separate groups:
+- **Local dev** (`localhost:5173` via `npm run dev`)
+- **Live site** (`gtd.reitzersmith.com`, after deploying per the Deployment section above)
+
+A passing local test is not sufficient confirmation for a production-facing change - get an explicit Pass on both groups before closing the item.
+
+## New Claude API call sites
+
+Any new code that calls the Anthropic API must route through `claudeRequest()` in `src/api/claudeApi.js` (see Issue#44/GH#235) rather than calling api.anthropic.com or reading VITE_ANTHROPIC_API_KEY directly. This keeps the real key server-side in production via the api.reitzersmith.com proxy.
+
+## Git remote hygiene
+
+Remote URLs must never have a token embedded (`https://ghp_...@github.com/...`). An embedded token bypasses Git Credential Manager's cached auth, gets tried first on every push/pull, and - if stale - causes repeated device-code prompts or silent hangs (root-caused and fixed 2026-07-14). Remotes should always be the plain form: `https://github.com/<owner>/<repo>.git`. If `git push`/`git pull` hangs with no output, check `git remote -v` first for an embedded credential before assuming a device-code auth issue.
 
 ---
 
