@@ -31,6 +31,7 @@ import { parseRRULE, calEventStart, isAllDayEvent, genId, doCalendarCreateEvent 
 import { driveUploadFile, driveExportFile, driveDownloadFileAsBase64 } from "./api/driveApi.js";
 import { doGmailSend, doGmailLabel, doGmailGetMessageBody } from "./features/email/gmailTools.js";
 import { sheetsAppendRows } from './api/sheetsApi.js';
+import { claudeRequest } from './api/claudeApi.js';
 import { extractReceiptFields } from './features/email/receiptUtils.js';
 import { todayStr, isDeferred, buildNextOccurrence, extractSuggestions, extractMetadata, getOrderedChildren, useResizer, effortToMinutes } from "./features/tasks/taskUtils.jsx";
 import { useDragDrop } from "./features/tasks/useDragDrop.js";
@@ -851,7 +852,7 @@ export default function GTDManager() {
   // Log an email as a receipt to the configured Google Sheet (FR#46)
   const logEmailAsReceipt = useCallback(async (email) => {
     if (!receiptSheetId || !sheetsEnabled || !googleToken) return;
-    const fields = await extractReceiptFields(email, import.meta.env.VITE_ANTHROPIC_API_KEY);
+    const fields = await extractReceiptFields(email);
     const row = [
       fields.date || new Date().toISOString().slice(0, 10),
       fields.vendor || '(unknown)',
@@ -960,14 +961,10 @@ export default function GTDManager() {
     const prompt = `You are a GTD coach. The user just added ${newTaskTitles.length} related tasks to their inbox:\n${taskLines}\n\nExisting projects:\n${projectLines}\n\nDo these tasks belong together as a project? If yes:\n- If an existing project is a strong match, reply with exactly: →GROUP:existing|<project_id>|<project_name>\n- If no good match exists, suggest a concise project name and reply with exactly: →GROUP:new|<project name>\n- If they do NOT belong together as a project, reply with exactly: →GROUP:none\n\nReply with only one line, no other text.`;
 
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const { url: claudeUrl, headers: claudeHeaders } = claudeRequest();
+      const res = await fetch(claudeUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
+        headers: claudeHeaders,
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 80,
@@ -1359,14 +1356,10 @@ export default function GTDManager() {
         { type: 'text', text: `Summarize this medical document ("${item.name}") in plain language. Be concise and focus on key findings, values, or recommendations.` },
       ];
     }
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const { url: claudeUrl, headers: claudeHeaders } = claudeRequest();
+    const res = await fetch(claudeUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers: claudeHeaders,
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,

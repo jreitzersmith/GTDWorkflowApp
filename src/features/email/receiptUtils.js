@@ -1,6 +1,7 @@
 // receiptUtils.js — AI-powered receipt field extraction from email content.
 // extractReceiptFields calls claude-haiku with a structured prompt and returns
 // { vendor, amount, currency, date, category, description }.
+import { claudeRequest } from '../../api/claudeApi.js';
 
 const RECEIPT_EXTRACTION_PROMPT = [
   'You are a receipt parser. Extract financial details from the provided email content.',
@@ -16,9 +17,8 @@ const RECEIPT_EXTRACTION_PROMPT = [
 
 // extractReceiptFields — call Claude haiku to parse financial data from an email.
 // emailDetail: { subject, from, date, body, snippet, id }
-// apiKey: VITE_ANTHROPIC_API_KEY string
 // Returns: { vendor, amount, currency, date, category, description }
-async function extractReceiptFields(emailDetail, apiKey) {
+async function extractReceiptFields(emailDetail) {
   const emailText = [
     `Subject: ${emailDetail.subject || '(no subject)'}`,
     `From: ${emailDetail.from || ''}`,
@@ -27,14 +27,10 @@ async function extractReceiptFields(emailDetail, apiKey) {
     (emailDetail.body || emailDetail.snippet || '').slice(0, 6000),
   ].join('\n');
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const { url: claudeUrl, headers: claudeHeaders } = claudeRequest();
+  const res = await fetch(claudeUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+    headers: claudeHeaders,
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,

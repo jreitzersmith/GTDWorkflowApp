@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { SYSTEM_PROMPTS, OPENWEBUI_URL, COACH_MODES } from '../../constants.jsx';
+import { claudeRequest } from '../../api/claudeApi.js';
 import { TOOLS, doWebSearch } from './webSearch.js';
 import { GMAIL_SEARCH_TOOL, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL,
   GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL,
@@ -469,14 +470,10 @@ function useCallAI({
           const abortTimer = setTimeout(() => abortCtrl.abort(), 90000);
           let res, data;
           try {
-            res = await fetch('https://api.anthropic.com/v1/messages', {
+            const { url: claudeUrl, headers: claudeHeaders } = claudeRequest();
+            res = await fetch(claudeUrl, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true',
-              },
+              headers: claudeHeaders,
               body: JSON.stringify(reqBody),
               signal: abortCtrl.signal,
             });
