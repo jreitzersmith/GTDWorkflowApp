@@ -1,6 +1,6 @@
 ﻿# GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#45** · Code Quality — **CQ#17** · Feature Requests — **FR#201**
+> **Last used numbers:** Known Issues — **Issue#45** · Code Quality — **CQ#18** · Feature Requests — **FR#201**
 
 ---
 
@@ -10,6 +10,7 @@
 
 ## Code quality
 
+- [ ] CQ#18 [GH#237] (2026-07-15) -- Product_Summary/ HTML docs stale since 2026-05-27 (FR#130); ~70 undocumented resolved items (FR#131-FR#201, Issue#34-45); scope/approach deferred, see GH#237
 
 ---
 
