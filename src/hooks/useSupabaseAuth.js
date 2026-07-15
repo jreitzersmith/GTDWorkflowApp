@@ -12,7 +12,10 @@ function useSupabaseAuth() {
 
   const sendMagicLink = useCallback(async () => {
     if (!authEmail.trim()) return;
-    await supabase.auth.signInWithOtp({ email: authEmail.trim() });
+    await supabase.auth.signInWithOtp({
+      email: authEmail.trim(),
+      options: { emailRedirectTo: window.location.origin },
+    });
     setAuthSent(true);
   }, [authEmail]);
 
