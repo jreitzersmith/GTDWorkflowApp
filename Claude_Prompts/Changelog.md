@@ -7,6 +7,7 @@ When an item is resolved, **remove** it from `Backlog.md` and add a full row her
 
 | Date       | Type         | #       | GH#   | Name                                                              | Commit(s)         |
 | 2026-07-14 | Bug Fix | Issue#44 | GH#235 | Anthropic API key exposed in production browser bundle - added src/api/claudeApi.js proxy-routing helper (api.reitzersmith.com + bearer token when VITE_API_BASE_URL set, unchanged direct call for local dev); updated useCallAI.js, App.jsx (2 sites), receiptUtils.js; verified zero sk-ant matches in prod bundle | a4dc522 |
+| 2026-07-14 | Feature | FR#201 | GH#234 | Harden Supabase magic-link redirect - pass explicit emailRedirectTo (window.location.origin) on signInWithOtp so redirect no longer depends solely on static Supabase Site URL (root cause of prior outage); tested pass on local dev and gtd.reitzersmith.com | 288db5e |
 | 2026-06-01 | Bug Fix | Issue#42 | GH#210 | AI subcategory creation — extractAddAction nodeType parser + useCallAI handler + Chat/Process prompt guidance for nodeType:subcategory | 4f6c496 |
 | 2026-05-31 | Feature | FR#175 | GH#206 | Email inbox server-side Gmail search on Enter — doGmailFetchInbox searchQuery param; serverSearchActive state; Enter triggers API call; hint, toolbar result count, ↻/✕ reset | 00063ce |
 | 2026-05-31 | Feature | FR#171 | GH#202 | Contact list row: ✉ email count badge + hover enrichment expansion (open promises, gift ideas, linked tasks, last email date) | 2620897 |
