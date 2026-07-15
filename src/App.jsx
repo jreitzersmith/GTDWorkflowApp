@@ -108,7 +108,7 @@ export default function GTDManager() {
   });
 
   // ── Auth ───────────────────────────────────────────────────────────────
-  const { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink } = useSupabaseAuth();
+  const { authUser, authLoading, authEmail, setAuthEmail, authSent, authError, sendMagicLink } = useSupabaseAuth();
 
   // true when processing was triggered by 'Add & Ask AI' (single-task scope)
   const singleTaskMode = useRef(false);
@@ -1456,6 +1456,7 @@ export default function GTDManager() {
       authEmail={authEmail}
       setAuthEmail={setAuthEmail}
       sendMagicLink={sendMagicLink}
+      authError={authError}
     >
       <div style={s.app} onClick={() => setMoveMenu(null)}>
         <AppSidebar

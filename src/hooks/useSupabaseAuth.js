@@ -9,13 +9,24 @@ function useSupabaseAuth() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authEmail,   setAuthEmail]   = useState('');
   const [authSent,    setAuthSent]    = useState(false);
+  const [authError,   setAuthError]   = useState(null);
 
   const sendMagicLink = useCallback(async () => {
     if (!authEmail.trim()) return;
-    await supabase.auth.signInWithOtp({
+    setAuthError(null);
+    const { error } = await supabase.auth.signInWithOtp({
       email: authEmail.trim(),
       options: { emailRedirectTo: window.location.origin },
     });
+    if (error) {
+      console.error('Supabase signInWithOtp:', error);
+      setAuthError(
+        error.status === 429 || /rate limit/i.test(error.message || '')
+          ? "Too many login link requests \u2014 please wait a bit and try again."
+          : "Couldn't send login link. Please try again."
+      );
+      return;
+    }
     setAuthSent(true);
   }, [authEmail]);
 
@@ -51,7 +62,7 @@ function useSupabaseAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  return { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink };
+  return { authUser, authLoading, authEmail, setAuthEmail, authSent, authError, sendMagicLink };
 }
 
 

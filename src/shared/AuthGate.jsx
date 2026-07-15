@@ -1,7 +1,7 @@
 import PropTypes from "prop-types";
 import { COLORS } from "../constants.jsx";
 
-function AuthGate({ authLoading, authUser, authSent, authEmail, setAuthEmail, sendMagicLink, children }) {
+function AuthGate({ authLoading, authUser, authSent, authEmail, setAuthEmail, sendMagicLink, authError, children }) {
   if (authLoading) return (
     <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center",
                   background: COLORS.bg, color: COLORS.muted,
@@ -43,6 +43,12 @@ function AuthGate({ authLoading, authUser, authSent, authEmail, setAuthEmail, se
                        color: "#111", fontFamily: "inherit", fontSize: 13,
                        fontWeight: 600, cursor: "pointer" }}
             >Send login link</button>
+            {authError && (
+              <div style={{ fontSize: 12, color: "#e57373", padding: "8px 12px",
+                            background: "rgba(229,115,115,0.1)", borderRadius: 8 }}>
+                {authError}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -59,6 +65,7 @@ AuthGate.propTypes = {
   authEmail:     PropTypes.string.isRequired,
   setAuthEmail:  PropTypes.func.isRequired,
   sendMagicLink: PropTypes.func.isRequired,
+  authError:     PropTypes.string,
   children:      PropTypes.node.isRequired,
 };
 
