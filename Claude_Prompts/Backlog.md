@@ -1,6 +1,6 @@
-# GTD Workflow App — Known Issues & Feature Requests
+﻿# GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#200**
+> **Last used numbers:** Known Issues — **Issue#43** · Code Quality — **CQ#17** · Feature Requests — **FR#201**
 
 ---
 
@@ -34,6 +34,7 @@
 
 #### Integrations / data
 
+- FR#201 [GH#234] (2026-07-14) — Harden Supabase magic-link redirect with explicit emailRedirectTo — signInWithOtp() currently has no redirectTo, so redirects depend entirely on the static Supabase Site URL (this caused a real outage: Site URL was stale at localhost:3000, fixed as an emergency config change via the Management API on 2026-07-14). Add options: { emailRedirectTo: window.location.origin } so the redirect is dynamic and correct regardless of origin. High risk (auth flow change) — requires full plan/build/test cycle. See GH#234.
 - FR#190 [GH#223] (2026-06-02) — Health panel: Paperless NGX Phase 2 — deferred until Paperless NGX MCP/connector exists; Phase 1 (AI coach summarization) already implemented
 - FR#185 [GH#218] (2026-06-02) — Android SMS contact tracking — companion app reads device SMS via content://sms/, syncs to new sms_messages Supabase table, surfaces threads in Contacts panel alongside email; deferred to Android app phase. See GH#218 for full architecture, schema, and design decisions.
 - FR#38 [GH#34] (2026-05-09) — Local provider tool support — get_task_context and other tool-use features currently require the Claude provider; extend tool dispatch to work with vllm, llama.cpp, and other OpenAI-compatible local providers when they gain tool-use support
