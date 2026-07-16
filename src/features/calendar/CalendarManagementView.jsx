@@ -9,6 +9,7 @@ import {
 } from "./calendarApi.js";
 import { CalendarNewEventsSection, CalendarPendingTasksSection } from "./CalendarManagementSections.jsx";
 import { CalendarMonthView, CalendarWeekView, CalendarDayView, MONTH_NAMES } from "./CalendarEventDisplay.jsx";
+import { useViewport } from "../../hooks/useViewport.js";
 
 function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, setCalendarTab, tasks, setTasks, calendarEvents, setCalendarEvents, processCalendarEventWithAI, onConnectCalendar, onOpenDetail, selectedTaskId, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, setRecurringAcknowledgedMap, calendarReminderMinutes }) {
   const [loading, setLoading] = useState(false);
@@ -216,12 +217,15 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
     return navDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   };
 
+  const { isPhone } = useViewport();
+
   const tabBtnStyle = (t) => ({
-    padding: '5px 13px', borderRadius: 6, border: `1px solid ${calendarTab === t ? COLORS.calendar : COLORS.border}`,
+    padding: isPhone ? '4px 8px' : '5px 13px', borderRadius: 6, border: `1px solid ${calendarTab === t ? COLORS.calendar : COLORS.border}`,
     background: calendarTab === t ? COLORS.calendar + '22' : 'transparent',
     color: calendarTab === t ? COLORS.calendar : COLORS.text2,
-    fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', fontWeight: calendarTab === t ? 600 : 400,
+    fontFamily: 'inherit', fontSize: isPhone ? 11 : 12, cursor: 'pointer', fontWeight: calendarTab === t ? 600 : 400,
   });
+  const navBtnStyle = { padding: isPhone ? '3px 7px' : '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer' };
 
   // ── Not connected ──
   if (!calendarEnabled) {
@@ -255,27 +259,29 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ padding: '10px 16px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: 15, fontWeight: 300, marginRight: 4 }}>📅 Calendar</div>
-        <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ padding: '10px 16px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', gap: isPhone ? 6 : 10, flexWrap: 'wrap', rowGap: 6 }}>
+        {!isPhone && (
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: 15, fontWeight: 300, marginRight: 4 }}>📅 Calendar</div>
+        )}
+        <div style={{ display: 'flex', gap: isPhone ? 3 : 4 }}>
           {['month', 'week', 'day'].map(t => (
             <button key={t} onClick={() => setCalendarTab(t)} style={tabBtnStyle(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
-          <button onClick={navPrev} style={{ padding: '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer' }}>‹</button>
-          <span style={{ fontSize: 13, fontWeight: 500, color: COLORS.text, minWidth: 160, textAlign: 'center' }}>{navLabel()}</span>
-          <button onClick={navNext} style={{ padding: '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text2, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer' }}>›</button>
-          <button onClick={() => { setNavDate(new Date()); }} style={{ padding: '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>Today</button>
-          <button onClick={() => fetchEvents(navDate)} disabled={loading} style={{ padding: '4px 9px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: loading ? COLORS.muted : COLORS.text2, fontFamily: 'inherit', fontSize: 11, cursor: loading ? 'default' : 'pointer' }}>{loading ? '…' : '↺'}</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 4 : 6, marginLeft: 'auto' }}>
+          <button onClick={navPrev} style={navBtnStyle}>‹</button>
+          <span style={{ fontSize: isPhone ? 12 : 13, fontWeight: 500, color: COLORS.text, minWidth: isPhone ? 84 : 160, textAlign: 'center' }}>{navLabel()}</span>
+          <button onClick={navNext} style={navBtnStyle}>›</button>
+          <button onClick={() => { setNavDate(new Date()); }} style={{ ...navBtnStyle, color: COLORS.muted, fontSize: isPhone ? 10 : 11 }}>Today</button>
+          <button onClick={() => fetchEvents(navDate)} disabled={loading} style={{ ...navBtnStyle, color: loading ? COLORS.muted : COLORS.text2, fontSize: isPhone ? 10 : 11, cursor: loading ? 'default' : 'pointer' }}>{loading ? '…' : '↺'}</button>
         </div>
       </div>
 
       {error && <div style={{ padding: '8px 16px', fontSize: 12, color: '#d4845a' }}>⚠ {error}</div>}
 
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {/* Calendar → Tasks: new events without linked tasks */}
         {pendingNewCalendarEvents.length > 0 && (
           <CalendarNewEventsSection
@@ -301,51 +307,54 @@ function CalendarManagementView({ googleToken, calendarEnabled, calendarTab, set
           />
         )}
 
-        {/* Calendar view */}
-        {calendarTab === 'month' && (
-          <CalendarMonthView
-            navDate={navDate}
-            events={calendarEvents}
-            today={today}
-            onDayClick={d => { setNavDate(d); setCalendarTab('day'); }}
-            onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
-            selectedEvent={selectedEvent}
-            onProcessWithAI={processCalendarEventWithAI}
-            onDelete={handleDeleteEvent}
-            onReschedule={handleRescheduleEvent}
-            linkedTasks={linkedTasks}
-            onOpenTask={onOpenDetail}
-          />
-        )}
-        {calendarTab === 'week' && (
-          <CalendarWeekView
-            navDate={navDate}
-            events={calendarEvents}
-            today={today}
-            onDayClick={d => { setNavDate(d); setCalendarTab('day'); }}
-            onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
-            selectedEvent={selectedEvent}
-            onProcessWithAI={processCalendarEventWithAI}
-            onDelete={handleDeleteEvent}
-            onReschedule={handleRescheduleEvent}
-            linkedTasks={linkedTasks}
-            onOpenTask={onOpenDetail}
-          />
-        )}
-        {calendarTab === 'day' && (
-          <CalendarDayView
-            navDate={navDate}
-            events={calendarEvents}
-            today={today}
-            onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
-            selectedEvent={selectedEvent}
-            onProcessWithAI={processCalendarEventWithAI}
-            onDelete={handleDeleteEvent}
-            onReschedule={handleRescheduleEvent}
-            linkedTasks={linkedTasks}
-            onOpenTask={onOpenDetail}
-          />
-        )}
+        {/* Calendar view — flex:1 so it fills whatever vertical space is left (instead of
+            leaving blank space below a short month grid) once the sections above are collapsed */}
+        <div style={{ flex: 1, minHeight: 320, display: 'flex', flexDirection: 'column' }}>
+          {calendarTab === 'month' && (
+            <CalendarMonthView
+              navDate={navDate}
+              events={calendarEvents}
+              today={today}
+              onDayClick={d => { setNavDate(d); setCalendarTab('day'); }}
+              onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
+              selectedEvent={selectedEvent}
+              onProcessWithAI={processCalendarEventWithAI}
+              onDelete={handleDeleteEvent}
+              onReschedule={handleRescheduleEvent}
+              linkedTasks={linkedTasks}
+              onOpenTask={onOpenDetail}
+            />
+          )}
+          {calendarTab === 'week' && (
+            <CalendarWeekView
+              navDate={navDate}
+              events={calendarEvents}
+              today={today}
+              onDayClick={d => { setNavDate(d); setCalendarTab('day'); }}
+              onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
+              selectedEvent={selectedEvent}
+              onProcessWithAI={processCalendarEventWithAI}
+              onDelete={handleDeleteEvent}
+              onReschedule={handleRescheduleEvent}
+              linkedTasks={linkedTasks}
+              onOpenTask={onOpenDetail}
+            />
+          )}
+          {calendarTab === 'day' && (
+            <CalendarDayView
+              navDate={navDate}
+              events={calendarEvents}
+              today={today}
+              onEventClick={ev => setSelectedEvent(selectedEvent?.id === ev.id ? null : ev)}
+              selectedEvent={selectedEvent}
+              onProcessWithAI={processCalendarEventWithAI}
+              onDelete={handleDeleteEvent}
+              onReschedule={handleRescheduleEvent}
+              linkedTasks={linkedTasks}
+              onOpenTask={onOpenDetail}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1493,7 +1493,7 @@ export default function GTDManager() {
         {isMobileViewport && (
           <div style={s.mobileTopBar}>
             <button style={s.hamburgerBtn} onClick={(e) => { e.stopPropagation(); setMobileNavOpen(v => !v); }} aria-label="Open menu">☰</button>
-            <div style={s.mobileTopBarTitle}>{currentView === "gtd" ? (BUCKETS[currentBucket]?.label || "GTD Manager") : "GTD Manager"}</div>
+            <div style={s.mobileTopBarTitle}>{currentView === "gtd" ? (BUCKETS[currentBucket]?.label || "GTD Manager") : currentView === "calendar" ? "Calendar" : "GTD Manager"}</div>
           </div>
         )}
         {isMobileViewport && mobileNavOpen && (

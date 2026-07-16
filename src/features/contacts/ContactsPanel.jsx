@@ -6,6 +6,7 @@ import { useState, useMemo } from 'react';
 import { COLORS } from '../../constants.jsx';
 import { ContactDetail } from './ContactDetail.jsx';
 import { contactInitials, contactPrimaryEmail } from './contactsUtils.js';
+import { useViewport } from '../../hooks/useViewport.js';
 
 const CONTACT_COLOR = '#4db6ac';
 
@@ -53,6 +54,7 @@ function ContactsPanel({
   // FR#176: inbox sender indicator
   inboxSenderEmails,
 }) {
+  const { isPhone } = useViewport();
   const [searchText,      setSearchText]      = useState('');
   const [activeTagFilter, setActiveTagFilter] = useState(null);
 
@@ -101,10 +103,53 @@ function ContactsPanel({
     );
   }
 
+  // Phone: show the list full-width OR the detail full-width, never both side by side —
+  // there isn't room for a two-pane layout at that width. Tablet/desktop keep the original
+  // sidebar + detail split.
+  if (isPhone && selectedContact) {
+    return (
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <ContactDetail
+          contact={selectedContact}
+          allContactTags={allTags}
+          onBack={() => setSelectedContactId(null)}
+          updateStandardFields={updateStandardFields}
+          updateCustomFields={updateCustomFields}
+          addPromise={addPromise}
+          togglePromiseDone={togglePromiseDone}
+          linkPromiseToTask={linkPromiseToTask}
+          deletePromise={deletePromise}
+          addLike={addLike}
+          deleteLike={deleteLike}
+          addDislike={addDislike}
+          deleteDislike={deleteDislike}
+          addGiftIdea={addGiftIdea}
+          toggleGiftGiven={toggleGiftGiven}
+          deleteGiftIdea={deleteGiftIdea}
+          tasks={tasks}
+          createInboxTask={createInboxTask}
+          onNavigateToTask={onNavigateToTask}
+          markTaskDone={markTaskDone}
+          linkGiftToTask={linkGiftToTask}
+          allContacts={contacts}
+          mergeOrphanIntoContact={mergeOrphanIntoContact}
+          deleteOrphanContact={deleteOrphanContact}
+          contactRelationshipTags={contactRelationshipTags}
+          setContactRelationshipTags={setContactRelationshipTags}
+          contactLikesCategories={contactLikesCategories}
+          addDriveAttachment={addDriveAttachment}
+          removeDriveAttachment={removeDriveAttachment}
+          googleToken={googleToken}
+          driveEnabled={driveEnabled}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-      {/* ── Left column: contact list ── */}
-      <div style={{ width: 280, flexShrink: 0, borderRight: `1px solid ${COLORS.border}`, display: 'flex', flexDirection: 'column', background: COLORS.surface }}>
+      {/* ── Left column: contact list (full width on phone; fixed sidebar width on tablet/desktop) ── */}
+      <div style={{ width: isPhone ? '100%' : 280, flexShrink: 0, borderRight: isPhone ? 'none' : `1px solid ${COLORS.border}`, display: 'flex', flexDirection: 'column', background: COLORS.surface }}>
 
         {/* Header */}
         <div style={{ padding: '12px 14px 8px', borderBottom: `1px solid ${COLORS.border}` }}>
@@ -218,7 +263,8 @@ function ContactsPanel({
         </div>
       </div>
 
-      {/* ── Right area: detail ── */}
+      {/* ── Right area: detail (tablet/desktop only — phone renders its own full-width
+          branch above and returns early before reaching this two-column layout) ── */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {selectedContact ? (
           <ContactDetail

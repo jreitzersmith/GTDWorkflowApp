@@ -18,6 +18,7 @@ const DISLIKE_CATEGORIES = ['Food', 'Hobbies', 'Music', 'Sport', 'Film/TV', 'Boo
 function ContactDetail({
   contact,
   allContactTags,
+  onBack,
   updateStandardFields,
   updateCustomFields,
   addPromise,
@@ -57,6 +58,7 @@ function ContactDetail({
       <ContactHeader
         contact={contact}
         initials={initials}
+        onBack={onBack}
         onSaveStandard={(fields) => updateStandardFields(contact.id, fields)}
       />
 
@@ -162,7 +164,7 @@ function ContactDetail({
 
 // ── Contact header ────────────────────────────────────────────────────────────
 
-function ContactHeader({ contact, initials, onSaveStandard }) {
+function ContactHeader({ contact, initials, onBack, onSaveStandard }) {
   const [editingName, setEditingName]    = useState(false);
   const [givenName,   setGivenName]      = useState(contact.givenName);
   const [familyName,  setFamilyName]     = useState(contact.familyName);
@@ -189,6 +191,13 @@ function ContactHeader({ contact, initials, onSaveStandard }) {
 
   return (
     <div style={{ padding: '16px 20px 12px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'flex-start', gap: 14, background: COLORS.surface }}>
+      {onBack && (
+        <button
+          onClick={onBack}
+          title="Back to contact list"
+          style={{ background: 'none', border: 'none', color: COLORS.text2, fontSize: 20, cursor: 'pointer', width: 32, height: 32, flexShrink: 0, lineHeight: 1, marginTop: 2 }}
+        >‹</button>
+      )}
       <Avatar initials={initials} photoUrl={contact.photoUrl} size={52} />
       <div style={{ flex: 1, minWidth: 0 }}>
         {editingName ? (
