@@ -528,7 +528,7 @@ SlidesGenerator.propTypes = {
 
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
-function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, slidesEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style, contactName, contacts, onNavigateToContact }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, slidesEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style, isMobile, contactName, contacts, onNavigateToContact }) {
   const {
     titleDraft, setTitleDraft, saveTitle,
     notesDraft, setNotesDraft, saveNotes,
@@ -555,7 +555,9 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
         <button
           onClick={onClose}
           title="Close (Esc)"
-          style={{ background: "none", border: "none", color: COLORS.muted, fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+          style={isMobile
+            ? { background: "none", border: "none", color: COLORS.muted, fontSize: 22, cursor: "pointer", width: 44, height: 44, lineHeight: 1 }
+            : { background: "none", border: "none", color: COLORS.muted, fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
         >×</button>
       </div>
 
@@ -921,6 +923,7 @@ TaskDetailPanel.propTypes = {
   onSkipRecurrence:  PropTypes.func,
   onClose:           PropTypes.func.isRequired,
   style:             PropTypes.object,
+  isMobile:          PropTypes.bool,
   contactName:       PropTypes.string,
   contacts:          PropTypes.array,
   onNavigateToContact: PropTypes.func,

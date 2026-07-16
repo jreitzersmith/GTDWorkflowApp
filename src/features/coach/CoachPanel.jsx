@@ -89,7 +89,7 @@ function CoachPanel({
   return (
     <div style={{ height: coachHeight, display: "flex", flexDirection: "column", flexShrink: 0 }}>
       {/* Header: label + provider selector + mode tabs */}
-      <div style={{ padding: "8px 14px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+      <div style={{ padding: "8px 14px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, rowGap: 6, flexShrink: 0 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.06em", textTransform: "uppercase" }}>🤖 {coachName || 'AI Coach'}</span>
         <ProviderSelector
           provider={provider} setProvider={setProvider}
@@ -291,7 +291,7 @@ function CoachPanel({
 }
 
 CoachPanel.propTypes = {
-  coachHeight:            PropTypes.number.isRequired,
+  coachHeight:            PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
   coachMode:              PropTypes.string.isRequired,
   messages:               PropTypes.array.isRequired,
   loading:                PropTypes.bool.isRequired,

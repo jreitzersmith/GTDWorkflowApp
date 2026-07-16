@@ -36,6 +36,7 @@ import { extractReceiptFields } from './features/email/receiptUtils.js';
 import { todayStr, isDeferred, buildNextOccurrence, extractSuggestions, extractMetadata, getOrderedChildren, useResizer, effortToMinutes } from "./features/tasks/taskUtils.jsx";
 import { useDragDrop } from "./features/tasks/useDragDrop.js";
 import { useSupabaseSync } from "./hooks/useSupabaseSync.js";
+import { useViewport } from "./hooks/useViewport.js";
 import { useCallAI } from "./features/coach/useCallAI.js";
 import { useInboxProcessing } from "./features/tasks/useInboxProcessing.js";
 import { useTaskCrud } from "./features/tasks/useTaskCrud.js";
@@ -146,6 +147,14 @@ export default function GTDManager() {
   const [coachHeight,  coachDragDown]         = useResizer("gtd_coach_h",       Math.round(window.innerHeight * 0.42), { min: 80,  max: 650, direction: 'v', sign: -1 });
   const [detailWidth,  detailDragDown]        = useResizer("gtd_detail_w",      360,                                   { min: 240, max: 600, direction: 'h', sign: -1 });
   const [chatInputHeight, chatInputDragDown]  = useResizer("gtd_chat_input_h",  60,                                    { min: 36,  max: 300, direction: 'v', sign: -1 });
+
+  const viewport = useViewport();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Phone (not tablet/desktop) splits Task list and AI Coach into separate tabs instead of
+  // a stacked, height-capped layout — there just isn't enough vertical room on a phone for
+  // both to be usable at once. Tablet and desktop are untouched.
+  const [mobileTab, setMobileTab] = useState('tasks');
+  useEffect(() => { setMobileNavOpen(false); }, [currentBucket, currentView]);
 
 
 
@@ -1403,14 +1412,36 @@ export default function GTDManager() {
     return tasks.find(t => isDeferred(t) && !t.done && words.some(w => t.text.toLowerCase().includes(w))) || null;
   })();
 
+  const isMobileViewport = viewport.breakpoint !== "desktop";
+  const isPhoneLayout = viewport.isPhone; // orientation-aware — also true for phone landscape
   const s = {
-    app:         { display: "flex", height: "100vh", background: COLORS.bg, color: COLORS.text, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif", fontSize: 14, overflow: "hidden" },
+    app:         { display: "flex", flexDirection: isMobileViewport ? "column" : "row", background: COLORS.bg, color: COLORS.text, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif", fontSize: 14, overflow: "hidden" },
     main:        { flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" },
     mainLeft:    { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
-    taskRow:     { flex: 1, display: "flex", overflow: "hidden" },
+    taskRow:     { flex: 1, display: (isPhoneLayout && mobileTab !== 'tasks') ? "none" : "flex", overflow: "hidden", minHeight: 0 },
     taskPanel:   { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
-    detailPanel: { width: detailWidth, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" },
+    mobileTabBar: { display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 },
+    mobileTabBtn: (active) => ({ flex: 1, padding: "10px", background: active ? COLORS.surface2 : "transparent", border: "none", borderBottom: `2px solid ${active ? COLORS.next : "transparent"}`, color: active ? COLORS.text : COLORS.text2, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }),
+    coachTabWrap: { display: isPhoneLayout ? (mobileTab === 'coach' ? "flex" : "none") : "contents", flexDirection: "column", flex: isPhoneLayout && mobileTab === 'coach' ? 1 : undefined, overflow: "hidden", minHeight: 0 },
+    detailPanel: isMobileViewport
+      ? { position: "fixed", top: 0, right: 0, bottom: 0, width: viewport.isPhone ? "100%" : "min(480px, 88vw)", zIndex: 1001, display: "flex", flexDirection: "column", overflow: "hidden", background: COLORS.surface, boxShadow: "-2px 0 16px rgba(0,0,0,0.4)" }
+      : { width: detailWidth, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" },
+    detailBackdrop: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000 },
+    mobileTopBar: { display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.surface, flexShrink: 0 },
+    hamburgerBtn: { width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, background: "transparent", border: "none", color: COLORS.text, cursor: "pointer", borderRadius: 8, flexShrink: 0 },
+    mobileTopBarTitle: { fontSize: 15, fontWeight: 600, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+    mobileNavBackdrop: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 999 },
   };
+  // coachHeight is a fixed px value persisted from whatever screen it was last resized on —
+  // cap it to a viewport-relative max on phone/tablet so it can't crowd out the task list.
+  // Use a real computed number (not a CSS min()/vh string) so the message list's flex:1
+  // scroll region gets a definite height — CSS min() here was breaking independent
+  // scroll of the coach conversation on some mobile browsers.
+  const effectiveCoachHeight = (isPhoneLayout && mobileTab === 'coach')
+    ? "100%"
+    : isMobileViewport
+      ? Math.min(coachHeight, Math.round(viewport.height * 0.32))
+      : coachHeight;
 
   // ── Context values ─────────────────────────────────────────────────────
   const taskActionsValue = {
@@ -1458,7 +1489,16 @@ export default function GTDManager() {
       sendMagicLink={sendMagicLink}
       authError={authError}
     >
-      <div style={s.app} onClick={() => setMoveMenu(null)}>
+      <div className="app-shell-height" style={s.app} onClick={() => setMoveMenu(null)}>
+        {isMobileViewport && (
+          <div style={s.mobileTopBar}>
+            <button style={s.hamburgerBtn} onClick={(e) => { e.stopPropagation(); setMobileNavOpen(v => !v); }} aria-label="Open menu">☰</button>
+            <div style={s.mobileTopBarTitle}>{currentView === "gtd" ? (BUCKETS[currentBucket]?.label || "GTD Manager") : "GTD Manager"}</div>
+          </div>
+        )}
+        {isMobileViewport && mobileNavOpen && (
+          <div style={s.mobileNavBackdrop} onClick={() => setMobileNavOpen(false)} />
+        )}
         <AppSidebar
           sidebarWidth={sidebarWidth}
           supabaseReady={supabaseReady}
@@ -1485,6 +1525,9 @@ export default function GTDManager() {
           onWeeklyReview={startWeeklyReview}
           onBrainDump={startBrainDump}
           onOpenSearch={() => setSearchOpen(true)}
+          isMobile={isMobileViewport}
+          mobileNavOpen={mobileNavOpen}
+          onCloseMobileNav={() => setMobileNavOpen(false)}
         />
         {searchOpen && (
           <SearchModal
@@ -1495,10 +1538,16 @@ export default function GTDManager() {
             shortcutModifier={shortcutModifier}
           />
         )}
-        <ResizeHandle onMouseDown={sidebarDragDown} direction="h" />
+        {!isMobileViewport && <ResizeHandle onMouseDown={sidebarDragDown} direction="h" />}
 
         <div style={s.main}>
           <div style={s.mainLeft}>
+            {isPhoneLayout && (
+              <div style={s.mobileTabBar}>
+                <button onClick={() => setMobileTab('tasks')} style={s.mobileTabBtn(mobileTab === 'tasks')}>📋 Tasks</button>
+                <button onClick={() => setMobileTab('coach')} style={s.mobileTabBtn(mobileTab === 'coach')}>🤖 Coach</button>
+              </div>
+            )}
             <div style={s.taskRow}>
               <ErrorBoundary label="Task Panel">
                 <TaskActionsContext.Provider value={taskActionsValue}>
@@ -1810,10 +1859,11 @@ export default function GTDManager() {
                 </TaskActionsContext.Provider>
               </ErrorBoundary>
             </div>
-            <ResizeHandle onMouseDown={coachDragDown} direction="v" />
+            <div style={s.coachTabWrap}>
+            {!isMobileViewport && <ResizeHandle onMouseDown={coachDragDown} direction="v" />}
             <ErrorBoundary label="AI Coach">
               <CoachPanel
-                coachHeight={coachHeight}
+                coachHeight={effectiveCoachHeight}
                 coachMode={coachMode}
                 messages={messages}
                 loading={loading}
@@ -1899,6 +1949,7 @@ export default function GTDManager() {
                 userName={userName}
               />
             </ErrorBoundary>
+            </div>
           </div>
 
           <ErrorBoundary label="Task Detail">
@@ -1906,7 +1957,8 @@ export default function GTDManager() {
               const selTask = tasks.find(t => t.id === selectedTaskId);
               return selTask ? (
                 <>
-                  <ResizeHandle onMouseDown={detailDragDown} direction="h" />
+                  {isMobileViewport && <div style={s.detailBackdrop} onClick={() => setSelectedTaskId(null)} />}
+                  {!isMobileViewport && <ResizeHandle onMouseDown={detailDragDown} direction="h" />}
                   <TaskDetailPanel
                     task={selTask}
                     allTasks={tasks}
@@ -1924,6 +1976,7 @@ export default function GTDManager() {
                     onSkipRecurrence={(id) => { skipRecurrence(id); setSelectedTaskId(null); }}
                     onClose={() => setSelectedTaskId(null)}
                     style={s.detailPanel}
+                    isMobile={isMobileViewport}
                     contactName={selTask.contactId ? (contacts.find(c => c.id === selTask.contactId)?.displayName || null) : null}
                     contacts={contacts}
                     onNavigateToContact={(contactId) => { setCurrentView('contacts'); setSelectedContactId(contactId); }}

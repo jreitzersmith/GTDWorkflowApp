@@ -1,6 +1,6 @@
 ﻿# GTD Workflow App — Known Issues & Feature Requests
 
-> **Last used numbers:** Known Issues — **Issue#45** · Code Quality — **CQ#18** · Feature Requests — **FR#201**
+> **Last used numbers:** Known Issues — **Issue#48** · Code Quality — **CQ#19** · Feature Requests — **FR#205**
 
 ---
 
@@ -11,6 +11,7 @@
 ## Code quality
 
 - [ ] CQ#18 [GH#237] (2026-07-15) -- Product_Summary/ HTML docs stale since 2026-05-27 (FR#130); ~70 undocumented resolved items (FR#131-FR#201, Issue#34-45); scope/approach deferred, see GH#237
+- [ ] CQ#19 [GH#245] (2026-07-16) -- Monitor useViewport performance -- called per-row/per-tree-node in TaskRow.jsx and TaskListHelpers.jsx (ProjectTree/ArchivedTree/DropLine), each with its own matchMedia/resize listeners; no known problem today, watch as task lists grow, see GH#245
 
 ---
 
@@ -52,6 +53,10 @@
 
 #### Platform / reach
 
+- [ ] FR#203 [GH#239] (2026-07-15) — Mobile: touch-compatible drag-and-drop row reordering — native HTML5 DnD has no touch support; drag handle hidden on phone/tablet as interim step; needs pointer-events-based reimplementation with long-press, auto-scroll, drop-target detection, see GH#239
+
+- [ ] FR#202 [GH#238] (2026-07-15) — Mobile: collapse/toggle Coach panel on phone/tablet — height-cap quick fix landed in Phase 1 (min(coachHeight, 32vh)); full redesign (default collapsed, toggle, mode reconsideration) deferred, see GH#238
+
 - [ ] FR#91 [GH#96] (2026-05-15) — Replace magic link auth with Google OAuth (Supabase Google provider) — eliminates OTP rate limits and expiry issues; one-click login for all users; evaluate unifying with existing Google API scope grant
 - [ ] FR#92 [GH#97] (2026-05-15) — Self-service account management — delete account + export data in Settings; GDPR/CCPA compliance prerequisite; depends on FR#91
 - [ ] FR#93 [GH#98] (2026-05-15) — Admin panel for user management — list/ban/delete users, usage metrics, impersonation; Supabase Dashboard is sufficient until user count demands it
@@ -83,3 +88,4 @@ Test cases that could not be executed during their cycle due to a missing condit
 - [FR#196 GH#229] Energy ecology panel: empty drain or regenerate field shows "—" placeholder — needs an energy entry with only one of drain/regenerate filled
 - [FR#198 GH#231] Score vs throughput: empty state shows "Start logging habits and completing tasks…" — needs a state with zero habits logged and zero completed tasks with completedDate
 - [FR#198 GH#231] Score vs throughput: legend note "No task completion dates logged yet" visible when tasks lack completedDate — needs tasks with done=true but no completedDate set
+- [FR#205 GH#244] On-screen keyboard behavior on coach chat input / add-task input / detail-panel fields on real mobile Chrome -- needs production deployment (dev site unreachable from phone)

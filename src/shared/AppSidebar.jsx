@@ -28,9 +28,22 @@ function AppSidebar({
   onWeeklyReview,
   onBrainDump,
   onOpenSearch,
+  isMobile,
+  mobileNavOpen,
+  onCloseMobileNav,
 }) {
+  const mobileStyle = isMobile ? {
+    position: "fixed", top: 0, left: 0, bottom: 0, width: 280, zIndex: 1000,
+    transform: mobileNavOpen ? "translateX(0)" : "translateX(-100%)",
+    transition: "transform 0.2s ease",
+    boxShadow: mobileNavOpen ? "2px 0 12px rgba(0,0,0,0.4)" : "none",
+  } : { width: sidebarWidth, flexShrink: 0 };
+
   return (
-    <div style={{ width: sidebarWidth, background: COLORS.surface, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+    <div
+      style={{ ...mobileStyle, background: COLORS.surface, display: "flex", flexDirection: "column" }}
+      onClickCapture={() => { if (isMobile) onCloseMobileNav?.(); }}
+    >
       <div style={{ padding: "18px 16px 14px", borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 300, fontStyle: "italic", color: COLORS.text }}>
@@ -220,6 +233,9 @@ AppSidebar.propTypes = {
   onWeeklyReview:  PropTypes.func.isRequired,
   onBrainDump:     PropTypes.func.isRequired,
   onOpenSearch:    PropTypes.func.isRequired,
+  isMobile:         PropTypes.bool,
+  mobileNavOpen:    PropTypes.bool,
+  onCloseMobileNav: PropTypes.func,
 };
 
 export { AppSidebar };

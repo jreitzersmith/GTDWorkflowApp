@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { COLORS } from "../../constants.jsx";
+import { useViewport } from "../../hooks/useViewport.js";
 import { effortToMinutes } from "./taskUtils.jsx";
 import { buildFocusViewExportContent, buildFocusViewJsonExport, buildRtfContent, stripMarkdown, saveToDrive, downloadText } from "../coach/exportUtils.js";
 
@@ -19,6 +20,7 @@ const FOCUS_INCLUDE_OPTIONS = [
 
 // tiers: [{ label, tasks }] — only the sections visible in the view
 function FocusExportPopover({ tiers, googleToken, docsEnabled, driveConversationExportFolderId }) {
+  const { isPhone } = useViewport();
   const [open, setOpen]       = useState(false);
   const [fmt, setFmt]         = useState('rtf');
   const [include, setInclude] = useState({ header: true, metadata: true, notes: false });
@@ -80,7 +82,7 @@ function FocusExportPopover({ tiers, googleToken, docsEnabled, driveConversation
       </button>
       {open && (
         <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: COLORS.surface2,
-          border: '1px solid ' + COLORS.border2, borderRadius: 8, padding: 14, zIndex: 60, width: 240,
+          border: '1px solid ' + COLORS.border2, borderRadius: 8, padding: 14, zIndex: 60, width: isPhone ? 'min(240px, calc(100vw - 32px))' : 240,
           boxShadow: '0 4px 16px rgba(0,0,0,0.35)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 10 }}>Export today's focus</div>
           <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 6 }}>Format</div>

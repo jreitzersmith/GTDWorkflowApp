@@ -1,5 +1,6 @@
-import { useContext } from "react";
+import { useContext, useState, useRef, useEffect } from "react";
 import { useTaskRowState } from "./useTaskRowState.js";
+import { useViewport } from "../../hooks/useViewport.js";
 import PropTypes from "prop-types";
 import { COLORS, BUCKETS } from "../../constants.jsx";
 import { TaskActionsContext, TaskRowContext, taskShape } from "../../contexts.js";
@@ -13,7 +14,27 @@ import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
 const PRIORITIES = ["Imperative", "As Possible", "Financial", "External"];
 
 function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelected }) {
-  const { onComplete, onDelete, onMove, onAskAI, onUpdateTask, onAssignToProject, onSkipRecurrence, onNavigate, onOpenDetail, onToggleCollapse, onToggleCollapseLevel } = useContext(TaskActionsContext);
+  const { isTouch, breakpoint, isPhone } = useViewport();
+  const isMobileLayout = breakpoint !== 'desktop';
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const actionsMenuRef = useRef(null);
+  useEffect(() => {
+    if (!actionsMenuOpen) return;
+    const handleOutside = e => {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(e.target)) {
+        setActionsMenuOpen(false);
+      }
+    };
+    // touchstart alongside mousedown — mousedown alone doesn't reliably fire for
+    // real touch taps on phone/tablet (unlike DevTools touch emulation).
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [actionsMenuOpen]);
+  const { onComplete, onDelete, onMove, onAskAI, onUpdateTask, onAssignToProject, onSkipRecurrence, onNavigate, onOpenDetail, onToggleCollapse } = useContext(TaskActionsContext);
   const { currentBucket, allTasks, moveMenu, setMoveMenu, pendingAction, collapsedNodes, selectedTaskId, focusedTaskId, setFocusedTaskId, locations, efforts, tagDisplay, categories } = useContext(TaskRowContext);
   const {
     hover, setHover,
@@ -36,31 +57,62 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
   // Collapse toggle — only relevant in the project view for tasks that have children.
   const childIds = task.childIds || [];
   const hasChildren = currentBucket === "project" && childIds.length > 0;
-  // Root projects (depth=0): collapsed when the project's own ID is in collapsedNodes
-  // ("projects only" mode) OR when all direct children are collapsed ("next level" mode).
-  // Subtasks (depth>0): collapsed when the task's own ID is in collapsedNodes.
-  const isCollapsed = hasChildren && (
-    depth === 0
-      ? !!(collapsedNodes?.has(task.id)) || childIds.every(cid => collapsedNodes?.has(cid))
-      : !!(collapsedNodes?.has(task.id))
-  );
+  // Collapsed when the task's own ID is in collapsedNodes — same rule at every depth,
+  // including root categories/projects, so the row's own chevron always just hides/shows
+  // its direct+nested children. The old root-only "collapse to next level" two-step mode
+  // is still reachable via the Sort menu's "Show Categories Only" / "Show SubCategories"
+  // bulk actions in TaskBucketView, via onToggleCollapseLevel.
+  const isCollapsed = hasChildren && !!(collapsedNodes?.has(task.id));
   const handleCollapseToggle = (e) => {
     e.stopPropagation();
     if (!hasChildren) return;
-    if (depth === 0) {
-      if (collapsedNodes?.has(task.id)) {
-        // "Projects only" state — clicking expands fully (removes the project's own ID).
-        onToggleCollapse?.(task.id);
-      } else {
-        // Expanded or "next level" state — toggle direct children.
-        onToggleCollapseLevel?.(childIds);
-      }
-    } else {
-      onToggleCollapse?.(task.id);
-    }
+    onToggleCollapse?.(task.id);
   };
 
   const isContainer = task.nodeType === 'category' || task.nodeType === 'subcategory';
+
+  // Mobile: the status dot is removed to save row width — completing a task is done via
+  // press-and-hold on the title/tags area instead. Cancelled if the finger moves (scroll)
+  // or lifts early, so it never fires accidentally during a normal tap or scroll.
+  const [isPressingComplete, setIsPressingComplete] = useState(false);
+  const pressTimerRef = useRef(null);
+  const pressStartRef = useRef(null);
+  const longPressFiredRef = useRef(false);
+  const LONG_PRESS_MS = 550;
+  const PRESS_MOVE_CANCEL_PX = 10;
+
+  const clearPressTimer = () => {
+    setIsPressingComplete(false);
+    pressStartRef.current = null;
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+  useEffect(() => () => { if (pressTimerRef.current) clearTimeout(pressTimerRef.current); }, []);
+
+  const handlePressStart = (e) => {
+    if (!isMobileLayout || isContainer) return;
+    const touch = e.touches?.[0];
+    if (!touch) return;
+    pressStartRef.current = { x: touch.clientX, y: touch.clientY };
+    setIsPressingComplete(true);
+    pressTimerRef.current = setTimeout(() => {
+      pressTimerRef.current = null;
+      setIsPressingComplete(false);
+      longPressFiredRef.current = true;
+      if (navigator.vibrate) navigator.vibrate(15);
+      onComplete(task.id);
+    }, LONG_PRESS_MS);
+  };
+  const handlePressMove = (e) => {
+    if (!pressStartRef.current) return;
+    const touch = e.touches?.[0];
+    if (!touch) return;
+    const dx = Math.abs(touch.clientX - pressStartRef.current.x);
+    const dy = Math.abs(touch.clientY - pressStartRef.current.y);
+    if (dx > PRESS_MOVE_CANCEL_PX || dy > PRESS_MOVE_CANCEL_PX) clearPressTimer();
+  };
 
   // FR#122: Bucket aging — show age badge in waiting/someday/deferred views
   const AGING_BUCKETS = ['waiting', 'someday', 'deferred'];
@@ -156,16 +208,18 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
             style={{ marginTop: 3 }}
           />
         )}
-        {isSubtask && <span style={{ color: COLORS.project, fontSize: 10, marginTop: 3, flexShrink: 0 }}>↳</span>}
-        {currentBucket === "project" && (
+        {/* Drag handle always comes first — consistent column position regardless of subtask depth.
+            Hidden on touch: native HTML5 drag-and-drop has no touch support (see FR#203/GH#239). */}
+        {currentBucket === "project" && !isTouch && (
           <span style={{ color: COLORS.muted, fontSize: 12, marginTop: 1, flexShrink: 0, cursor: "grab", userSelect: "none", opacity: hover ? 0.6 : 0, transition: "opacity 0.1s", lineHeight: 1 }}>⠿</span>
         )}
+        {isSubtask && <span style={{ color: COLORS.project, fontSize: 10, marginTop: 3, flexShrink: 0 }}>↳</span>}
         {/* Collapse / expand toggle — shown only for tasks with children in the project view */}
         {hasChildren && (
           <button
             onClick={handleCollapseToggle}
             title={isCollapsed ? "Expand" : "Collapse"}
-            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: COLORS.project, fontSize: 11, flexShrink: 0, marginTop: 2, lineHeight: 1, opacity: hover ? 1 : 0.45, transition: "opacity 0.1s", width: 14, textAlign: "center" }}
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: COLORS.project, fontSize: isTouch ? 15 : 11, flexShrink: 0, marginTop: isTouch ? -3 : 2, lineHeight: 1, opacity: (hover || isTouch) ? 1 : 0.45, transition: "opacity 0.1s", width: isTouch ? 24 : 14, height: isTouch ? 24 : "auto", textAlign: "center" }}
           >
             {isCollapsed ? "▸" : "▾"}
           </button>
@@ -174,18 +228,46 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
         {!hasChildren && currentBucket === "project" && (
           <span style={{ width: 14, flexShrink: 0 }} />
         )}
-        {isContainer ? (
-          <span style={{ width: 15, height: 15, flexShrink: 0, marginTop: 2 }} />
-        ) : (
-          <div
-            onClick={() => onComplete(task.id)}
-            style={{ width: 15, height: 15, borderRadius: "50%", border: `1.5px solid ${task.done ? COLORS.next : COLORS.border2}`, background: task.done ? COLORS.next : "transparent", flexShrink: 0, marginTop: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#111", transition: "all 0.15s" }}
-          >
-            {task.done ? "✓" : ""}
-          </div>
+        {/* Status dot — desktop only. On mobile it's removed to save row width;
+            completing a task is done via press-and-hold on the title/tags area instead. */}
+        {!isMobileLayout && (
+          isContainer ? (
+            <span style={{ width: 15, height: 15, flexShrink: 0, marginTop: 2 }} />
+          ) : (
+            <div
+              onClick={() => onComplete(task.id)}
+              style={{ width: 15, height: 15, borderRadius: "50%", border: `1.5px solid ${task.done ? COLORS.next : COLORS.border2}`, background: task.done ? COLORS.next : "transparent", flexShrink: 0, marginTop: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#111", transition: "all 0.15s" }}
+            >
+              {task.done ? "✓" : ""}
+            </div>
+          )
         )}
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          onTouchStart={handlePressStart}
+          onTouchMove={handlePressMove}
+          onTouchEnd={clearPressTimer}
+          onTouchCancel={clearPressTimer}
+          onClickCapture={e => {
+            // Swallow the browser's synthetic "ghost click" that fires after a long-press
+            // release — otherwise completing the task would also open the detail panel.
+            if (longPressFiredRef.current) {
+              longPressFiredRef.current = false;
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+          title={isMobileLayout && !isContainer ? "Press and hold to mark complete" : undefined}
+          style={{
+            flex: 1, minWidth: 0, display: "grid",
+            gridTemplateColumns: (tagDisplay === "inline" && !expanded && hasMetadata) ? "minmax(0,1fr) minmax(0,42%)" : "minmax(0,1fr)",
+            columnGap: 9, alignItems: "start",
+            background: isPressingComplete ? COLORS.next + "22" : "transparent",
+            borderRadius: 6,
+            transition: isPressingComplete ? `background ${LONG_PRESS_MS}ms ease` : "background 0.15s ease",
+          }}
+        >
+        <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 13.5, color: task.isWaitingFor ? "#c04040" : task.isSomeday ? "#b8960c" : COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
             <span
               onClick={(e) => { e.stopPropagation(); onOpenDetail?.(selectedTaskId === task.id ? null : task.id); }}
@@ -246,7 +328,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
             </div>
           )}
           {/* Parent project link for Next Actions */}
-          {parentProject && currentBucket === "next" && hover && (
+          {parentProject && currentBucket === "next" && (hover || isTouch) && (
             <div
               onClick={() => onNavigate("project")}
               style={{ marginTop: 3, fontSize: 11, color: COLORS.project, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, opacity: 0.85 }}
@@ -258,9 +340,9 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
           )}
         </div>
 
-        {/* Metadata chips — inline mode: sit between text and chevron */}
+        {/* Metadata chips — inline mode: own grid column, wraps independently, never overlaps title */}
         {tagDisplay === "inline" && !expanded && hasMetadata && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, flexShrink: 0, alignSelf: "center" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "flex-end", justifySelf: "end", alignSelf: "start" }}>
             {taskLocation.map(loc => (
               <span key={loc} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.project, border: `1px solid ${COLORS.project}44`, whiteSpace: "nowrap" }}>{loc}</span>
             ))}
@@ -283,51 +365,111 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
             )}
           </div>
         )}
-
-        <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center" }}>
-          {/* Chevron — always visible if has metadata, else on hover */}
-          {(hover || expanded || hasMetadata) && (
-            <button
-              onClick={e => { e.stopPropagation(); setExpanded(x => !x); }}
-              title="Task details"
-              style={{ padding: "2px 5px", borderRadius: 5, border: `1px solid ${expanded ? COLORS.border2 : COLORS.border}`, background: expanded ? COLORS.surface3 : "transparent", color: expanded ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", lineHeight: 1, transition: "all 0.1s" }}
-            >
-              {expanded ? "▾" : "›"}
-            </button>
-          )}
-          {hover && (
-            <>
-              {currentBucket === "inbox" && (
-                <ActionBtn onClick={() => onAskAI(task)} color={COLORS.inbox}>✦ AI</ActionBtn>
-              )}
-              {currentBucket === "next" && !task.parentId && onAssignToProject && (
-                <ActionBtn onClick={() => setShowAssign(x => !x)} color={showAssign ? COLORS.project : undefined}>📁</ActionBtn>
-              )}
-              {task.recurrence && onSkipRecurrence && (
-                <ActionBtn onClick={() => onSkipRecurrence(task.id)} color={COLORS.deferred} title="Skip — advance schedule without completing">↻ Skip</ActionBtn>
-              )}
-              <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-                <ActionBtn onClick={() => setMoveMenu(moveMenu === task.id ? null : task.id)}>Move ▾</ActionBtn>
-                {moveMenu === task.id && (
-                  <div style={{ position: "absolute", right: 0, top: "100%", background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 8, padding: 4, zIndex: 100, minWidth: 150, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
-                    {Object.entries(BUCKETS).filter(([k]) => k !== currentBucket && k !== "done" && k !== "inboxHistory").map(([k, cfg]) => (
-                      <div
-                        key={k}
-                        onClick={() => onMove(task.id, k)}
-                        style={{ padding: "7px 10px", borderRadius: 5, fontSize: 12, cursor: "pointer", color: COLORS.text2, display: "flex", alignItems: "center", gap: 7 }}
-                        onMouseEnter={e => e.currentTarget.style.background = COLORS.surface2}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                      >
-                        <span style={{ color: cfg.color }}>●</span> {cfg.label}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <ActionBtn onClick={() => onDelete(task.id)} color="#d45a5a">✕</ActionBtn>
-            </>
-          )}
         </div>
+
+        {isMobileLayout ? (
+          <div ref={actionsMenuRef} style={{ position: "relative", flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setActionsMenuOpen(o => !o)}
+              title="Actions"
+              style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: actionsMenuOpen ? COLORS.surface3 : "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 6, color: COLORS.text2, fontSize: 16, cursor: "pointer", lineHeight: 1 }}
+            >⋮</button>
+            {actionsMenuOpen && (
+              <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 8, padding: 4, zIndex: 100, minWidth: 180, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", display: "flex", flexDirection: "column" }}>
+                <button
+                  onClick={() => { setExpanded(x => !x); setActionsMenuOpen(false); }}
+                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "9px 10px", background: "none", border: "none", color: COLORS.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer", borderRadius: 5 }}
+                >{expanded ? "▾" : "›"} Task details</button>
+                {currentBucket === "inbox" && (
+                  <button
+                    onClick={() => { onAskAI(task); setActionsMenuOpen(false); }}
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "9px 10px", background: "none", border: "none", color: COLORS.inbox, fontFamily: "inherit", fontSize: 13, cursor: "pointer", borderRadius: 5 }}
+                  >✦ Ask AI</button>
+                )}
+                {currentBucket === "next" && !task.parentId && onAssignToProject && (
+                  <button
+                    onClick={() => { setShowAssign(x => !x); setActionsMenuOpen(false); }}
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "9px 10px", background: "none", border: "none", color: showAssign ? COLORS.project : COLORS.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer", borderRadius: 5 }}
+                  >📁 Assign to project</button>
+                )}
+                {task.recurrence && onSkipRecurrence && (
+                  <button
+                    onClick={() => { onSkipRecurrence(task.id); setActionsMenuOpen(false); }}
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "9px 10px", background: "none", border: "none", color: COLORS.deferred, fontFamily: "inherit", fontSize: 13, cursor: "pointer", borderRadius: 5 }}
+                  >↻ Skip recurrence</button>
+                )}
+                <div style={{ position: "relative" }}>
+                  <button
+                    onClick={() => setMoveMenu(moveMenu === task.id ? null : task.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "9px 10px", background: "none", border: "none", color: COLORS.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer", borderRadius: 5 }}
+                  >↪ Move to…</button>
+                  {moveMenu === task.id && (
+                    <div style={{ position: "absolute", left: isPhone ? 0 : "auto", right: isPhone ? "auto" : "100%", top: isPhone ? "100%" : 0, marginTop: isPhone ? 4 : 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 8, padding: 4, zIndex: 101, minWidth: 150, maxWidth: isPhone ? "calc(100vw - 64px)" : "none", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+                      {Object.entries(BUCKETS).filter(([k]) => k !== currentBucket && k !== "done" && k !== "inboxHistory").map(([k, cfg]) => (
+                        <div
+                          key={k}
+                          onClick={() => { onMove(task.id, k); setMoveMenu(null); setActionsMenuOpen(false); }}
+                          style={{ padding: "9px 10px", borderRadius: 5, fontSize: 13, cursor: "pointer", color: COLORS.text2, display: "flex", alignItems: "center", gap: 7 }}
+                        >
+                          <span style={{ color: cfg.color }}>●</span> {cfg.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => { onDelete(task.id); setActionsMenuOpen(false); }}
+                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "9px 10px", background: "none", border: "none", color: "#d45a5a", fontFamily: "inherit", fontSize: 13, cursor: "pointer", borderRadius: 5 }}
+                >✕ Delete</button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center" }}>
+            {/* Chevron — always visible if has metadata, else on hover */}
+            {(hover || expanded || hasMetadata) && (
+              <button
+                onClick={e => { e.stopPropagation(); setExpanded(x => !x); }}
+                title="Task details"
+                style={{ padding: "2px 5px", borderRadius: 5, border: `1px solid ${expanded ? COLORS.border2 : COLORS.border}`, background: expanded ? COLORS.surface3 : "transparent", color: expanded ? COLORS.text : COLORS.muted, fontFamily: "inherit", fontSize: 11, cursor: "pointer", lineHeight: 1, transition: "all 0.1s" }}
+              >
+                {expanded ? "▾" : "›"}
+              </button>
+            )}
+            {hover && (
+              <>
+                {currentBucket === "inbox" && (
+                  <ActionBtn onClick={() => onAskAI(task)} color={COLORS.inbox}>✦ AI</ActionBtn>
+                )}
+                {currentBucket === "next" && !task.parentId && onAssignToProject && (
+                  <ActionBtn onClick={() => setShowAssign(x => !x)} color={showAssign ? COLORS.project : undefined}>📁</ActionBtn>
+                )}
+                {task.recurrence && onSkipRecurrence && (
+                  <ActionBtn onClick={() => onSkipRecurrence(task.id)} color={COLORS.deferred} title="Skip — advance schedule without completing">↻ Skip</ActionBtn>
+                )}
+                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+                  <ActionBtn onClick={() => setMoveMenu(moveMenu === task.id ? null : task.id)}>Move ▾</ActionBtn>
+                  {moveMenu === task.id && (
+                    <div style={{ position: "absolute", right: 0, top: "100%", background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 8, padding: 4, zIndex: 100, minWidth: 150, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+                      {Object.entries(BUCKETS).filter(([k]) => k !== currentBucket && k !== "done" && k !== "inboxHistory").map(([k, cfg]) => (
+                        <div
+                          key={k}
+                          onClick={() => onMove(task.id, k)}
+                          style={{ padding: "7px 10px", borderRadius: 5, fontSize: 12, cursor: "pointer", color: COLORS.text2, display: "flex", alignItems: "center", gap: 7 }}
+                          onMouseEnter={e => e.currentTarget.style.background = COLORS.surface2}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                        >
+                          <span style={{ color: cfg.color }}>●</span> {cfg.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <ActionBtn onClick={() => onDelete(task.id)} color="#d45a5a">✕</ActionBtn>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Expanded metadata panel */}

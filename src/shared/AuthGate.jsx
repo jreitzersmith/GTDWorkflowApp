@@ -3,7 +3,7 @@ import { COLORS } from "../constants.jsx";
 
 function AuthGate({ authLoading, authUser, authSent, authEmail, setAuthEmail, sendMagicLink, authError, children }) {
   if (authLoading) return (
-    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center",
+    <div className="app-shell-height" style={{ display: "flex", alignItems: "center", justifyContent: "center",
                   background: COLORS.bg, color: COLORS.muted,
                   fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif" }}>
       Loading…
@@ -11,7 +11,7 @@ function AuthGate({ authLoading, authUser, authSent, authEmail, setAuthEmail, se
   );
 
   if (!authUser) return (
-    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center",
+    <div className="app-shell-height" style={{ display: "flex", alignItems: "center", justifyContent: "center",
                   background: COLORS.bg, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif" }}>
       <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12,
                     padding: "36px 40px", width: 340, display: "flex", flexDirection: "column", gap: 16 }}>

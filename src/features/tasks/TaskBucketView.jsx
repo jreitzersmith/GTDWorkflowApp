@@ -9,9 +9,10 @@ import { ArchivedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListH
 import { InboxBulkBar } from "./InboxBars.jsx";
 import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
 import { waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, minutesToEffortLabel, effortAccuracyColor, isDeferred, computeVisibleIds } from "./taskUtils.jsx";
+import { useViewport } from "../../hooks/useViewport.js";
 
-const ADD_ROW_STYLE = { display: "flex", gap: 6, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}` };
-const PANEL_HEADER_STYLE = { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 };
+const ADD_ROW_STYLE = { display: "flex", flexWrap: "wrap", gap: 6, rowGap: 6, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}` };
+const PANEL_HEADER_STYLE = { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, rowGap: 8 };
 const TASK_LIST_STYLE = { flex: 1, overflowY: "auto", padding: "4px 0" };
 const INPUT_STYLE = { flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" };
 
@@ -102,6 +103,14 @@ function TaskBucketView({
   exportTemplates,
 }) {
   const { efforts, collapsedNodes } = useContext(TaskRowContext);
+  const { isPhone } = useViewport();
+  // Phone only: categories/locations/sort/display/export/group/age-sort controls and the
+  // "add project" row start collapsed to save vertical space. Filter input is exempt —
+  // it's always visible. Tablet/desktop are unaffected (isPhone is false there).
+  const [toolbarExpanded, setToolbarExpanded] = useState(false);
+  const [addProjectExpanded, setAddProjectExpanded] = useState(false);
+  const [addTaskExpanded, setAddTaskExpanded] = useState(false);
+  const showToolbarControls = !isPhone || toolbarExpanded;
   const [filterText, setFilterText] = useState("");
   const [projPickerOpen, setProjPickerOpen] = useState(false);
   const [quickSortOpen, setQuickSortOpen] = useState(false);
@@ -214,29 +223,64 @@ function TaskBucketView({
     <>
       {/* Panel header — bucket title + toolbar */}
       <div style={PANEL_HEADER_STYLE}>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: "1 1 160px", minWidth: 160 }}>
           <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 300 }}>{BUCKETS[currentBucket].label}</div>
           <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{BUCKETS[currentBucket].desc}</div>
         </div>
 
-        {/* In-bucket search filter */}
-        {(bucketTasks.length > 0 || ["next", "project", "waiting", "someday", "deferred", "done"].includes(currentBucket)) && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            <input
-              value={filterText}
-              onChange={e => setFilterText(e.target.value)}
-              placeholder="Filter…"
-              style={{ width: filterTextActive ? 160 : 90, background: COLORS.surface2, border: `1px solid ${filterTextActive ? COLORS.inbox + "88" : COLORS.border}`, borderRadius: 6, padding: "4px 9px", fontFamily: "inherit", fontSize: 12, color: COLORS.text, outline: "none", transition: "width 0.15s, border-color 0.15s" }}
-            />
-            {filterActive && (
-              <span style={{ fontSize: 11, color: COLORS.muted, whiteSpace: "nowrap" }}>
-                {filteredTasks.length} / {bucketTasks.length}
-              </span>
-            )}
-          </div>
-        )}
+        {/* In-bucket search filter, grouped together with the phone-only toggle buttons so
+            they wrap together as a unit (stay on the same row as each other) rather than the
+            toggles being forced onto their own separate line below. */}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, rowGap: 6 }}>
+          {(bucketTasks.length > 0 || ["next", "project", "waiting", "someday", "deferred", "done"].includes(currentBucket)) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <input
+                value={filterText}
+                onChange={e => setFilterText(e.target.value)}
+                placeholder="Filter…"
+                style={{ width: filterTextActive ? 160 : 90, background: COLORS.surface2, border: `1px solid ${filterTextActive ? COLORS.inbox + "88" : COLORS.border}`, borderRadius: 6, padding: "4px 9px", fontFamily: "inherit", fontSize: 12, color: COLORS.text, outline: "none", transition: "width 0.15s, border-color 0.15s" }}
+              />
+              {filterActive && (
+                <span style={{ fontSize: 11, color: COLORS.muted, whiteSpace: "nowrap" }}>
+                  {filteredTasks.length} / {bucketTasks.length}
+                </span>
+              )}
+            </div>
+          )}
 
-        {["next", "project", "waiting", "someday", "deferred", "done"].includes(currentBucket) && (
+          {/* Phone-only toggles: secondary controls (category/location, sort, display,
+              export, group, age-sort) and the add-project / add-task row. All start
+              collapsed to save space; each opens its existing content in its existing spot. */}
+          {isPhone && (["next", "project", "waiting", "someday", "deferred", "done"].includes(currentBucket)) && (
+            <button
+              onClick={() => setToolbarExpanded(v => !v)}
+              title={toolbarExpanded ? "Hide sort & filter controls" : "Show sort & filter controls"}
+              style={{ background: toolbarExpanded ? COLORS.surface3 : "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 9px", minHeight: 36, fontFamily: "inherit", fontSize: 15, color: COLORS.text2, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 3 }}
+            >
+              ⚙ {toolbarExpanded ? "▲" : "▾"}
+            </button>
+          )}
+          {isPhone && currentBucket === "project" && (
+            <button
+              onClick={() => setAddProjectExpanded(v => !v)}
+              title={addProjectExpanded ? "Hide add project" : "Add a project or task"}
+              style={{ background: addProjectExpanded ? COLORS.surface3 : "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 9px", minHeight: 36, fontFamily: "inherit", fontSize: 15, color: COLORS.text2, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 3 }}
+            >
+              ＋ {addProjectExpanded ? "▲" : "▾"}
+            </button>
+          )}
+          {isPhone && ["inbox", "next", "done"].includes(currentBucket) && (
+            <button
+              onClick={() => setAddTaskExpanded(v => !v)}
+              title={addTaskExpanded ? "Hide add task" : "Add a task"}
+              style={{ background: addTaskExpanded ? COLORS.surface3 : "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 9px", minHeight: 36, fontFamily: "inherit", fontSize: 15, color: COLORS.text2, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 3 }}
+            >
+              ＋ {addTaskExpanded ? "▲" : "▾"}
+            </button>
+          )}
+        </div>
+
+        {showToolbarControls && ["next", "project", "waiting", "someday", "deferred", "done"].includes(currentBucket) && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             {categories?.length > 0 && (
               <select
@@ -263,7 +307,7 @@ function TaskBucketView({
           </div>
         )}
 
-        {currentBucket === "project" && (
+        {showToolbarControls && currentBucket === "project" && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             {/* Quick Sort popover */}
             <div ref={quickSortRef} style={{ position: "relative" }}>
@@ -275,7 +319,7 @@ function TaskBucketView({
                 Sort ▾
               </ToolbarBtn>
               {quickSortOpen && (
-                <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 190, boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+                <div style={{ position: "absolute", top: "calc(100% + 4px)", left: isPhone ? 0 : "auto", right: isPhone ? "auto" : 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 190, maxWidth: isPhone ? "calc(100vw - 32px)" : "none", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
                   {[
                     { icon: "🗂", label: "Show Categories Only", action: () => { const s = new Set(); rootProjects.forEach(p => s.add(p.id)); setCollapsedNodes(s); setQuickSortOpen(false); } },
                     { icon: "📂", label: "Show SubCategories",   action: () => { const s = new Set(); const addDesc = id => { const t = tasks.find(x => x.id === id); (t?.childIds||[]).forEach(cid => { s.add(cid); addDesc(cid); }); }; rootProjects.forEach(p => addDesc(p.id)); setCollapsedNodes(s); setQuickSortOpen(false); } },
@@ -306,7 +350,7 @@ function TaskBucketView({
                     Display [{visibleCount}/3] ▾
                   </ToolbarBtn>
                   {displayOpen && (
-                    <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 185, boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: isPhone ? 0 : "auto", right: isPhone ? "auto" : 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 185, maxWidth: isPhone ? "calc(100vw - 32px)" : "none", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
                       {[
                         { label: "📦 Archived",     state: showCompletedInProjects, toggle: () => setShowCompletedInProjects(v => !v) },
                         { label: "🛑  Waiting For",   state: showWaitingInProjects,   toggle: () => setShowWaitingInProjects(v => !v) },
@@ -340,7 +384,7 @@ function TaskBucketView({
           </div>
         )}
 
-        {currentBucket === "next" && (
+        {showToolbarControls && currentBucket === "next" && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <span style={{ fontSize: 11, color: COLORS.muted }}>Group:</span>
             <select
@@ -360,7 +404,7 @@ function TaskBucketView({
             />
           </div>
         )}
-        {(currentBucket === "waiting" || currentBucket === "someday" || currentBucket === "deferred") && (
+        {showToolbarControls && (currentBucket === "waiting" || currentBucket === "someday" || currentBucket === "deferred") && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <ToolbarBtn
               onClick={() => setAgeSortDir(d => d === null ? 'asc' : d === 'asc' ? 'desc' : null)}
@@ -391,6 +435,7 @@ function TaskBucketView({
       {/* Add row */}
       {!(["deferred", "waiting", "someday"].includes(currentBucket)) && (
         currentBucket === "project" ? (
+          isPhone && !addProjectExpanded ? null : (
           <div style={ADD_ROW_STYLE}>
             <input
               value={addText}
@@ -443,7 +488,9 @@ function TaskBucketView({
               </>
             )}
           </div>
+          )
         ) : (
+          isPhone && !addTaskExpanded ? null : (
           <>
             <div style={ADD_ROW_STYLE}>
               <input
@@ -464,6 +511,7 @@ function TaskBucketView({
               </div>
             )}
           </>
+          )
         )
       )}
 

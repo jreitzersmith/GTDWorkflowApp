@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { COLORS } from '../../constants.jsx';
+import { useViewport } from '../../hooks/useViewport.js';
 import { buildExportContent, buildRtfContent, stripMarkdown, saveToDrive, downloadText, buildExportTitle, buildJsonExport, buildHierarchicalExportContent, buildHierarchicalJsonExport } from './exportUtils.js';
 
 // Format options: Rich Text | Markdown | Plain text
@@ -27,6 +28,7 @@ function resolveFormat(fmt) {
 }
 
 function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSettingsChange, googleToken, docsEnabled, driveConversationExportFolderId, rawApiThread, coachName, userName, exportTemplates }) {
+  const { isPhone } = useViewport();
   const [open, setOpen]               = useState(false);
   // status: 'idle' | 'downloading' | 'saving' | 'downloaded' | 'saved' | 'error'
   const [status, setStatus]           = useState('idle');
@@ -147,7 +149,7 @@ function ExportPopover({ messages, coachMode, tasks, exportSettings, onExportSet
           borderRadius: 8,
           padding: 14,
           zIndex: 60,
-          width: 240,
+          width: isPhone ? 'min(240px, calc(100vw - 32px))' : 240,
           boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
         }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 10 }}>Export conversation</div>
@@ -285,6 +287,7 @@ const TASK_INCLUDE_OPTIONS = [
 ];
 
 function TaskListExportPopover({ tasks, googleToken, docsEnabled, driveConversationExportFolderId, defaultSections, exportTemplates }) {
+  const { isPhone } = useViewport();
   const [open, setOpen]       = useState(false);
   const [fmt, setFmt]         = useState('rtf');
   const [include, setInclude] = useState({ header: true, metadata: true, notes: false });
@@ -348,7 +351,7 @@ function TaskListExportPopover({ tasks, googleToken, docsEnabled, driveConversat
       </button>
       {open && (
         <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: COLORS.surface2,
-          border: '1px solid ' + COLORS.border2, borderRadius: 8, padding: 14, zIndex: 60, width: 240,
+          border: '1px solid ' + COLORS.border2, borderRadius: 8, padding: 14, zIndex: 60, width: isPhone ? 'min(240px, calc(100vw - 32px))' : 240,
           boxShadow: '0 4px 16px rgba(0,0,0,0.35)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 10 }}>Export task list</div>
           <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 6 }}>Format</div>
