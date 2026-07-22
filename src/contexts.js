@@ -2,7 +2,7 @@ import { createContext } from "react";
 import PropTypes from "prop-types";
 
 // ── Task contexts — eliminates rowProps drilling through ProjectTree/CompletedTree ──
-// Stable callbacks (completeTask, deleteTask, etc.) that TaskRow needs from GTDManager.
+// Stable callbacks (archiveTask, deleteTask, etc.) that TaskRow needs from GTDManager.
 const TaskActionsContext = createContext(null);
 // Shared state (currentBucket, allTasks, moveMenu, etc.) that every row in a view reads.
 const TaskRowContext = createContext(null);

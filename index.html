@@ -8,6 +8,18 @@
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
       html, body, #root { height: 100%; }
+      html, body { overflow-x: hidden; }
+      /* Real viewport height that accounts for mobile browser chrome show/hide;
+         falls back to 100vh in browsers without dvh support (declaration order = fallback). */
+      .app-shell-height { height: 100vh; height: 100dvh; }
+      /* Mobile hardening: layout logic itself is JS-driven via useViewport,
+         these are the handful of things real CSS does better than inline styles. */
+      @media (max-width: 1024px) {
+        html, body { overscroll-behavior-y: contain; }
+        * { -webkit-tap-highlight-color: transparent; }
+        ::-webkit-scrollbar { display: none; }
+        * { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+      }
     </style>
   </head>
   <body>

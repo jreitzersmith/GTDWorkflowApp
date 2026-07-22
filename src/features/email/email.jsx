@@ -3,12 +3,13 @@ import { COLORS } from "../../constants.jsx";
 import { EmailInboxPanel } from "./EmailInboxPanel.jsx";
 import { EmailCleanupPanel } from "./EmailCleanupPanel.jsx";
 import { EmailRulesPanel } from "./EmailRulesPanel.jsx";
+import { EmailContactsPanel } from "./EmailContactsPanel.jsx";
 import { useGmailRulesCache } from "./useGmailRulesCache.js";
 
 // Tab container for the Email Management view — renders one of three panels
 // (Inbox, Cleanup, Rules) based on the active emailTab prop.
-function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, processEmailWithAI, attachEmailToTask, tasks, openCoachChat, authUser }) {
-  const { gmailLabels, setGmailLabels, gmailFilters, setGmailFilters } = useGmailRulesCache();
+function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQueue, emailTab, setEmailTab, processEmailWithAI, attachEmailToTask, tasks, contacts, addContactEmail, contactEmailLinkingMode, openCoachChat, authUser, logEmailAsReceipt, markAsSpam, onInboxLoaded }) {
+  const { gmailLabels, setGmailLabels, gmailFilters, setGmailFilters, supabaseLoading } = useGmailRulesCache({ authUser });
 
   const tabStyle = (t) => ({
     padding: '9px 14px', fontSize: 13, cursor: 'pointer',
@@ -32,7 +33,7 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Tab bar */}
       <div style={{ display: 'flex', borderBottom: `1px solid ${COLORS.border}`, background: COLORS.surface, padding: '0 16px', flexShrink: 0 }}>
-        {['inbox', 'cleanup', 'rules'].map(t => (
+        {['inbox', 'cleanup', 'rules', 'contacts'].map(t => (
           <div key={t} style={tabStyle(t)} onClick={() => setEmailTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
             {t === 'cleanup' && gmailQueue.length > 0 && (
@@ -42,9 +43,10 @@ function EmailManagementView({ googleToken, googleScope, gmailQueue, setGmailQue
         ))}
       </div>
 
-      {emailTab === 'inbox'   && <EmailInboxPanel   googleToken={googleToken} googleScope={googleScope} processEmailWithAI={processEmailWithAI} attachEmailToTask={attachEmailToTask} tasks={tasks} />}
+      {emailTab === 'inbox'   && <EmailInboxPanel   googleToken={googleToken} googleScope={googleScope} processEmailWithAI={processEmailWithAI} attachEmailToTask={attachEmailToTask} tasks={tasks} contacts={contacts} addContactEmail={addContactEmail} contactEmailLinkingMode={contactEmailLinkingMode} logEmailAsReceipt={logEmailAsReceipt} markAsSpam={markAsSpam} onInboxLoaded={onInboxLoaded} />}
       {emailTab === 'cleanup' && <EmailCleanupPanel gmailQueue={gmailQueue} setGmailQueue={setGmailQueue} googleToken={googleToken} authUser={authUser} openCoachChat={openCoachChat} />}
-      {emailTab === 'rules'   && <EmailRulesPanel   googleToken={googleToken} googleScope={googleScope} gmailLabels={gmailLabels} setGmailLabels={setGmailLabels} gmailFilters={gmailFilters} setGmailFilters={setGmailFilters} />}
+      {emailTab === 'rules'   && <EmailRulesPanel   googleToken={googleToken} googleScope={googleScope} gmailLabels={gmailLabels} setGmailLabels={setGmailLabels} gmailFilters={gmailFilters} setGmailFilters={setGmailFilters} supabaseLoading={supabaseLoading} />}
+      {emailTab === 'contacts' && <EmailContactsPanel googleToken={googleToken} contacts={contacts} />}
     </div>
   );
 }
@@ -61,6 +63,12 @@ EmailManagementView.propTypes = {
   tasks:              PropTypes.array,
   openCoachChat:      PropTypes.func.isRequired,
   authUser:           PropTypes.object,
+  contacts:           PropTypes.array,
+  addContactEmail:    PropTypes.func,
+  contactEmailLinkingMode: PropTypes.string,
+  logEmailAsReceipt:  PropTypes.func,
+  markAsSpam:         PropTypes.func,
+  onInboxLoaded:      PropTypes.func,
 };
 
 export { EmailManagementView };

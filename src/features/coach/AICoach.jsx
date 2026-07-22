@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
-import { COLORS } from "../../constants.jsx";
-import { formatBubble } from "../tasks/taskUtils.jsx";
+import { COLORS, getEffectiveBuckets, getPriorityColor } from "../../constants.jsx";
+import { formatBubble, normalizeEffort } from "../tasks/taskUtils.jsx";
 import { PRIORITIES } from "../tasks/TaskRow.jsx";
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
+import { ProjectTreePicker } from "../tasks/ProjectTreePicker.jsx";
 
 function ActionBtn({ children, onClick, color }) {
   const [hover, setHover] = useState(false);
@@ -45,7 +46,7 @@ function RecurringReviewCard({ events, onStillFine, onNeedsWork }) {
   );
 }
 
-function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubmit }) {
+function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubmit, coachName, userName }) {
   const isUser = msg.role === "user";
   if (msg.isSearchChip) return (
     <div style={{ display: "flex", alignItems: "center", gap: 6,
@@ -63,16 +64,24 @@ function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubm
   return (
     <div style={{ display: "flex", gap: 7, flexDirection: isUser ? "row-reverse" : "row", maxWidth: "100%" }}>
       <div style={{ width: 22, height: 22, borderRadius: "50%", background: isUser ? COLORS.surface3 : COLORS.inbox, color: isUser ? COLORS.text2 : "#111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isUser ? 9 : 11, fontFamily: "Georgia, serif", flexShrink: 0, marginTop: 1 }}>
-        {isUser ? "Y" : "G"}
+        {isUser ? (userName ? userName[0].toUpperCase() : "Y") : (coachName ? coachName[0].toUpperCase() : "C")}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 5, maxWidth: "calc(100% - 70px)" }}>
         <div style={{ padding: "8px 11px", borderRadius: 11, fontSize: 13, lineHeight: 1.55, background: isUser ? COLORS.surface3 : COLORS.surface2, color: isUser ? COLORS.text2 : COLORS.text, borderTopLeftRadius: isUser ? 11 : 3, borderTopRightRadius: isUser ? 3 : 11 }}>
           {formatBubble(msg.text)}
         </div>
+        {msg.attachedPdf && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 20, background: COLORS.surface3, border: `1px solid ${COLORS.border}`, fontSize: 11, color: COLORS.text2, alignSelf: 'flex-end' }}>
+            <span>📄</span><span>{msg.attachedPdf}</span>
+          </div>
+        )}
         {msg.updateChip && (
           <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 20, background: COLORS.surface3, border: `1px solid ${COLORS.border}`, fontSize: 11, color: COLORS.text2, alignSelf: "flex-start" }}>
             <span>✏️</span>
             <span>Updated <strong style={{ color: COLORS.text }}>{msg.updateChip.taskName}</strong> — {msg.updateChip.fields.join(" · ")}</span>
+            {msg.updateChip.url && (
+              <a href={msg.updateChip.url} target="_blank" rel="noreferrer" style={{ color: COLORS.next, textDecoration: 'none', marginLeft: 4 }}>Open ↗</a>
+            )}
           </div>
         )}
       </div>
@@ -80,10 +89,10 @@ function ChatBubble({ msg, onRecurringStillFine, onRecurringNeedsWork, onMITSubm
   );
 }
 
-function TypingIndicator() {
+function TypingIndicator({ coachName }) {
   return (
     <div style={{ display: "flex", gap: 7 }}>
-      <div style={{ width: 22, height: 22, borderRadius: "50%", background: COLORS.inbox, color: "#111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontFamily: "Georgia, serif", flexShrink: 0 }}>G</div>
+      <div style={{ width: 22, height: 22, borderRadius: "50%", background: COLORS.inbox, color: "#111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontFamily: "Georgia, serif", flexShrink: 0 }}>{coachName ? coachName[0].toUpperCase() : "C"}</div>
       <div style={{ padding: "9px 13px", borderRadius: 11, borderTopLeftRadius: 3, background: COLORS.surface2, display: "flex", gap: 4, alignItems: "center" }}>
         {[0, 1, 2].map(i => (
           <div key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: COLORS.muted, animation: `bounce 1.2s ${i * 0.2}s infinite` }} />
@@ -94,29 +103,65 @@ function TypingIndicator() {
   );
 }
 
-function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, locations, categories, onUpdatePendingAction }) {
+function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, locations, categories, allTasks, onUpdatePendingAction, colorSettings }) {
   if (!action) return null;
-  const { type, title, nextAction, parentName, dueDate, deferUntil, effort, category, priority = [], location = [] } = action;
+  const { type, title, nextAction, parentName, dueDate, deferUntil, effort, category, priority = [], location = [], taskId, changes } = action;
 
+  const effectiveBuckets = getEffectiveBuckets(colorSettings?.bucketColors);
   const configs = {
-    next:    { color: COLORS.next,    label: "Next Actions", confirmText: "Create ✓" },
-    project: { color: COLORS.project, label: "Project + Next Action", confirmText: "Create ✓" },
-    someday: { color: COLORS.someday, label: "Someday / Maybe", confirmText: "Move ✓" },
-    waiting: { color: COLORS.waiting, label: "Waiting For", confirmText: "Move ✓" },
+    next:    { color: effectiveBuckets.next.color,    label: "Next Actions", confirmText: "Create ✓" },
+    project: { color: effectiveBuckets.project.color, label: "Project + Next Action", confirmText: "Create ✓" },
+    someday: { color: effectiveBuckets.someday.color, label: "Someday / Maybe", confirmText: "Move ✓" },
+    waiting: { color: effectiveBuckets.waiting.color, label: "Waiting For", confirmText: "Move ✓" },
     delete:  { color: COLORS.muted,   label: "Archive (not actionable)", confirmText: "Archive ✓" },
-    add:     { color: COLORS.project, label: "Add to existing project", confirmText: "Add ✓" },
+    add:     { color: effectiveBuckets.project.color, label: "Add to existing project", confirmText: "Add ✓" },
+    update:   { color: COLORS.accent,  label: "Update task",              confirmText: "Apply ✓" },
+    gmail_send: { color: '#4285F4',       label: "Send email",               confirmText: "Send ✓" },
   };
   const cfg = configs[type] || configs.next;
 
-  const hasAIValues = !!(dueDate || deferUntil || effort || category);
-  const [expanded, setExpanded] = useState(hasAIValues);
+  const hasAIValues = !!(dueDate || deferUntil || effort || category || (location && location.length) || (priority && priority.length));
+  const [expanded, setExpanded] = useState(false);
+  const [catOpen, setCatOpen] = useState(false);
+  const catPickerRef = useRef(null);
+  useEffect(() => {
+    if (!catOpen) return;
+    const handler = e => { if (catPickerRef.current && !catPickerRef.current.contains(e.target)) setCatOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [catOpen]);
+
+  const [projPickerOpen, setProjPickerOpen] = useState(false);
+  const projPickerRef = useRef(null);
+  useEffect(() => {
+    if (!projPickerOpen) return;
+    const handler = e => { if (projPickerRef.current && !projPickerRef.current.contains(e.target)) setProjPickerOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [projPickerOpen]);
+  const eligibleProjects = (allTasks || []).filter(t => t.bucket === 'project' && !t.done);
+
+  // Normalize AI-inferred effort string to the nearest configured effort label.
+  // The AI may return "2h" while the user's list has "2 hours" — normalizeEffort
+  // snaps by minutes. Fire a one-time update so pendingAction.effort is also correct
+  // before the user confirms without touching the field.
+  const displayEffort = (effort && efforts && efforts.length)
+    ? normalizeEffort(effort, efforts)
+    : effort;
+  useEffect(() => {
+    if (displayEffort && displayEffort !== effort) {
+      onUpdatePendingAction('effort', displayEffort);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentional: key prop resets component on new action, run once per mount
 
   const showDue      = ['next', 'project', 'add', 'waiting'].includes(type);
   const showDefer    = ['next', 'project', 'add', 'someday'].includes(type);
-  const showEffort   = ['next', 'add', 'someday', 'waiting'].includes(type);
-  const showPriority = ['next', 'add'].includes(type);
-  const showLocation = ['next', 'add'].includes(type);
-  const showMeta     = type !== 'delete';
+  const showEffort   = ['next', 'project', 'add', 'someday', 'waiting'].includes(type);
+  const showPriority = ['next', 'add', 'project', 'someday', 'waiting'].includes(type);
+  const showLocation = ['next', 'add', 'project', 'someday', 'waiting'].includes(type);
+  const showProject  = ['next', 'project', 'someday', 'waiting'].includes(type);
+  const showMeta     = type !== 'delete' && type !== 'gmail_send';
 
   const chip = (label, active, color, onClick) => (
     <button
@@ -127,7 +172,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
   );
 
   const collapsedHint = !expanded && hasAIValues
-    ? ` (${[dueDate && `due ${dueDate}`, deferUntil && `defer ${deferUntil}`, effort, category].filter(Boolean).join(", ")})`
+    ? ` (${[dueDate && `due ${dueDate}`, deferUntil && `defer ${deferUntil}`, effort, category, location && location.length && location.join(','), priority && priority.length && priority.join(',')].filter(Boolean).join(", ")})`
     : "";
 
   return (
@@ -140,8 +185,50 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
         </div>
       ) : type === "add" ? (
         <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
-          <div><span style={{ color: COLORS.muted }}>Under: </span><strong style={{ color: COLORS.project }}>{parentName}</strong></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: COLORS.muted, flexShrink: 0 }}>Under: </span>
+            <div ref={projPickerRef} style={{ position: "relative", flex: 1 }}>
+              <button
+                onClick={() => setProjPickerOpen(o => !o)}
+                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: parentName ? COLORS.project : COLORS.muted, padding: "3px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, width: "100%", boxSizing: "border-box" }}
+              >
+                <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{parentName || "— UnCategorized"}</span>
+                <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>▾</span>
+              </button>
+              {projPickerOpen && (
+                <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 50, maxHeight: 240, overflowY: "auto", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}>
+                  <ProjectTreePicker
+                    eligibleProjects={eligibleProjects}
+                    selectedId={action.parentRef}
+                    onSelect={id => {
+                      const proj = eligibleProjects.find(p => p.id === id);
+                      onUpdatePendingAction("parentRef", id || null);
+                      onUpdatePendingAction("parentName", proj ? proj.text : "");
+                      setProjPickerOpen(false);
+                    }}
+                    showUncategorized
+                    sorted
+                  />
+                </div>
+              )}
+            </div>
+          </div>
           <div><span style={{ color: COLORS.muted }}>Action: </span><strong style={{ color: COLORS.next }}>{title}</strong></div>
+        </div>
+      ) : type === "gmail_send" ? (
+        <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
+          <div><span style={{ color: COLORS.muted }}>To: </span><strong style={{ color: COLORS.text }}>{action.to}</strong></div>
+          <div><span style={{ color: COLORS.muted }}>Subject: </span><strong style={{ color: COLORS.text }}>{action.subject}</strong></div>
+          {action.body && (
+            <div style={{ marginTop: 4, padding: "6px 8px", background: COLORS.surface2, borderRadius: 5, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 120, overflowY: "auto", color: COLORS.text2 }}>
+              {action.body.length > 400 ? action.body.slice(0, 400) + '…' : action.body}
+            </div>
+          )}
+        </div>
+      ) : type === "update" ? (
+        <div style={{ fontSize: 12, color: COLORS.text2, lineHeight: 1.5 }}>
+          <div><strong style={{ color: COLORS.text }}>{title}</strong></div>
+          <div style={{ color: COLORS.muted, marginTop: 2 }}>{changes?.done ? 'Mark complete' : changes?.isSomeday === true ? 'Move to Someday/Maybe' : changes?.isSomeday === false ? 'Activate to Next Actions' : changes?.isWaitingFor ? 'Move to Waiting For' : 'Update fields'}</div>
         </div>
       ) : type !== "delete" ? (
         <div style={{ fontSize: 12, color: COLORS.text2 }}>
@@ -159,25 +246,63 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
           </button>
           {expanded && (
             <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${COLORS.border}` }}>
+              {showProject && (
+                <div>
+                  <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Project</div>
+                  <div ref={projPickerRef} style={{ position: "relative" }}>
+                    <button
+                      onClick={() => setProjPickerOpen(o => !o)}
+                      style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: action.parentRef ? COLORS.project : COLORS.muted, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                    >
+                      <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{parentName || "— UnCategorized"}</span>
+                      <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>▾</span>
+                    </button>
+                    {projPickerOpen && (
+                      <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 50, maxHeight: 240, overflowY: "auto", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}>
+                        <ProjectTreePicker
+                          eligibleProjects={eligibleProjects}
+                          selectedId={action.parentRef}
+                          onSelect={id => {
+                            const proj = eligibleProjects.find(p => p.id === id);
+                            onUpdatePendingAction("parentRef", id || null);
+                            onUpdatePendingAction("parentName", proj ? proj.text : "");
+                            setProjPickerOpen(false);
+                          }}
+                          showUncategorized
+                          sorted
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: -4 }}>Category</div>
-              <div>
-                <input
-                  list="pending-cats"
-                  value={category || ""}
-                  onChange={e => onUpdatePendingAction("category", e.target.value || null)}
-                  placeholder="category…"
-                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: COLORS.text, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box" }}
-                />
-                <datalist id="pending-cats">
-                  {(categories || []).map(c => <option key={c} value={c} />)}
-                </datalist>
+              <div ref={catPickerRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setCatOpen(o => !o)}
+                  style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, color: category ? COLORS.text : COLORS.muted, padding: "4px 8px", fontFamily: "inherit", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                >
+                  <span style={{ flex: 1, textAlign: "left" }}>{category || "— none —"}</span>
+                  <span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}>▾</span>
+                </button>
+                {catOpen && (
+                  <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 50, maxHeight: 200, overflowY: "auto", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}>
+                    <div onClick={() => { onUpdatePendingAction("category", null); setCatOpen(false); }} style={{ padding: "5px 8px", cursor: "pointer", fontSize: 12, borderRadius: 4, color: !category ? COLORS.text : COLORS.muted, background: !category ? COLORS.surface3 : "transparent" }}>— none —</div>
+                    {category && !(categories || []).includes(category) && (
+                      <div onClick={() => { onUpdatePendingAction("category", category); setCatOpen(false); }} style={{ padding: "5px 8px", cursor: "pointer", fontSize: 12, borderRadius: 4, color: COLORS.text, background: COLORS.surface3 }}>{category}</div>
+                    )}
+                    {(categories || []).map(c => (
+                      <div key={c} onClick={() => { onUpdatePendingAction("category", c); setCatOpen(false); }} style={{ padding: "5px 8px", cursor: "pointer", fontSize: 12, borderRadius: 4, color: category === c ? COLORS.project : COLORS.text, background: category === c ? COLORS.surface3 : "transparent" }}>{c}</div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {showEffort && (efforts || []).length > 0 && (
                 <div>
                   <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Effort</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {(efforts || []).map(e => chip(e, effort === e, COLORS.effort, () => onUpdatePendingAction("effort", effort === e ? null : e)))}
+                    {(efforts || []).map(e => chip(e, displayEffort === e, COLORS.effort, () => onUpdatePendingAction("effort", displayEffort === e ? null : e)))}
                   </div>
                 </div>
               )}
@@ -186,7 +311,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
                 <div>
                   <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Priority</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {PRIORITIES.map(p => chip(p, priority.includes(p), COLORS.inbox, () => {
+                    {PRIORITIES.map(p => chip(p, priority.includes(p), getPriorityColor(p, colorSettings), () => {
                       const next = priority.includes(p) ? priority.filter(x => x !== p) : [...priority, p];
                       onUpdatePendingAction("priority", next);
                     }))}
@@ -565,80 +690,89 @@ ProjectReviewBar.propTypes = {
 
 function MITPicker({ overdue, dueToday, onSubmit }) {
   const today8601 = new Date().toISOString().slice(0, 10);
-  const [selected, setSelected] = useState(() => new Set());
-  const toggle = (id) => setSelected(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const [selected, setSelected] = useState([]);
+  const toggle = (id) => setSelected(prev =>
+    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  );
   const allTasks = [...overdue, ...dueToday];
-  const handleSubmit = () => {
-    if (selected.size === 0) return;
-    onSubmit([...selected]);
-  };
-  const TaskLine = ({ task, group }) => {
-    const isChecked = selected.has(task.id);
-    const dotColor = group === 'overdue' ? '#e05050' : COLORS.next;
-    return (
-      <div
-        onClick={() => toggle(task.id)}
-        style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 8px', borderRadius: 6,
-          cursor: 'pointer', background: isChecked ? dotColor + '18' : 'transparent',
-          border: `1px solid ${isChecked ? dotColor + '55' : 'transparent'}`, transition: 'all 0.1s' }}
-      >
-        <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${isChecked ? dotColor : COLORS.border2}`,
-          background: isChecked ? dotColor : 'transparent', flexShrink: 0, marginTop: 2,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.1s' }}>
-          {isChecked && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span>}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, color: COLORS.text, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.text}</div>
-          {task.dueDate && (
-            <div style={{ fontSize: 10, color: dotColor, marginTop: 1 }}>
-              {task.dueDate < today8601 ? `Overdue · ${task.dueDate}` : `Due today`}{task.dueTime ? ` · ${task.dueTime}` : ''}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+
   return (
-    <div style={{ border: `1px solid ${COLORS.border2}`, borderRadius: 10, overflow: 'hidden', margin: '2px 0' }}>
+    <div style={{ border: `1px solid ${COLORS.border2}`, borderRadius: 10, margin: '2px 0 28px 0', overflow: 'visible' }}>
       <div style={{ padding: '8px 12px', background: COLORS.surface2, borderBottom: `1px solid ${COLORS.border}`,
+        borderRadius: '9px 9px 0 0',
         fontSize: 11, fontWeight: 600, color: COLORS.text2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         Select your MUST ACCOMPLISH tasks
       </div>
-      <div style={{ padding: '6px 8px', maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {overdue.length > 0 && (
-          <>
-            <div style={{ fontSize: 10, color: '#e05050', fontWeight: 600, padding: '4px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Overdue ({overdue.length})
-            </div>
-            {overdue.map(t => <TaskLine key={t.id} task={t} group="overdue" />)}
-          </>
-        )}
-        {dueToday.length > 0 && (
-          <>
-            <div style={{ fontSize: 10, color: COLORS.next, fontWeight: 600, padding: '6px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Due Today ({dueToday.length})
-            </div>
-            {dueToday.map(t => <TaskLine key={t.id} task={t} group="today" />)}
-          </>
-        )}
-        {allTasks.length === 0 && (
-          <div style={{ padding: '12px 8px', fontSize: 12, color: COLORS.muted, fontStyle: 'italic' }}>No overdue or due-today tasks.</div>
-        )}
+      <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+        <div style={{ padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {overdue.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, color: '#e05050', fontWeight: 600, padding: '4px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Overdue ({overdue.length})
+              </div>
+              {overdue.map(t => {
+                const checked = selected.includes(t.id);
+                return (
+                  <div key={t.id} onClick={() => toggle(t.id)}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 8px', borderRadius: 6,
+                      cursor: 'pointer', background: checked ? '#e0505018' : 'transparent',
+                      border: `1px solid ${checked ? '#e0505055' : 'transparent'}` }}>
+                    <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${checked ? '#e05050' : COLORS.border2}`,
+                      background: checked ? '#e05050' : 'transparent', flexShrink: 0, marginTop: 2,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {checked && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.text}</div>
+                      {t.dueDate && <div style={{ fontSize: 10, color: '#e05050', marginTop: 1 }}>Overdue · {t.dueDate}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+          {dueToday.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, color: COLORS.next, fontWeight: 600, padding: '6px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Due Today ({dueToday.length})
+              </div>
+              {dueToday.map(t => {
+                const checked = selected.includes(t.id);
+                return (
+                  <div key={t.id} onClick={() => toggle(t.id)}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 8px', borderRadius: 6,
+                      cursor: 'pointer', background: checked ? COLORS.next + '18' : 'transparent',
+                      border: `1px solid ${checked ? COLORS.next + '55' : 'transparent'}` }}>
+                    <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${checked ? COLORS.next : COLORS.border2}`,
+                      background: checked ? COLORS.next : 'transparent', flexShrink: 0, marginTop: 2,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {checked && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.text}</div>
+                      {t.dueDate && <div style={{ fontSize: 10, color: COLORS.next, marginTop: 1 }}>Due today{t.dueTime ? ` · ${t.dueTime}` : ''}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+          {allTasks.length === 0 && (
+            <div style={{ padding: '12px 8px', fontSize: 12, color: COLORS.muted, fontStyle: 'italic' }}>No overdue or due-today tasks.</div>
+          )}
+        </div>
       </div>
-      <div style={{ padding: '8px 12px', borderTop: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontSize: 11, color: COLORS.muted }}>{selected.size} selected</span>
+      {/* Submit button — always outside scroll, with bottom padding so it clears the panel edge */}
+      <div style={{ padding: '8px 8px 16px', borderTop: `1px solid ${COLORS.border}`, background: COLORS.surface2, borderRadius: '0 0 9px 9px' }}>
         <button
-          onClick={handleSubmit}
-          disabled={selected.size === 0}
-          style={{ padding: '5px 14px', borderRadius: 6, border: 'none', background: selected.size > 0 ? '#f0c040' : COLORS.surface3,
-            color: selected.size > 0 ? '#1a1a0e' : COLORS.muted, fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
-            cursor: selected.size > 0 ? 'pointer' : 'default', transition: 'all 0.15s' }}
-        >
-          Set as Today's Focus →
+          onClick={() => selected.length > 0 && onSubmit([...selected])}
+          style={{ width: '100%', padding: '9px 0', borderRadius: 8, fontFamily: 'inherit',
+            border: selected.length > 0 ? 'none' : `1px solid ${COLORS.border}`,
+            background: selected.length > 0 ? '#f0c040' : COLORS.surface3,
+            color: selected.length > 0 ? '#1a1a0e' : COLORS.muted,
+            fontSize: 12, fontWeight: 600,
+            cursor: selected.length > 0 ? 'pointer' : 'default', transition: 'all 0.15s' }}>
+          {selected.length > 0 ? `Set ${selected.length} task${selected.length > 1 ? 's' : ''} as Today's Focus →` : 'Select tasks above'}
         </button>
       </div>
     </div>

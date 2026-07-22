@@ -3,14 +3,16 @@ import { useState, useRef, useEffect, useContext } from "react";
 import { COLORS, BUCKETS } from "../../constants.jsx";
 import { TaskRowContext } from "../../contexts.js";
 import { Btn, ToolbarBtn } from "../../shared/SidebarComponents.jsx";
+import { TaskListExportPopover } from "../coach/ExportPopover.jsx";
 import { TaskRow } from "./TaskRow.jsx";
-import { CompletedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListHelpers.jsx";
+import { ArchivedTree, ProjectTree, GroupDivider, EmptyState } from "./TaskListHelpers.jsx";
 import { InboxBulkBar } from "./InboxBars.jsx";
 import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
 import { waterfallFilter, groupByField, groupByTwoLevelProject, effortToMinutes, minutesToEffortLabel, effortAccuracyColor, isDeferred, computeVisibleIds } from "./taskUtils.jsx";
+import { useViewport } from "../../hooks/useViewport.js";
 
-const ADD_ROW_STYLE = { display: "flex", gap: 6, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}` };
-const PANEL_HEADER_STYLE = { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 10 };
+const ADD_ROW_STYLE = { display: "flex", flexWrap: "wrap", gap: 6, rowGap: 6, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}` };
+const PANEL_HEADER_STYLE = { padding: "14px 18px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, rowGap: 8 };
 const TASK_LIST_STYLE = { flex: 1, overflowY: "auto", padding: "4px 0" };
 const INPUT_STYLE = { flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 7, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none" };
 
@@ -59,6 +61,9 @@ EffortAccuracyBar.propTypes = {
 function TaskBucketView({
   currentBucket,
   tasks,
+  googleToken,
+  docsEnabled,
+  driveConversationExportFolderId,
   bucketTasks,
   addText,
   setAddText,
@@ -83,6 +88,8 @@ function TaskBucketView({
   onViewDeferred,
   onBulkAssign,
   categories,
+  badgeVisibility,
+  setBadgeVisibility,
   projectCategoryFilter,
   setProjectCategoryFilter,
   uncategorizedProjectId,
@@ -92,18 +99,36 @@ function TaskBucketView({
   setShowWaitingInProjects,
   showSomeDayInProjects,
   setShowSomeDayInProjects,
+  locations,
+  focusedTaskId,
+  setFocusedTaskId,
+  exportTemplates,
 }) {
-  const { efforts } = useContext(TaskRowContext);
+  const { efforts, collapsedNodes } = useContext(TaskRowContext);
+  const { isPhone } = useViewport();
+  // Phone only: categories/locations/sort/display/export/group/age-sort controls and the
+  // "add project" row start collapsed to save vertical space. Filter input is exempt —
+  // it's always visible. Tablet/desktop are unaffected (isPhone is false there).
+  const [toolbarExpanded, setToolbarExpanded] = useState(false);
+  const [addProjectExpanded, setAddProjectExpanded] = useState(false);
+  const [addTaskExpanded, setAddTaskExpanded] = useState(false);
+  const showToolbarControls = !isPhone || toolbarExpanded;
   const [filterText, setFilterText] = useState("");
   const [projPickerOpen, setProjPickerOpen] = useState(false);
   const [quickSortOpen, setQuickSortOpen] = useState(false);
   const [displayOpen, setDisplayOpen] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
   const projPickerRef = useRef(null);
   const quickSortRef = useRef(null);
   const displayRef = useRef(null);
+  const fieldsRef = useRef(null);
+  const taskListRef = useRef(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [ageSortDir, setAgeSortDir] = useState(null); // null=tree, 'asc'=oldest-first, 'desc'=newest-first
 
   // Reset filter when switching buckets
-  useEffect(() => { setFilterText(""); }, [currentBucket]);
+  useEffect(() => { setFilterText(""); setSelectedCategory(null); setSelectedLocation(null); setAgeSortDir(null); setFocusedTaskId?.(null); }, [currentBucket]);
 
   // Close project picker on outside click
   useEffect(() => {
@@ -129,16 +154,123 @@ function TaskBucketView({
     return () => document.removeEventListener("mousedown", handler);
   }, [displayOpen]);
 
+  useEffect(() => {
+    if (!fieldsOpen) return;
+    const handler = e => { if (fieldsRef.current && !fieldsRef.current.contains(e.target)) setFieldsOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [fieldsOpen]);
+
+  const FIELD_OPTIONS = [
+    { key: "tags",      label: "Tags (priority & location)" },
+    { key: "time",      label: "Time / effort" },
+    { key: "category",  label: "Category" },
+    { key: "dueDate",   label: "Due date" },
+    { key: "deferDate", label: "Defer date" },
+  ];
+
+  // The Fields popover markup is identical wherever it's rendered — factored out so it can
+  // appear either inline with the filter (phone, and non-project buckets on tablet/desktop)
+  // or inside the Projects Sort/Display cluster (tablet/desktop, project bucket only).
+  const renderFieldsPopover = () => (
+    <div ref={fieldsRef} style={{ position: "relative" }}>
+      <ToolbarBtn
+        onClick={() => setFieldsOpen(o => !o)}
+        active={fieldsOpen}
+        title="Show / hide row details"
+      >
+        <span style={{ fontSize: 15, verticalAlign: -1 }}>👁</span> {!isPhone && "Fields "}▾
+      </ToolbarBtn>
+      {fieldsOpen && (
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: isPhone ? 0 : "auto", right: isPhone ? "auto" : 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 195, maxWidth: isPhone ? "calc(100vw - 32px)" : "none", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+          {FIELD_OPTIONS.map(({ key, label }) => {
+            const on = badgeVisibility?.[key] !== false;
+            return (
+              <button
+                key={key}
+                onClick={() => setBadgeVisibility(prev => ({ ...prev, [key]: !on }))}
+                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "7px 10px", background: "none", border: "none", color: COLORS.text, fontFamily: "inherit", fontSize: 12, cursor: "pointer", borderRadius: 4, whiteSpace: "nowrap" }}
+                onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}
+              >
+                <span style={{ width: 14, height: 14, border: `1px solid ${on ? COLORS.next + "88" : COLORS.border2}`, borderRadius: 3, background: on ? COLORS.next + "22" : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.1s" }}>
+                  {on && <span style={{ color: COLORS.next, fontSize: 10, lineHeight: 1 }}>✓</span>}
+                </span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  // Keyboard navigation: arrow keys move focus through visible task rows,
+  // Enter opens the detail panel, j/k are vim-style aliases, Left/Right collapse/expand in Projects.
+  useEffect(() => {
+    const container = taskListRef.current;
+    if (!container) return;
+
+    const handler = (e) => {
+      // Skip when typing in any input/textarea/select
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Skip modifier combos that belong to other shortcuts (Cmd+K etc.)
+      if (e.metaKey || e.ctrlKey) return;
+
+      const rows = Array.from(container.querySelectorAll('[data-task-id]'));
+      if (!rows.length) return;
+
+      const currentIdx = rows.findIndex(el => el.dataset.taskId === focusedTaskId);
+
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault();
+        const nextIdx = currentIdx < rows.length - 1 ? currentIdx + 1 : 0;
+        setFocusedTaskId(rows[nextIdx].dataset.taskId);
+        rows[nextIdx].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault();
+        const prevIdx = currentIdx > 0 ? currentIdx - 1 : rows.length - 1;
+        setFocusedTaskId(rows[prevIdx].dataset.taskId);
+        rows[prevIdx].scrollIntoView({ block: 'nearest' });
+      } else if ((e.key === 'Enter' || e.key === ' ') && focusedTaskId) {
+        e.preventDefault();
+        // Delegate to the task actions context open-detail handler
+        container.querySelector(`[data-task-id="${focusedTaskId}"] span[title="Open detail panel"]`)?.click();
+      } else if (e.key === 'ArrowRight' && focusedTaskId && currentBucket === 'project') {
+        e.preventDefault();
+        // Expand: remove from collapsedNodes if present
+        setCollapsedNodes(prev => { const next = new Set(prev); next.delete(focusedTaskId); return next; });
+      } else if (e.key === 'ArrowLeft' && focusedTaskId && currentBucket === 'project') {
+        e.preventDefault();
+        // Collapse: add to collapsedNodes (only meaningful if task has children)
+        const focused = tasks.find(t => t.id === focusedTaskId);
+        if (focused && (focused.childIds || []).length > 0) {
+          setCollapsedNodes(prev => { const next = new Set(prev); next.add(focusedTaskId); return next; });
+        }
+      } else if (e.key === 'Escape') {
+        setFocusedTaskId(null);
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [focusedTaskId, setFocusedTaskId, currentBucket, collapsedNodes, setCollapsedNodes, tasks]);
+
   const rootProjects = tasks.filter(t => t.bucket === "project" && !t.parentId && !t.done);
   const allProjectTasks = tasks.filter(t => t.bucket === "project" && !t.done);
   const selectedProjectNode = allProjectTasks.find(t => t.id === projectParentId);
 
   // Flat filtered list used when filterText is active (bypasses all grouping/tree logic)
-  const filterActive = filterText.trim().length > 0;
+  const filterTextActive = filterText.trim().length > 0;
+  const filterActive = filterTextActive || selectedCategory != null || selectedLocation != null;
   const filteredTasks = filterActive
     ? bucketTasks.filter(t => {
-        const q = filterText.toLowerCase();
-        return (t.text || "").toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q);
+        const q = filterText.toLowerCase().trim();
+        const textMatch = !q || (t.text || "").toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q);
+        const catMatch  = selectedCategory == null || (selectedCategory === '__unassigned__' ? !t.category : t.category === selectedCategory);
+        const locMatch  = selectedLocation == null || (selectedLocation === '__unassigned__' ? !(t.location?.length) : (t.location || []).includes(selectedLocation));
+        return textMatch && catMatch && locMatch;
       })
     : null;
 
@@ -146,29 +278,98 @@ function TaskBucketView({
     <>
       {/* Panel header — bucket title + toolbar */}
       <div style={PANEL_HEADER_STYLE}>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: "1 1 160px", minWidth: 160 }}>
           <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 300 }}>{BUCKETS[currentBucket].label}</div>
           <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{BUCKETS[currentBucket].desc}</div>
         </div>
 
-        {/* In-bucket search filter */}
-        {bucketTasks.length > 0 && (
+        {/* In-bucket search filter, grouped together with the phone-only toggle buttons so
+            they wrap together as a unit (stay on the same row as each other) rather than the
+            toggles being forced onto their own separate line below. */}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, rowGap: 6 }}>
+          {(bucketTasks.length > 0 || ["next", "project", "waiting", "someday", "deferred", "done"].includes(currentBucket)) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <input
+                value={filterText}
+                onChange={e => setFilterText(e.target.value)}
+                placeholder="Filter…"
+                style={{ width: filterTextActive ? 160 : 90, background: COLORS.surface2, border: `1px solid ${filterTextActive ? COLORS.inbox + "88" : COLORS.border}`, borderRadius: 6, padding: "4px 9px", fontFamily: "inherit", fontSize: 12, color: COLORS.text, outline: "none", transition: "width 0.15s, border-color 0.15s" }}
+              />
+              {filterActive && (
+                <span style={{ fontSize: 11, color: COLORS.muted, whiteSpace: "nowrap" }}>
+                  {filteredTasks.length} / {bucketTasks.length}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Field visibility toggle — available for every bucket with tasks. Controls which
+              metadata badges (tags/time/category/due date/defer date) show on rows across the
+              whole app. On tablet/desktop, the Projects bucket instead renders this button
+              inside the Sort/Display cluster (between them) — see below — so it's skipped here
+              in that one case to avoid a duplicate. */}
+          {bucketTasks.length > 0 && !(currentBucket === "project" && !isPhone) && renderFieldsPopover()}
+
+          {/* Phone-only toggles: secondary controls (category/location, sort, display,
+              export, group, age-sort) and the add-project / add-task row. All start
+              collapsed to save space; each opens its existing content in its existing spot. */}
+          {isPhone && (["next", "project", "waiting", "someday", "deferred", "done"].includes(currentBucket)) && (
+            <button
+              onClick={() => setToolbarExpanded(v => !v)}
+              title={toolbarExpanded ? "Hide sort & filter controls" : "Show sort & filter controls"}
+              style={{ background: toolbarExpanded ? COLORS.surface3 : "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 9px", minHeight: 36, fontFamily: "inherit", fontSize: 15, color: COLORS.text2, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 3 }}
+            >
+              ⚙ {toolbarExpanded ? "▲" : "▾"}
+            </button>
+          )}
+          {isPhone && currentBucket === "project" && (
+            <button
+              onClick={() => setAddProjectExpanded(v => !v)}
+              title={addProjectExpanded ? "Hide add project" : "Add a project or task"}
+              style={{ background: addProjectExpanded ? COLORS.surface3 : "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 9px", minHeight: 36, fontFamily: "inherit", fontSize: 15, color: COLORS.text2, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 3 }}
+            >
+              ＋ {addProjectExpanded ? "▲" : "▾"}
+            </button>
+          )}
+          {isPhone && ["inbox", "next", "done"].includes(currentBucket) && (
+            <button
+              onClick={() => setAddTaskExpanded(v => !v)}
+              title={addTaskExpanded ? "Hide add task" : "Add a task"}
+              style={{ background: addTaskExpanded ? COLORS.surface3 : "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 9px", minHeight: 36, fontFamily: "inherit", fontSize: 15, color: COLORS.text2, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 3 }}
+            >
+              ＋ {addTaskExpanded ? "▲" : "▾"}
+            </button>
+          )}
+        </div>
+
+        {showToolbarControls && ["next", "project", "waiting", "someday", "deferred", "done"].includes(currentBucket) && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            <input
-              value={filterText}
-              onChange={e => setFilterText(e.target.value)}
-              placeholder="Filter…"
-              style={{ width: filterActive ? 160 : 90, background: COLORS.surface2, border: `1px solid ${filterActive ? COLORS.inbox + "88" : COLORS.border}`, borderRadius: 6, padding: "4px 9px", fontFamily: "inherit", fontSize: 12, color: COLORS.text, outline: "none", transition: "width 0.15s, border-color 0.15s" }}
-            />
-            {filterActive && (
-              <span style={{ fontSize: 11, color: COLORS.muted, whiteSpace: "nowrap" }}>
-                {filteredTasks.length} / {bucketTasks.length}
-              </span>
+            {categories?.length > 0 && (
+              <select
+                value={selectedCategory || ''}
+                onChange={e => setSelectedCategory(e.target.value || null)}
+                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: selectedCategory ? '#d4a844' : COLORS.text2, colorScheme: 'dark', cursor: 'pointer', outline: 'none' }}
+              >
+                <option value=''>All categories</option>
+                <option value='__unassigned__'>— No category assigned</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+            {locations?.length > 0 && (
+              <select
+                value={selectedLocation || ''}
+                onChange={e => setSelectedLocation(e.target.value || null)}
+                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: selectedLocation ? '#4a9fd4' : COLORS.text2, colorScheme: 'dark', cursor: 'pointer', outline: 'none' }}
+              >
+                <option value=''>All locations</option>
+                <option value='__unassigned__'>— No location assigned</option>
+                {locations.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
             )}
           </div>
         )}
 
-        {currentBucket === "project" && (
+        {showToolbarControls && currentBucket === "project" && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             {/* Quick Sort popover */}
             <div ref={quickSortRef} style={{ position: "relative" }}>
@@ -180,7 +381,7 @@ function TaskBucketView({
                 Sort ▾
               </ToolbarBtn>
               {quickSortOpen && (
-                <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 190, boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+                <div style={{ position: "absolute", top: "calc(100% + 4px)", left: isPhone ? 0 : "auto", right: isPhone ? "auto" : 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 190, maxWidth: isPhone ? "calc(100vw - 32px)" : "none", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
                   {[
                     { icon: "🗂", label: "Show Categories Only", action: () => { const s = new Set(); rootProjects.forEach(p => s.add(p.id)); setCollapsedNodes(s); setQuickSortOpen(false); } },
                     { icon: "📂", label: "Show SubCategories",   action: () => { const s = new Set(); const addDesc = id => { const t = tasks.find(x => x.id === id); (t?.childIds||[]).forEach(cid => { s.add(cid); addDesc(cid); }); }; rootProjects.forEach(p => addDesc(p.id)); setCollapsedNodes(s); setQuickSortOpen(false); } },
@@ -198,6 +399,10 @@ function TaskBucketView({
               )}
             </div>
 
+            {/* Fields toggle — positioned between Sort and Display per feedback, tablet/desktop only
+                (phone renders its own copy inline with the filter, above). */}
+            {!isPhone && renderFieldsPopover()}
+
             {/* Display popover */}
             {(() => {
               const visibleCount = [showCompletedInProjects, showWaitingInProjects, showSomeDayInProjects].filter(Boolean).length;
@@ -211,9 +416,9 @@ function TaskBucketView({
                     Display [{visibleCount}/3] ▾
                   </ToolbarBtn>
                   {displayOpen && (
-                    <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 185, boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: isPhone ? 0 : "auto", right: isPhone ? "auto" : 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 185, maxWidth: isPhone ? "calc(100vw - 32px)" : "none", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
                       {[
-                        { label: "✓  Completed",     state: showCompletedInProjects, toggle: () => setShowCompletedInProjects(v => !v) },
+                        { label: "📦 Archived",     state: showCompletedInProjects, toggle: () => setShowCompletedInProjects(v => !v) },
                         { label: "🛑  Waiting For",   state: showWaitingInProjects,   toggle: () => setShowWaitingInProjects(v => !v) },
                         { label: "⏳  Someday/Maybe", state: showSomeDayInProjects,   toggle: () => setShowSomeDayInProjects(v => !v) },
                       ].map(({ label, state, toggle }) => (
@@ -234,32 +439,61 @@ function TaskBucketView({
               );
             })()}
 
-            {categories && categories.length > 0 && (
-              <select
-                value={projectCategoryFilter || ''}
-                onChange={e => setProjectCategoryFilter(e.target.value || null)}
-                style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: projectCategoryFilter ? '#d4a844' : COLORS.text2, colorScheme: 'dark', cursor: 'pointer', outline: 'none' }}
-              >
-                <option value=''>All categories</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            )}
+            <TaskListExportPopover
+              tasks={tasks.filter(t => t.bucket === 'project')}
+              googleToken={googleToken}
+              docsEnabled={docsEnabled}
+              driveConversationExportFolderId={driveConversationExportFolderId}
+              defaultSections={{ project: true, next: true, waiting: false, someday: false, deferred: false }}
+              exportTemplates={exportTemplates}
+            />
           </div>
         )}
 
-        {currentBucket === "next" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
-            <span style={{ fontSize: 11, color: COLORS.muted, marginRight: 2 }}>Group:</span>
-            {GROUP_OPTS.map(opt => (
-              <ToolbarBtn
-                key={opt.key}
-                onClick={() => setNextGroupBy(opt.key)}
-                active={nextGroupBy === opt.key}
-                style={{ padding: '3px 9px', borderRadius: 6 }}
-              >
-                {opt.label}
-              </ToolbarBtn>
-            ))}
+        {showToolbarControls && currentBucket === "next" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: COLORS.muted }}>Group:</span>
+            <select
+              value={nextGroupBy}
+              onChange={e => setNextGroupBy(e.target.value)}
+              style={{ background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: nextGroupBy !== 'none' ? '#d4a844' : COLORS.text2, colorScheme: 'dark', cursor: 'pointer', outline: 'none' }}
+            >
+              {GROUP_OPTS.map(opt => <option key={opt.key} value={opt.key}>{opt.label}</option>)}
+            </select>
+            <TaskListExportPopover
+              tasks={tasks.filter(t => t.bucket === 'project')}
+              googleToken={googleToken}
+              docsEnabled={docsEnabled}
+              driveConversationExportFolderId={driveConversationExportFolderId}
+              defaultSections={{ project: false, next: true, waiting: false, someday: false, deferred: false }}
+              exportTemplates={exportTemplates}
+            />
+          </div>
+        )}
+        {showToolbarControls && (currentBucket === "waiting" || currentBucket === "someday" || currentBucket === "deferred") && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <ToolbarBtn
+              onClick={() => setAgeSortDir(d => d === null ? 'asc' : d === 'asc' ? 'desc' : null)}
+              active={ageSortDir !== null}
+              title="Sort by age (oldest first / newest first / tree)"
+            >
+              {ageSortDir === 'desc' ? 'Age ↓' : 'Age ↑'}
+            </ToolbarBtn>
+            <TaskListExportPopover
+              key={currentBucket}
+              tasks={tasks.filter(t => t.bucket === 'project')}
+              googleToken={googleToken}
+              docsEnabled={docsEnabled}
+              driveConversationExportFolderId={driveConversationExportFolderId}
+              exportTemplates={exportTemplates}
+              defaultSections={{
+                project:  false,
+                next:     false,
+                waiting:  currentBucket === 'waiting',
+                someday:  currentBucket === 'someday',
+                deferred: currentBucket === 'deferred',
+              }}
+            />
           </div>
         )}
       </div>
@@ -267,6 +501,7 @@ function TaskBucketView({
       {/* Add row */}
       {!(["deferred", "waiting", "someday"].includes(currentBucket)) && (
         currentBucket === "project" ? (
+          isPhone && !addProjectExpanded ? null : (
           <div style={ADD_ROW_STYLE}>
             <input
               value={addText}
@@ -319,7 +554,9 @@ function TaskBucketView({
               </>
             )}
           </div>
+          )
         ) : (
+          isPhone && !addTaskExpanded ? null : (
           <>
             <div style={ADD_ROW_STYLE}>
               <input
@@ -340,11 +577,12 @@ function TaskBucketView({
               </div>
             )}
           </>
+          )
         )
       )}
 
       {/* Task list */}
-      <div style={TASK_LIST_STYLE}>
+      <div style={TASK_LIST_STYLE} ref={taskListRef}>
         {filterActive ? (
           filteredTasks.length === 0 ? (
             <div style={{ padding: "28px 24px", textAlign: "center", color: COLORS.muted, fontSize: 12 }}>
@@ -422,27 +660,49 @@ function TaskBucketView({
         })() : (currentBucket === "waiting" || currentBucket === "someday" || currentBucket === "deferred") ? (() => {
           const flaggedIds = bucketTasks.map(t => t.id);
           const visibleSet = computeVisibleIds(flaggedIds, tasks);
+          const oldestTask = bucketTasks.length > 0
+            ? bucketTasks.reduce((oldest, t) => t.created < oldest.created ? t : oldest, bucketTasks[0])
+            : null;
+          const oldestDays = oldestTask ? Math.floor((Date.now() - oldestTask.created) / 86400000) : null;
+          const oldestColor = oldestDays === null ? COLORS.muted
+            : oldestDays >= 90 ? '#c87070'
+            : oldestDays >= 30 ? '#d4a844'
+            : COLORS.muted;
+          const sortedFlat = ageSortDir !== null
+            ? [...bucketTasks].sort((a, b) => ageSortDir === 'asc' ? a.created - b.created : b.created - a.created)
+            : null;
           return (
             <div>
+              {oldestTask && (
+                <div style={{ padding: "5px 18px 5px", fontSize: 11, color: COLORS.text2, borderBottom: `1px solid ${COLORS.border}`, display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ color: COLORS.muted, flexShrink: 0 }}>Oldest:</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{oldestTask.text}</span>
+                  <span style={{ color: oldestColor, flexShrink: 0, fontWeight: 500 }}>{oldestDays}d</span>
+                </div>
+              )}
               {currentBucket === "deferred" && (
                 <div style={{ padding: "6px 18px 4px", fontSize: 11, color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}`, marginBottom: 2 }}>
                   Tasks with a defer date — shown in project hierarchy. Move to Inbox automatically when their date arrives.
                 </div>
               )}
-              <ProjectTree
-                parentId={null}
-                depth={0}
-                dragId={null}
-                dropTarget={null}
-                visibilitySet={visibleSet}
-              />
+              {sortedFlat !== null ? (
+                sortedFlat.map(task => <TaskRow key={task.id} task={task} />)
+              ) : (
+                <ProjectTree
+                  parentId={null}
+                  depth={0}
+                  dragId={null}
+                  dropTarget={null}
+                  visibilitySet={visibleSet}
+                />
+              )}
             </div>
           );
         })() : (
           <>
             {currentBucket === "done" && <EffortAccuracyBar bucketTasks={bucketTasks} />}
             {currentBucket === "done" ? (
-              <CompletedTree parentId={null} depth={0} />
+              <ArchivedTree parentId={null} depth={0} />
             ) : currentBucket === "inbox" ? (
               <>
                 {inboxSelectedIds.size > 0 && (
@@ -499,13 +759,19 @@ TaskBucketView.propTypes = {
   onDragOver:        PropTypes.func.isRequired,
   onDragEnd:         PropTypes.func.isRequired,
   onDrop:            PropTypes.func.isRequired,
+  badgeVisibility:   PropTypes.object,
+  setBadgeVisibility: PropTypes.func,
   deferredDupeWarning: PropTypes.object,
   onViewDeferred:    PropTypes.func.isRequired,
   onBulkAssign:      PropTypes.func.isRequired,
+  locations:             PropTypes.array,
   uncategorizedProjectId: PropTypes.string,
   showCompletedInProjects:   PropTypes.bool,
   showWaitingInProjects:   PropTypes.bool,
   showSomeDayInProjects:   PropTypes.bool,
+  focusedTaskId:           PropTypes.string,
+  setFocusedTaskId:        PropTypes.func,
+  exportTemplates:         PropTypes.object,
   setShowWaitingInProjects: PropTypes.func,
   setShowSomeDayInProjects: PropTypes.func,
   setShowCompletedInProjects: PropTypes.func,

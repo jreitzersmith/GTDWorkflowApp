@@ -103,14 +103,14 @@ describe('getOrderedChildren', () => {
   const tasks = [
     { id: 'proj-1', bucket: 'project', childIds: ['child-b', 'child-a'] },
     { id: 'proj-2', bucket: 'project', childIds: [] },
-    { id: 'child-a', bucket: 'next', parentId: 'proj-1' },
-    { id: 'child-b', bucket: 'next', parentId: 'proj-1' },
-    { id: 'orphan', bucket: 'next' },
+    { id: 'child-a', bucket: 'project', isNextAction: true, parentId: 'proj-1' },
+    { id: 'child-b', bucket: 'project', isNextAction: true, parentId: 'proj-1' },
+    { id: 'orphan', bucket: 'project', isNextAction: true },
   ];
 
   it('returns all root projects when parentId is null', () => {
     const result = getOrderedChildren(null, tasks);
-    expect(result.map(t => t.id)).toEqual(['proj-1', 'proj-2']);
+    expect(result.map(t => t.id)).toEqual(['proj-1', 'proj-2', 'orphan']);
   });
 
   it('returns children in the order specified by parent.childIds', () => {
@@ -133,8 +133,8 @@ describe('getOrderedChildren', () => {
 describe('waterfallFilter', () => {
   it('includes tasks that have no next-bucket children', () => {
     const allTasks = [
-      { id: 'parent', bucket: 'next', done: false },
-      { id: 'child', bucket: 'inbox', parentId: 'parent', done: false },
+      { id: 'parent', bucket: 'project', isNextAction: true, done: false },
+      { id: 'child', bucket: 'project', parentId: 'parent', done: false }, // not a next action
     ];
     const result = waterfallFilter([allTasks[0]], allTasks);
     expect(result).toHaveLength(1);
@@ -142,16 +142,16 @@ describe('waterfallFilter', () => {
 
   it('excludes tasks that have at least one incomplete next-bucket child', () => {
     const allTasks = [
-      { id: 'parent', bucket: 'next', done: false },
-      { id: 'child', bucket: 'next', parentId: 'parent', done: false },
+      { id: 'parent', bucket: 'project', isNextAction: true, done: false },
+      { id: 'child', bucket: 'project', isNextAction: true, parentId: 'parent', done: false },
     ];
     expect(waterfallFilter([allTasks[0]], allTasks)).toHaveLength(0);
   });
 
   it('includes tasks whose next-bucket children are all done', () => {
     const allTasks = [
-      { id: 'parent', bucket: 'next', done: false },
-      { id: 'child', bucket: 'next', parentId: 'parent', done: true },
+      { id: 'parent', bucket: 'project', isNextAction: true, done: false },
+      { id: 'child', bucket: 'project', isNextAction: true, parentId: 'parent', done: true },
     ];
     expect(waterfallFilter([allTasks[0]], allTasks)).toHaveLength(1);
   });
@@ -276,6 +276,16 @@ describe('extractUpdateAction', () => {
   it('returns null when no recognised fields are present', () => {
     expect(extractUpdateAction('→ACTION:update|task-1|unknown:value')).toBeNull();
   });
+
+  it('parses notes_append and returns a notesAppend change', () => {
+    const result = extractUpdateAction('→ACTION:update|task-1|notes_append:New context');
+    expect(result).toEqual({ taskId: 'task-1', changes: { notesAppend: 'New context' } });
+  });
+
+  it('notes_append converts escaped newlines', () => {
+    const result = extractUpdateAction('→ACTION:update|task-1|notes_append:Line A\\nLine B');
+    expect(result).toEqual({ taskId: 'task-1', changes: { notesAppend: 'Line A\nLine B' } });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -368,8 +378,8 @@ describe('moveTaskInTree', () => {
   const baseTasks = [
     { id: 'proj-a', bucket: 'project', childIds: ['child-1', 'child-2'] },
     { id: 'proj-b', bucket: 'project', childIds: [] },
-    { id: 'child-1', bucket: 'next', parentId: 'proj-a' },
-    { id: 'child-2', bucket: 'next', parentId: 'proj-a' },
+    { id: 'child-1', bucket: 'project', isNextAction: true, parentId: 'proj-a' },
+    { id: 'child-2', bucket: 'project', isNextAction: true, parentId: 'proj-a' },
   ];
 
   it('returns the original array reference when drag and target are the same task', () => {

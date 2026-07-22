@@ -107,7 +107,7 @@
     <span class="current">📝 Code Snippets</span>
     <a href="project-commits.html">📦 Commit Log</a>
   </div>
-  <span class="updated">Last updated: May 9, 2026</span>
+  <span class="updated">Last updated: May 27, 2026</span>
 </header>
 
 <div class="shell">
@@ -183,6 +183,10 @@
   <a href="#snip-label-filter">Label filter — controlled input</a>
   <a href="#snip-record-usage">recordUsage callback</a>
   <a href="#snip-usage-panel">UsagePanel component</a>
+  <div class="group-label">May 19-20 — Process Inbox</div>
+  <a href="#snip-send-chat-with-text">sendChatWithText (OK button)</a>
+  <a href="#snip-extract-add-action-dispatch">extractAddAction dispatch</a>
+  <a href="#snip-cat-picker-dropdown">Category picker dropdown</a>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -6045,3 +6049,530 @@ function EventChip({ ev, isSelected, onClick }) {
 }
   </code></pre>
 </section>
+
+<hr>
+
+<h2>May 19–20 — Process Inbox: Quick-Reply, Action Dispatch, Category Dropdown</h2>
+
+<!-- sendChatWithText -->
+<div class="snippet" id="snip-send-chat-with-text">
+  <div class="snip-header">
+    <span class="snip-title">sendChatWithText — OK quick-reply without touching input state</span>
+    <span class="snip-file">src/features/coach/useCallAI.js · CoachPanel.jsx</span>
+    <span class="snip-back"><a href="project-summary.html#feat-process-inbox">↑ Feature: Process Inbox</a></span>
+  </div>
+  <div class="hljs-wrap">
+    <pre><code class="language-javascript">// ── useCallAI.js ──────────────────────────────────────────────────────────
+
+// The regular sendChat reads from the chatInput textarea state and clears it
+// after sending. Quick-reply buttons don't use the textarea at all — they
+// have a fixed payload ('confirm', 'yes', etc.). By extracting a separate
+// function that takes the text directly, we avoid coupling the quick-reply
+// to the input field lifecycle.
+
+const sendChat = useCallback(async () => {
+  const text = chatInput.trim();       // reads from controlled input state
+  if (!text || loading) return;
+  setChatInput('');                    // clears the textarea after sending
+  setMessages(prev => [...prev, { role: 'user', text }]);
+  await callAI(text, coachMode, chatHistory, { emailContext: emailContextRef.current });
+}, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages]);
+
+// Quick-reply variant: sends a fixed string without touching chatInput state.
+// Used by CoachPanel's OK button to confirm Step 3a interpretations.
+const sendChatWithText = useCallback(async (text) => {
+  if (!text || loading) return;
+  // No setChatInput('') here — the input field is untouched.
+  setMessages(prev => [...prev, { role: 'user', text }]);
+  await callAI(text, coachMode, chatHistory, { emailContext: emailContextRef.current });
+}, [loading, coachMode, chatHistory, callAI, setMessages]);
+
+// Both functions are returned from the hook and wired into the app:
+return { callAI, sendChat, sendChatWithText, fetchModels, lastInputLog, setEmailContext };
+
+
+// ── CoachPanel.jsx ────────────────────────────────────────────────────────
+
+// The OK button appears only in process mode, when:
+//   - the AI is not currently loading a response
+//   - there is no pending action bar showing
+//   - the last message in the conversation is from the assistant
+// Clicking it calls onQuickReply('confirm'), which is sendChatWithText
+// passed down as a prop from App.jsx.
+
+{coachMode === 'process' &amp;&amp; !loading &amp;&amp; !pendingAction &amp;&amp;
+ messages.length &gt; 0 &amp;&amp; messages[messages.length - 1]?.role === 'assistant' &amp;&amp; (
+  &lt;div style={{ padding: '4px 12px 0', display: 'flex', gap: 6, flexShrink: 0 }}&gt;
+    &lt;button
+      onClick={() =&gt; onQuickReply &amp;&amp; onQuickReply('confirm')}
+      // &#10003; is the HTML entity for a checkmark ✓
+      style={{ padding: '4px 14px', borderRadius: 6,
+               background: COLORS.next,   // green — confirms/approves
+               color: '#111', border: 'none',
+               fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+               cursor: 'pointer' }}
+    &gt;&#10003; OK&lt;/button&gt;
+  &lt;/div&gt;
+)}</code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why two separate functions?</strong> <code>sendChat</code> and
+    <code>sendChatWithText</code> both call <code>callAI</code>, but they differ
+    in one important way: <code>sendChat</code> reads from and clears the
+    controlled textarea (<code>chatInput</code> state), while
+    <code>sendChatWithText</code> bypasses it entirely. If you tried to reuse
+    <code>sendChat</code> for a quick-reply button, you'd have to set
+    <code>chatInput</code> to the fixed text, wait for a re-render, then call
+    <code>sendChat</code> — fragile and async-messy. A dedicated function is
+    cleaner.
+  </div>
+</div>
+
+<!-- extractAddAction dispatch -->
+<div class="snippet" id="snip-extract-add-action-dispatch">
+  <div class="snip-header">
+    <span class="snip-title">extractAddAction dispatch — wiring →ACTION:add into process mode</span>
+    <span class="snip-file">src/features/coach/useCallAI.js · ~line 1080</span>
+    <span class="snip-back"><a href="project-summary.html#feat-process-inbox">↑ Feature: Process Inbox</a></span>
+  </div>
+  <div class="hljs-wrap">
+    <pre><code class="language-javascript">// Inside the callAI response handler, after the AI reply comes back:
+// The app checks for three mutually-exclusive action types in priority order.
+
+// 1. →ACTION:update — modify an existing task (highest priority check)
+const updateAction = extractUpdateAction(reply);
+if (updateAction &amp;&amp; !_hasQuestion) {
+  const target = tasks.find(t =&gt; t.id === updateAction.taskId);
+  setPendingAction({
+    type: 'update',
+    taskId: updateAction.taskId,
+    changes: updateAction.changes,
+    title: target?.text || updateAction.taskId,
+  });
+} else {
+  // 2. →ACTION:add — place a new task under an existing project
+  // NOTE: extractAction() never returns type:'add' — its regex only matches
+  // next/project/someday/waiting/delete. So we need a separate parser here.
+  const addAction = extractAddAction(reply);
+  if (addAction &amp;&amp; !_hasQuestion) {
+
+    // Resolve the parent: try by ID first, then by exact name match.
+    // The AI might emit a task ID or a project name — both are supported.
+    const parent = tasks.find(t =&gt; t.id === addAction.parentId)
+                || tasks.find(t =&gt; t.text.toLowerCase() === (addAction.parentId || '').toLowerCase());
+
+    // Build the pending action object — all metadata fields are forwarded.
+    // The user can edit these in the metadata bar before confirming.
+    setPendingAction({
+      type: 'add',
+      title:      addAction.title,
+      parentRef:  addAction.parentId,         // raw value from ACTION line
+      parentName: parent?.text || addAction.parentId,  // display name
+      dueDate:    addAction.dueDate    || null,
+      deferUntil: addAction.deferUntil || null,
+      effort:     addAction.effort     || null,
+      location:   addAction.location   || [],
+      priority:   addAction.priority   || [],
+      category:   addAction.category   || null,
+      notes:      addAction.notes      || null,
+      recurrence: addAction.recurrence || null,
+    });
+  }
+  // If neither update nor add matched, the reply was informational only.
+  // (extractAction for next/project/someday/waiting/delete is handled
+  //  in a separate block earlier in the function.)
+}</code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why three separate parsers?</strong> The <code>→ACTION:</code>
+    protocol has grown over time. <code>extractAction</code> handles the
+    original types (next, project, someday, waiting, delete).
+    <code>extractUpdateAction</code> handles the later-added update type.
+    <code>extractAddAction</code> handles the newest add type. Each parser
+    uses a different regex tuned to its format. Merging them into one would
+    create a complex regex; keeping them separate makes each one easy to
+    read and modify independently.
+  </div>
+</div>
+
+<!-- Category picker dropdown -->
+<div class="snippet" id="snip-cat-picker-dropdown">
+  <div class="snip-header">
+    <span class="snip-title">Collapsible category picker — custom dropdown in PendingActionBar</span>
+    <span class="snip-file">src/features/coach/AICoach.jsx · PendingActionBar component</span>
+    <span class="snip-back"><a href="project-summary.html#feat-process-inbox">↑ Feature: Process Inbox</a></span>
+  </div>
+  <div class="hljs-wrap">
+    <pre><code class="language-javascript">// ── State &amp; outside-click handler ────────────────────────────────────────
+
+// catOpen tracks whether the dropdown list is visible.
+const [catOpen, setCatOpen] = useState(false);
+
+// catPickerRef points at the wrapper div that contains both the button
+// and the dropdown list. Used to detect outside clicks.
+const catPickerRef = useRef(null);
+
+// When the dropdown is open, listen for any mousedown on the document.
+// If the click target is outside our wrapper div, close the dropdown.
+// The cleanup function (return) removes the listener when catOpen changes,
+// preventing handler stacking.
+useEffect(() =&gt; {
+  if (!catOpen) return;  // no-op when dropdown is already closed
+  const handler = e =&gt; {
+    if (catPickerRef.current &amp;&amp; !catPickerRef.current.contains(e.target)) {
+      setCatOpen(false);  // clicked outside → close
+    }
+  };
+  document.addEventListener('mousedown', handler);
+  return () =&gt; document.removeEventListener('mousedown', handler);  // cleanup
+}, [catOpen]);
+
+
+// ── JSX: the button + dropdown list ──────────────────────────────────────
+
+&lt;div ref={catPickerRef} style={{ position: 'relative' }}&gt;
+  {/* The trigger button. Flexbox puts the label left, chevron right. */}
+  &lt;button
+    onClick={() =&gt; setCatOpen(o =&gt; !o)}    // toggle open/closed
+    style={{
+      background: COLORS.surface2, border: `1px solid ${COLORS.border}`,
+      borderRadius: 6, color: category ? COLORS.text : COLORS.muted,
+      padding: '4px 8px', fontFamily: 'inherit', fontSize: 12, outline: 'none',
+      width: '100%', boxSizing: 'border-box', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    }}
+  &gt;
+    {/* Label takes all available space; chevron stays fixed on the right */}
+    &lt;span style={{ flex: 1 }}&gt;{category || '— none —'}&lt;/span&gt;
+    &lt;span style={{ color: COLORS.muted, fontSize: 10, flexShrink: 0 }}&gt;▾&lt;/span&gt;
+  &lt;/button&gt;
+
+  {/* The dropdown list — only rendered when catOpen is true */}
+  {catOpen &amp;&amp; (
+    &lt;div style={{
+      position: 'absolute', top: 'calc(100% + 2px)',
+      left: 0, right: 0,                  // same width as button
+      background: COLORS.surface2,
+      border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4,
+      zIndex: 50,                          // float above other content
+      maxHeight: 200, overflowY: 'auto',   // scroll if many categories
+      boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+    }}&gt;
+      {/* "none" option always at top */}
+      &lt;div onClick={() =&gt; { onUpdatePendingAction('category', null); setCatOpen(false); }}
+           style={{ padding: '5px 8px', cursor: 'pointer', fontSize: 12, borderRadius: 4,
+                    color: !category ? COLORS.text : COLORS.muted,
+                    background: !category ? COLORS.surface3 : 'transparent' }}&gt;
+        — none —
+      &lt;/div&gt;
+
+      {/* If the AI suggested a category not in the user's list, show it first */}
+      {category &amp;&amp; !(categories || []).includes(category) &amp;&amp; (
+        &lt;div onClick={() =&gt; { onUpdatePendingAction('category', category); setCatOpen(false); }}
+             style={{ padding: '5px 8px', cursor: 'pointer', fontSize: 12, borderRadius: 4,
+                      color: COLORS.text, background: COLORS.surface3 }}&gt;
+          {category}
+        &lt;/div&gt;
+      )}
+
+      {/* User's configured category list */}
+      {(categories || []).map(c =&gt; (
+        &lt;div key={c}
+             onClick={() =&gt; { onUpdatePendingAction('category', c); setCatOpen(false); }}
+             style={{ padding: '5px 8px', cursor: 'pointer', fontSize: 12, borderRadius: 4,
+                      color: category === c ? COLORS.project : COLORS.text,
+                      background: category === c ? COLORS.surface3 : 'transparent' }}&gt;
+          {c}
+        &lt;/div&gt;
+      ))}
+    &lt;/div&gt;
+  )}
+&lt;/div&gt;</code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why not use a native &lt;select&gt;?</strong> The native HTML
+    <code>&lt;select&gt;</code> element cannot be styled to match the dark
+    theme or the button/chip aesthetic used elsewhere in the app. By building
+    a custom dropdown (button + absolute-positioned list), every pixel is
+    under your control. The outside-click handler via <code>useEffect</code>
+    + <code>useRef</code> is the standard React pattern for click-away
+    dismissal — think of it as "if the user clicks anywhere except this div,
+    close it."
+  </div>
+</div>
+
+<!-- ═══ applyTemplate ═══ -->
+<div class="snippet-entry" id="snippet-applyTemplate">
+  <div class="snippet-header">
+    <span class="snippet-title">applyTemplate() — pure template substitution</span>
+    <span class="snippet-file">src/features/coach/exportUtils.js</span>
+  </div>
+  <div class="snippet-body">
+    <pre><code class="language-javascript">
+// applyTemplate takes a template string and a vars object.
+// It replaces every {{key}} placeholder with the corresponding value.
+// Pure function: no side effects, always same output for same input.
+export function applyTemplate(template, vars) {
+  return Object.entries(vars).reduce((acc, [key, val]) => {
+    // split on "{{key}}" then rejoin with the value — avoids regex entirely.
+    // null/undefined values become empty string (not the word "null").
+    return acc.split('{{' + key + '}}').join(val != null ? String(val) : '');
+  }, template);
+  // reduce starts with the full template string as the accumulator (acc),
+  // then applies each variable substitution in turn.
+}
+    </code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why split/join instead of regex replace?</strong> A regex like
+    <code>/\{\{key\}\}/g</code> requires escaping and can behave
+    unexpectedly if the value contains <code>$</code> signs (which regex
+    replace interprets as backreferences). The split/join idiom is simpler,
+    faster for few substitutions, and handles any value string safely.
+  </div>
+  <div class="snippet-back"><a href="project-summary.html#feat-export-templates">↑ Feature: User-Editable Export Templates</a></div>
+</div>
+
+<!-- ═══ stripMarkdown ═══ -->
+<div class="snippet-entry" id="snippet-stripMarkdown">
+  <div class="snippet-header">
+    <span class="snippet-title">stripMarkdown() — convert Markdown to plain text</span>
+    <span class="snippet-file">src/features/coach/exportUtils.js</span>
+  </div>
+  <div class="snippet-body">
+    <pre><code class="language-javascript">
+// stripMarkdown converts a Markdown string to plain text suitable for
+// .txt export or clipboard paste. It preserves the structure but removes
+// all Markdown syntax markers.
+export function stripMarkdown(text) {
+  return text
+    // Convert --- (horizontal rule on its own line) to a row of dashes.
+    // The word boundary \b ensures we don't match "---extra" or "----".
+    .replace(/^---$/gm, '----------')
+    // Remove heading markers (# ## ###) at start of line, plus trailing space.
+    .replace(/^#{1,3} /gm, '')
+    // Remove bold markers (**text** or __text__).
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    // Remove italic markers (*text* or _text_).
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/_(.*?)_/g, '$1');
+  // Note: blockquote (>) and bullet (-) markers are left as-is
+  // because they read naturally in plain text.
+}
+    </code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why convert --- to ----------?</strong> A horizontal rule in plain
+    text export looks better as a visible divider line. Ten dashes are wide
+    enough to read as a separator without being overwhelming. The <code>^---$</code>
+    with <code>gm</code> flags (global + multiline) ensures only a line that
+    is <em>exactly</em> three dashes triggers the conversion — not
+    <code>---extra</code> or <code>----</code>.
+  </div>
+  <div class="snippet-back"><a href="project-summary.html#feat-export-templates">↑ Feature: User-Editable Export Templates</a></div>
+</div>
+
+<!-- ═══ escRtf ═══ -->
+<div class="snippet-entry" id="snippet-escRtf">
+  <div class="snippet-header">
+    <span class="snippet-title">escRtf() — encode non-ASCII characters for RTF files</span>
+    <span class="snippet-file">src/features/coach/exportUtils.js</span>
+  </div>
+  <div class="snippet-body">
+    <pre><code class="language-javascript">
+// escRtf converts a string so it is safe to embed in an RTF file.
+// RTF is a 7-bit ASCII format — any character with a code point > 127
+// must be written using RTF's own Unicode escape notation: \uN?
+// where N is the signed 16-bit code point and ? is the ASCII fallback.
+function escRtf(str) {
+  // First escape the three characters RTF uses as control signals.
+  let s = str
+    .replace(/\\/g, '\\\\')   // backslash → \\
+    .replace(/\{/g, '\\{')       // { → \{
+    .replace(/\}/g, '\\}');      // } → \}
+
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const cp = s.codePointAt(i);    // Unicode code point of this character
+
+    if (cp > 0xFFFF) {
+      // Characters above U+FFFF need two UTF-16 code units (a surrogate pair).
+      // RTF \u only understands 16-bit values — skip these with a ? placeholder.
+      out += '?';
+      i++;  // skip the second half of the surrogate pair
+    } else if (cp > 127) {
+      // Non-ASCII BMP character: write as RTF Unicode escape.
+      // RTF uses signed 16-bit, so values above 32767 become negative.
+      const signed = cp <= 0x7FFF ? cp : cp - 0x10000;
+      out += '\\u' + signed + '?';  // e.g. \u8212? for em dash (U+2014)
+    } else {
+      out += s[i];                    // plain ASCII — pass through unchanged
+    }
+  }
+  return out;
+}
+    </code></pre>
+  </div>
+  <div class="annotation">
+    <strong>The signed 16-bit rule feels odd but is the spec:</strong>
+    U+2014 (em dash) has decimal value 8212, which is below 32767, so it
+    writes as <code>\u8212?</code>. U+00B7 (middle dot) is 183 — also
+    direct. A character at U+9000 (36864 decimal) exceeds 32767, so it
+    becomes <code>36864 - 65536 = -28672</code>, written as
+    <code>\u-28672?</code>. This is exactly what the RTF specification
+    requires; Word and other readers implement it correctly.
+    The <code>?</code> at the end is the "fallback" — what to show if the
+    reader does not understand the Unicode escape. For most readers today
+    it is never displayed.
+  </div>
+  <div class="snippet-back"><a href="project-summary.html#feat-rtf-unicode">↑ Feature: RTF Unicode Fix</a></div>
+</div>
+
+<!-- ═══ insertIntoRowTemplate ═══ -->
+<div class="snippet-entry" id="snippet-insertIntoRowTemplate">
+  <div class="snippet-header">
+    <span class="snippet-title">insertIntoRowTemplate() — cursor-position-aware chip insertion</span>
+    <span class="snippet-file">src/features/settings/ExportTemplateEditor.jsx</span>
+  </div>
+  <div class="snippet-body">
+    <pre><code class="language-javascript">
+// rowTemplateSelectionRef remembers where the cursor was in the row
+// template textarea, even after the user clicks away to press a chip button.
+const rowTemplateSelectionRef = useRef({ start: 0, end: 0 });
+
+// saveRowSelection is called whenever focus leaves the textarea (onBlur)
+// or the selection changes (onSelect). It records the cursor position.
+const saveRowSelection = useCallback((e) => {
+  const ta = e.target;
+  rowTemplateSelectionRef.current = {
+    start: ta.selectionStart,
+    end: ta.selectionEnd,
+  };
+}, []);
+
+// The textarea uses both handlers so the ref is always up to date.
+// &lt;textarea
+//   ref={rowTemplateRef}
+//   onBlur={saveRowSelection}
+//   onSelect={saveRowSelection}
+//   ...
+// /&gt;
+
+// insertIntoRowTemplate splices the insertion string at the saved cursor
+// position, then restores focus and repositions the cursor after the insertion.
+const insertIntoRowTemplate = useCallback((templateKey, insertion) => {
+  // Read the saved cursor position from the ref (not document.activeElement —
+  // that would be the chip button, because clicking it stole focus).
+  const { start, end } = rowTemplateSelectionRef.current;
+
+  // Get the current template value and splice the insertion in.
+  const currentValue = exportTemplates[templateKey] || DEFAULT_EXPORT_TEMPLATES[templateKey];
+  const newValue = currentValue.slice(0, start) + insertion + currentValue.slice(end);
+
+  // Update the template state.
+  onExportTemplatesChange({ ...exportTemplates, [templateKey]: newValue });
+
+  // After React re-renders, refocus the textarea and set the cursor
+  // to just after the inserted text. requestAnimationFrame defers this
+  // until after the DOM has been updated.
+  requestAnimationFrame(() => {
+    const ta = rowTemplateRef.current;
+    if (ta) {
+      ta.focus();
+      const pos = start + insertion.length;
+      ta.setSelectionRange(pos, pos);
+      rowTemplateSelectionRef.current = { start: pos, end: pos };
+    }
+  });
+}, [exportTemplates, onExportTemplatesChange]);
+    </code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Why not just check document.activeElement?</strong>
+    Clicking a button is a two-step event: mousedown (focus moves to the button,
+    textarea loses focus) then click (handler runs). By the time the click handler
+    fires, <code>document.activeElement</code> is the button, not the textarea.
+    The check <code>if (document.activeElement === ta)</code> always fails.
+    Saving the cursor position in a <code>useRef</code> on <code>onBlur</code>
+    captures it at the moment focus leaves — which is before the click fires.
+    The ref persists the value across renders and event handlers without
+    causing re-renders itself, making it perfect for mutable bookkeeping
+    like "where was the cursor last time?"
+  </div>
+  <div class="snippet-back"><a href="project-summary.html#feat-export-row-templates">↑ Feature: Export Row Sub-Templates</a></div>
+</div>
+
+<!-- ═══ subIndent ═══ -->
+<div class="snippet-entry" id="snippet-subIndent">
+  <div class="snippet-header">
+    <span class="snippet-title">subIndent pattern — depth+1 for task sub-rows in hierarchical export</span>
+    <span class="snippet-file">src/features/coach/exportUtils.js</span>
+  </div>
+  <div class="snippet-body">
+    <pre><code class="language-javascript">
+// Inside buildHierarchicalExportContent, walk() is called recursively for
+// each task in the tree. `depth` tracks how many levels deep we are.
+// `resolvedIndentUnit` is the user-configured indent string (e.g. "  " or "--").
+
+function walk(task, depth) {
+  // Build the indent prefix for this task's main row.
+  // depth 0 = root, depth 1 = one level in, etc.
+  const indent = resolvedIndentUnit.repeat(depth);
+
+  // Apply the user's row template (e.g. "{{indent}}{{bullet}} {{text}}").
+  lines.push(applyTemplate(resolvedTaskRowTemplate, {
+    indent,
+    depth: String(depth),
+    bullet: task.done ? '[x]' : '[ ]',
+    text: task.text,
+  }));
+
+  // Sub-rows (metadata and notes) belong to this task but are visually
+  // subordinate — so they live at depth + 1.
+  const subIndent = resolvedIndentUnit.repeat(depth + 1);
+
+  if (include.metadata) {
+    const meta = [];
+    if (task.dueDate)                 meta.push('Due: ' + task.dueDate);
+    if (task.effort)                  meta.push('Effort: ' + task.effort);
+    if ((task.location || []).length) meta.push('Location: ' + task.location.join(', '));
+    if ((task.priority || []).length) meta.push('Priority: ' + task.priority.join(', '));
+    // subIndent is one level deeper than the task row itself.
+    if (meta.length) lines.push(subIndent + '*' + meta.join(' · ') + '*');
+  }
+
+  if (include.notes && task.notes) {
+    // Multi-line notes: every continuation line gets the same subIndent prefix.
+    lines.push(subIndent + '> ' + task.notes.replace(/\n/g, '\n' + subIndent + '> '));
+  }
+
+  // Recurse into children at depth + 1.
+  (task.childIds || []).forEach(childId => {
+    const child = taskMap[childId];
+    if (child) walk(child, depth + 1);
+  });
+}
+    </code></pre>
+  </div>
+  <div class="annotation">
+    <strong>Recursive tree walking:</strong>
+    Each call to <code>walk(task, depth)</code> processes one task and then
+    calls itself for each child, passing <code>depth + 1</code>. This is
+    the standard algorithm for traversing any tree structure. The base case
+    is implicit: when a task has no <code>childIds</code> the
+    <code>forEach</code> does nothing and the recursion stops naturally.
+    <br><br>
+    <strong>DRY sub-indent:</strong>
+    Using <code>resolvedIndentUnit.repeat(depth + 1)</code> means the
+    sub-row indent always tracks the main-row indent unit. If you later
+    change the indent unit from spaces to dashes, both the task row and its
+    metadata/notes automatically update — there is no second constant to
+    change.
+  </div>
+  <div class="snippet-back"><a href="project-summary.html#feat-hierarchical-sub-rows">↑ Feature: Hierarchical Export Sub-rows</a></div>
+</div>
+
+</main>
+</body>
+</html>

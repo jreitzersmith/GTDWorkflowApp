@@ -41,7 +41,7 @@ If unsure: use Sonnet Only. The worker variant saves money on repetitive executi
 
 Do this before opening the session:
 
-1. Open `Known_Issues_And_Requests.md` and pick items by priority. Note their Issue#/FR# numbers.
+1. Open `Backlog.md` and pick items by priority. Note their Issue#/FR# numbers.
 2. Write a one-sentence definition of done for each item. If you can't write it, the item isn't ready to plan.
 3. Check for dependencies: does any item require another to be done first?
 4. Set a scope limit: 2–4 items per cycle. More than that invites drift.
@@ -154,7 +154,7 @@ Apply these on both variants.
 **Do instead:** Write your complete item list before opening the session. The first message should contain everything Claude needs to plan.
 
 **Stop:** Asking Claude if something was done rather than checking the artifact.
-**Do instead:** Check `git log`, `Known_Issues_And_Requests.md`, or GitHub Issues directly. Claude's confirmation is not a substitute for checking the actual artifact.
+**Do instead:** Check `git log`, `Backlog.md`, or GitHub Issues directly. Claude's confirmation is not a substitute for checking the actual artifact.
 
 ---
 

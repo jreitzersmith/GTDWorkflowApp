@@ -206,47 +206,57 @@ function CalendarMonthView({ navDate, events, today, onDayClick, onEventClick, s
   const year = navDate.getFullYear();
   const month = navDate.getMonth();
   const grid = buildMonthGrid(year, month);
+  const weekCount = grid.length / 7;
 
   return (
-    <div style={{ padding: '8px 0' }}>
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '8px 0 0' }}>
       {selectedEvent && (
         <EventDetailPanel ev={selectedEvent} onProcessWithAI={onProcessWithAI} onClose={() => onEventClick(selectedEvent)} onDelete={onDelete} onReschedule={onReschedule} linkedTasks={linkedTasks} onOpenTask={onOpenTask} />
       )}
-      {/* Unified grid: header row + day cells share one set of column tracks */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(135px, 1fr))' }}>
-        {DAY_NAMES_SHORT.map(d => (
-          <div key={d} style={{ padding: '4px 6px', fontSize: 10, color: COLORS.muted, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${COLORS.border}` }}>{d}</div>
-        ))}
-        {grid.map((d, i) => {
-          const isThisMonth = d.getMonth() === month;
-          const isToday = isSameDay(d, today);
-          const dayEvents = eventsForDay(events, d.getFullYear(), d.getMonth(), d.getDate());
-          const maxShow = 3;
-          const overflow = dayEvents.length - maxShow;
-          return (
-            <div
-              key={d.toISOString()}
-              onClick={() => onDayClick(new Date(d))}
-              style={{
-                minHeight: 80, padding: '4px 4px 2px',
-                borderRight: (i + 1) % 7 !== 0 ? `1px solid ${COLORS.border}` : 'none',
-                borderBottom: `1px solid ${COLORS.border}`, cursor: 'pointer',
-                background: isToday ? COLORS.calendarBg : 'transparent',
-                transition: 'background 0.1s',
-              }}
-            >
-              <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? COLORS.calendar : isThisMonth ? COLORS.text2 : COLORS.muted, marginBottom: 2, textAlign: 'right', paddingRight: 2 }}>
-                {isToday ? <span style={{ background: COLORS.calendar, color: '#fff', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{d.getDate()}</span> : d.getDate()}
-              </div>
-              {dayEvents.slice(0, maxShow).map(ev => (
-                <EventChip key={ev.id} ev={ev} isSelected={selectedEvent?.id === ev.id} onClick={onEventClick} />
-              ))}
-              {overflow > 0 && (
-                <div style={{ fontSize: 9, color: COLORS.muted, paddingLeft: 4, cursor: 'pointer' }}>+{overflow} more</div>
-              )}
-            </div>
-          );
-        })}
+      {/* Horizontal scroll wrapper — the 7-column grid has a 135px/col floor (945px total)
+          that won't fit a phone width; scrolling sideways to see the rest of the week is
+          the accepted tradeoff. Vertically, the grid fills whatever height its flex:1
+          parent gives it, with each week row dividing that height equally. */}
+      <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+        <div style={{ minWidth: 945, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(135px, 1fr))', flexShrink: 0 }}>
+            {DAY_NAMES_SHORT.map(d => (
+              <div key={d} style={{ padding: '4px 6px', fontSize: 10, color: COLORS.muted, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${COLORS.border}` }}>{d}</div>
+            ))}
+          </div>
+          <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'repeat(7, minmax(135px, 1fr))', gridTemplateRows: `repeat(${weekCount}, 1fr)` }}>
+            {grid.map((d, i) => {
+              const isThisMonth = d.getMonth() === month;
+              const isToday = isSameDay(d, today);
+              const dayEvents = eventsForDay(events, d.getFullYear(), d.getMonth(), d.getDate());
+              const maxShow = 3;
+              const overflow = dayEvents.length - maxShow;
+              return (
+                <div
+                  key={d.toISOString()}
+                  onClick={() => onDayClick(new Date(d))}
+                  style={{
+                    padding: '4px 4px 2px', overflow: 'hidden',
+                    borderRight: (i + 1) % 7 !== 0 ? `1px solid ${COLORS.border}` : 'none',
+                    borderBottom: `1px solid ${COLORS.border}`, cursor: 'pointer',
+                    background: isToday ? COLORS.calendarBg : 'transparent',
+                    transition: 'background 0.1s',
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? COLORS.calendar : isThisMonth ? COLORS.text2 : COLORS.muted, marginBottom: 2, textAlign: 'right', paddingRight: 2 }}>
+                    {isToday ? <span style={{ background: COLORS.calendar, color: '#fff', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>{d.getDate()}</span> : d.getDate()}
+                  </div>
+                  {dayEvents.slice(0, maxShow).map(ev => (
+                    <EventChip key={ev.id} ev={ev} isSelected={selectedEvent?.id === ev.id} onClick={onEventClick} />
+                  ))}
+                  {overflow > 0 && (
+                    <div style={{ fontSize: 9, color: COLORS.muted, paddingLeft: 4, cursor: 'pointer' }}>+{overflow} more</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

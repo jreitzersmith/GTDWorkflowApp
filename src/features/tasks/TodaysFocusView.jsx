@@ -1,12 +1,143 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { COLORS } from "../../constants.jsx";
+import { useViewport } from "../../hooks/useViewport.js";
 import { effortToMinutes } from "./taskUtils.jsx";
+import { buildFocusViewExportContent, buildFocusViewJsonExport, buildRtfContent, stripMarkdown, saveToDrive, downloadText } from "../coach/exportUtils.js";
 
 const FOCUS_COLOR = "#f0c040";
 
+const FOCUS_FORMAT_OPTIONS = [
+  { value: 'rtf',      shortLabel: 'Rich text'  },
+  { value: 'markdown', shortLabel: 'Markdown'   },
+  { value: 'text',     shortLabel: 'Plain text' },
+  { value: 'json',     shortLabel: 'JSON'       },
+];
+const FOCUS_INCLUDE_OPTIONS = [
+  { key: 'header',   label: 'Export header'        },
+  { key: 'metadata', label: 'Dates, effort & tags'  },
+  { key: 'notes',    label: 'Task notes'            },
+];
+
+// tiers: [{ label, tasks }] — only the sections visible in the view
+function FocusExportPopover({ tiers, googleToken, docsEnabled, driveConversationExportFolderId }) {
+  const { isPhone } = useViewport();
+  const [open, setOpen]       = useState(false);
+  const [fmt, setFmt]         = useState('rtf');
+  const [include, setInclude] = useState({ header: true, metadata: true, notes: false });
+  const [status, setStatus]   = useState('idle');
+  const [driveUrl, setDriveUrl] = useState(null);
+  const [errMsg, setErrMsg]   = useState(null);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const toggleInclude = key => setInclude(prev => ({ ...prev, [key]: !prev[key] }));
+  const handleOpen = () => { setOpen(o => !o); setStatus('idle'); setDriveUrl(null); setErrMsg(null); };
+
+  const getContent = useCallback(() => {
+    if (fmt === 'json') return buildFocusViewJsonExport(tiers, include);
+    return buildFocusViewExportContent(tiers, include);
+  }, [tiers, include, fmt]);
+
+  const handleDownload = useCallback(() => {
+    setStatus('downloading'); setDriveUrl(null); setErrMsg(null);
+    try {
+      const title = 'GTD-Focus-' + new Date().toISOString().slice(0, 10);
+      const raw = getContent();
+      if (fmt === 'rtf')           downloadText(buildRtfContent(raw), title + '.rtf',  'application/rtf');
+      else if (fmt === 'markdown') downloadText(raw,                  title + '.md',   'text/markdown');
+      else if (fmt === 'json')     downloadText(raw,                  title + '.json', 'application/json');
+      else                         downloadText(stripMarkdown(raw),   title + '.txt',  'text/plain');
+      setStatus('downloaded');
+    } catch (err) { setErrMsg(err.message || 'Download failed'); setStatus('error'); }
+  }, [getContent, fmt]);
+
+  const handleSaveToDrive = useCallback(async () => {
+    if (!googleToken || !docsEnabled) {
+      setErrMsg('Google Docs is not connected. Connect Docs in Settings › Google Services.');
+      setStatus('error'); return;
+    }
+    setStatus('saving'); setDriveUrl(null); setErrMsg(null);
+    try {
+      const title = 'GTD-Focus-' + new Date().toISOString().slice(0, 10);
+      const url = await saveToDrive({ markdownText: getContent(), googleToken, title, format: fmt === 'json' ? 'text' : fmt, driveConversationExportFolderId });
+      setDriveUrl(url); setStatus('saved');
+    } catch (err) { setErrMsg(err.message || 'Save to Drive failed'); setStatus('error'); }
+  }, [getContent, fmt, googleToken, docsEnabled, driveConversationExportFolderId]);
+
+  const busy = status === 'downloading' || status === 'saving';
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+      <button onClick={handleOpen} title="Export today's focus"
+        style={{ background: 'transparent', border: '0.5px solid ' + COLORS.border2, borderRadius: 6,
+          padding: '3px 8px', fontFamily: 'inherit', fontSize: 12, color: COLORS.text2, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 3 }}>
+        Export
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: COLORS.surface2,
+          border: '1px solid ' + COLORS.border2, borderRadius: 8, padding: 14, zIndex: 60, width: isPhone ? 'min(240px, calc(100vw - 32px))' : 240,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.35)' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 10 }}>Export today's focus</div>
+          <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 6 }}>Format</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 12 }}>
+            {FOCUS_FORMAT_OPTIONS.map(({ value, shortLabel }) => (
+              <button key={value} onClick={() => setFmt(value)}
+                style={{ padding: '4px 0', borderRadius: 5, fontFamily: 'inherit', fontSize: 10, cursor: 'pointer',
+                  border: '0.5px solid ' + (fmt === value ? COLORS.next : COLORS.border2),
+                  background: fmt === value ? COLORS.next + '22' : 'transparent',
+                  color: fmt === value ? COLORS.next : COLORS.text2,
+                  fontWeight: fmt === value ? 600 : 400 }}>
+                {shortLabel}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.text2, marginBottom: 6 }}>Include</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
+            {FOCUS_INCLUDE_OPTIONS.map(({ key, label }) => (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: COLORS.text, cursor: 'pointer' }}>
+                <input type="checkbox" checked={!!include[key]} onChange={() => toggleInclude(key)}
+                  style={{ accentColor: COLORS.next, width: 13, height: 13, flexShrink: 0 }} />
+                {label}
+              </label>
+            ))}
+          </div>
+          {status === 'downloaded' && <div style={{ fontSize: 11, color: COLORS.next, marginBottom: 8 }}>Downloaded successfully.</div>}
+          {status === 'saved' && driveUrl && (
+            <div style={{ fontSize: 11, marginBottom: 8 }}>
+              <a href={driveUrl} target="_blank" rel="noreferrer" style={{ color: COLORS.next, textDecoration: 'none' }}>View in Google Docs &#x2197;</a>
+            </div>
+          )}
+          {status === 'error' && <div style={{ fontSize: 11, color: COLORS.waiting, marginBottom: 8, lineHeight: 1.4 }}>{errMsg}</div>}
+          <button onClick={handleDownload} disabled={busy}
+            style={{ width: '100%', padding: '6px 0', borderRadius: 6, border: 'none', fontFamily: 'inherit',
+              fontSize: 12, fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', marginBottom: docsEnabled ? 6 : 0,
+              background: busy ? COLORS.surface3 : COLORS.next, color: busy ? COLORS.muted : '#111' }}>
+            {status === 'downloading' ? 'Downloading…' : 'Download'}
+          </button>
+          {docsEnabled && (
+            <button onClick={handleSaveToDrive} disabled={busy}
+              style={{ width: '100%', padding: '6px 0', borderRadius: 6, border: '0.5px solid ' + COLORS.border2,
+                background: 'transparent', fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+                cursor: busy ? 'not-allowed' : 'pointer', color: busy ? COLORS.muted : COLORS.text2 }}>
+              {status === 'saving' ? 'Saving…' : 'Save to Drive'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TIER_KEYS = ['dueToday', 'overdue', 'dueThisWeek', 'noCalEvent'];
 
-function TodaysFocusView({ tasks, calendarEvents, calendarEnabled, onDailyReview, onOpenDetail, tagDisplay, focusExpandedDefaults, onSetFocusExpandedDefaults }) {
+function TodaysFocusView({ tasks, calendarEvents, calendarEnabled, onDailyReview, onOpenDetail, tagDisplay, focusExpandedDefaults, onSetFocusExpandedDefaults, googleToken, docsEnabled, driveConversationExportFolderId }) {
   const today8601 = new Date().toISOString().slice(0, 10);
   const focusKey = `gtd-todays-focus-${today8601}`;
 
@@ -68,6 +199,15 @@ function TodaysFocusView({ tasks, calendarEvents, calendarEnabled, onDailyReview
   });
 
   const totalItems = mustAccomplish.length + dueToday.length + overdue.length + dueThisWeek.length + noCalEvent.length;
+
+  // Tiers passed to FocusExportPopover — only sections with items, matching the view
+  const focusTiers = [
+    ...(mustAccomplish.length > 0 ? [{ label: '⭐ Must Accomplish', tasks: mustAccomplish }] : []),
+    ...(dueToday.length    > 0 ? [{ label: '📅 Due Today',              tasks: dueToday    }] : []),
+    ...(overdue.length     > 0 ? [{ label: '⚠ Overdue',                 tasks: overdue     }] : []),
+    ...(dueThisWeek.length > 0 ? [{ label: '📆 Due This Week (>1hr)',    tasks: dueThisWeek }] : []),
+    ...(noCalEvent.length  > 0 ? [{ label: '📆 Due · No Calendar Event', tasks: noCalEvent  }] : []),
+  ];
 
   const s = {
     container: { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: COLORS.bg },
@@ -169,14 +309,17 @@ function TodaysFocusView({ tasks, calendarEvents, calendarEnabled, onDailyReview
 
   return (
     <div style={s.container}>
-      <div style={s.header}>
-        <div style={s.headerTitle}>📋 Today's Focus</div>
-        <div style={s.headerSub}>
-          {today8601}
-          {hasFocusToday
-            ? ` · ${mustAccomplish.filter(t => t.done).length}/${mustAccomplish.length} MUST accomplished`
-            : ' · No focus set — run Start Day to set your MITs'}
+      <div style={{ ...s.header, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <div style={s.headerTitle}>📋 Today's Focus</div>
+          <div style={s.headerSub}>
+            {today8601}
+            {hasFocusToday
+              ? ` · ${mustAccomplish.filter(t => t.done).length}/${mustAccomplish.length} MUST accomplished`
+              : ' · No focus set — run Start Day to set your MITs'}
+          </div>
         </div>
+        <FocusExportPopover tiers={focusTiers} googleToken={googleToken} docsEnabled={docsEnabled} driveConversationExportFolderId={driveConversationExportFolderId} />
       </div>
       <div style={s.body}>
         {hasFocusToday && (

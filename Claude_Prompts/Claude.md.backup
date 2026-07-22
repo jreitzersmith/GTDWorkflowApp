@@ -4,40 +4,30 @@
 
 A personal GTD task manager built as a React SPA with an AI coach powered by the Anthropic Claude API. Integrates with Google services (Gmail, Google Calendar, Drive, Docs, Sheets, Slides) for email management, calendar sync, and file attachments. Primary persistence via Supabase (tasks + user_settings + gmail_queue tables); localStorage fallback for unauthenticated sessions. Real-time cross-device sync via Supabase subscription channel.
 
-## User context
-
-Knowledge worker / desk job. Has tried GTD before but fades after ~1 week. Wants the AI to actively maintain the GTD system, not just answer questions. Is a capable sysadmin (Linux/macOS/Windows/AWS) but new to React/Node and to AI-assisted pair programming.
-
 ---
 
 ## Tech stack
 
-- React (functional components + hooks), inline styles only, shared tokens in `COLORS`, styles in `s`
+- React (functional components + hooks only — no class components), inline styles throughout (no CSS files), shared design tokens in `COLORS`
 - Anthropic Claude API (`claude-sonnet-4-6`); local Ollama support for coach panel
 - Supabase: `tasks` + `user_settings` + `gmail_queue` tables; `useSupabaseAuth.js`, `src/api/supabase.js` (field mappers: `taskToDb`/`dbToTask`, `queueEntryToRow`/`rowToQueueEntry`); tasks table includes `drive_attachments` JSONB column
 - Google OAuth 2.0 (PKCE flow) via `useGoogleAuth.js`; unified scope management for Gmail, Calendar, Drive, Docs, Sheets, Slides
 - Google API modules: `src/api/driveApi.js`, `docsApi.js`, `sheetsApi.js`, `slidesApi.js` (typed wrappers with 401 retry)
 - Vite for local dev
 
-## Coding standards
+---
 
-See `Claude_Prompts/Cycle_Programming_Code_Standards.md`. Read it before writing or reviewing any code.
+## References
 
-## Pairing workflow
-
-See `Claude_Prompts/Cycle_Programming_Workflow.md`. Read it at session start and follow it for every change.
-
-## Known issues and roadmap
-
-See `Claude_Prompts/Known_Issues_And_Requests.md`. Read when planning or triaging.
-
-## Resolved issues
-
-See `Claude_Prompts/Resolved_Issues_And_Requests.md`. Append after every resolving commit.
-
-## Project documentation
-
-See `Claude_Prompts/Project_Summary.md` before updating HTML docs in `Product_Summary/`.
+| Trigger | File |
+|---|---|
+| Every session | `Claude_Prompts/Workflow.md` |
+| Writing or reviewing any code | `Claude_Prompts/Standards_Code_React.md` |
+| Planning or triaging | `Claude_Prompts/Backlog.md` |
+| After resolving items | `Claude_Prompts/Changelog.md` |
+| Updating HTML docs | `Claude_Prompts/Project_Summary.md` |
+| Inspecting live schema | `scripts/get_schema.md` |
+| Editing any file | `Claude_Prompts/File_Editing_Rules.md` |
 
 ---
 
@@ -46,18 +36,24 @@ See `Claude_Prompts/Project_Summary.md` before updating HTML docs in `Product_Su
 ```
 GTDWorkflowApp/
 ├── CLAUDE.md
+├── Graphics/                  ← app icons and image assets
+│   ├── getting-things-done.ico
+│   └── getting-things-done.png
 ├── Product_Summary/
 │   ├── project-summary.html
 │   ├── project-commits.html
 │   └── project-snippets.html
 ├── Claude_Prompts/
-│   ├── Cycle_Programming_Claude.md   ← this file
-│   ├── Cycle_Programming_Workflow.md
-│   ├── Cycle_Programming_Code_Standards.md
-│   ├── Cycle_Programming_UserProcess.md
-│   ├── Known_Issues_And_Requests.md
-│   ├── Resolved_Issues_And_Requests.md
+│   ├── Claude.md.backup   ← this file
+│   ├── Workflow.md
+│   ├── Standards_Code_React.md
+│   ├── User_Process.md
+│   ├── Backlog.md
+│   ├── Changelog.md
 │   └── Project_Summary.md
+├── scripts/                   ← dev-session tools (not part of app bundle)
+│   ├── get_schema.py          ← fetch live Supabase schema
+│   └── README.md
 ├── src/
 │   ├── App.jsx
 │   ├── constants.jsx          ← COLORS, BUCKETS, COACH_MODES, SYSTEM_PROMPTS
@@ -76,8 +72,8 @@ GTDWorkflowApp/
 │   │   └── useSupabaseSync.js
 │   ├── prompts/               ← exported copies of all AI system prompts
 │   ├── shared/
-│   └── SQL/
-│   └── Visual_Mockups/		   ← exported copies of all mockups produced
+│   ├── SQL/
+│   └── Visual_Mockups/        ← exported copies of all mockups produced
 └── README.md
 ```
 
@@ -103,9 +99,9 @@ File placement:
 
 Add/edit/delete/move across buckets. Priority tags, location tags, due dates, effort estimates, defer-until. Task Detail Panel (360px side panel). Project hierarchy with drag-and-drop. Collapsible project tree. Descendant count badge. Cumulative effort totals. Waterfall filtering. Completed view hierarchy. In-bucket text filter (bypasses tree/grouping; resets on bucket change). Global search modal (Cmd+K / Ctrl+K) across all non-archive buckets with keyboard nav and match highlighting. Drive file attachments on tasks via Google Picker (stored as `driveAttachments[]`).
 
-### AI Coach (5 modes)
+### AI Coach (6 modes)
 
-Chat · Process · Weekly Review · Brain Dump · Project Review. Action lines: `→ACTION:update`, `→ACTION:add`, `→ACTION:create`.
+Chat · Process · Weekly Review · Brain Dump · Project Review · Daily Review. Action lines: `→ACTION:update`, `→ACTION:add`, `→ACTION:create`.
 
 - **Chat** — lazy task context: compact bucket-count summary + `get_task_context` tool on demand; other modes receive full task list
 - **Process** — `→ACTION:add|<title>|parent:<id>` places tasks under existing projects; code-level question guard prevents auto-confirm when AI response contains a clarifying question; duplicate detection via expanded context (Next Actions + Waiting For visible to AI)
@@ -117,9 +113,20 @@ Chat · Process · Weekly Review · Brain Dump · Project Review. Action lines: 
 
 ---
 
+## Branching model
+
+- `main` — stable/releasable only. Never commit directly to main.
+- `develop` — integration branch. All feature branches are cut from here and merged back here.
+- Feature branches — named `feature/<slug>`, `fix/<slug>`, or `cq/<slug>`. Cut from `develop`, merge into `develop` when done.
+- Releases — merge `develop` → `main` when a batch of work is stable and tested.
+
+**At session start:** check out `develop` (or the relevant feature branch) before making any changes. Never commit to `main`.
+
+---
+
 ## Ongoing maintenance
 
-**Vite timestamp cleanup:** At session start, check for `vite.config.js.timestamp-*.mjs` in the project root. If 5 or more exist, delete them:
+**Vite timestamp cleanup:** At session start, check for `vite.config.js.timestamp-*.mjs` in the project root. If 5 or more exist, delete them via desktop-commander:
 
 ```
 Remove-Item "C:\Programming_Projects\GTDWorkflowApp\vite.config.js.timestamp-*.mjs" -Force
@@ -127,22 +134,20 @@ Remove-Item "C:\Programming_Projects\GTDWorkflowApp\vite.config.js.timestamp-*.m
 
 ---
 
-## Response format and behavior preferences
-
-These preferences apply to all sessions and both workflow variants. They exist to minimize unnecessary token usage and round-trips.
-
-**Verbosity**
-- Do not summarize what you just did after completing a task. The user can read the output.
-- Do not add preamble before files or explanations before tool calls.
-- Inline notes are preferred over full paragraphs when a decision has an obvious rationale.
+## Session behavior
 
 **Approval gates**
 - Do not ask for confirmation on individual steps that were already covered in an approved plan.
 - If the plan says "commit each item separately," commit — do not ask before each commit.
 - Ask for explicit go-ahead only when: scope has changed unexpectedly, a HALT condition was triggered, or a decision requires user judgment that wasn't anticipated in the plan.
+- Exception: trivial single-line fixes where the change is self-evident from the diagnosis may be executed without a separate plan step.
+
+**Testing checklists**
+- Always present as an interactive widget (mcp__visualize__show_widget): state button cycles Pass → Fail → Skip → Note per item, per-item notes text field, Submit button calling sendPrompt() with full summary.
+- Render the widget in TWO situations: (1) at the end of a cycle when presenting the checklist for the first time, and (2) whenever John asks which tests are outstanding or remaining — never answer that question in plain text.
+- See Workflow.md Phase 5 for full spec.
 
 **Clarifying questions**
-- Ask one clarifying question when category is ambiguous, not a list.
 - If you can proceed confidently with a reasonable assumption, state the assumption and proceed rather than asking.
 
 **Planning sessions (both variants)**
@@ -178,7 +183,7 @@ These preferences apply to all sessions and both workflow variants. They exist t
 | Data model expansions | `FR#x` | New fields, buckets, task properties |
 | Platform / reach | `FR#x` | Mobile, export, third-party sync |
 
-**On new entry:** File a GitHub issue immediately via `mcp__github__create_issue` using the repo's label set. Record the GH# and creation date in `Known_Issues_And_Requests.md`:
+**On new entry:** File a GitHub issue immediately via `mcp__github__create_issue` using the repo's label set. Record the GH# and creation date in `Backlog.md`:
 
 ```
 - [ ] Issue#12 [GH#31] (2026-05-09) — description
@@ -188,7 +193,7 @@ Update the Last used numbers line at the top of the file.
 
 **On root cause identified:** When the cause of an issue or the approach to a feature is determined — even before any code is written — update the corresponding GitHub issue with that reasoning. Include what the root cause is, what files/functions are involved, and the proposed fix. This keeps the issue self-documenting and avoids re-deriving the analysis if a session is interrupted.
 
-**On resolution:** Delete the line from `Known_Issues_And_Requests.md`. Append a row to `Resolved_Issues_And_Requests.md` (date · type · # · GH# · name · commit hash). Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
+**On resolution:** Delete the line from `Backlog.md`. Append a row to `Changelog.md` (date · type · # · GH# · name · commit hash). Close the GitHub issue via `mcp__github__update_issue` with `state: closed`.
 
 **Triage on report:** Categorize immediately when John reports an issue or request. Ask one clarifying question if category is ambiguous. Do not begin investigation until the item is logged.
 
@@ -201,5 +206,9 @@ Update the Last used numbers line at the top of the file.
 - Run commands directly — do not hand copy-paste steps
 - No emoji in responses unless asked
 - Use `mcp__git__git_commit` for commits, not bash git (avoids HEAD.lock on Windows mount)
-- Use `git -C "path" push origin main` for push, not `cd && git push` (PowerShell `&&` is invalid)
-- Claude Desktop on this machine is MSIX-packaged; config is at `C:\Users\JRS\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`
+- Use `git -C "path" push origin develop` for push, not `cd && git push` (PowerShell `&&` is invalid)
+- Supabase migrations: confirm John is ready, then run using the Management API directly (project ref `tudmteqljgpocffalssz`, token in `.env` as `SUPABASE_MANAGEMENT_TOKEN`). Verify with an `information_schema.columns` query before proceeding to testing. Never hand copy-paste SQL steps to John.
+
+**File write rules (enforced every time — no exceptions):**
+- `.md` files (Backlog.md, Changelog.md, any Claude_Prompts/*.md): always use PowerShell `[System.IO.File]::WriteAllText(path, content, UTF8)` — for both targeted edits and full rewrites. Never Python `open(path,'w')`, `mcp__desktop-commander__write_file`, or `mcp__desktop-commander__edit_block` — all write through the FUSE layer and leave null bytes on this Windows mount.
+- `.js` / `.jsx` files: edits → Python `str.replace()` via bash sandbox (never the Cowork Edit or Write tools — template literals get corrupted on the FUSE mount). New files → `mcp__desktop-commander__write_file` in chunks.

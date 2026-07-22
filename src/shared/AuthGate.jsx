@@ -1,9 +1,9 @@
 import PropTypes from "prop-types";
 import { COLORS } from "../constants.jsx";
 
-function AuthGate({ authLoading, authUser, authSent, authEmail, setAuthEmail, sendMagicLink, children }) {
+function AuthGate({ authLoading, authUser, authSent, authEmail, setAuthEmail, sendMagicLink, authError, children }) {
   if (authLoading) return (
-    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center",
+    <div className="app-shell-height" style={{ display: "flex", alignItems: "center", justifyContent: "center",
                   background: COLORS.bg, color: COLORS.muted,
                   fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif" }}>
       Loading…
@@ -11,7 +11,7 @@ function AuthGate({ authLoading, authUser, authSent, authEmail, setAuthEmail, se
   );
 
   if (!authUser) return (
-    <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center",
+    <div className="app-shell-height" style={{ display: "flex", alignItems: "center", justifyContent: "center",
                   background: COLORS.bg, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif" }}>
       <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12,
                     padding: "36px 40px", width: 340, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -43,6 +43,12 @@ function AuthGate({ authLoading, authUser, authSent, authEmail, setAuthEmail, se
                        color: "#111", fontFamily: "inherit", fontSize: 13,
                        fontWeight: 600, cursor: "pointer" }}
             >Send login link</button>
+            {authError && (
+              <div style={{ fontSize: 12, color: "#e57373", padding: "8px 12px",
+                            background: "rgba(229,115,115,0.1)", borderRadius: 8 }}>
+                {authError}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -59,6 +65,7 @@ AuthGate.propTypes = {
   authEmail:     PropTypes.string.isRequired,
   setAuthEmail:  PropTypes.func.isRequired,
   sendMagicLink: PropTypes.func.isRequired,
+  authError:     PropTypes.string,
   children:      PropTypes.node.isRequired,
 };
 

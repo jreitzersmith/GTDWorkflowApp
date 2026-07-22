@@ -78,6 +78,7 @@ function extractAction(text) {
   const categoryMatch = extras.match(/\|category:([^|]+)/);
   const priorityMatch = extras.match(/\|priority:([^|]+)/);
   const locationMatch = extras.match(/\|location:([^|]+)/);
+  const notesMatch    = extras.match(/\|notes:(.+)/s);
   const somedayMatch    = extras.match(/\|someday:(true|false)/);
   const waitingForMatch = extras.match(/\|waitingFor:(true|false)/);
   return {
@@ -94,6 +95,7 @@ function extractAction(text) {
     location:   locationMatch ? locationMatch[1].split(',').map(s => s.trim()).filter(Boolean) : [],
     isSomeday:    somedayMatch    ? somedayMatch[1] === 'true'    : false,
     isWaitingFor: waitingForMatch ? waitingForMatch[1] === 'true' : false,
+    notes:      notesMatch    ? notesMatch[1].trim()                      : null,
   };
 }
 
@@ -104,10 +106,21 @@ function extractUpdateAction(text) {
   const taskId = m[1].trim();
   const fieldStr = m[2];
 
-  // notes must be last — everything after 'notes:' is its value (may contain |)
-  const notesIdx = fieldStr.search(/(^|\|)notes:/);
-  const pureFields = notesIdx !== -1 ? fieldStr.slice(0, notesIdx).replace(/\|$/, '') : fieldStr;
-  const notesRaw   = notesIdx !== -1 ? fieldStr.slice(fieldStr.indexOf('notes:', notesIdx) + 6) : null;
+  // notes / notes_append must be last — everything after the key is its value (may contain |)
+  const notesAppendIdx  = fieldStr.search(/(^|\|)notes_append:/);
+  const notesReplaceIdx = fieldStr.search(/(^|\|)notes:/);
+  let notesRaw = null;
+  let notesIsAppend = false;
+  let lastFieldIdx = -1;
+  if (notesAppendIdx !== -1 && (notesReplaceIdx === -1 || notesAppendIdx <= notesReplaceIdx)) {
+    lastFieldIdx = notesAppendIdx;
+    notesRaw = fieldStr.slice(fieldStr.indexOf('notes_append:', notesAppendIdx) + 13);
+    notesIsAppend = true;
+  } else if (notesReplaceIdx !== -1) {
+    lastFieldIdx = notesReplaceIdx;
+    notesRaw = fieldStr.slice(fieldStr.indexOf('notes:', notesReplaceIdx) + 6);
+  }
+  const pureFields = lastFieldIdx !== -1 ? fieldStr.slice(0, lastFieldIdx).replace(/\|$/, '') : fieldStr;
 
   const changes = {};
   pureFields.split('|').filter(Boolean).forEach(pair => {
@@ -128,8 +141,15 @@ function extractUpdateAction(text) {
     if (key === 'waitingFor') changes.isWaitingFor = val === 'true';
     if (key === 'someday')    changes.isSomeday    = val === 'true';
     if (key === 'nextAction') changes.isNextAction = val === 'true';
+    if (key === 'done')       changes.done         = val === 'true';
   });
-  if (notesRaw !== null) changes.notes = notesRaw.replace(/\\n/g, '\n');
+  if (notesRaw !== null) {
+    if (notesIsAppend) {
+      changes.notesAppend = notesRaw.replace(/\\n/g, '\n');
+    } else {
+      changes.notes = notesRaw.replace(/\\n/g, '\n');
+    }
+  }
 
   return Object.keys(changes).length ? { taskId, changes } : null;
 }
@@ -152,9 +172,14 @@ function extractAddAction(text) {
     if (key === 'defer')    fields.deferUntil = val;
     if (key === 'effort')   fields.effort     = val;
     if (key === 'category') fields.category   = val;
+    if (key === 'notes')    fields.notes      = val;
     if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'priority') fields.priority  = val.split(',').map(s => s.trim()).filter(Boolean);
     if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
     if (key === 'dueTime') fields.dueTime = val;
+    if (key === 'someday')    fields.isSomeday    = val === 'true';
+    if (key === 'waitingFor') fields.isWaitingFor = val === 'true';
+    if (key === 'nodeType')   fields.nodeType     = val;
   });
   if (!fields.parentId || !title) return null;
   return { title, ...fields };
@@ -178,8 +203,13 @@ function extractCreateAction(text) {
     if (key === 'defer')    fields.deferUntil = val;
     if (key === 'effort')   fields.effort     = val;
     if (key === 'location') fields.location   = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'notes')    fields.notes      = val;
     if (key === 'recur') fields.recurrence = parseRecurrenceValue(val);
     if (key === 'dueTime') fields.dueTime = val;
+    if (key === 'priority') fields.priority = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (key === 'category') fields.category = val;
+    if (key === 'someday')    fields.isSomeday    = val === 'true';
+    if (key === 'waitingFor') fields.isWaitingFor = val === 'true';
   });
   if (!title || !fields.bucket) return null;
   return { title, ...fields };
@@ -244,7 +274,7 @@ function extractCalendarDeleteAction(text) {
 function waterfallFilter(nextTasks, allTasks) {
   return nextTasks.filter(task => {
     const incompleteNextChildren = allTasks.filter(
-      t => t.parentId === task.id && t.bucket === "next" && !t.done
+      t => t.parentId === task.id && !!t.isNextAction && !t.done
     );
     return incompleteNextChildren.length === 0;
   });
@@ -409,7 +439,7 @@ function effortAccuracyColor(estimatedMin, actualMin) {
   const delta = (actualMin - estimatedMin) / estimatedMin;
   if (delta <= 0)    return "#5ab878"; // under or on time
   if (delta <= 0.25) return "#d4a95a"; // within 25% over
-  return "#d45a5a";                    // significantly over
+  return COLORS.danger;                // significantly over
 }
 
 // Converts a minutes total back to a compact human label (e.g. 150 → "2.5h").
@@ -606,12 +636,11 @@ function moveTaskInTree(allTasks, dragId, targetId, position) {
   if (isAncestorOf(dragId, targetId)) return allTasks;
 
   const newParentId = position === "inside" ? targetId : (target.parentId || null);
-  // Root items are always "project". When reparenting under a "next" item the
-  // dragged item becomes "next"; under a "project" item, preserve its own bucket
-  // so sub-projects stay "project" and tasks stay "next" across reorders.
+  // Root items are always "project". When reparenting under an existing item,
+  // preserve the dragged item's own bucket so sub-projects and tasks
+  // maintain their type across reorders.
   const newParent = newParentId ? allTasks.find(t => t.id === newParentId) : null;
   const newBucket = !newParentId ? "project"
-    : newParent?.bucket === "next" ? "next"
     : dragged.bucket;
 
   // 1. Remove dragged from its current parent's childIds.

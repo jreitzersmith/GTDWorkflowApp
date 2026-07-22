@@ -4,19 +4,33 @@ import { COLORS } from "../../constants.jsx";
 import { TaskRowContext, taskShape } from "../../contexts.js";
 import { getOrderedChildren } from "./taskUtils.jsx";
 import { TaskRow } from "./TaskRow.jsx";
+import { useViewport } from "../../hooks/useViewport.js";
+
+// Per-level indent width — smaller on phone/tablet so nested rows don't eat most of a
+// narrow screen's width. Nesting is still legible via the "↳" subtask marker and the
+// colored left-border accent on each row, which don't scale with this value.
+function getIndentStep(breakpoint) {
+  if (breakpoint === 'phone') return 12;
+  if (breakpoint === 'tablet') return 16;
+  return 22;
+}
 
 // Drag-and-drop insertion indicator rendered between project tree rows.
 function DropLine({ depth }) {
+  const { breakpoint } = useViewport();
+  const indentStep = getIndentStep(breakpoint);
   return (
-    <div style={{ height: 2, background: COLORS.project, margin: `1px 18px 1px ${18 + depth * 22}px`, borderRadius: 2, pointerEvents: "none" }} />
+    <div style={{ height: 2, background: COLORS.project, margin: `1px 18px 1px ${18 + depth * indentStep}px`, borderRadius: 2, pointerEvents: "none" }} />
   );
 }
 
 // Read-only hierarchical view of completed tasks.
 // parentId === null  -> virtual roots: done tasks whose parent is not also done.
 // parentId !== null  -> done children of parentId, in childIds order.
-function CompletedTree({ parentId, depth }) {
+function ArchivedTree({ parentId, depth }) {
   const { allTasks, collapsedNodes } = useContext(TaskRowContext);
+  const { breakpoint } = useViewport();
+  const indentStep = getIndentStep(breakpoint);
   if (depth > 6) return null;
 
   let children;
@@ -33,16 +47,16 @@ function CompletedTree({ parentId, depth }) {
     <>
       {children.map(task => (
         <div key={task.id}>
-          <TaskRow task={task} isSubtask={depth > 0} indentOverride={depth * 22} depth={depth} />
+          <TaskRow task={task} isSubtask={depth > 0} indentOverride={depth * indentStep} depth={depth} />
           {!collapsedNodes?.has(task.id) && (
-            <CompletedTree parentId={task.id} depth={depth + 1} />
+            <ArchivedTree parentId={task.id} depth={depth + 1} />
           )}
         </div>
       ))}
     </>
   );
 }
-CompletedTree.propTypes = {
+ArchivedTree.propTypes = {
   parentId: PropTypes.string,
   depth:    PropTypes.number.isRequired,
 };
@@ -50,6 +64,8 @@ CompletedTree.propTypes = {
 // Drag-and-drop reorderable tree of project children.
 function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragOver, onDragEnd, onDrop, visibilitySet }) {
   const { allTasks, collapsedNodes, projectCategoryFilter, uncategorizedProjectId, currentBucket, showCompletedInProjects, showWaitingInProjects, showSomeDayInProjects } = useContext(TaskRowContext);
+  const { breakpoint } = useViewport();
+  const indentStep = getIndentStep(breakpoint);
   if (depth > 6) return null;
   let children = getOrderedChildren(parentId, allTasks);
   if (!showCompletedInProjects) children = children.filter(t => !t.done);
@@ -96,7 +112,7 @@ function ProjectTree({ parentId, depth, dragId, dropTarget, onDragStart, onDragO
                 transition: "opacity 0.1s",
               }}
             >
-              <TaskRow task={task} isSubtask={depth > 0} indentOverride={depth * 22} depth={depth} />
+              <TaskRow task={task} isSubtask={depth > 0} indentOverride={depth * indentStep} depth={depth} />
             </div>
 
             {!collapsedNodes?.has(task.id) && (
@@ -177,4 +193,4 @@ EmptyState.propTypes = {
   bucket: PropTypes.string.isRequired,
 };
 
-export { CompletedTree, ProjectTree, GroupDivider, EmptyState };
+export { ArchivedTree, ProjectTree, GroupDivider, EmptyState };

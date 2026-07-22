@@ -18,6 +18,7 @@ function useTaskUIState() {
   const [showWaitingInProjects, setShowWaitingInProjects] = useState(true);
   const [showSomeDayInProjects, setShowSomeDayInProjects] = useState(true);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(null); // { taskId, taskText }
+  const [focusedTaskId, setFocusedTaskId] = useState(null);  // keyboard navigation focus (separate from detail-panel selection)
 
   const toggleCollapse = useCallback((id) => {
     setCollapsedNodes(prev => {
@@ -60,6 +61,7 @@ function useTaskUIState() {
     showWaitingInProjects, setShowWaitingInProjects,
     showSomeDayInProjects, setShowSomeDayInProjects,
     pendingDeleteConfirm, setPendingDeleteConfirm,
+    focusedTaskId, setFocusedTaskId,
   };
 }
 

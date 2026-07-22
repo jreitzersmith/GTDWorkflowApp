@@ -11,9 +11,11 @@ import { ProjectGroupSuggestionBar } from "../tasks/InboxBars.jsx";
 import { ResizeHandle } from "../../shared/ResizeHandle.jsx";
 import { ToolbarBtn } from "../../shared/SidebarComponents.jsx";
 import { fmtTokens, fmtCost } from "../settings/useAIUsageTracking.js";
+import { ExportPopover } from "./ExportPopover.jsx";
 
 function CoachPanel({
   coachHeight,
+  colorSettings,
   coachMode,
   messages,
   loading,
@@ -41,6 +43,9 @@ function CoachPanel({
   chatInputRef,
   sessionUsage,
   onSendChat,
+  pendingPdf,
+  onPdfAttach,
+  onPdfClear,
   onConfirmMove,
   onDismissPendingAction,
   onDeleteInboxItem,
@@ -65,18 +70,28 @@ function CoachPanel({
   onStartWeeklyReview,
   onStartBrainDump,
   onStartProjectReview,
+  onStartDailyReview,
   onSwitchToChat,
   onMITSubmit,
   efforts,
   locations,
   categories,
   onUpdatePendingAction,
+  docsEnabled,
+  driveConversationExportFolderId,
+  exportSettings,
+  onExportSettingsChange,
+  exportTemplates,
+  googleToken,
+  rawApiThread,
+  coachName,
+  userName,
 }) {
   return (
     <div style={{ height: coachHeight, display: "flex", flexDirection: "column", flexShrink: 0 }}>
       {/* Header: label + provider selector + mode tabs */}
-      <div style={{ padding: "8px 14px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.06em", textTransform: "uppercase" }}>🤖 AI Coach</span>
+      <div style={{ padding: "8px 14px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, rowGap: 6, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.06em", textTransform: "uppercase" }}>🤖 {coachName || 'AI Coach'}</span>
         <ProviderSelector
           provider={provider} setProvider={setProvider}
           localModel={localModel} setLocalModel={setLocalModel}
@@ -112,6 +127,7 @@ function CoachPanel({
                         else if (key === 'review') onStartWeeklyReview();
                         else if (key === 'dump') onStartBrainDump();
                         else if (key === 'projectReview') onStartProjectReview();
+                        else if (key === 'daily') onStartDailyReview?.();
                         else onSwitchToChat();
                       }}
                       style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 12, cursor: 'pointer', borderRadius: 4, color: coachMode === key ? '#d4a844' : COLORS.text, fontWeight: coachMode === key ? 600 : 400 }}
@@ -126,16 +142,37 @@ function CoachPanel({
             </div>
           );
         })()}
+        {messages.length > 1 && exportSettings && (
+          <div style={{ marginLeft: 'auto' }}>
+            <ExportPopover
+              messages={messages}
+              coachMode={coachMode}
+              tasks={tasks}
+              exportSettings={exportSettings}
+              onExportSettingsChange={onExportSettingsChange}
+              driveConversationExportFolderId={driveConversationExportFolderId}
+              googleToken={googleToken}
+              docsEnabled={docsEnabled}
+              rawApiThread={rawApiThread}
+              coachName={coachName}
+              userName={userName}
+              exportTemplates={exportTemplates}
+            />
+          </div>
+        )}
       </div>
+
+
 
       {/* Message list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
         {messages.map((msg, i) => (
-          <ChatBubble key={i} msg={msg} onRecurringStillFine={onRecurringStillFine} onRecurringNeedsWork={onRecurringNeedsWork} onMITSubmit={onMITSubmit} />
+          <ChatBubble key={i} msg={msg} onRecurringStillFine={onRecurringStillFine} onRecurringNeedsWork={onRecurringNeedsWork} onMITSubmit={onMITSubmit} coachName={coachName} userName={userName} />
         ))}
-        {loading && <TypingIndicator />}
+        {loading && <TypingIndicator coachName={coachName} />}
         {pendingAction && (
           <PendingActionBar
+            key={`${pendingAction.type}|${pendingAction.title || ""}`}
             action={pendingAction}
             onConfirm={onConfirmMove}
             onDismiss={onDismissPendingAction}
@@ -143,7 +180,9 @@ function CoachPanel({
             efforts={efforts}
             locations={locations}
             categories={categories}
+            allTasks={tasks}
             onUpdatePendingAction={onUpdatePendingAction}
+            colorSettings={colorSettings}
           />
         )}
         {coachMode === "projectReview" && reviewMode === null && !loading && (
@@ -193,20 +232,55 @@ function CoachPanel({
 
       {/* Chat input */}
       <ResizeHandle onMouseDown={chatInputDragDown} direction="v" />
-      <div style={{ display: "flex", gap: 6, padding: "8px 12px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, alignItems: "flex-end" }}>
-        <textarea
-          ref={chatInputRef}
-          value={chatInput}
-          onChange={e => setChatInput(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSendChat(); } }}
-          placeholder="Ask the coach anything…"
-          style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none", resize: "none", height: chatInputHeight, minHeight: 36 }}
-        />
-        <button
-          onClick={onSendChat}
-          disabled={loading}
-          style={{ width: 34, height: 34, background: loading ? COLORS.surface3 : COLORS.inbox, color: "#111", border: "none", borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-        >↑</button>
+      <div style={{ padding: "0 12px 0", flexShrink: 0 }}>
+        {/* PDF attachment chip */}
+        {pendingPdf && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: COLORS.surface3, borderRadius: 8, marginBottom: 4, border: `1px solid ${COLORS.border}` }}>
+            <span style={{ fontSize: 14 }}>📄</span>
+            <span style={{ fontSize: 12, color: COLORS.text2, flex: 1 }}>{pendingPdf.name}</span>
+            <button onClick={onPdfClear} style={{ background: 'none', border: 'none', color: COLORS.muted, cursor: 'pointer', fontSize: 13, lineHeight: 1 }}>✕</button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 6, paddingBottom: 8, borderTop: pendingPdf ? 'none' : `1px solid ${COLORS.border}`, paddingTop: pendingPdf ? 0 : 8, alignItems: "flex-end" }}>
+          {/* Hidden PDF file input */}
+          <input
+            type="file" accept="application/pdf" style={{ display: 'none' }}
+            ref={el => { if (el) el._pdfInput = true; }}
+            id="coach-pdf-input"
+            onChange={async (e) => {
+              const file = e.target.files[0];
+              if (!file || !onPdfAttach) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                const base64 = reader.result.split(',')[1];
+                onPdfAttach({ name: file.name, data: base64, size: file.size });
+              };
+              reader.readAsDataURL(file);
+              e.target.value = '';
+            }}
+          />
+          {/* PDF attach button */}
+          {onPdfAttach && (
+            <button
+              onClick={() => document.getElementById('coach-pdf-input')?.click()}
+              title="Attach PDF"
+              style={{ width: 34, height: 34, background: pendingPdf ? COLORS.inbox : COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            >📎</button>
+          )}
+          <textarea
+            ref={chatInputRef}
+            value={chatInput}
+            onChange={e => setChatInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSendChat(); } }}
+            placeholder="Ask the coach anything…"
+            style={{ flex: 1, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "7px 11px", fontFamily: "inherit", fontSize: 13, color: COLORS.text, outline: "none", resize: "none", height: chatInputHeight, minHeight: 36 }}
+          />
+          <button
+            onClick={onSendChat}
+            disabled={loading}
+            style={{ width: 34, height: 34, background: loading ? COLORS.surface3 : COLORS.inbox, color: "#111", border: "none", borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >↑</button>
+        </div>
       </div>
 
       {/* Usage footer */}
@@ -219,7 +293,8 @@ function CoachPanel({
 }
 
 CoachPanel.propTypes = {
-  coachHeight:            PropTypes.number.isRequired,
+  coachHeight:            PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
+  colorSettings:          PropTypes.object,
   coachMode:              PropTypes.string.isRequired,
   messages:               PropTypes.array.isRequired,
   loading:                PropTypes.bool.isRequired,
@@ -247,6 +322,9 @@ CoachPanel.propTypes = {
   chatInputRef:           PropTypes.object.isRequired,
   sessionUsage:           PropTypes.object.isRequired,
   onSendChat:             PropTypes.func.isRequired,
+  pendingPdf:             PropTypes.object,
+  onPdfAttach:            PropTypes.func,
+  onPdfClear:             PropTypes.func,
   onConfirmMove:          PropTypes.func.isRequired,
   onDismissPendingAction: PropTypes.func.isRequired,
   onDeleteInboxItem:      PropTypes.func.isRequired,
@@ -271,11 +349,21 @@ CoachPanel.propTypes = {
   onStartWeeklyReview:    PropTypes.func.isRequired,
   onStartBrainDump:       PropTypes.func.isRequired,
   onStartProjectReview:   PropTypes.func.isRequired,
+  onStartDailyReview:     PropTypes.func,
   onSwitchToChat:         PropTypes.func.isRequired,
   efforts:                PropTypes.array,
   locations:              PropTypes.array,
   categories:             PropTypes.array,
   onUpdatePendingAction:  PropTypes.func,
+  docsEnabled:            PropTypes.bool,
+  driveConversationExportFolderId: PropTypes.string,
+  exportSettings:         PropTypes.object,
+  onExportSettingsChange: PropTypes.func,
+  exportTemplates:        PropTypes.object,
+  googleToken:            PropTypes.string,
+  rawApiThread:           PropTypes.array,
+  coachName:              PropTypes.string,
+  userName:               PropTypes.string,
 };
 
 export { CoachPanel };

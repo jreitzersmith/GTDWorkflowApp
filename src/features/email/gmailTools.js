@@ -478,9 +478,9 @@ function extractGmailPlainText(payload) {
 
 // Fetch inbox messages as structured objects (for the Email Management inbox tab)
 // Returns { emails, nextPageToken } — pass pageToken to load the next page
-async function doGmailFetchInbox(token, pageToken = null) {
+async function doGmailFetchInbox(token, pageToken = null, searchQuery = '') {
   const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
-  url.searchParams.set('q', 'in:inbox');
+  url.searchParams.set('q', searchQuery.trim() ? `in:inbox ${searchQuery.trim()}` : 'in:inbox');
   url.searchParams.set('maxResults', '50');
   if (pageToken) url.searchParams.set('pageToken', pageToken);
   const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
@@ -527,6 +527,7 @@ async function doGmailGetMessageBody(id, token) {
     body: extractGmailPlainText(msg.payload).trim(),
     snippet: msg.snippet || '',
     labelIds: msg.labelIds || [],
+    attachments: extractAttachments(msg.payload?.parts || []),
   };
 }
 
@@ -540,4 +541,83 @@ async function doGmailFetchFilters(token) {
 }
 
 
-export { GMAIL_SEARCH_TOOL, generateCodeVerifier, generateCodeChallenge, fetchWithBackoff, batchedAll, doGmailSearch, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL, GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL, GMAIL_LIST_FILTERS_TOOL, GMAIL_CREATE_FILTER_TOOL, GMAIL_DELETE_FILTER_TOOL, GMAIL_BULK_ACTION_TOOL, GMAIL_QUEUE_ADD_TOOL, GMAIL_SCOPE_OPTS, GMAIL_SCOPE_DISPLAY, doGmailListLabels, doGmailFetchLabelsRaw, doGmailLabel, doGmailBatchLabel, buildRawMessage, doGmailCompose, doGmailSend, doGmailCreateLabel, doGmailListFilters, doGmailCreateFilter, doGmailDeleteFilter, doGmailBulkAction, extractGmailPlainText, doGmailFetchInbox, doGmailGetMessageBody, doGmailFetchFilters };
+// ── Attachment helpers (FR#178/FR#179) ───────────────────────────────────────
+
+// Recursively collect attachment metadata from a MIME tree.
+function extractAttachments(parts) {
+  const attachments = [];
+  for (const part of (parts || [])) {
+    if (part.filename && part.body?.attachmentId) {
+      attachments.push({
+        filename:     part.filename,
+        mimeType:     part.mimeType || 'application/octet-stream',
+        attachmentId: part.body.attachmentId,
+        size:         part.body.size || 0,
+      });
+    }
+    if (part.parts) attachments.push(...extractAttachments(part.parts));
+  }
+  return attachments;
+}
+
+const GMAIL_SAVE_ATTACHMENT_TOOL = {
+  name: 'gmail_save_attachment_to_drive',
+  description: 'Download an email attachment and save it to Google Drive. Use after identifying an attachment in the email context. Resolve the target folder using drive_search first if needed.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      message_id:    { type: 'string', description: 'Gmail message ID' },
+      attachment_id: { type: 'string', description: 'Gmail attachment ID from the email context' },
+      file_name:     { type: 'string', description: 'Filename to save as in Drive' },
+      folder_id:     { type: 'string', description: 'Google Drive folder ID to save into (use drive_search to find it)' },
+    },
+    required: ['message_id', 'attachment_id', 'file_name'],
+  },
+};
+
+// Download an email attachment from Gmail and upload it to Google Drive.
+async function doGmailSaveAttachmentToDrive(messageId, attachmentId, fileName, folderId, token) {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error?.message || `Gmail API ${res.status}`); }
+  const { data } = await res.json(); // base64url-encoded bytes
+  const bytes = Uint8Array.from(atob(data.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+
+  const boundary = 'gtd_upload_boundary';
+  const metadata = JSON.stringify({ name: fileName, ...(folderId ? { parents: [folderId] } : {}) });
+  const metaPart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`;
+  const dataPart = `--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`;
+  const closing  = `\r\n--${boundary}--`;
+
+  const upload = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
+      body: new Blob([metaPart, dataPart, bytes, closing]),
+    }
+  );
+  if (!upload.ok) { const d = await upload.json(); throw new Error(d.error?.message || `Drive API ${upload.status}`); }
+  return upload.json(); // { id, name, webViewLink }
+}
+
+const GMAIL_SAVE_EMAIL_TO_DOC_TOOL = {
+  name: 'gmail_save_email_to_doc',
+  description: 'Save the body of an email as a new Google Doc in Drive. Use when the user asks to save, export, or archive an email as a document. Resolve the target folder using drive_search first if needed.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      message_id: { type: 'string', description: 'Gmail message ID (from email context)' },
+      title:      { type: 'string', description: 'Title for the Google Doc (defaults to email subject)' },
+      folder_id:  { type: 'string', description: 'Drive folder ID to save into (use drive_search to find it; omit to save to root)' },
+    },
+    required: ['message_id', 'title'],
+  },
+};
+
+export { GMAIL_SEARCH_TOOL, generateCodeVerifier, generateCodeChallenge, fetchWithBackoff, batchedAll, doGmailSearch, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL, GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL, GMAIL_LIST_FILTERS_TOOL, GMAIL_CREATE_FILTER_TOOL, GMAIL_DELETE_FILTER_TOOL, GMAIL_BULK_ACTION_TOOL, GMAIL_QUEUE_ADD_TOOL, GMAIL_SCOPE_OPTS, GMAIL_SCOPE_DISPLAY, doGmailListLabels, doGmailFetchLabelsRaw, doGmailLabel, doGmailBatchLabel, buildRawMessage, doGmailCompose, doGmailSend, doGmailCreateLabel, doGmailListFilters, doGmailCreateFilter, doGmailDeleteFilter, doGmailBulkAction, extractGmailPlainText, doGmailFetchInbox, doGmailGetMessageBody, doGmailFetchFilters, extractAttachments, GMAIL_SAVE_ATTACHMENT_TOOL, doGmailSaveAttachmentToDrive, GMAIL_SAVE_EMAIL_TO_DOC_TOOL };

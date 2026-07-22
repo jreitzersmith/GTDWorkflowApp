@@ -1,3 +1,4 @@
+import "./utils/accessKeyLabelPolyfill.js";
 import { StrictMode, Component } from "react";
 import { createRoot } from "react-dom/client";
 import GTDManager from "./App.jsx";
@@ -16,7 +17,7 @@ class AppErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 16, fontFamily: 'sans-serif', color: '#ccc', background: '#1a1a1a' }}>
+        <div className="app-shell-height" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, fontFamily: 'sans-serif', color: '#ccc', background: '#1a1a1a' }}>
           <div style={{ fontSize: 16, color: '#ef4444', fontWeight: 600 }}>⚠ The app crashed</div>
           <div style={{ fontSize: 12, color: '#888', fontFamily: 'monospace', maxWidth: 500, textAlign: 'center' }}>{this.state.error?.message}</div>
           <button onClick={() => this.setState({ hasError: false, error: null })} style={{ fontSize: 13, padding: '6px 18px', borderRadius: 6, border: '1px solid #555', background: 'transparent', color: '#ccc', cursor: 'pointer' }}>Reload</button>

@@ -9,10 +9,24 @@ function useSupabaseAuth() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authEmail,   setAuthEmail]   = useState('');
   const [authSent,    setAuthSent]    = useState(false);
+  const [authError,   setAuthError]   = useState(null);
 
   const sendMagicLink = useCallback(async () => {
     if (!authEmail.trim()) return;
-    await supabase.auth.signInWithOtp({ email: authEmail.trim() });
+    setAuthError(null);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: authEmail.trim(),
+      options: { emailRedirectTo: window.location.origin },
+    });
+    if (error) {
+      console.error('Supabase signInWithOtp:', error);
+      setAuthError(
+        error.status === 429 || /rate limit/i.test(error.message || '')
+          ? "Too many login link requests \u2014 please wait a bit and try again."
+          : "Couldn't send login link. Please try again."
+      );
+      return;
+    }
     setAuthSent(true);
   }, [authEmail]);
 
@@ -34,10 +48,21 @@ function useSupabaseAuth() {
       supabase.auth.exchangeCodeForSession(_code)
         .then(({ error }) => { if (error) console.error('Supabase code exchange:', error); });
     }
+    // Handle magic-link hash callback (#access_token=...)
+    const _hash = new URLSearchParams(window.location.hash.substring(1));
+    const _accessToken = _hash.get('access_token');
+    const _refreshToken = _hash.get('refresh_token');
+    if (_accessToken && _refreshToken) {
+      supabase.auth.setSession({ access_token: _accessToken, refresh_token: _refreshToken })
+        .then(({ error }) => {
+          if (error) console.error('Supabase hash session:', error);
+          else window.history.replaceState(null, '', window.location.pathname);
+        });
+    }
     return () => subscription.unsubscribe();
   }, []);
 
-  return { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink };
+  return { authUser, authLoading, authEmail, setAuthEmail, authSent, authError, sendMagicLink };
 }
 
 

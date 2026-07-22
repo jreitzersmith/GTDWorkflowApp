@@ -1,19 +1,27 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { SYSTEM_PROMPTS, OPENWEBUI_URL } from '../../constants.jsx';
+import { SYSTEM_PROMPTS, OPENWEBUI_URL, COACH_MODES } from '../../constants.jsx';
+import { claudeRequest } from '../../api/claudeApi.js';
 import { TOOLS, doWebSearch } from './webSearch.js';
 import { GMAIL_SEARCH_TOOL, GMAIL_LIST_LABELS_TOOL, GMAIL_LABEL_TOOL,
   GMAIL_BATCH_LABEL_TOOL, GMAIL_COMPOSE_TOOL, GMAIL_SEND_TOOL, GMAIL_CREATE_LABEL_TOOL,
   GMAIL_LIST_FILTERS_TOOL, GMAIL_CREATE_FILTER_TOOL, GMAIL_DELETE_FILTER_TOOL,
   GMAIL_BULK_ACTION_TOOL, GMAIL_QUEUE_ADD_TOOL,
+  GMAIL_SAVE_ATTACHMENT_TOOL, GMAIL_SAVE_EMAIL_TO_DOC_TOOL,
   doGmailSearch, doGmailListLabels, doGmailCreateLabel,
   doGmailListFilters, doGmailCreateFilter, doGmailDeleteFilter, doGmailBatchLabel,
-  doGmailBulkAction, doGmailLabel, doGmailCompose, doGmailSend } from '../email/gmailTools.js';
+  doGmailBulkAction, doGmailLabel, doGmailCompose, doGmailSend,
+  doGmailSaveAttachmentToDrive, doGmailGetMessageBody } from '../email/gmailTools.js';
 import { doCalendarCreateEvent, doCalendarUpdateEvent, doCalendarDeleteEvent,
   genId } from '../calendar/calendarApi.js';
 import { buildCalibrationContext, normalizeEffort, extractAction, extractUpdateAction, extractAddAction,
   extractCreateAction, extractCalendarCreateAction, extractCalendarUpdateAction,
   extractCalendarDeleteAction } from '../tasks/taskUtils.jsx';
 import { supabase, queueEntryToRow } from '../../api/supabase.js';
+import { docsCreateDocument, docsAppendText, docsAppendMarkdown, docsMoveToFolder } from '../../api/docsApi.js';
+import { driveListFiles, driveGetFile, driveDownloadFile, driveDownloadFileAsBase64, driveExportFile } from '../../api/driveApi.js';
+import { sheetsCreateSpreadsheet, sheetsAppendRows, sheetsBatchUpdate, sheetsMoveToFolder } from '../../api/sheetsApi.js';
+import { createAndUploadPptx, PPTX_MIME } from '../../api/pptxApi.js';
+import { peopleSearchContacts } from '../../api/peopleApi.js';
 
 // Lazy task-retrieval tool — used in chat mode so the full task list isn't
 // sent on every message. The AI calls this when it needs task details.
@@ -32,6 +40,72 @@ const GET_TASK_CONTEXT_TOOL = {
   },
 };
 
+// Drive search tool — available in chat mode when Drive is connected (FR#59/FR#99)
+const DRIVE_SEARCH_TOOL = {
+  name: 'drive_search',
+  description: "Search Google Drive for files and folders by name or content. Returns matching items with IDs, names, MIME types, and view links. Use before get_drive_file or any operation that needs a file/folder ID. IMPORTANT: query must use Drive query syntax — e.g. \"name contains 'LeanIX'\" or \"fullText contains 'LeanIX'\". To find a folder add: and mimeType='application/vnd.google-apps.folder'. Searches include Shared Drives and shared-with-me items automatically. If a name search returns no results, try a shorter name fragment. If search still returns no results for a known folder, ask the user to provide the folder URL from their browser — extract the folder ID from the URL path (the long alphanumeric segment after /folders/) and use that ID directly. Plain text keywords without an operator will be rejected by the API.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: "Drive query syntax string. Examples: \"name contains 'report'\", \"fullText contains 'budget'\", \"name contains 'LeanIX' or fullText contains 'LeanIX'\", \"'root' in parents and trashed=false\". Do NOT pass plain keywords — they cause a 400 error.",
+      },
+      max_results: {
+        type: 'number',
+        description: 'Maximum number of files to return (default 10, max 50).',
+      },
+    },
+    required: ['query'],
+  },
+};
+
+const GET_DRIVE_FILE_TOOL = {
+  name: 'get_drive_file',
+  description: 'Read the text content of a Google Drive file (Google Doc, Sheet, or other text-based file). Use drive_search first to get the file_id.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      file_id: {
+        type: 'string',
+        description: 'The Google Drive file ID from drive_search results.',
+      },
+      mime_type: {
+        type: 'string',
+        description: 'Export format. Defaults to text/plain for Docs, text/csv for Sheets. Leave blank for auto-detect.',
+      },
+    },
+    required: ['file_id'],
+  },
+};
+
+// Weather tool -- available in chat mode when VITE_OPENWEATHERMAP_API_KEY is set (FR#105)
+const GET_WEATHER_TOOL = {
+  name: 'get_weather',
+  description: 'Get current weather conditions and a 24-hour forecast for a city. Use when the user asks about weather, plans outdoor activities, or needs weather context for scheduling.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      city: { type: 'string', description: "City name. Omit to use the user's configured default city." },
+      units: { type: 'string', enum: ['imperial', 'metric'], description: 'Temperature units: imperial = °F, metric = °C. Defaults to imperial.' },
+    },
+  },
+};
+
+// Contacts lookup tool — available in chat mode when Contacts is connected (FR#115)
+const CONTACTS_LOOKUP_TOOL = {
+  name: 'contacts_lookup',
+  description: "Search the user's contacts by name or email. Returns matching contacts with names, emails, phones, and any saved enrichment data (relationship tags, notes, dietary likes/dislikes, gift ideas, promises). Use when the user mentions a person by name, asks about someone's preferences or dietary needs, or needs contact info.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Name or email to search for.' },
+      max_results: { type: 'number', description: 'Maximum contacts to return (default 5, max 30).' },
+    },
+    required: ['query'],
+  },
+};
+
 // Buckets to include in the task context for each coach mode.
 // Modes not listed here receive all buckets (null = no filter).
 const MODE_CONTEXT_BUCKETS = {
@@ -40,6 +114,180 @@ const MODE_CONTEXT_BUCKETS = {
   projectMetadata: ['project'],
   calendarEvent:   ['project'],
 };
+
+// Parse |tab:<Name>[|params...]|tab:<Name>[|params...] sections from a create-sheet ACTION line.
+// parts[0] = spreadsheet title; remaining parts are tab: separators and filter params.
+// Returns [{ name: string, params: string[] }, ...] — one entry per tab.
+// Falls back to a single Sheet1 tab containing all parts when no tab: markers are present.
+function parseSheetTabs(parts) {
+  var tabs = [];
+  var current = null;
+  for (var i = 1; i < parts.length; i++) {
+    var p = parts[i].trim();
+    if (p.startsWith('tab:')) {
+      if (current) tabs.push(current);
+      current = { name: p.slice(4).trim() || 'Sheet', params: [], columns: null };
+    } else if (current) {
+      if (p.startsWith('columns:')) {
+        current.columns = p.slice(8).split(',').map(function(c) { return c.trim(); }).filter(Boolean);
+      } else {
+        current.params.push(p);
+      }
+    }
+  }
+  if (current) tabs.push(current);
+  if (tabs.length === 0) {
+    var colPart = parts.slice(1).find(function(p) { return p.trim().startsWith('columns:'); });
+    var columns = colPart ? colPart.slice(colPart.indexOf(':') + 1).split(',').map(function(c) { return c.trim(); }).filter(Boolean) : null;
+    var params = parts.slice(1).filter(function(p) { return !p.trim().startsWith('columns:'); });
+    tabs.push({ name: 'Sheet1', params: params, columns: columns });
+  }
+  return tabs;
+}
+
+// Build headers + data rows for a single sheet tab from a filtered task list.
+function buildSheetData(filteredTasks, taskById, columns) {
+  var BUCKET_LABELS = { next: 'Next Actions', waiting: 'Waiting For', project: 'Projects', someday: 'Someday/Maybe', inbox: 'Inbox', deferred: 'Deferred' };
+  var NODE_TYPE_LABELS = { category: 'Category', subcategory: 'Subcategory', project: 'Project', subproject: 'Subproject' };
+  var COLUMN_EXTRACTORS = {
+    'task':           function(t) { return t.text; },
+    'bucket':         function(t) { return BUCKET_LABELS[t.bucket] || t.bucket || ''; },
+    'status':         function(t) { return t.done ? 'Done' : 'Active'; },
+    'created date':   function(t) { return t.created ? new Date(t.created).toISOString().slice(0, 10) : ''; },
+    'completed date': function(t) { return t.completedDate || ''; },
+    'due date':       function(t) { return t.dueDate || ''; },
+    'category':       function(t) { return t.category || ''; },
+    'flags':          function(t) { return [t.isWaitingFor && 'Waiting For', t.isSomeday && 'Someday'].filter(Boolean).join(', '); },
+    'type':           function(t) { return NODE_TYPE_LABELS[t.nodeType] || t.nodeType || ''; },
+    'project':        function(t) { return t.parentId && taskById[t.parentId] ? taskById[t.parentId].text : ''; },
+    'priority':       function(t) { return (t.priority || []).join(', '); },
+    'location':       function(t) { return (t.location || []).join(', '); },
+    'est. effort':    function(t) { return t.effort || ''; },
+    'actual effort':  function(t) { return t.actualEffort || ''; },
+    'repeat':         function(t) { return t.recurrence ? (typeof t.recurrence === 'string' ? t.recurrence : JSON.stringify(t.recurrence)) : ''; },
+    'notes':          function(t) { return t.notes || ''; },
+  };
+  var DEFAULT_COLUMNS = ['Task', 'Bucket', 'Status', 'Created Date', 'Completed Date', 'Due Date', 'Category', 'Flags', 'Type', 'Project', 'Priority', 'Location', 'Est. Effort', 'Actual Effort', 'Repeat', 'Notes'];
+  var activeColumns = (columns && columns.length)
+    ? columns.filter(function(c) { return COLUMN_EXTRACTORS[c.toLowerCase()]; })
+    : DEFAULT_COLUMNS;
+  if (!activeColumns.length) activeColumns = DEFAULT_COLUMNS;
+  var headers = [activeColumns];
+  var rows = filteredTasks.map(function(t) {
+    return activeColumns.map(function(col) {
+      var fn = COLUMN_EXTRACTORS[col.toLowerCase()];
+      return fn ? fn(t) : '';
+    });
+  });
+  return headers.concat(rows);
+}
+
+// Shared task filter — used by create-sheet, create-doc, and create-slides ACTION handlers.
+// parts: pipe-split ACTION parameter array (parts[0] is the title; params start from parts[1])
+// Supported params: after:YYYY-MM-DD  before:YYYY-MM-DD  due_after:YYYY-MM-DD  due_before:YYYY-MM-DD
+//   status:done|active  bucket:<name>  category:<text>  priority:<tag>  location:<tag>
+//   effort:<value>  project:<name or id>  overdue
+function applyTaskFilters(parts, tasks) {
+  var get = function(prefix) {
+    var part = parts.find(function(p) { return p.startsWith(prefix + ':'); });
+    return part ? part.slice(prefix.length + 1).trim() : null;
+  };
+  var has = function(flag) { return parts.some(function(p) { return p.trim() === flag; }); };
+  var afterDate      = get('after');
+  var beforeDate     = get('before');
+  var dueAfter       = get('due_after');
+  var dueBefore      = get('due_before');
+  var statusFilter   = get('status');
+  var categoryFilter = get('category');
+  var bucketFilter   = get('bucket');
+  var priorityFilter = get('priority');
+  var locationFilter = get('location');
+  var effortFilter   = get('effort');
+  var projectFilter  = get('project');
+  var overdueFlag    = has('overdue');
+  var today          = new Date().toISOString().slice(0, 10);
+  var BUCKET_MAP = {
+    'next actions': 'next',   'next': 'next',
+    'projects': 'project',    'project': 'project',
+    'waiting for': 'waiting', 'waiting': 'waiting',
+    'someday maybe': 'someday', 'someday': 'someday',
+    'inbox': 'inbox', 'done': 'done', 'completed': 'done', 'deferred': 'deferred',
+  };
+  var result = tasks.filter(function(t) { return t.bucket !== 'inboxHistory'; });
+  // Status: done=done only, active=active only, no status+no creation-date=active only, no status+date=all
+  if (statusFilter === 'done') {
+    result = result.filter(function(t) { return t.done || t.bucket === 'done'; });
+  } else if (statusFilter === 'active' || (!statusFilter && !afterDate && !beforeDate)) {
+    result = result.filter(function(t) { return !t.done && t.bucket !== 'done'; });
+  }
+  if (bucketFilter) {
+    var bucketKey = BUCKET_MAP[bucketFilter.toLowerCase()] || bucketFilter.toLowerCase();
+    result = result.filter(function(t) { return t.bucket === bucketKey; });
+  }
+  if (afterDate)  result = result.filter(function(t) { return t.created && new Date(t.created).toISOString().slice(0, 10) >= afterDate; });
+  if (beforeDate) result = result.filter(function(t) { return t.created && new Date(t.created).toISOString().slice(0, 10) <= beforeDate; });
+  if (dueAfter)   result = result.filter(function(t) { return t.dueDate && t.dueDate >= dueAfter; });
+  if (dueBefore)  result = result.filter(function(t) { return t.dueDate && t.dueDate <= dueBefore; });
+  if (overdueFlag) result = result.filter(function(t) { return t.dueDate && t.dueDate < today; });
+  if (categoryFilter) {
+    var cat = categoryFilter.toLowerCase();
+    result = result.filter(function(t) { return t.category && t.category.toLowerCase().includes(cat); });
+  }
+  if (priorityFilter) {
+    var pri = priorityFilter.toLowerCase();
+    result = result.filter(function(t) { return (t.priority || []).some(function(p) { return p.toLowerCase().includes(pri); }); });
+  }
+  if (locationFilter) {
+    var loc = locationFilter.toLowerCase();
+    result = result.filter(function(t) { return (t.location || []).some(function(l) { return l.toLowerCase().includes(loc); }); });
+  }
+  if (effortFilter) {
+    var eff = effortFilter.toLowerCase();
+    result = result.filter(function(t) { return t.effort && t.effort.toLowerCase().includes(eff); });
+  }
+  if (projectFilter) {
+    var pf = projectFilter.toLowerCase();
+    var taskById = Object.fromEntries(tasks.map(function(t) { return [t.id, t]; }));
+    var root = tasks.find(function(t) {
+      return t.id === projectFilter ||
+        (t.text && t.text.toLowerCase().includes(pf) && t.childIds && t.childIds.length > 0);
+    });
+    if (root) {
+      var subtreeIds = new Set();
+      var queue = [root.id];
+      while (queue.length) {
+        var qid = queue.shift();
+        subtreeIds.add(qid);
+        var task = taskById[qid];
+        if (task && task.childIds) task.childIds.forEach(function(cid) { queue.push(cid); });
+      }
+      result = result.filter(function(t) { return subtreeIds.has(t.id); });
+    }
+  }
+  return result;
+}
+
+// Resolve a contact by name with fuzzy/partial matching fallback.
+// Returns { contact, ambiguous, candidates } where:
+//   contact    — matched contact object, or null
+//   ambiguous  — true when multiple contacts match (user must be more specific)
+//   candidates — display names of all partial matches (only when ambiguous)
+function resolveContactByName(contacts, name) {
+  const q = (name || '').toLowerCase().trim();
+  if (!q) return { contact: null, ambiguous: false };
+  // Exact case-insensitive match on displayName
+  const exact = contacts.find(c => (c.displayName || '').toLowerCase() === q);
+  if (exact) return { contact: exact, ambiguous: false };
+  // Substring fallback across displayName, givenName, familyName
+  const partials = contacts.filter(c =>
+    (c.displayName || '').toLowerCase().includes(q) ||
+    (c.givenName   || '').toLowerCase().includes(q) ||
+    (c.familyName  || '').toLowerCase().includes(q)
+  );
+  if (partials.length === 1) return { contact: partials[0], ambiguous: false };
+  if (partials.length > 1)  return { contact: null, ambiguous: true, candidates: partials.map(c => c.displayName || '(no name)') };
+  return { contact: null, ambiguous: false };
+}
 
 /**
  * Owns the AI fetch loop, all tool-dispatch branches, action-line parsing,
@@ -50,6 +298,7 @@ const MODE_CONTEXT_BUCKETS = {
  *   provider: string, localModel: string,
  *   googleToken: string|null, googleScope: string|null, calendarEnabled: boolean,
  *   authUser: object|null,
+ *   docsEnabled: boolean, sheetsEnabled: boolean, slidesEnabled: boolean,
  *   coachMode: string, chatInput: string, chatHistory: Array, loading: boolean,
  *   getTaskContext: Function, recordUsage: Function,
  *   setTasks: Function, setCalendarEvents: Function, setGmailQueue: Function,
@@ -63,13 +312,34 @@ function useCallAI({
   provider, localModel,
   googleToken, googleScope, calendarEnabled,
   authUser,
+  docsEnabled, sheetsEnabled, slidesEnabled,
   coachMode, chatInput, chatHistory, loading,
   getTaskContext, recordUsage,
   setTasks, setCalendarEvents, setGmailQueue,
   setMessages, setChatHistory, setChatInput,
   setLoading, setAvailableModels, setPendingAction,
+  setRawApiThread,
   calendarReminderMinutes,
   uncategorizedProjectId,
+  exportFormat,
+  userCity,
+  userHomeAddress,
+  userWorkAddress,
+  coachName,
+  userName,
+  driveEnabled,
+  contactsEnabled,
+  driveDocumentFolderId,
+  driveSpreadsheetFolderId,
+  driveSlideDeckFolderId,
+  driveBaseFolderId,
+  receiptSheetId,
+  healthItems,
+  pendingPdfRef,
+  clearPendingPdf,
+  onFocusSet,
+  contactActionsRef,
+  refreshGoogleToken,
 }) {
   const fetchModels = useCallback(async () => {
     try {
@@ -106,10 +376,40 @@ function useCallAI({
           const counts = Object.entries(BUCKET_LABELS)
             .map(([k, label]) => { const n = tasks.filter(t => t.bucket === k && !t.done).length; return n ? `${label}: ${n}` : null; })
             .filter(Boolean).join(' · ');
-          return `\n\n[Task Overview — ${counts}]\nCall get_task_context to retrieve full task details when needed.`;
+          return `\n\n[Task Overview — Today: ${new Date().toISOString().slice(0, 10)} | ${counts}]\nCall get_task_context to retrieve full task details when needed.`;
         })()
       : `\n\n[Current Task List]\n${getTaskContext(MODE_CONTEXT_BUCKETS[mode] ?? null)}`;
-    const systemPrompt = SYSTEM_PROMPTS[mode] + calibCtx + taskContextPart;
+    const _locParts = [
+      userCity ? 'City: ' + userCity : null,
+      userHomeAddress ? 'Home address: ' + userHomeAddress : null,
+      userWorkAddress ? 'Work address: ' + userWorkAddress : null,
+    ].filter(Boolean);
+    const locationCtx = _locParts.length ? '\n\n[User Location]\n' + _locParts.join('\n') : '';
+    const personalizationCtx = [
+      coachName ? 'Your name is ' + coachName + '.' : null,
+      userName ? "The user's name is " + userName + "." : null,
+    ].filter(Boolean).join(' ');
+    // Build compact health context for chat mode when health items exist
+    let healthCtx = '';
+    if (healthItems && healthItems.length > 0) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const past90 = new Date(today.getTime() - 90 * 86400000);
+      const meds = healthItems.filter(i => (i.type === 'medication' || i.type === 'supplement') && i.status === 'active');
+      const upcoming = healthItems
+        .filter(i => i.type === 'appointment' && i.appointment_date && new Date(i.appointment_date) >= today)
+        .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date))
+        .slice(0, 5);
+      const past = healthItems
+        .filter(i => i.type === 'appointment' && i.appointment_date && new Date(i.appointment_date) < today && new Date(i.appointment_date) >= past90)
+        .sort((a, b) => b.appointment_date.localeCompare(a.appointment_date))
+        .slice(0, 5);
+      const parts = [];
+      if (meds.length) parts.push('Medications/supplements: ' + meds.map(m => [m.name, m.dose, m.frequency].filter(Boolean).join(' ')).join('; '));
+      if (upcoming.length) parts.push('Upcoming appointments: ' + upcoming.map(a => [a.name, a.appointment_date ? new Date(a.appointment_date).toLocaleDateString([], {dateStyle:'medium'}) : null, a.provider && 'with ' + a.provider].filter(Boolean).join(' · ')).join(' | '));
+      if (past.length) parts.push('Recent appointments (last 90 days): ' + past.map(a => [a.name, a.appointment_date ? new Date(a.appointment_date).toLocaleDateString([], {dateStyle:'medium'}) : null, a.provider && 'with ' + a.provider].filter(Boolean).join(' · ')).join(' | '));
+      if (parts.length) healthCtx = '\n\n[Health context]\n' + parts.join('\n');
+    }
+    const systemPrompt = (personalizationCtx ? personalizationCtx + '\n\n' : '') + SYSTEM_PROMPTS[mode] + calibCtx + locationCtx + healthCtx + taskContextPart;
     let inputLogSet = false;
     const newHistory = [...history, { role: 'user', content: userMsg }];
 
@@ -146,27 +446,34 @@ function useCallAI({
               }
               if (googleScope === 'compose' || googleScope === 'send')
                 availableTools.push(GMAIL_COMPOSE_TOOL);
-              if (googleScope === 'send')
+              if (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send')
                 availableTools.push(GMAIL_SEND_TOOL);
             }
+            if (googleToken && driveEnabled) {
+              availableTools.push(DRIVE_SEARCH_TOOL);
+              availableTools.push(GET_DRIVE_FILE_TOOL);
+              // FR#178/179: attachment + email→Doc tools (need both gmail + drive)
+              if (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send') {
+                availableTools.push(GMAIL_SAVE_ATTACHMENT_TOOL);
+                availableTools.push(GMAIL_SAVE_EMAIL_TO_DOC_TOOL);
+              }
+            }
+            if (googleToken && contactsEnabled) availableTools.push(CONTACTS_LOOKUP_TOOL);
+            if (import.meta.env.VITE_OPENWEATHERMAP_API_KEY) availableTools.push(GET_WEATHER_TOOL);
             if (availableTools.length > 0) reqBody.tools = availableTools;
           }
           if (loopCount > 1) {
-            setMessages(prev => [...prev, { role: 'assistant', text: `⏳ Thinking... (step ${loopCount})`, isSearchChip: true }]);
+            setMessages(prev => [...prev, { role: 'assistant', text: `⏳ Processing Tool #${loopCount - 1} Output...`, isSearchChip: true }]);
           }
           const reqStart = Date.now();
           const abortCtrl = new AbortController();
           const abortTimer = setTimeout(() => abortCtrl.abort(), 90000);
           let res, data;
           try {
-            res = await fetch('https://api.anthropic.com/v1/messages', {
+            const { url: claudeUrl, headers: claudeHeaders } = claudeRequest();
+            res = await fetch(claudeUrl, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true',
-              },
+              headers: claudeHeaders,
               body: JSON.stringify(reqBody),
               signal: abortCtrl.signal,
             });
@@ -307,13 +614,144 @@ function useCallAI({
                   toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result) });
                 } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               } else if (toolUse.name === 'gmail_send') {
-                setMessages(prev => [...prev, { role: 'assistant', text: `📤 Sending email...`, isSearchChip: true }]);
+                setPendingAction({
+                  type: 'gmail_send',
+                  to: toolUse.input.to,
+                  subject: toolUse.input.subject,
+                  body: toolUse.input.body,
+                  threadId: toolUse.input.thread_id || null,
+                });
+                toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify({ status: 'Email staged for sending — awaiting user confirmation in the action bar.' }) });
+              } else if (toolUse.name === 'drive_search') {
+                const driveQuery = toolUse.input.query;
+                const driveMax = Math.min(toolUse.input.max_results || 10, 50);
+                // Pass query through unchanged. Prior normalization regex had \b
+                // stored as \x08 (backspace) so it always fired, double-wrapping
+                // valid queries. The tool description requires proper Drive syntax.
+                const normalizedQuery = driveQuery;
+                setMessages(prev => [...prev, {
+                  role: 'assistant', text: '🔍 Searching Drive: "' + driveQuery + '"', isSearchChip: true,
+                }]);
                 try {
-                  const result = await doGmailSend(
-                    toolUse.input.to, toolUse.input.subject, toolUse.input.body,
-                    toolUse.input.thread_id, googleToken
-                  );
-                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                  const result = await driveListFiles({ token: googleToken, q: normalizedQuery, pageSize: driveMax });
+                  const files = (result.files || []).map(function(f) {
+                    return { id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, webViewLink: f.webViewLink };
+                  });
+                  let driveResult = JSON.stringify(files);
+                  if (files.length === 0) driveResult += '\n\nNote: No files found. If searching for a pre-existing file or folder, the Drive connection may lack read access to existing files. Inform the user and suggest they reconnect Drive in Settings, or ask them to share the folder URL so you can extract the ID directly.';
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: driveResult });
+                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === 'get_drive_file') {
+                const driveFileId = toolUse.input.file_id;
+                setMessages(prev => [...prev, {
+                  role: 'assistant', text: '📄 Reading Drive file…', isSearchChip: true,
+                }]);
+                try {
+                  const meta = await driveGetFile({ token: googleToken, fileId: driveFileId });
+                  const fileMime = meta.mimeType || '';
+                  if (fileMime === 'application/pdf') {
+                    setMessages(prev => [...prev, { role: 'assistant', text: '\u{1F4C4} Downloading PDF...', isSearchChip: true }]);
+                    const pdfBase64 = await driveDownloadFileAsBase64({ token: googleToken, fileId: driveFileId, onTokenRefresh: refreshGoogleToken });
+                    toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: [
+                      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+                      { type: 'text', text: 'File: ' + meta.name },
+                    ] });
+                  } else {
+                    let fileContent;
+                    if (fileMime.startsWith('application/vnd.google-apps.')) {
+                      const exportMime = toolUse.input.mime_type || (fileMime.includes('spreadsheet') ? 'text/csv' : 'text/plain');
+                      fileContent = await driveExportFile({ token: googleToken, fileId: driveFileId, mimeType: exportMime });
+                    } else {
+                      fileContent = await driveDownloadFile({ token: googleToken, fileId: driveFileId });
+                    }
+                    if (fileContent.length > 50000) fileContent = fileContent.slice(0, 50000) + '\n[content truncated at 50,000 chars]';
+                    toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: fileContent });
+                  }
+                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === 'get_weather') {
+                const weatherCity = toolUse.input.city || userCity;
+                const weatherUnits = toolUse.input.units || 'imperial';
+                if (!weatherCity) {
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: 'No city specified and no default city configured. Ask the user for their city.' });
+                } else {
+                  setMessages(prev => [...prev, { role: 'assistant', text: '🌤️ Fetching weather for ' + weatherCity + '…', isSearchChip: true }]);
+                  try {
+                    const owmKey = import.meta.env.VITE_OPENWEATHERMAP_API_KEY;
+                    const [curRes, fcastRes] = await Promise.all([
+                      fetch('https://api.openweathermap.org/data/2.5/weather?q=' + encodeURIComponent(weatherCity) + '&appid=' + owmKey + '&units=' + weatherUnits),
+                      fetch('https://api.openweathermap.org/data/2.5/forecast?q=' + encodeURIComponent(weatherCity) + '&appid=' + owmKey + '&units=' + weatherUnits + '&cnt=8'),
+                    ]);
+                    const curData = await curRes.json();
+                    const fcastData = await fcastRes.json();
+                    if (curData.cod !== 200) throw new Error(curData.message || 'City not found');
+                    const unitLabel = weatherUnits === 'metric' ? '°C' : '°F';
+                    const result = {
+                      city: curData.name,
+                      country: curData.sys.country,
+                      current: {
+                        temp: curData.main.temp,
+                        feels_like: curData.main.feels_like,
+                        humidity: curData.main.humidity,
+                        description: curData.weather[0].description,
+                        wind_speed: curData.wind.speed,
+                        units: unitLabel,
+                        wind_units: weatherUnits === 'metric' ? 'm/s' : 'mph',
+                      },
+                      forecast: (fcastData.list || []).map(function(f) {
+                        return { time: f.dt_txt, temp: f.main.temp, description: f.weather[0].description, pop: Math.round((f.pop || 0) * 100) };
+                      }),
+                    };
+                    toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result) });
+                  } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: 'Weather fetch failed: ' + e.message }); }
+                }
+              } else if (toolUse.name === 'gmail_save_attachment_to_drive') {
+                setMessages(prev => [...prev, { role: 'assistant', text: '📎 Saving attachment to Drive…', isSearchChip: true }]);
+                try {
+                  const { message_id, attachment_id, file_name, folder_id } = toolUse.input;
+                  const result = await doGmailSaveAttachmentToDrive(message_id, attachment_id, file_name, folder_id || null, googleToken);
+                  const msg = result.webViewLink
+                    ? `Saved "${result.name}" to Drive: ${result.webViewLink}`
+                    : 'Error saving attachment to Drive.';
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: msg });
+                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === 'gmail_save_email_to_doc') {
+                setMessages(prev => [...prev, { role: 'assistant', text: '📄 Saving email as Google Doc…', isSearchChip: true }]);
+                try {
+                  const { message_id, title, folder_id } = toolUse.input;
+                  const emailData = await doGmailGetMessageBody(message_id, googleToken);
+                  const docBody = [
+                    `From: ${emailData.from}`,
+                    `To: ${emailData.to || ''}`,
+                    `Date: ${emailData.date}`,
+                    `Subject: ${emailData.subject}`,
+                    '',
+                    emailData.body || emailData.snippet || '',
+                  ].join('\n');
+                  const doc = await docsCreateDocument({ token: googleToken, title });
+                  await docsAppendText({ token: googleToken, documentId: doc.documentId, text: docBody });
+                  if (folder_id) await docsMoveToFolder({ token: googleToken, documentId: doc.documentId, newParentId: folder_id });
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: `Saved as Google Doc "${title}": https://docs.google.com/document/d/${doc.documentId}/edit` });
+                } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
+              } else if (toolUse.name === 'contacts_lookup') {
+                const contactsQuery = toolUse.input.query;
+                const contactsMax = Math.min(toolUse.input.max_results || 5, 30);
+                setMessages(prev => [...prev, { role: 'assistant', text: `👤 Searching contacts: "${contactsQuery}"`, isSearchChip: true }]);
+                try {
+                  const results = await peopleSearchContacts({ token: googleToken, query: contactsQuery, maxResults: contactsMax });
+                  const localContacts = (contactActionsRef.current && contactActionsRef.current.contacts) || [];
+                  const enriched = results.map(r => {
+                    const local = localContacts.find(c => c.googleResourceName === r.resourceName);
+                    if (!local) return r;
+                    const extra = {};
+                    if (local.relationshipTags && local.relationshipTags.length) extra.relationshipTags = local.relationshipTags;
+                    if (local.notes && local.notes.trim()) extra.notes = local.notes;
+                    if (local.likesPreferences && local.likesPreferences.length) extra.likesPreferences = local.likesPreferences;
+                    if (local.dislikes && local.dislikes.length) extra.dislikes = local.dislikes;
+                    if (local.giftIdeas && local.giftIdeas.length) extra.giftIdeas = local.giftIdeas;
+                    if (local.promises && local.promises.length) extra.promises = local.promises;
+                    return { ...r, ...extra };
+                  });
+                  toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(enriched) });
                 } catch (e) { toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: e.message }); }
               }
             }
@@ -330,6 +768,23 @@ function useCallAI({
             ];
           } else {
             reply = data.content?.find(b => b.type === 'text')?.text || 'Sorry, something went wrong.';
+            // FR#102: capture tool rounds from this turn
+            if (setRawApiThread) {
+              const toolRoundsRaw = apiMessages.slice(newHistory.length);
+              if (toolRoundsRaw.length > 0) {
+                const toolRoundsForTurn = [];
+                for (let i = 0; i < toolRoundsRaw.length; i += 2) {
+                  const asst = toolRoundsRaw[i]; const usr = toolRoundsRaw[i + 1];
+                  if (asst && usr) toolRoundsForTurn.push({
+                    toolCalls: asst.content.filter(b => b.type === 'tool_use'),
+                    toolResults: usr.content.filter(b => b.type === 'tool_result'),
+                  });
+                }
+                if (toolRoundsForTurn.length > 0) {
+                  setRawApiThread(prev => [...prev, { userMessage: userMsg, toolRounds: toolRoundsForTurn, finalReply: reply }]);
+                }
+              }
+            }
             break;
           }
         }
@@ -370,20 +825,22 @@ function useCallAI({
       // Apply →ACTION lines when in chat or dump mode — supports multiple actions per response
       let updateChip = null;
       let actionError = null;
-      if (mode === 'chat' || mode === 'dump' || mode === 'daily') {
+      // Declare at this scope so the calendar section below can also reference it
+      let workingTasks = [...tasks];
+      if (mode === 'chat' || mode === 'dump' || mode === 'daily' || mode === 'review') {
         // Extract →ACTION lines — notes values may span multiple non-blank lines,
         // so match each block until the first blank line (\n\n) which separates
         // action lines from the AI's subsequent prose response.
         const taskActionLines = [];
-        const actionRe = /→ACTION:(?:update|add|create|link_email)\|(?:[^\n]|\n(?!\n))+/g;
+        const actionRe = /→ACTION:(?:update|add|create|link_email|next|someday|waiting|contact_promise|contact_like|contact_dislike|contact_tag|contact_note|contact_gift|attach_drive)\|(?:[^\n]|\n(?!\n)(?!→ACTION:))+/g;
         for (const am of reply.matchAll(actionRe)) {
           taskActionLines.push(am[0].trimEnd());
         }
 
+        workingTasks = [...tasks];
         if (taskActionLines.length > 0) {
           // Process all actions against a local working copy so parent lookups
           // work across the batch (e.g. create parent then add children in same response)
-          let workingTasks = [...tasks];
           const chips = [];
           const actionErrors = [];
 
@@ -392,10 +849,18 @@ function useCallAI({
             if (upd) {
               const target = workingTasks.find(t => t.id === upd.taskId);
               if (target) {
+                const resolvedChanges = { ...upd.changes };
+                if (resolvedChanges.notesAppend !== undefined) {
+                  const existing = target.notes || '';
+                  resolvedChanges.notes = existing
+                    ? existing + '\n' + resolvedChanges.notesAppend
+                    : resolvedChanges.notesAppend;
+                  delete resolvedChanges.notesAppend;
+                }
                 workingTasks = workingTasks.map(t =>
-                  t.id === upd.taskId ? { ...t, ...upd.changes } : t
+                  t.id === upd.taskId ? { ...t, ...resolvedChanges } : t
                 );
-                const fieldLabels = Object.keys(upd.changes).map(k => ({
+                const fieldLabels = Object.keys(resolvedChanges).map(k => ({
                   notes: 'notes', dueDate: 'due date', deferUntil: 'defer date',
                   effort: 'effort', actualEffort: 'actual effort', text: 'title', bucket: 'bucket',
                   priority: 'priority', location: 'location', recurrence: 'recurrence',
@@ -421,9 +886,10 @@ function useCallAI({
                 const newTask = {
                   id: newId, text: title, bucket: addBucketFinal, done: false, created: Date.now(),
                   parentId: parent.id, priority: [], location, dueDate, effort: normalizeEffort(effort, efforts),
-                  actualEffort: null, deferUntil, notes: null, recurrence,
+                  actualEffort: null, deferUntil, notes: add.notes || null, recurrence,
                   category: category || parent.category || null,
                   ...(addIsNext ? { isNextAction: true } : {}),
+                  ...(add.nodeType ? { nodeType: add.nodeType } : {}),
                 };
                 workingTasks = [
                   ...workingTasks.map(t => t.id === parent.id
@@ -450,7 +916,7 @@ function useCallAI({
               const newTask = {
                 id: newId, text: title, bucket, done: false, created: Date.now(),
                 priority: [], location, dueDate, dueTime, effort: normalizeEffort(effort, efforts), actualEffort: null,
-                deferUntil, notes: null, recurrence,
+                deferUntil, notes: create.notes || null, recurrence,
                 ...(createIsNext ? { isNextAction: true } : {}),
                 ...(parentId ? { parentId } : {}),
               };
@@ -481,6 +947,307 @@ function useCallAI({
                   });
                   chips.push({ taskName: target.text, fields: ['email linked'] });
                 }
+              }
+              continue;
+            }
+
+            // →ACTION:next|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|priority:<p1,p2>][|location:<loc>][|notes:<text>]
+            if (line.startsWith('→ACTION:next|')) {
+              const parts = line.slice('→ACTION:next|'.length).split('|');
+              const title = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                const k = parts[i].slice(0, ci).trim();
+                const v = parts[i].slice(ci + 1).trim();
+                if (k === 'due')      xtra.dueDate    = v;
+                if (k === 'defer')    xtra.deferUntil = v;
+                if (k === 'effort')   xtra.effort     = normalizeEffort(v, efforts);
+                if (k === 'notes')    xtra.notes      = v;
+                if (k === 'location') xtra.location   = v.split(',').map(s => s.trim()).filter(Boolean);
+                if (k === 'priority') xtra.priority   = v.split(',').map(s => s.trim()).filter(Boolean);
+                if (k === 'contact') xtra.contact   = v;
+              }
+              if (xtra.contact && contactActionsRef.current.contacts) {
+                const { contact: ct } = resolveContactByName(contactActionsRef.current.contacts, xtra.contact);
+                if (ct) xtra.contactId = ct.id;
+              }
+              if (title) {
+                const newId = genId();
+                const parentId = uncategorizedProjectId || undefined;
+                const newTask = {
+                  id: newId, text: title, bucket: 'project', done: false, created: Date.now(),
+                  priority: xtra.priority || [], location: xtra.location || [],
+                  dueDate: xtra.dueDate || null, effort: xtra.effort || null, actualEffort: null,
+                  deferUntil: xtra.deferUntil || null, notes: xtra.notes || null,
+                  recurrence: null, isNextAction: true,
+                  ...(xtra.contactId ? { contactId: xtra.contactId } : {}),
+                  ...(parentId ? { parentId } : {}),
+                };
+                if (parentId) {
+                  workingTasks = [newTask, ...workingTasks.map(t => t.id === parentId
+                    ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
+                } else {
+                  workingTasks = [newTask, ...workingTasks];
+                }
+                chips.push({ taskName: title, fields: ['created in Next Actions'] });
+              }
+              continue;
+            }
+
+            // →ACTION:someday|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|effort:<label>][|notes:<text>]
+            if (line.startsWith('→ACTION:someday|')) {
+              const parts = line.slice('→ACTION:someday|'.length).split('|');
+              const title = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                const k = parts[i].slice(0, ci).trim();
+                const v = parts[i].slice(ci + 1).trim();
+                if (k === 'due')      xtra.dueDate    = v;
+                if (k === 'defer')    xtra.deferUntil = v;
+                if (k === 'effort')   xtra.effort     = normalizeEffort(v, efforts);
+                if (k === 'notes')    xtra.notes      = v;
+                if (k === 'location') xtra.location   = v.split(',').map(s => s.trim()).filter(Boolean);
+                if (k === 'priority') xtra.priority   = v.split(',').map(s => s.trim()).filter(Boolean);
+                if (k === 'contact') xtra.contact   = v;
+              }
+              if (xtra.contact && contactActionsRef.current.contacts) {
+                const { contact: ct } = resolveContactByName(contactActionsRef.current.contacts, xtra.contact);
+                if (ct) xtra.contactId = ct.id;
+              }
+              if (title) {
+                const newId = genId();
+                const parentId = uncategorizedProjectId || undefined;
+                const newTask = {
+                  id: newId, text: title, bucket: 'project', done: false, created: Date.now(),
+                  priority: xtra.priority || [], location: xtra.location || [],
+                  dueDate: xtra.dueDate || null, effort: xtra.effort || null, actualEffort: null,
+                  deferUntil: xtra.deferUntil || null, notes: xtra.notes || null,
+                  recurrence: null, isSomeday: true,
+                  ...(xtra.contactId ? { contactId: xtra.contactId } : {}),
+                  ...(parentId ? { parentId } : {}),
+                };
+                if (parentId) {
+                  workingTasks = [newTask, ...workingTasks.map(t => t.id === parentId
+                    ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
+                } else {
+                  workingTasks = [newTask, ...workingTasks];
+                }
+                chips.push({ taskName: title, fields: ['created in Someday/Maybe'] });
+              }
+              continue;
+            }
+
+            // →ACTION:waiting|<title>[|due:YYYY-MM-DD][|defer:YYYY-MM-DD][|notes:<text>]
+            if (line.startsWith('→ACTION:waiting|')) {
+              const parts = line.slice('→ACTION:waiting|'.length).split('|');
+              const title = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                const k = parts[i].slice(0, ci).trim();
+                const v = parts[i].slice(ci + 1).trim();
+                if (k === 'due')     xtra.dueDate    = v;
+                if (k === 'defer')   xtra.deferUntil = v;
+                if (k === 'notes')   xtra.notes      = v;
+                if (k === 'contact') xtra.contact    = v;
+              }
+              if (xtra.contact && contactActionsRef.current.contacts) {
+                const { contact: ct } = resolveContactByName(contactActionsRef.current.contacts, xtra.contact);
+                if (ct) xtra.contactId = ct.id;
+              }
+              if (title) {
+                const newId = genId();
+                const parentId = uncategorizedProjectId || undefined;
+                const newTask = {
+                  id: newId, text: title, bucket: 'project', done: false, created: Date.now(),
+                  priority: [], location: [],
+                  dueDate: xtra.dueDate || null, effort: null, actualEffort: null,
+                  deferUntil: xtra.deferUntil || null, notes: xtra.notes || null,
+                  recurrence: null, isWaitingFor: true,
+                  ...(xtra.contactId ? { contactId: xtra.contactId } : {}),
+                  ...(parentId ? { parentId } : {}),
+                };
+                if (parentId) {
+                  workingTasks = [newTask, ...workingTasks.map(t => t.id === parentId
+                    ? { ...t, childIds: [...(t.childIds || []), newId] } : t)];
+                } else {
+                  workingTasks = [newTask, ...workingTasks];
+                }
+                chips.push({ taskName: title, fields: ['created in Waiting For'] });
+              }
+              continue;
+            }
+
+            // →ACTION:contact_promise|<contactName>|direction:made|text:<text>[|create_task:yes]
+            // →ACTION:contact_promise|<contactName>|direction:received|text:<text>
+            if (line.startsWith('→ACTION:contact_promise|')) {
+              const parts = line.slice('→ACTION:contact_promise|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
+              }
+              const direction = xtra.direction || 'made';
+              const text = xtra.text || '';
+              const doCreateTask = xtra.create_task === 'yes';
+              if (contactName && text && contactActionsRef.current.addPromise) {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
+                  await contactActionsRef.current.addPromise(contact.id, { text, direction });
+                  if (direction === 'made' && doCreateTask && contactActionsRef.current.createInboxTask) {
+                    contactActionsRef.current.createInboxTask(text, { contactId: contact.id });
+                  }
+                  chips.push({ taskName: contact.displayName || contactName, fields: [direction === 'made' ? 'promise recorded' : 'received promise recorded'] });
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:contact_like|<contactName>|category:<cat>|value:<val>
+            if (line.startsWith('→ACTION:contact_like|')) {
+              const parts = line.slice('→ACTION:contact_like|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
+              }
+              if (contactName && xtra.value && contactActionsRef.current.addLike) {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
+                  await contactActionsRef.current.addLike(contact.id, { category: xtra.category || 'General', value: xtra.value });
+                  chips.push({ taskName: contact.displayName || contactName, fields: ['like added: ' + xtra.value] });
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:contact_dislike|<contactName>|category:<cat>|value:<val>
+            if (line.startsWith('→ACTION:contact_dislike|')) {
+              const parts = line.slice('→ACTION:contact_dislike|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci < 0) continue;
+                xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
+              }
+              if (contactName && xtra.value && contactActionsRef.current.addDislike) {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
+                  await contactActionsRef.current.addDislike(contact.id, { category: xtra.category || 'General', value: xtra.value });
+                  chips.push({ taskName: contact.displayName || contactName, fields: ['dislike added: ' + xtra.value] });
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:contact_tag|<contactName>|tag:<tag>
+            if (line.startsWith('→ACTION:contact_tag|')) {
+              const parts = line.slice('→ACTION:contact_tag|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const tag = (parts[1] || '').replace(/^tag:/, '').trim();
+              if (contactName && tag && contactActionsRef.current.updateCustomFields) {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
+                  const existing = contact.relationshipTags || [];
+                  if (!existing.includes(tag)) {
+                    await contactActionsRef.current.updateCustomFields(contact.id, { relationshipTags: [...existing, tag] });
+                  }
+                  chips.push({ taskName: contact.displayName || contactName, fields: ['tag added: ' + tag] });
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:contact_note|<contactName>|text:<text>
+            if (line.startsWith('→ACTION:contact_note|')) {
+              const parts = line.slice('→ACTION:contact_note|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const text = (parts[1] || '').replace(/^text:/, '').trim();
+              if (contactName && text && contactActionsRef.current.updateCustomFields) {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
+                  const existing = contact.notes || '';
+                  const newNotes = existing ? existing + '\n' + text : text;
+                  await contactActionsRef.current.updateCustomFields(contact.id, { notes: newNotes });
+                  chips.push({ taskName: contact.displayName || contactName, fields: ['note added'] });
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:contact_gift|<contactName>|text:<text>
+            if (line.startsWith('→ACTION:contact_gift|')) {
+              const parts = line.slice('→ACTION:contact_gift|'.length).split('|');
+              const contactName = (parts[0] || '').trim();
+              const text = (parts[1] || '').replace(/^text:/, '').trim();
+              if (contactName && text && contactActionsRef.current.addGiftIdea) {
+                const { contact, ambiguous, candidates } = resolveContactByName(contactActionsRef.current.contacts || [], contactName);
+                if (ambiguous) {
+                  actionErrors.push(`⚠ "${contactName}" matches multiple contacts (${candidates.join(', ')}) — please use the full name.`);
+                } else if (!contact) {
+                  actionErrors.push(`⚠ Contact action failed: no contact named "${contactName}".`);
+                } else {
+                  await contactActionsRef.current.addGiftIdea(contact.id, { text });
+                  chips.push({ taskName: contact.displayName || contactName, fields: ['gift idea added: ' + text] });
+                }
+              }
+              continue;
+            }
+
+            // →ACTION:attach_drive|<task_id>|fileId:<id>|name:<name>|mimeType:<type>|url:<url> (FR#180)
+            if (line.startsWith('→ACTION:attach_drive|')) {
+              const parts = line.slice('→ACTION:attach_drive|'.length).split('|');
+              const taskId = (parts[0] || '').trim();
+              const xtra = {};
+              for (let i = 1; i < parts.length; i++) {
+                const ci = parts[i].indexOf(':');
+                if (ci >= 0) xtra[parts[i].slice(0, ci).trim()] = parts[i].slice(ci + 1).trim();
+              }
+              if (taskId && xtra.fileId) {
+                const attachment = {
+                  id:       xtra.fileId,
+                  name:     xtra.name     || 'Drive file',
+                  mimeType: xtra.mimeType || 'application/octet-stream',
+                  url:      xtra.url      || `https://drive.google.com/file/d/${xtra.fileId}/view`,
+                };
+                workingTasks = workingTasks.map(t => {
+                  if (t.id !== taskId) return t;
+                  const existing = t.driveAttachments || [];
+                  if (existing.some(a => a.id === attachment.id)) return t;
+                  return { ...t, driveAttachments: [...existing, attachment] };
+                });
+                const taskName = (workingTasks.find(t => t.id === taskId) || {}).text || taskId;
+                chips.push({ taskName, fields: ['Drive file attached: ' + attachment.name] });
               }
               continue;
             }
@@ -515,15 +1282,17 @@ function useCallAI({
             });
             setCalendarEvents(prev => [...prev, ev]);
             if (calCreate.taskId) {
-              setTasks(prev => prev.map(t => t.id === calCreate.taskId ? { ...t, calendarEventId: ev.id } : t));
+              workingTasks = workingTasks.map(t => t.id === calCreate.taskId ? { ...t, calendarEventId: ev.id } : t);
+              setTasks(workingTasks);
             } else {
               const newId = genId();
-              setTasks(prev => [{
+              workingTasks = [{
                 id: newId, text: calCreate.title, bucket: 'inbox', done: false, created: Date.now(),
                 priority: [], location: [], dueDate: calCreate.date, effort: null, actualEffort: null,
                 deferUntil: null, notes: calCreate.description || null, recurrence: null,
                 calendarEventId: ev.id,
-              }, ...prev]);
+              }, ...workingTasks];
+              setTasks(workingTasks);
             }
             updateChip = { taskName: calCreate.title, fields: ['created in Google Calendar', 'added to Inbox'] };
           } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
@@ -536,7 +1305,8 @@ function useCallAI({
             });
             setCalendarEvents(prev => prev.map(e => e.id === ev.id ? ev : e));
             if (calUpdate.taskId) {
-              setTasks(prev => prev.map(t => t.id === calUpdate.taskId ? { ...t, dueDate: calUpdate.date } : t));
+              workingTasks = workingTasks.map(t => t.id === calUpdate.taskId ? { ...t, dueDate: calUpdate.date } : t);
+              setTasks(workingTasks);
             }
             updateChip = { taskName: calUpdate.title || calUpdate.eventId, fields: ['updated in Google Calendar'] };
           } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
@@ -552,16 +1322,183 @@ function useCallAI({
                 const eStart = e.start?.date || e.start?.dateTime?.slice(0, 10);
                 return eStart && eStart < cutoffDateStr;
               }));
-              setTasks(prev => prev.map(t =>
+              workingTasks = workingTasks.map(t =>
                 (t.calendarEventId === calDelete.eventId || t.calendarEventId === masterEventId)
                   ? { ...t, calendarEventId: null } : t
-              ));
+              );
+              setTasks(workingTasks);
             } else {
               setCalendarEvents(prev => prev.filter(e => e.id !== calDelete.eventId));
-              setTasks(prev => prev.map(t => t.calendarEventId === calDelete.eventId ? { ...t, calendarEventId: null } : t));
+              workingTasks = workingTasks.map(t => t.calendarEventId === calDelete.eventId ? { ...t, calendarEventId: null } : t);
+              setTasks(workingTasks);
             }
             updateChip = { taskName: 'Calendar event', fields: ['deleted from Google Calendar'] };
           } catch (e) { actionError = `⚠ Calendar action failed: ${e.message}`; }
+        }
+      }
+
+      // →ACTION:create-doc|<title>[|task:<id>] — create Google Doc from coach
+      if (googleToken && docsEnabled) {
+        const docLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-doc|'));
+        if (docLine) {
+          try {
+            const parts = docLine.slice('\u2192ACTION:create-doc|'.length).split('|');
+            const modeDocLabel = (COACH_MODES[coachMode] || {}).label || coachMode;
+            const docDateStr = new Date().toISOString().slice(0, 10);
+            const docTitle = modeDocLabel + ' — ' + (parts[0] || 'Coach Output').trim() + ' — ' + docDateStr;
+            const taskRef = (parts.find(p => p.startsWith('task:')) || '').replace('task:', '').trim();
+            const docFolderParam = (parts.find(p => p.startsWith('folder:')) || '').replace('folder:', '').trim();
+            const doc = await docsCreateDocument({ token: googleToken, title: docTitle });
+            // Strip ACTION lines, then trim conversational framing:
+            // - leading prose before the first markdown heading
+            // - trailing prose after the last standalone --- divider
+            var bodyText = reply.replace(/\u2192ACTION:[^\n]*/g, '').trim();
+            var firstHeadingIdx = bodyText.search(/^#{1,6}\s/m);
+            if (firstHeadingIdx > 0) bodyText = bodyText.slice(firstHeadingIdx).trim();
+            var lastDivIdx = bodyText.lastIndexOf('\n---');
+            if (lastDivIdx !== -1) {
+              var afterDiv = bodyText.slice(lastDivIdx + 4).trim();
+              if (afterDiv && !/^[#*\->\|`]/.test(afterDiv)) {
+                bodyText = bodyText.slice(0, lastDivIdx + 4).trim();
+              }
+            }
+            if (bodyText) {
+              const fmt = exportFormat || 'rtf';
+              if (fmt === 'markdown') {
+                await docsAppendText({ token: googleToken, documentId: doc.documentId, text: bodyText, onTokenRefresh: refreshGoogleToken });
+              } else if (fmt === 'text') {
+                const plain = bodyText.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1').replace(/^#{1,6}\s+/gm, '').replace(/^>\s*/gm, '').replace(/^---$/gm, '');
+                await docsAppendText({ token: googleToken, documentId: doc.documentId, text: plain, onTokenRefresh: refreshGoogleToken });
+              } else {
+                await docsAppendMarkdown({ token: googleToken, documentId: doc.documentId, markdownText: bodyText, onTokenRefresh: refreshGoogleToken });
+              }
+            }
+            const docUrl = `https://docs.google.com/document/d/${doc.documentId}/edit`;
+            if (taskRef) {
+              const target = tasks.find(t => t.id === taskRef || t.text.toLowerCase() === taskRef.toLowerCase());
+              if (target) {
+                const existing = target.driveAttachments || [];
+                setTasks(prev => prev.map(t => t.id === target.id
+                  ? { ...t, driveAttachments: [...existing, { id: doc.documentId, name: docTitle, mimeType: 'application/vnd.google-apps.document', url: docUrl }] }
+                  : t));
+              }
+            }
+            const docTargetFolder = docFolderParam || driveDocumentFolderId || driveBaseFolderId || null;
+            if (docTargetFolder) {
+              await docsMoveToFolder({ token: googleToken, documentId: doc.documentId, newParentId: docTargetFolder, onTokenRefresh: refreshGoogleToken });
+            }
+            updateChip = { taskName: docTitle, fields: ['Google Doc created'], url: docUrl };
+          } catch (e) { actionError = `\u26a0 Doc creation failed: ${e.message}`; }
+        }
+      }
+
+      // →ACTION:create-sheet|<title>[|after:YYYY-MM-DD][|before:YYYY-MM-DD] — create Google Sheet from coach
+      if (googleToken && sheetsEnabled) {
+        const sheetLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-sheet|'));
+        if (sheetLine) {
+          try {
+            const sheetParts = sheetLine.slice('\u2192ACTION:create-sheet|'.length).split('|');
+            const sheetTitle = (sheetParts[0] || 'Coach Spreadsheet').trim();
+            const sheetFolderParam = (sheetParts.find(p => p.startsWith('folder:')) || '').replace('folder:', '').trim();
+            const sheetTabs = parseSheetTabs(sheetParts);
+            const sheet = await sheetsCreateSpreadsheet({ token: googleToken, title: sheetTitle });
+            const sheetId = sheet.spreadsheetId;
+            const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+            const taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
+            // Rename default Sheet1 tab and create additional tabs in one batchUpdate
+            const batchReqs = [{ updateSheetProperties: { properties: { sheetId: 0, title: sheetTabs[0].name }, fields: 'title' } }];
+            for (var ti = 1; ti < sheetTabs.length; ti++) {
+              batchReqs.push({ addSheet: { properties: { title: sheetTabs[ti].name } } });
+            }
+            await sheetsBatchUpdate({ token: googleToken, spreadsheetId: sheetId, requests: batchReqs });
+            // Populate each tab with filtered task data
+            var totalRows = 0;
+            for (var ti = 0; ti < sheetTabs.length; ti++) {
+              var tab = sheetTabs[ti];
+              var tabTasks = applyTaskFilters(tab.params, tasks);
+              totalRows += tabTasks.length;
+              var tabValues = buildSheetData(tabTasks, taskById, tab.columns);
+              await sheetsAppendRows({ token: googleToken, spreadsheetId: sheetId, range: tab.name, values: tabValues });
+            }
+            var tabsLabel = sheetTabs.length > 1 ? sheetTabs.length + ' tabs, ' + totalRows + ' tasks' : totalRows + ' tasks';
+            const sheetTargetFolder = sheetFolderParam || driveSpreadsheetFolderId || driveBaseFolderId || null;
+            if (sheetTargetFolder) {
+              await sheetsMoveToFolder({ token: googleToken, spreadsheetId: sheetId, newParentId: sheetTargetFolder, onTokenRefresh: refreshGoogleToken });
+            }
+            updateChip = { taskName: sheetTitle, fields: ['Google Sheet created — ' + tabsLabel], url: sheetUrl };
+          } catch (e) { actionError = `\u26a0 Sheet creation failed: ${e.message}`; }
+        }
+      }
+
+      // →ACTION:append-sheet|<date>|<vendor>|<amount>|<currency>|<category>|<description>
+      // Appends one receipt row to the configured receipt sheet (Settings → Receipt Tracking)
+      if (googleToken && sheetsEnabled && receiptSheetId) {
+        const appendLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('→ACTION:append-sheet|'));
+        if (appendLine) {
+          try {
+            const parts = appendLine.slice('→ACTION:append-sheet|'.length).split('|');
+            const [rowDate, rowVendor, rowAmount, rowCurrency, rowCategory, ...descParts] = parts;
+            const rowDescription = descParts.join('|').trim();
+            const row = [
+              (rowDate || new Date().toISOString().slice(0, 10)).trim(),
+              (rowVendor || '').trim(),
+              (rowAmount || '').trim(),
+              (rowCurrency || 'USD').trim(),
+              (rowCategory || '').trim(),
+              rowDescription,
+            ];
+            await sheetsAppendRows({ token: googleToken, spreadsheetId: receiptSheetId, range: 'Sheet1', values: [row], onTokenRefresh: refreshGoogleToken });
+            updateChip = { taskName: rowVendor || 'Receipt', fields: ['appended to receipt sheet'] };
+          } catch (e) { actionError = `⚠ Receipt sheet append failed: ${e.message}`; }
+        }
+      }
+
+      // →ACTION:mark-spam|<messageId> — mark email as spam and remove from inbox
+      if (googleToken && (googleScope === 'modify' || googleScope === 'compose' || googleScope === 'send')) {
+        const spamLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('→ACTION:mark-spam|'));
+        if (spamLine) {
+          try {
+            const spamMsgId = spamLine.slice('→ACTION:mark-spam|'.length).trim();
+            if (spamMsgId) {
+              await doGmailLabel(spamMsgId, ['SPAM'], ['INBOX'], googleToken);
+              updateChip = { taskName: 'Email', fields: ['marked as spam'] };
+            }
+          } catch (e) { actionError = `⚠ Mark as spam failed: ${e.message}`; }
+        }
+      }
+
+      // →ACTION:create-slides|<title> — create PowerPoint (.pptx) via pptxgenjs + Drive upload
+      if (googleToken && slidesEnabled) {
+        const slidesLine = reply.split('\n').map(l => l.trim()).find(l => l.startsWith('\u2192ACTION:create-slides|'));
+        if (slidesLine) {
+          try {
+            const slidesParts = slidesLine.slice('\u2192ACTION:create-slides|'.length).split('|');
+            const slidesTitle = (slidesParts[0] || 'Coach Presentation').trim();
+            const slidesTheme = (slidesParts.find(function(p) { return p.startsWith('template:'); }) || '').replace('template:', '').trim() || 'dark-slate';
+            const slidesFolderParam = (slidesParts.find(function(p) { return p.startsWith('folder:'); }) || '').replace('folder:', '').trim();
+            // Parse slide sections: split on --- dividers, ## heading = title, rest = body
+            const parsedSlides = reply.split(/\n?---\n?/)
+              .map(function(section) {
+                const lines = section.trim().split('\n');
+                const titleLine = lines.find(function(l) { return /^#+\s/.test(l); });
+                if (!titleLine) return null;
+                const title = titleLine.replace(/^#+\s*/, '').replace(/^\s*Slide\s+\d+[:.\s]\s*/i, '').trim();
+                const body = lines.filter(function(l) { return l !== titleLine; }).join('\n').trim();
+                return title ? { title: title, body: body } : null;
+              })
+              .filter(Boolean);
+            const slideCount = parsedSlides.length;
+            const slidesTargetFolder = slidesFolderParam || driveSlideDeckFolderId || driveBaseFolderId || undefined;
+            const result = await createAndUploadPptx({
+              token: googleToken,
+              title: slidesTitle,
+              slides: parsedSlides,
+              theme: slidesTheme,
+              folderId: slidesTargetFolder,
+            });
+            const fieldLabel = slideCount > 0 ? slideCount + ' slides' : 'PowerPoint created';
+            updateChip = { taskName: result.fileName, fields: [fieldLabel], url: result.webViewLink };
+          } catch (e) { actionError = `⚠ Presentation creation failed: ${e.message}`; }
         }
       }
 
@@ -574,6 +1511,7 @@ function useCallAI({
             const today = new Date().toISOString().slice(0, 10);
             localStorage.setItem(`gtd-todays-focus-${today}`, JSON.stringify({ ids, date: today }));
             updateChip = { taskName: `${ids.length} task${ids.length !== 1 ? 's' : ''}`, fields: ["set as Today's Focus"] };
+            if (onFocusSet) onFocusSet();
           }
         }
       }
@@ -604,23 +1542,70 @@ function useCallAI({
         });
       }
 
-      const action = extractAction(reply);
-      if (action) {
-        // Guard: if the AI asked a question AND included an →ACTION tag in the same
-        // response (violating the system prompt), suppress the pending action so the
-        // user can answer the question first. Strip [bracketed] id tokens before
-        // checking for '?' so parenthetical references don't false-positive.
-        const actionLineIdx = reply.search(/→ACTION:/);
-        const textBeforeAction = actionLineIdx !== -1 ? reply.slice(0, actionLineIdx) : '';
-        const hasQuestion = textBeforeAction.replace(/\[[^\]]*\]/g, '').includes('?');
-        if (!hasQuestion) {
-          // Resolve parent name for →ACTION:add so PendingActionBar can display it
-          if (action.type === 'add' && action.parentRef) {
-            const parent = tasks.find(t => t.id === action.parentRef)
-                        || tasks.find(t => t.text.toLowerCase() === action.parentRef.toLowerCase());
-            action.parentName = parent?.text || action.parentRef;
+      // In chat/dump/daily modes, →ACTION lines are already applied directly to
+      // workingTasks above. Only run the setPendingAction flow for process and
+      // related modes where the user must confirm before the task is created.
+      // (Issue#43: without this guard, chat mode creates duplicate tasks — once
+      //  immediately and once when the user confirms the pending action bar.)
+      if (mode !== 'chat' && mode !== 'dump' && mode !== 'daily') {
+        const action = extractAction(reply);
+        // Shared question guard — check for '?' ONLY in the last non-empty line
+        // before →ACTION. Checking the full preceding text is too broad:
+        // follow-up questions like 'Anything else?' after a confirmation would incorrectly
+        // suppress the action. Only the last line matters — that's where a
+        // question about the action itself would appear.
+        const _guardIdx = reply.search(/→ACTION:/);
+        const _beforeAction = _guardIdx !== -1 ? reply.slice(0, _guardIdx) : '';
+        const _lastLine = _beforeAction.split('\n').map(l => l.trim()).filter(Boolean).pop() || '';
+        const _hasQuestion = _lastLine.replace(/\[[^\]]*\]/g, '').includes('?');
+        if (action) {
+          if (!_hasQuestion) {
+            // Resolve parent name for →ACTION:add and →ACTION:project so PendingActionBar can display it
+            if ((action.type === 'add' || action.type === 'project') && action.parentRef) {
+              const parent = tasks.find(t => t.id === action.parentRef)
+                          || tasks.find(t => t.text.toLowerCase() === action.parentRef.toLowerCase());
+              action.parentName = parent?.text || action.parentRef;
+            }
+            setPendingAction(action);
           }
-          setPendingAction(action);
+        } else {
+          // extractAction only handles next/project/someday/waiting/delete.
+          // For update actions (review mode marking tasks done/moved), try extractUpdateAction.
+          const updateAction = extractUpdateAction(reply);
+          if (updateAction && !_hasQuestion) {
+            const target = tasks.find(t => t.id === updateAction.taskId);
+            setPendingAction({
+              type: 'update',
+              taskId: updateAction.taskId,
+              changes: updateAction.changes,
+              title: target?.text || updateAction.taskId,
+            });
+          } else {
+            // For →ACTION:add (process mode: add child task to existing project),
+            // try extractAddAction. extractAction never returns type:'add' because its
+            // regex only matches next/project/someday/waiting/delete.
+            const addAction = extractAddAction(reply);
+            if (addAction && !_hasQuestion) {
+              const _spPrl = (addAction.parentId || '').toLowerCase();
+              const parent = tasks.find(t => t.id === addAction.parentId)
+                          || tasks.find(t => t.text.toLowerCase() === _spPrl)
+                          || tasks.find(t => t.bucket === 'project' && !t.done && (t.text.toLowerCase().includes(_spPrl) || _spPrl.includes(t.text.toLowerCase())));
+              setPendingAction({
+                type: 'add',
+                title: addAction.title,
+                parentRef: addAction.parentId,
+                parentName: parent?.text || addAction.parentId,
+                dueDate: addAction.dueDate || null,
+                deferUntil: addAction.deferUntil || null,
+                effort: addAction.effort || null,
+                location: addAction.location || [],
+                priority: addAction.priority || [],
+                category: addAction.category || null,
+                notes: addAction.notes || null,
+                recurrence: addAction.recurrence || null,
+              });
+            }
+          }
         }
       }
 
@@ -633,19 +1618,37 @@ function useCallAI({
       setLoading(false);
     }
   }, [getTaskContext, tasks, efforts, calibrationOverrides, provider, localModel,
-      googleToken, googleScope, calendarEnabled, setCalendarEvents,
-      recordUsage, setLastInputLog, setTasks, setGmailQueue, setMessages, setChatHistory,
-      setLoading, setPendingAction, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+      googleToken, googleScope, calendarEnabled, docsEnabled, sheetsEnabled, slidesEnabled,
+      setCalendarEvents, recordUsage, setLastInputLog, setTasks, setGmailQueue,
+      setMessages, setChatHistory, setLoading, setPendingAction, authUser, userCity, userHomeAddress, userWorkAddress, coachName, userName,
+      driveEnabled, contactsEnabled, driveDocumentFolderId, driveSpreadsheetFolderId, driveSlideDeckFolderId, driveBaseFolderId, receiptSheetId, onFocusSet]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
-    if (!text || loading) return;
+    const pdf = pendingPdfRef ? pendingPdfRef.current : null;
+    if ((!text && !pdf) || loading) return;
     setChatInput('');
+    if (clearPendingPdf) clearPendingPdf();
+    const displayText = text || ('📎 ' + pdf.name);
+    setMessages(prev => [...prev, { role: 'user', text: displayText, attachedPdf: pdf ? pdf.name : null }]);
+    const userContent = (pdf && provider === 'claude')
+      ? [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf.data } },
+          { type: 'text', text: text || 'Please read and summarize this document.' },
+        ]
+      : text || (pdf ? '[PDF: ' + pdf.name + '] Please summarize this document.' : '');
+    await callAI(userContent, coachMode, chatHistory, { emailContext: emailContextRef.current });
+  }, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages, provider]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Quick-reply variant: sends a fixed string without touching chatInput state.
+  // Used by CoachPanel's OK button to confirm Step 3a interpretations.
+  const sendChatWithText = useCallback(async (text) => {
+    if (!text || loading) return;
     setMessages(prev => [...prev, { role: 'user', text }]);
     await callAI(text, coachMode, chatHistory, { emailContext: emailContextRef.current });
-  }, [chatInput, loading, coachMode, chatHistory, callAI, setChatInput, setMessages]);
+  }, [loading, coachMode, chatHistory, callAI, setMessages]);
 
-  return { callAI, sendChat, fetchModels, lastInputLog, setEmailContext };
+  return { callAI, sendChat, sendChatWithText, fetchModels, lastInputLog, setEmailContext };
 }
 
 export { useCallAI }

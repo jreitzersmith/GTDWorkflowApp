@@ -14,6 +14,7 @@ import { AuthGate } from "./shared/AuthGate.jsx";
 import { AppSidebar } from "./shared/AppSidebar.jsx";
 import { SearchModal } from "./shared/SearchModal.jsx";
 import { TaskBucketView } from "./features/tasks/TaskBucketView.jsx";
+import { AnalyticsArea } from "./features/tasks/AnalyticsArea.jsx";
 import { CoachPanel } from "./features/coach/CoachPanel.jsx";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth.js";
 import { useGoogleAuth } from "./hooks/useGoogleAuth.js";
@@ -26,13 +27,24 @@ import { useAICoachState } from "./features/coach/useAICoachState.js";
 import { useTaskUIState } from "./features/tasks/useTaskUIState.js";
 import { createEmptyUsageStats } from "./features/settings/useAIUsageTracking.js";
 
-import { parseRRULE, calEventStart, isAllDayEvent, genId } from "./features/calendar/calendarApi.js";
+import { parseRRULE, calEventStart, isAllDayEvent, genId, doCalendarCreateEvent } from "./features/calendar/calendarApi.js";
+import { driveUploadFile, driveExportFile, driveDownloadFileAsBase64 } from "./api/driveApi.js";
+import { doGmailSend, doGmailLabel, doGmailGetMessageBody } from "./features/email/gmailTools.js";
+import { sheetsAppendRows } from './api/sheetsApi.js';
+import { claudeRequest } from './api/claudeApi.js';
+import { extractReceiptFields } from './features/email/receiptUtils.js';
 import { todayStr, isDeferred, buildNextOccurrence, extractSuggestions, extractMetadata, getOrderedChildren, useResizer, effortToMinutes } from "./features/tasks/taskUtils.jsx";
 import { useDragDrop } from "./features/tasks/useDragDrop.js";
 import { useSupabaseSync } from "./hooks/useSupabaseSync.js";
+import { useViewport } from "./hooks/useViewport.js";
 import { useCallAI } from "./features/coach/useCallAI.js";
 import { useInboxProcessing } from "./features/tasks/useInboxProcessing.js";
 import { useTaskCrud } from "./features/tasks/useTaskCrud.js";
+import { ContactsPanel } from "./features/contacts/ContactsPanel.jsx";
+import { useContacts } from "./features/contacts/useContacts.js";
+import { HealthPanel } from "./features/health/HealthPanel.jsx";
+import { HabitsPanel } from "./features/habits/HabitsPanel.jsx";
+import { useHealth } from "./features/health/useHealth.js";
 import { useSettings } from "./features/settings/useSettings.js";
 
 
@@ -58,22 +70,24 @@ export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
-  const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState();
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults } = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, badgeVisibility, setBadgeVisibility, categories, setCategories, colorSettings, setColorSettings, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId, contactRelationshipTags, setContactRelationshipTags, contactLikesCategories, setContactLikesCategories, contactEmailLinkingMode, setContactEmailLinkingMode, taskCompletionToContactNotes, setTaskCompletionToContactNotes, healthDocSummarizeMode, setHealthDocSummarizeMode} = useAppSettings();
+  const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState(coachName);
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
+  const [inboxSenderEmails, setInboxSenderEmails] = useState(new Set()); // FR#176
   const { calendarEvents, setCalendarEvents, calendarTab, setCalendarTab, skippedCalendarIds, setSkippedCalendarIds, seenCalendarEventIds, setSeenCalendarEventIds, recurringAcknowledgedMap, setRecurringAcknowledgedMap, recurringReviewDays, setRecurringReviewDays, calendarSuggestions, setCalendarSuggestions, calendarSuggestionsReady, setCalendarSuggestionsReady } = useCalendarState();
   const { googleToken, googleScope, calendarEnabled, driveEnabled, docsEnabled,
-          sheetsEnabled, slidesEnabled, gmailError, scopePrefs,
+          sheetsEnabled, slidesEnabled, contactsEnabled, gmailError, scopePrefs,
           setScopePref, reauthorizeGoogle, connectCalendar, disconnectCalendar,
-          disconnectAll, refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
-  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects, showWaitingInProjects, setShowWaitingInProjects, showSomeDayInProjects, setShowSomeDayInProjects, pendingDeleteConfirm, setPendingDeleteConfirm } = useTaskUIState();
+          disconnectContacts, disconnectAll, refreshGoogleToken } = useGoogleAuth({ setCalendarEvents });
+  const { currentBucket, setCurrentBucket, addText, setAddText, showSettings, setShowSettings, showUsage, setShowUsage, nextGroupBy, setNextGroupBy, projectParentId, setProjectParentId, collapsedNodes, setCollapsedNodes, toggleCollapse, toggleCollapseLevel, selectedTaskId, setSelectedTaskId, actualEffortPrompt, setActualEffortPrompt, pendingRollup, setPendingRollup, pendingDeferCheck, setPendingDeferCheck, inboxSelectedIds, setInboxSelectedIds, pendingGroupSuggestion, setPendingGroupSuggestion, showCompletedInProjects, setShowCompletedInProjects, showWaitingInProjects, setShowWaitingInProjects, showSomeDayInProjects, setShowSomeDayInProjects, focusedTaskId, setFocusedTaskId, pendingDeleteConfirm, setPendingDeleteConfirm } = useTaskUIState();
   const { reviewProjectIdx, setReviewProjectIdx, reviewSuggestions, setReviewSuggestions, reviewReady, setReviewReady, reviewMode, setReviewMode, metadataSuggestions, setMetadataSuggestions } = useProjectReview();
   const [projectCategoryFilter, setProjectCategoryFilter] = useState(null);
   const [uncategorizedProjectId, setUncategorizedProjectId] = useState(null);
   const [pendingEmailContext, setPendingEmailContext] = useState(null); // { id, subject } — set while processing an email
   const preEmailTaskIdsRef = useRef(null); // snapshot of task IDs at email processing start
   const [searchOpen, setSearchOpen] = useState(false);
+  const [rawApiThread, setRawApiThread] = useState([]);
   // Compute Today's Focus count from localStorage for sidebar badge
   const focusCount = (() => {
     try {
@@ -95,7 +109,7 @@ export default function GTDManager() {
   });
 
   // ── Auth ───────────────────────────────────────────────────────────────
-  const { authUser, authLoading, authEmail, setAuthEmail, authSent, sendMagicLink } = useSupabaseAuth();
+  const { authUser, authLoading, authEmail, setAuthEmail, authSent, authError, sendMagicLink } = useSupabaseAuth();
 
   // true when processing was triggered by 'Add & Ask AI' (single-task scope)
   const singleTaskMode = useRef(false);
@@ -105,8 +119,14 @@ export default function GTDManager() {
   const skippedInSessionIds = useRef(new Set());
   // Stable ref so useInboxProcessing can call suggestProjectGroup without a TDZ forward-reference
   const suggestProjectGroupRef = useRef(null);
+  // PDF attachment pending in the coach chat input (Option 1 PDF reading)
+  const [pendingPdf, setPendingPdf] = useState(null);
+  const pendingPdfRef = useRef(null);
+  pendingPdfRef.current = pendingPdf;
+  // Stable ref so useInboxProcessing can re-link contact gifts/promises after task replacement (Issue#39)
+  const relinkTaskContactsRef = useRef(null);
 
-  const { syncStatus, supabaseReady } = useSupabaseSync({
+  const { syncStatus, supabaseReady, settingsReady } = useSupabaseSync({
     authUser, tasks, setTasks,
     locations, efforts, calibrationOverrides, categories,
     skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays,
@@ -115,6 +135,9 @@ export default function GTDManager() {
     setLocations, setEfforts, setCalibrationOverrides, setCategories,
     setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
     setGmailQueue,
+    exportTemplates, setExportTemplates,
+    contactRelationshipTags, setContactRelationshipTags,
+    contactLikesCategories, setContactLikesCategories,
   });
 
   const { dragId, dropTarget, setDropTarget, handleProjectDragStart, handleProjectDragOver, handleProjectDragEnd, handleProjectDrop } = useDragDrop({ setTasks });
@@ -125,12 +148,20 @@ export default function GTDManager() {
   const [detailWidth,  detailDragDown]        = useResizer("gtd_detail_w",      360,                                   { min: 240, max: 600, direction: 'h', sign: -1 });
   const [chatInputHeight, chatInputDragDown]  = useResizer("gtd_chat_input_h",  60,                                    { min: 36,  max: 300, direction: 'v', sign: -1 });
 
+  const viewport = useViewport();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Phone (not tablet/desktop) splits Task list and AI Coach into separate tabs instead of
+  // a stacked, height-capped layout — there just isn't enough vertical room on a phone for
+  // both to be usable at once. Tablet and desktop are untouched.
+  const [mobileTab, setMobileTab] = useState('tasks');
+  useEffect(() => { setMobileNavOpen(false); }, [currentBucket, currentView]);
+
 
 
   // Fetch unread inbox count whenever the Gmail token changes
   // Use labels/INBOX endpoint — messagesUnread is exact; resultSizeEstimate on messages.list is unreliable
   useEffect(() => {
-    if (!googleToken) { setGmailUnreadCount(null); return; }
+    if (!googleToken) { setGmailUnreadCount(null); setInboxSenderEmails(new Set()); return; }
     fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX', {
       headers: { Authorization: `Bearer ${googleToken}` },
     })
@@ -149,6 +180,9 @@ export default function GTDManager() {
     setProjectParentId(sel?.bucket === 'project' ? selectedTaskId : '__new__');
   }, [selectedTaskId, currentBucket]);
 
+  // Eagerly fetch local models on mount so Ctrl+Alt+Y can cycle immediately
+  useEffect(() => { fetchModels(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Global search — Cmd+K / Ctrl+K
   useEffect(() => {
     const handler = (e) => {
@@ -160,6 +194,77 @@ export default function GTDManager() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  // Stable ref updated every render so the shortcut listener below never goes stale
+  const shortcutActionsRef = useRef({});
+  const pendingModelCycleRef = useRef(false);
+  useEffect(() => {
+    const nav = (bucket) => () => { setCurrentBucket(bucket); setCurrentView("gtd"); setShowSettings(false); setSelectedTaskId(null); };
+    shortcutActionsRef.current = {
+      _modifier: shortcutModifier,
+      // Views
+      I: nav("inbox"),
+      N: nav("next"),
+      P: nav("project"),
+      W: nav("waiting"),
+      S: nav("someday"),
+      D: nav("deferred"),
+      A: nav("done"),
+      F: () => { setCurrentView("focus"); setShowSettings(false); setSelectedTaskId(null); },
+      E: () => { setCurrentView("email"); setShowSettings(false); setSelectedTaskId(null); },
+      L: () => { setCurrentView("calendar"); setShowSettings(false); setSelectedTaskId(null); },
+      K: () => setSearchOpen(true),
+      O: () => setShowSettings(v => !v),
+      U: () => setShowUsage(v => !v),
+      // Modes
+      Q: () => startDailyReview(),
+      V: () => startDailyReview(),
+      R: () => startWeeklyReview(),
+      X: () => startProjectReview(),
+      Z: () => startProcessInbox(),
+      B: () => startBrainDump(),
+      Y: () => {
+        // Cycle: claude → local[0] → local[1] → ... → claude
+        const allModels = ['claude', ...(availableModels.length ? availableModels : [])];
+        const currentKey = provider === 'claude' ? 'claude' : localModel;
+        const currentIdx = allModels.indexOf(currentKey);
+        const nextIdx = (currentIdx + 1) % allModels.length;
+        const next = allModels[nextIdx];
+        if (next === 'claude') {
+          setProvider('claude');
+        } else {
+          setProvider('local');
+          setLocalModel(next);
+        }
+      },
+    };
+  });
+
+  // Global Ctrl+Shift shortcuts — views and coach modes
+  useEffect(() => {
+    const handler = (e) => {
+      const mod = shortcutActionsRef.current._modifier || 'ctrl+alt';
+      const match =
+        mod === 'ctrl+alt'  ? (e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey) :
+        mod === 'alt+shift' ? (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey) :
+        mod === 'ctrl+shift'? (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) : false;
+      if (!match) return;
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const action = shortcutActionsRef.current[e.key.toUpperCase()];
+      if (action) { e.preventDefault(); action(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Complete a pending model cycle once availableModels populates
+  useEffect(() => {
+    if (!pendingModelCycleRef.current || !availableModels.length) return;
+    pendingModelCycleRef.current = false;
+    setProvider('local');
+    setLocalModel(availableModels[0]);
+  }, [availableModels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-link email to any tasks created during an active email processing session
   useEffect(() => {
@@ -209,10 +314,14 @@ export default function GTDManager() {
     const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0);
     const cutoff14 = new Date(todayDate); cutoff14.setDate(cutoff14.getDate() + 14);
     const BUCKET_CAPS = { next: 75, someday: 40 };
-    const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe" };
+    const bucketNames = { inbox: "Inbox", next: "Next Actions", project: "Projects", waiting: "Waiting For", someday: "Someday/Maybe", done: "Archive" };
     const sections = Object.entries(bucketNames).filter(([k]) => !allowedBuckets || allowedBuckets.includes(k)).map(([k, label]) => {
       const items = k === 'next'
         ? tasks.filter(t => t.isNextAction && !t.isSomeday && !t.isWaitingFor && !t.done)
+        : k === 'someday'
+        ? tasks.filter(t => t.isSomeday && !t.done)
+        : k === 'waiting'
+        ? tasks.filter(t => t.isWaitingFor && !t.done)
         : tasks.filter(t => t.bucket === k && !t.done);
       if (!items.length) return `${label}: empty`;
       const cap = BUCKET_CAPS[k];
@@ -326,19 +435,43 @@ export default function GTDManager() {
     return `Today's date: ${today}\n\n${sections.join("\n\n")}${calSection}`;
   }, [tasks, calendarEnabled, calendarEvents]);
 
-  const { callAI, sendChat, fetchModels, lastInputLog, setEmailContext,
+  const { healthItems, healthLoading, addHealthItem, updateHealthItem, removeHealthItem } = useHealth({ supabaseReady, userId: authUser?.id });
+
+  const contactActionsRef = useRef({});
+  const { callAI, sendChat, sendChatWithText, fetchModels, lastInputLog, setEmailContext,
 } = useCallAI({
     tasks, efforts, calibrationOverrides,
     provider, localModel,
     googleToken, googleScope, calendarEnabled,
     authUser,
+    docsEnabled, sheetsEnabled, slidesEnabled,
+    contactsEnabled,
     coachMode, chatInput, chatHistory, loading,
     getTaskContext, recordUsage,
     setTasks, setCalendarEvents, setGmailQueue,
     setMessages, setChatHistory, setChatInput,
     setLoading, setAvailableModels, setPendingAction,
+    setRawApiThread,
     calendarReminderMinutes,
     uncategorizedProjectId,
+    exportFormat: exportSettings.format,
+    userCity,
+    userHomeAddress,
+    userWorkAddress,
+    coachName,
+    userName,
+    driveEnabled,
+    driveDocumentFolderId,
+    driveSpreadsheetFolderId,
+    driveSlideDeckFolderId,
+    driveBaseFolderId,
+    receiptSheetId,
+    healthItems,
+    pendingPdfRef,
+    clearPendingPdf: () => setPendingPdf(null),
+    onFocusSet: () => setCurrentView('focus'),
+    contactActionsRef,
+    refreshGoogleToken,
   });
 
   const switchCoachMode = useCallback((mode, introMsg) => {
@@ -347,6 +480,7 @@ export default function GTDManager() {
     preEmailTaskIdsRef.current = null;
     setCoachMode(mode);
     setChatHistory([]);
+    setRawApiThread([]);
     setPendingAction(null);
     setMessages([{ role: "assistant", text: introMsg }]);
   }, []);
@@ -367,12 +501,34 @@ export default function GTDManager() {
     setPendingAction,
     callAI, switchCoachMode,
     onSessionTasksCreated: (ids, titles) => suggestProjectGroupRef.current?.(ids, titles),
+    onTaskReplaced: (oldId, newId) => relinkTaskContactsRef.current?.(oldId, newId),
   });
+
+  // Intercepts gmail_send before delegating to the inbox-processing confirm handler.
+  const handleConfirmMoveWithSend = useCallback(async () => {
+    if (pendingAction?.type === 'gmail_send') {
+      const { to, subject, body, threadId } = pendingAction;
+      setPendingAction(null);
+      try {
+        await doGmailSend(to, subject, body, threadId, googleToken);
+        setMessages(prev => [...prev, { role: 'assistant', text: `Email sent to ${to}.` }]);
+      } catch (e) {
+        setMessages(prev => [...prev, { role: 'assistant', text: `Failed to send email: ${e.message}` }]);
+      }
+      return;
+    }
+    handleConfirmMove();
+  }, [pendingAction, googleToken, handleConfirmMove, setPendingAction, setMessages]);
+
+  // Ref-forwarded callback so useTaskCrud can notify contacts of task done/undo
+  // (contacts + togglers come from useContacts which is called after useTaskCrud)
+  const handleTaskDoneChangedRef = useRef(null);
+  const stableTaskDoneChanged = useCallback((...args) => handleTaskDoneChangedRef.current?.(...args), []);
 
   const {
     addTask, addAndProcess, addProjectTask,
     moveTask, deleteTask, confirmDelete,
-    completeTask, finishComplete,
+    archiveTask, finishComplete,
     handleRollupConfirm, handleRollupSkip,
     handleDeferCheckSkip, handleDeferCheckReview,
     handleActualEffortSave, handleActualEffortSkip,
@@ -392,7 +548,105 @@ export default function GTDManager() {
     setInboxSelectedIds, setSelectedTaskId,
     setRecurringAcknowledgedMap,
     askAIAboutTask,
+    onTaskDoneChanged: stableTaskDoneChanged,
   });
+
+  // Create an Inbox or Waiting For task from a contact; returns the new task id.
+  // options.isWaitingFor = true → places task in Inbox with isWaitingFor flag for GTD processing (FR#134, FR#146)
+  const createInboxTask = useCallback((text, options = {}) => {
+    const newId = genId();
+    const baseTask = {
+      id: newId, text, done: false,
+      created: Date.now(), priority: [], location: [], dueDate: null,
+      effort: null, actualEffort: null, deferUntil: null, notes: null,
+      ...(options.contactId ? { contactId: options.contactId } : {}),
+    };
+    if (options.isWaitingFor) {
+      setTasks(prev => [{ ...baseTask, bucket: 'inbox', isWaitingFor: true }, ...prev]);
+    } else {
+      setTasks(prev => [{ ...baseTask, bucket: 'inbox' }, ...prev]);
+    }
+    return newId;
+  }, [setTasks]);
+
+  // Mark a task as done from the Contacts panel (promise/gift sync — FR#133, FR#135).
+  const markTaskDone = useCallback((taskId) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, done: true } : t));
+  }, [setTasks]);
+
+  const { contacts, selectedContactId, setSelectedContactId,
+          contactsLoading, contactsSyncing, contactsError, lastSyncedAt,
+          syncContacts, updateStandardFields, updateCustomFields,
+          addPromise, togglePromiseDone, linkPromiseToTask, deletePromise,
+          addLike, deleteLike, addDislike, deleteDislike, addGiftIdea, toggleGiftGiven, deleteGiftIdea,
+          linkGiftToTask,
+          renameContactRelationshipTag, removeContactRelationshipTag,
+          renameContactLikeCategory, removeContactLikeCategory,
+          mergeOrphanIntoContact,
+          deleteOrphanContact,
+    addContactEmail,
+    addDriveAttachment,
+    removeDriveAttachment,
+    toggleFavorite,
+  } = useContacts({ googleToken, contactsEnabled, supabaseReady, refreshGoogleToken, userId: authUser?.id, createTask: createInboxTask });
+  contactActionsRef.current = { contacts, addPromise, addLike, addDislike, addGiftIdea, updateCustomFields, createInboxTask };
+
+
+  // FR#154: one-time backfill of contact tags already on contacts into the settings list
+  const contactTagsBackfilledRef = useRef(false);
+  useEffect(() => {
+    if (contactTagsBackfilledRef.current || !settingsReady || !contacts.length) return;
+    contactTagsBackfilledRef.current = true;
+    const allTagsSet = new Set(contacts.flatMap(c => c.relationshipTags || []));
+    const newTags = [...allTagsSet].filter(t => !contactRelationshipTags.includes(t));
+    if (newTags.length > 0) {
+      setContactRelationshipTags(prev => [...new Set([...prev, ...newTags])]);
+    }
+  }, [settingsReady, contacts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Wire up the task-done→contact sync now that contacts + togglers are available (FR#148, FR#145)
+  handleTaskDoneChangedRef.current = (taskId, isDone) => {
+    contacts.forEach(contact => {
+      const promise = (contact.promises || []).find(p => p.taskId === taskId);
+      if (promise && Boolean(promise.done) !== isDone) togglePromiseDone(contact.id, promise.id);
+      const gift = (contact.giftIdeas || []).find(g => g.taskId === taskId);
+      if (gift && Boolean(gift.given) !== isDone) toggleGiftGiven(contact.id, gift.id);
+    });
+    // FR#186: when a contact-linked task is marked done, append a completion entry to that contact's notes
+    if (isDone && taskCompletionToContactNotes) {
+      const task = tasks.find(t => t.id === taskId);
+      if (task?.contactId) {
+        const contact = contacts.find(c => c.id === task.contactId);
+        if (contact) {
+          const date = new Date().toISOString().slice(0, 10);
+          const entry = `[${date}] Completed: ${task.text}` + (task.notes ? `\n${task.notes}` : '');
+          const existing = contact.notes ? contact.notes.trim() : '';
+          updateCustomFields(task.contactId, { notes: existing ? `${existing}\n\n${entry}` : entry });
+        }
+      }
+    }
+  };
+
+  // Re-link contact gifts/promises when inbox processing replaces a task (Issue#39)
+  relinkTaskContactsRef.current = (oldId, newId) => {
+    contacts.forEach(contact => {
+      const linkedGifts = (contact.giftIdeas || []).filter(g => g.taskId === oldId);
+      linkedGifts.forEach(gift => linkGiftToTask(contact.id, gift.id, newId));
+      const linkedPromises = (contact.promises || []).filter(p => p.taskId === oldId);
+      linkedPromises.forEach(promise => linkPromiseToTask(contact.id, promise.id, newId));
+    });
+  };
+
+  // Navigate to a specific task from the Contacts panel (promise task link).
+  // Switches to the task's bucket view and opens the task detail panel.
+  const navigateToTask = useCallback((taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    setCurrentBucket(task.bucket);
+    setCurrentView('gtd');
+    setSelectedTaskId(taskId);
+    setShowSettings(false);
+  }, [tasks, setCurrentBucket, setCurrentView, setSelectedTaskId, setShowSettings]);
 
   const startWeeklyReview = () => {
     const total = tasks.filter(t => t.bucket !== "done").length;
@@ -412,7 +666,14 @@ export default function GTDManager() {
       msgs.push({ role: 'system', type: 'recurringReview', events: dueForReview });
     }
     setCoachMode("review");
-    setChatHistory([]);
+    // Seed chatHistory with the intro so the API knows it already presented Step 1.
+    // Anthropic API requires conversations to start with a user message, so we
+    // prepend a synthetic trigger that stays invisible in the UI (messages state).
+    setChatHistory([
+      { role: 'user', content: '[Starting Weekly Review]' },
+      { role: 'assistant', content: introMsg },
+    ]);
+    setRawApiThread([]);
     setPendingAction(null);
     setMessages(msgs);
   };
@@ -463,10 +724,10 @@ export default function GTDManager() {
       const urgencyNote = overdue.length > 0 ? ` You have ${overdue.length} overdue item${overdue.length !== 1 ? 's' : ''} that need attention.` : '';
       setCoachMode('daily');
       setChatHistory([]);
+      setRawApiThread([]);
       setPendingAction(null);
-      setMessages([]);
+      setMessages([{ role: 'user', text: `Good morning! Let's start my day.` }]);
       callAI(`Good morning! Let's start my day.${urgencyNote}\n\n${lines}`, 'daily', []);
-      setCurrentView('gtd');
       const newPhase = 'end';
       setDailyReviewPhase(newPhase);
       localStorage.setItem('gtd-daily-phase', JSON.stringify({ phase: newPhase, date: today }));
@@ -491,10 +752,10 @@ export default function GTDManager() {
 
       setCoachMode('daily');
       setChatHistory([]);
+      setRawApiThread([]);
       setPendingAction(null);
-      setMessages([]);
+      setMessages([{ role: 'user', text: `Let's close out my day.` }]);
       callAI(`Let's close out my day.\n\n${lines}`, 'daily', []);
-      setCurrentView('gtd');
       const newPhase = 'start';
       setDailyReviewPhase(newPhase);
       localStorage.setItem('gtd-daily-phase', JSON.stringify({ phase: newPhase, date: today }));
@@ -513,11 +774,19 @@ export default function GTDManager() {
     const userMsg = `My MITs for today:\n${listText}`;
     setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     callAI(userMsg, 'daily', chatHistory);
+    setCurrentView('focus');
   };
 
   // Prefill the coach chat with email content so the user can process it into tasks
-  const processEmailWithAI = useCallback((email) => {
-    const body = email.body ? email.body.slice(0, 4000) : email.snippet;
+  const processEmailWithAI = useCallback(async (email) => {
+    // When triggered from toolbar (not detail panel) the email object has no body or attachments.
+    // Fetch the full message so attachment metadata is available to the AI.
+    let fullEmail = email;
+    if (!email.body && email.id && googleToken) {
+      try { fullEmail = await doGmailGetMessageBody(email.id, googleToken); }
+      catch { /* fall back to metadata-only */ }
+    }
+    const body = fullEmail.body ? fullEmail.body.slice(0, 4000) : email.snippet;
     const prompt = [
       `Please review this email and handle it completely using this workflow:`,
       ``,
@@ -527,6 +796,10 @@ export default function GTDManager() {
       `  - Effort estimate and any relevant location`,
       `Once confirmed, create the task with full metadata (category, effort, location, project). The email will be automatically linked.`,
       ``,
+      `**Calendar:** Check if this email contains any scheduling information, meeting requests, invitations, or appointment details. If found, summarise the proposed time/date and offer to create a calendar event. Wait for confirmation before emitting →ACTION:calendar_create.`,
+      ``,
+      `**Contact note:** If the sender matches a contact in your enrichment context, offer to add a brief note summarising the key communication. Use →ACTION:contact_note if the user confirms.`,
+      ``,
       `**Similar emails:** After tasks are confirmed, search Gmail for other emails from this sender or with a similar subject — report briefly.`,
       ``,
       `**Filter / label:** Ask whether I'd like a Gmail filter + label for future emails like this. If yes, create the label then the filter.`,
@@ -534,13 +807,38 @@ export default function GTDManager() {
       `**Archive:** Once ALL other steps are complete, archive this email via gmail_batch_label with message_ids: ["${email.id}"] and remove_label_ids: ["INBOX"]. Confirm when done.`,
       ``,
       `Email:`,
-      `From: ${email.from}`,
-      `Subject: ${email.subject}`,
-      `Date: ${email.date}`,
+      `From: ${fullEmail.from || email.from}`,
+      `Subject: ${fullEmail.subject || email.subject}`,
+      `Date: ${fullEmail.date || email.date}`,
       `Gmail-ID: ${email.id}`,
       ``,
       body,
+      ...(fullEmail.attachments && fullEmail.attachments.length > 0 ? [
+        ``,
+        `Attachments: ${fullEmail.attachments.map(a => `${a.filename} (${a.mimeType})`).join(', ')}`,
+        `Attachment IDs for tool use: ${JSON.stringify(fullEmail.attachments)}`,
+      ] : []),
     ].join('\n');
+    // FR#161: auto-link email to matching contact if setting allows
+    if (contactEmailLinkingMode === 'onProcess' || contactEmailLinkingMode === 'both') {
+      const rawFrom = email.from || '';
+      const senderEmail = (/<([^>]+)>/.exec(rawFrom)?.[1] || rawFrom).trim().toLowerCase();
+      if (senderEmail) {
+        const matchedContact = contacts.find(ct =>
+          (ct.emails || []).some(e => (e.value || '').toLowerCase() === senderEmail)
+        );
+        if (matchedContact) {
+          addContactEmail(matchedContact.id, {
+            messageId: email.id,
+            threadId:  email.threadId || email.id,
+            subject:   email.subject  || '',
+            snippet:   email.snippet  || (email.body ? email.body.slice(0, 120) : ''),
+            date:      email.date     || new Date().toISOString(),
+            direction: 'received',
+          });
+        }
+      }
+    }
     preEmailTaskIdsRef.current = new Set(tasks.map(t => t.id));
     setPendingEmailContext({ id: email.id, subject: email.subject });
     setEmailContext({ id: email.id, subject: email.subject });
@@ -548,7 +846,7 @@ export default function GTDManager() {
     setChatInput("");
     setMessages(prev => [...prev, { role: "user", text: prompt }]);
     callAI(prompt, "chat", chatHistory, { emailContext: { id: email.id, subject: email.subject } });
-  }, [setCoachMode, setChatInput, setMessages, callAI, chatHistory]);
+  }, [setCoachMode, setChatInput, setMessages, callAI, chatHistory, contacts, addContactEmail, contactEmailLinkingMode]);
 
   // Attach an email as a driveAttachments entry on a task (FR#40)
   const attachEmailToTask = useCallback((taskId, emailAttachment) => {
@@ -559,6 +857,28 @@ export default function GTDManager() {
       return { ...t, driveAttachments: [...existing, emailAttachment] };
     }));
   }, [setTasks]);
+
+  // Log an email as a receipt to the configured Google Sheet (FR#46)
+  const logEmailAsReceipt = useCallback(async (email) => {
+    if (!receiptSheetId || !sheetsEnabled || !googleToken) return;
+    const fields = await extractReceiptFields(email);
+    const row = [
+      fields.date || new Date().toISOString().slice(0, 10),
+      fields.vendor || '(unknown)',
+      fields.amount || '',
+      fields.currency || 'USD',
+      fields.category || '',
+      fields.description || email.subject || '',
+      email.id ? `https://mail.google.com/mail/#inbox/${email.id}` : '',
+    ];
+    await sheetsAppendRows({ token: googleToken, spreadsheetId: receiptSheetId, range: 'Sheet1', values: [row] });
+  }, [receiptSheetId, sheetsEnabled, googleToken]);
+
+  // Mark an email as spam via Gmail API (FR#131)
+  const markAsSpam = useCallback(async (email) => {
+    if (!googleToken || !email?.id) return;
+    await doGmailLabel(email.id, ['SPAM'], ['INBOX'], googleToken);
+  }, [googleToken]);
 
   // Prefill the coach chat with a raw prompt (no email wrapper) — used by cleanup workflow buttons
   const openCoachChat = useCallback((prompt) => {
@@ -650,14 +970,10 @@ export default function GTDManager() {
     const prompt = `You are a GTD coach. The user just added ${newTaskTitles.length} related tasks to their inbox:\n${taskLines}\n\nExisting projects:\n${projectLines}\n\nDo these tasks belong together as a project? If yes:\n- If an existing project is a strong match, reply with exactly: →GROUP:existing|<project_id>|<project_name>\n- If no good match exists, suggest a concise project name and reply with exactly: →GROUP:new|<project name>\n- If they do NOT belong together as a project, reply with exactly: →GROUP:none\n\nReply with only one line, no other text.`;
 
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const { url: claudeUrl, headers: claudeHeaders } = claudeRequest();
+      const res = await fetch(claudeUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
+        headers: claudeHeaders,
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 80,
@@ -887,7 +1203,10 @@ export default function GTDManager() {
       if ("isWaitingFor" in ch) descendantChanges._isWaitingFor = ch.isWaitingFor;
       if ("isSomeday" in ch) descendantChanges._isSomeday = ch.isSomeday;
       return prev.map(t => {
-        if (t.id === id) return { ...t, ...ch };
+        if (t.id === id) {
+          const inc = 'deferUntil' in ch && ch.deferUntil != null ? 1 : 0;
+          return inc ? { ...t, ...ch, deferCount: (t.deferCount || 0) + 1 } : { ...t, ...ch };
+        }
         if (!descendants.has(t.id)) return t;
         const dc = {};
         if (descendantChanges._deferUntil !== undefined) {
@@ -978,6 +1297,7 @@ export default function GTDManager() {
     }
     setCoachMode("projectReview");
     setChatHistory([]);
+    setRawApiThread([]);
     setPendingAction(null);
     setReviewProjectIdx(0);
     setReviewSuggestions([]);
@@ -1016,6 +1336,51 @@ export default function GTDManager() {
     categories, setCategories,
   });
 
+  const handleDriveBackup = useCallback(async () => {
+    if (!googleToken) throw new Error('Google Drive is not connected.');
+    const data = { version: 1, exportedAt: new Date().toISOString(), tasks, locations, efforts, categories };
+    const filename = `gtd-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    await driveUploadFile({
+      token: googleToken,
+      name: filename,
+      mimeType: 'application/json',
+      content: JSON.stringify(data, null, 2),
+      parents: driveBackupFolderId ? [driveBackupFolderId] : [],
+    });
+  }, [googleToken, tasks, locations, efforts, categories, driveBackupFolderId]);
+
+  // Health > Documents: background summarize → write to notes (used in 'on_add' mode and Summarize button)
+  // Tries text export first (Google Docs/Sheets/Slides), falls back to base64 PDF for other files.
+  const onAutoSummarizeDoc = useCallback(async (item) => {
+    if (!googleToken || !item.drive_file_id) return;
+    let messageContent;
+    try {
+      const text = await driveExportFile({ token: googleToken, fileId: item.drive_file_id });
+      messageContent = `Summarize the following medical document in plain language. Be concise and focus on key findings, values, or recommendations.\n\nDocument: "${item.name}"\n\n${text}`;
+    } catch {
+      // Not a Google Workspace file — download as base64 and send as a PDF document block
+      const b64 = await driveDownloadFileAsBase64({ token: googleToken, fileId: item.drive_file_id });
+      messageContent = [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
+        { type: 'text', text: `Summarize this medical document ("${item.name}") in plain language. Be concise and focus on key findings, values, or recommendations.` },
+      ];
+    }
+    const { url: claudeUrl, headers: claudeHeaders } = claudeRequest();
+    const res = await fetch(claudeUrl, {
+      method: 'POST',
+      headers: claudeHeaders,
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: messageContent }],
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || `API error ${res.status}`);
+    const summary = data.content?.[0]?.text || '';
+    if (summary) await updateHealthItem(item.id, { notes: summary });
+  }, [googleToken, updateHealthItem]);
+
   // "deferred" is a virtual view — tasks keep their original bucket, filtered by deferUntil > today.
   const bucketTasks = currentBucket === "deferred"
     ? tasks.filter(t => isDeferred(t) && !t.done).sort((a, b) => (a.deferUntil > b.deferUntil ? 1 : -1))
@@ -1047,18 +1412,40 @@ export default function GTDManager() {
     return tasks.find(t => isDeferred(t) && !t.done && words.some(w => t.text.toLowerCase().includes(w))) || null;
   })();
 
+  const isMobileViewport = viewport.breakpoint !== "desktop";
+  const isPhoneLayout = viewport.isPhone; // orientation-aware — also true for phone landscape
   const s = {
-    app:         { display: "flex", height: "100vh", background: COLORS.bg, color: COLORS.text, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif", fontSize: 14, overflow: "hidden" },
+    app:         { display: "flex", flexDirection: isMobileViewport ? "column" : "row", background: COLORS.bg, color: COLORS.text, fontFamily: "'Instrument Sans', 'Segoe UI', sans-serif", fontSize: 14, overflow: "hidden" },
     main:        { flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" },
     mainLeft:    { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
-    taskRow:     { flex: 1, display: "flex", overflow: "hidden" },
+    taskRow:     { flex: 1, display: (isPhoneLayout && mobileTab !== 'tasks') ? "none" : "flex", overflow: "hidden", minHeight: 0 },
     taskPanel:   { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
-    detailPanel: { width: detailWidth, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" },
+    mobileTabBar: { display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 },
+    mobileTabBtn: (active) => ({ flex: 1, padding: "10px", background: active ? COLORS.surface2 : "transparent", border: "none", borderBottom: `2px solid ${active ? COLORS.next : "transparent"}`, color: active ? COLORS.text : COLORS.text2, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }),
+    coachTabWrap: { display: isPhoneLayout ? (mobileTab === 'coach' ? "flex" : "none") : "contents", flexDirection: "column", flex: isPhoneLayout && mobileTab === 'coach' ? 1 : undefined, overflow: "hidden", minHeight: 0 },
+    detailPanel: isMobileViewport
+      ? { position: "fixed", top: 0, right: 0, bottom: 0, width: viewport.isPhone ? "100%" : "min(480px, 88vw)", zIndex: 1001, display: "flex", flexDirection: "column", overflow: "hidden", background: COLORS.surface, boxShadow: "-2px 0 16px rgba(0,0,0,0.4)" }
+      : { width: detailWidth, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden" },
+    detailBackdrop: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000 },
+    mobileTopBar: { display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.surface, flexShrink: 0 },
+    hamburgerBtn: { width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, background: "transparent", border: "none", color: COLORS.text, cursor: "pointer", borderRadius: 8, flexShrink: 0 },
+    mobileTopBarTitle: { fontSize: 15, fontWeight: 600, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+    mobileNavBackdrop: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 999 },
   };
+  // coachHeight is a fixed px value persisted from whatever screen it was last resized on —
+  // cap it to a viewport-relative max on phone/tablet so it can't crowd out the task list.
+  // Use a real computed number (not a CSS min()/vh string) so the message list's flex:1
+  // scroll region gets a definite height — CSS min() here was breaking independent
+  // scroll of the coach conversation on some mobile browsers.
+  const effectiveCoachHeight = (isPhoneLayout && mobileTab === 'coach')
+    ? "100%"
+    : isMobileViewport
+      ? Math.min(coachHeight, Math.round(viewport.height * 0.32))
+      : coachHeight;
 
   // ── Context values ─────────────────────────────────────────────────────
   const taskActionsValue = {
-    onComplete:           completeTask,
+    onComplete:           archiveTask,
     onDelete:             deleteTask,
     onMove:               moveTask,
     onAskAI:              askAIAboutTask,
@@ -1081,13 +1468,17 @@ export default function GTDManager() {
     locations,
     efforts,
     tagDisplay,
+    badgeVisibility,
     categories,
+    colorSettings,
     projectCategoryFilter,
     setProjectCategoryFilter,
     showCompletedInProjects,
     showWaitingInProjects,
     showSomeDayInProjects,
     uncategorizedProjectId,
+    focusedTaskId,
+    setFocusedTaskId,
   };
 
   return (
@@ -1098,10 +1489,21 @@ export default function GTDManager() {
       authEmail={authEmail}
       setAuthEmail={setAuthEmail}
       sendMagicLink={sendMagicLink}
+      authError={authError}
     >
-      <div style={s.app} onClick={() => setMoveMenu(null)}>
+      <div className="app-shell-height" style={s.app} onClick={() => setMoveMenu(null)}>
+        {isMobileViewport && (
+          <div style={s.mobileTopBar}>
+            <button style={s.hamburgerBtn} onClick={(e) => { e.stopPropagation(); setMobileNavOpen(v => !v); }} aria-label="Open menu">☰</button>
+            <div style={s.mobileTopBarTitle}>{currentView === "gtd" ? (BUCKETS[currentBucket]?.label || "GTD Manager") : currentView === "calendar" ? "Calendar" : "GTD Manager"}</div>
+          </div>
+        )}
+        {isMobileViewport && mobileNavOpen && (
+          <div style={s.mobileNavBackdrop} onClick={() => setMobileNavOpen(false)} />
+        )}
         <AppSidebar
           sidebarWidth={sidebarWidth}
+          colorSettings={colorSettings}
           supabaseReady={supabaseReady}
           syncStatus={syncStatus}
           counts={counts}
@@ -1114,6 +1516,11 @@ export default function GTDManager() {
           focusCount={focusCount}
           onSelectEmail={() => { setCurrentView("email"); setShowSettings(false); setSelectedTaskId(null); }}
           onSelectCalendar={() => { setCurrentView("calendar"); setShowSettings(false); setSelectedTaskId(null); }}
+          onSelectAnalytics={() => { setCurrentView("analytics"); setShowSettings(false); setSelectedTaskId(null); }}
+          contactsEnabled={contactsEnabled}
+          onSelectContacts={() => { setCurrentView("contacts"); setShowSettings(false); setSelectedTaskId(null); }}
+          onSelectHealth={() => { setCurrentView("health"); setShowSettings(false); setSelectedTaskId(null); }}
+          onSelectHabits={() => { setCurrentView("habits"); setShowSettings(false); setSelectedTaskId(null); }}
           onToggleSettings={() => { setShowSettings(v => !v); setShowUsage(false); }}
           onToggleUsage={() => { setShowUsage(v => !v); setShowSettings(false); }}
           onDailyReview={startDailyReview}
@@ -1121,18 +1528,29 @@ export default function GTDManager() {
           onWeeklyReview={startWeeklyReview}
           onBrainDump={startBrainDump}
           onOpenSearch={() => setSearchOpen(true)}
+          isMobile={isMobileViewport}
+          mobileNavOpen={mobileNavOpen}
+          onCloseMobileNav={() => setMobileNavOpen(false)}
         />
         {searchOpen && (
           <SearchModal
             tasks={tasks}
             onSelect={handleSearchSelect}
             onClose={() => setSearchOpen(false)}
+            colorSettings={colorSettings}
+            shortcutModifier={shortcutModifier}
           />
         )}
-        <ResizeHandle onMouseDown={sidebarDragDown} direction="h" />
+        {!isMobileViewport && <ResizeHandle onMouseDown={sidebarDragDown} direction="h" />}
 
         <div style={s.main}>
           <div style={s.mainLeft}>
+            {isPhoneLayout && (
+              <div style={s.mobileTabBar}>
+                <button onClick={() => setMobileTab('tasks')} style={s.mobileTabBtn(mobileTab === 'tasks')}>📋 Tasks</button>
+                <button onClick={() => setMobileTab('coach')} style={s.mobileTabBtn(mobileTab === 'coach')}>🤖 Coach</button>
+              </div>
+            )}
             <div style={s.taskRow}>
               <ErrorBoundary label="Task Panel">
                 <TaskActionsContext.Provider value={taskActionsValue}>
@@ -1154,8 +1572,12 @@ export default function GTDManager() {
                           onClearCalibrationOverride={clearCalibrationOverride}
                           tagDisplay={tagDisplay}
                           onSetTagDisplay={setTagDisplay}
+                          colorSettings={colorSettings}
+                          onSetColorSettings={setColorSettings}
                           focusExpandedDefaults={focusExpandedDefaults}
                           onSetFocusExpandedDefaults={setFocusExpandedDefaults}
+                          shortcutModifier={shortcutModifier}
+                          onSetShortcutModifier={setShortcutModifier}
                           nextActionsViewMode={nextActionsViewMode}
                           onSetNextActionsViewMode={setNextActionsViewMode}
                           reviewNodeTypes={reviewNodeTypes}
@@ -1175,15 +1597,73 @@ export default function GTDManager() {
                           docsEnabled={docsEnabled}
                           sheetsEnabled={sheetsEnabled}
                           slidesEnabled={slidesEnabled}
+                          contactsEnabled={contactsEnabled}
                           scopePrefs={scopePrefs}
                           onSetScopePref={setScopePref}
                           onReauthorizeGoogle={reauthorizeGoogle}
                           onDisconnectCalendar={disconnectCalendar}
+                          onDisconnectContacts={disconnectContacts}
                           onDisconnectAll={disconnectAll}
                           recurringReviewDays={recurringReviewDays}
                           onSetRecurringReviewDays={setRecurringReviewDays}
                           calendarReminderMinutes={calendarReminderMinutes}
                           onSetCalendarReminderMinutes={setCalendarReminderMinutes}
+                          driveBaseFolderId={driveBaseFolderId}
+                          onSetDriveBaseFolderId={setDriveBaseFolderId}
+                          driveConversationExportFolderId={driveConversationExportFolderId}
+                          onSetDriveConversationExportFolderId={setDriveConversationExportFolderId}
+                          driveSlideDeckFolderId={driveSlideDeckFolderId}
+                          onSetDriveSlideDeckFolderId={setDriveSlideDeckFolderId}
+                          driveSpreadsheetFolderId={driveSpreadsheetFolderId}
+                          onSetDriveSpreadsheetFolderId={setDriveSpreadsheetFolderId}
+                          driveDocumentFolderId={driveDocumentFolderId}
+                          onSetDriveDocumentFolderId={setDriveDocumentFolderId}
+                          driveBaseFolderPath={driveBaseFolderPath}
+                          onSetDriveBaseFolderPath={setDriveBaseFolderPath}
+                          driveConversationExportFolderPath={driveConversationExportFolderPath}
+                          onSetDriveConversationExportFolderPath={setDriveConversationExportFolderPath}
+                          driveSlideDeckFolderPath={driveSlideDeckFolderPath}
+                          onSetDriveSlideDeckFolderPath={setDriveSlideDeckFolderPath}
+                          driveSpreadsheetFolderPath={driveSpreadsheetFolderPath}
+                          onSetDriveSpreadsheetFolderPath={setDriveSpreadsheetFolderPath}
+                          driveDocumentFolderPath={driveDocumentFolderPath}
+                          onSetDriveDocumentFolderPath={setDriveDocumentFolderPath}
+                          driveBackupFolderId={driveBackupFolderId}
+                          onSetDriveBackupFolderId={setDriveBackupFolderId}
+                          driveBackupFolderPath={driveBackupFolderPath}
+                          onSetDriveBackupFolderPath={setDriveBackupFolderPath}
+                          onBackupToDrive={handleDriveBackup}
+                          exportSettings={exportSettings}
+                          onExportSettingsChange={setExportSettings}
+                          exportTemplates={exportTemplates}
+                          onExportTemplatesChange={setExportTemplates}
+                          userCity={userCity}
+                          onSetUserCity={setUserCity}
+                          userHomeAddress={userHomeAddress}
+                          onSetUserHomeAddress={setUserHomeAddress}
+                          userWorkAddress={userWorkAddress}
+                          onSetUserWorkAddress={setUserWorkAddress}
+                          coachName={coachName}
+                          onSetCoachName={setCoachName}
+                          userName={userName}
+                          onSetUserName={setUserName}
+                          receiptSheetId={receiptSheetId}
+                          onSetReceiptSheetId={setReceiptSheetId}
+                          contactRelationshipTags={contactRelationshipTags}
+                          onSetContactRelationshipTags={setContactRelationshipTags}
+                          contactLikesCategories={contactLikesCategories}
+                          onSetContactLikesCategories={setContactLikesCategories}
+                          contacts={contacts}
+                          onRenameContactRelationshipTag={renameContactRelationshipTag}
+                          onRemoveContactRelationshipTag={removeContactRelationshipTag}
+                          onRenameContactLikeCategory={renameContactLikeCategory}
+                          onRemoveContactLikeCategory={removeContactLikeCategory}
+                          contactEmailLinkingMode={contactEmailLinkingMode}
+                          onSetContactEmailLinkingMode={setContactEmailLinkingMode}
+                          taskCompletionToContactNotes={taskCompletionToContactNotes}
+                          onSetTaskCompletionToContactNotes={setTaskCompletionToContactNotes}
+                          healthDocSummarizeMode={healthDocSummarizeMode}
+                          onSetHealthDocSummarizeMode={setHealthDocSummarizeMode}
                         />
                       ) : showUsage ? (
                         <UsagePanel
@@ -1203,8 +1683,14 @@ export default function GTDManager() {
                           processEmailWithAI={processEmailWithAI}
                           attachEmailToTask={attachEmailToTask}
                           tasks={tasks}
+                          contacts={contacts}
+                          addContactEmail={addContactEmail}
+                          contactEmailLinkingMode={contactEmailLinkingMode}
                           openCoachChat={openCoachChat}
                           authUser={authUser}
+                          logEmailAsReceipt={logEmailAsReceipt}
+                          markAsSpam={markAsSpam}
+                          onInboxLoaded={setInboxSenderEmails}
                         />
                       ) : currentView === "calendar" ? (
                         <CalendarManagementView
@@ -1239,6 +1725,93 @@ export default function GTDManager() {
                           tagDisplay={tagDisplay}
                           focusExpandedDefaults={focusExpandedDefaults}
                           onSetFocusExpandedDefaults={setFocusExpandedDefaults}
+                          shortcutModifier={shortcutModifier}
+                          onSetShortcutModifier={setShortcutModifier}
+                          googleToken={googleToken}
+                          docsEnabled={docsEnabled}
+                          driveConversationExportFolderId={driveConversationExportFolderId}
+                          exportTemplates={exportTemplates}
+                        />
+                      ) : currentView === "health" ? (
+                        <HealthPanel
+                          healthItems={healthItems}
+                          healthLoading={healthLoading}
+                          addHealthItem={addHealthItem}
+                          updateHealthItem={updateHealthItem}
+                          removeHealthItem={removeHealthItem}
+                          googleToken={googleToken}
+                          driveEnabled={driveEnabled}
+                          calendarEnabled={calendarEnabled}
+                          calendarEvents={calendarEvents}
+                          onSummarizeDoc={(item) => onAutoSummarizeDoc(item)}
+                          healthDocSummarizeMode={healthDocSummarizeMode}
+                          onAutoSummarizeDoc={onAutoSummarizeDoc}
+                          onCreateCalendarEvent={async (form) => {
+                            if (!googleToken || !form.appointmentDate) return;
+                            try {
+                              const dt = new Date(form.appointmentDate);
+                              const date = dt.toISOString().slice(0, 10);
+                              const startTime = dt.toTimeString().slice(0, 5);
+                              const endTime = new Date(dt.getTime() + 30 * 60000).toTimeString().slice(0, 5);
+                              const desc = [form.provider && `Provider: ${form.provider}`, form.notes].filter(Boolean).join("\n");
+                              const ev = await doCalendarCreateEvent(googleToken, { summary: form.name, description: desc, date, startTime, endTime, reminderMinutes: calendarReminderMinutes ?? 10 });
+                              setCalendarEvents(prev => [...prev, ev]);
+                            } catch { /* health item saved regardless */ }
+                          }}
+                        />
+                      ) : currentView === "habits" ? (
+                        <HabitsPanel
+                          supabaseReady={supabaseReady}
+                        />
+                      ) : currentView === "contacts" ? (
+                        <ContactsPanel
+                          contacts={contacts}
+                          selectedContactId={selectedContactId}
+                          setSelectedContactId={setSelectedContactId}
+                          contactsLoading={contactsLoading}
+                          contactsSyncing={contactsSyncing}
+                          contactsError={contactsError}
+                          lastSyncedAt={lastSyncedAt}
+                          contactsEnabled={contactsEnabled}
+                          syncContacts={syncContacts}
+                          updateStandardFields={updateStandardFields}
+                          updateCustomFields={updateCustomFields}
+                          addPromise={addPromise}
+                          togglePromiseDone={togglePromiseDone}
+                          linkPromiseToTask={linkPromiseToTask}
+                          deletePromise={deletePromise}
+                          addLike={addLike}
+                          deleteLike={deleteLike}
+                          addDislike={addDislike}
+                          deleteDislike={deleteDislike}
+                          addGiftIdea={addGiftIdea}
+                          toggleGiftGiven={toggleGiftGiven}
+                          deleteGiftIdea={deleteGiftIdea}
+                          tasks={tasks}
+                          createInboxTask={createInboxTask}
+                          onNavigateToTask={navigateToTask}
+                          markTaskDone={markTaskDone}
+                          linkGiftToTask={linkGiftToTask}
+                          mergeOrphanIntoContact={mergeOrphanIntoContact}
+                          deleteOrphanContact={deleteOrphanContact}
+                          onOpenSettings={() => setShowSettings(true)}
+                          contactRelationshipTags={contactRelationshipTags}
+                          setContactRelationshipTags={setContactRelationshipTags}
+                          contactLikesCategories={contactLikesCategories}
+                          addDriveAttachment={addDriveAttachment}
+                          removeDriveAttachment={removeDriveAttachment}
+                          googleToken={googleToken}
+                          driveEnabled={driveEnabled}
+                          toggleFavorite={toggleFavorite}
+                          inboxSenderEmails={inboxSenderEmails}
+                        />
+                      ) : currentView === "analytics" ? (
+                        <AnalyticsArea
+                          tasks={tasks}
+                          colorSettings={colorSettings}
+                          contacts={contacts}
+                          onNavigateToContact={(id) => { setCurrentView('contacts'); setSelectedContactId(id); }}
+                          supabaseReady={supabaseReady}
                         />
                       ) : (
                         <TaskBucketView
@@ -1270,6 +1843,9 @@ export default function GTDManager() {
                           onStartProjectReview={startProjectReview}
                           onBulkAssign={bulkAssignToProject}
                           categories={categories}
+                          locations={locations}
+                          badgeVisibility={badgeVisibility}
+                          setBadgeVisibility={setBadgeVisibility}
                           projectCategoryFilter={projectCategoryFilter}
                           setProjectCategoryFilter={setProjectCategoryFilter}
                           showCompletedInProjects={showCompletedInProjects}
@@ -1278,6 +1854,12 @@ export default function GTDManager() {
                           showSomeDayInProjects={showSomeDayInProjects}
                           setShowSomeDayInProjects={setShowSomeDayInProjects}
                           setShowCompletedInProjects={setShowCompletedInProjects}
+                          focusedTaskId={focusedTaskId}
+                          setFocusedTaskId={setFocusedTaskId}
+                          googleToken={googleToken}
+                          docsEnabled={docsEnabled}
+                          driveConversationExportFolderId={driveConversationExportFolderId}
+                          exportTemplates={exportTemplates}
                         />
                       )}
                     </div>
@@ -1285,10 +1867,12 @@ export default function GTDManager() {
                 </TaskActionsContext.Provider>
               </ErrorBoundary>
             </div>
-            <ResizeHandle onMouseDown={coachDragDown} direction="v" />
+            <div style={s.coachTabWrap}>
+            {!isMobileViewport && <ResizeHandle onMouseDown={coachDragDown} direction="v" />}
             <ErrorBoundary label="AI Coach">
               <CoachPanel
-                coachHeight={coachHeight}
+                coachHeight={effectiveCoachHeight}
+                colorSettings={colorSettings}
                 coachMode={coachMode}
                 messages={messages}
                 loading={loading}
@@ -1316,7 +1900,10 @@ export default function GTDManager() {
                 chatInputRef={chatInputRef}
                 sessionUsage={sessionUsage}
                 onSendChat={sendChat}
-                onConfirmMove={handleConfirmMove}
+                pendingPdf={pendingPdf}
+                onPdfAttach={setPendingPdf}
+                onPdfClear={() => setPendingPdf(null)}
+                onConfirmMove={handleConfirmMoveWithSend}
                 onDismissPendingAction={handleSkipPendingAction}
                 onDeleteInboxItem={handleDeleteInboxItem}
                 onRecurringStillFine={handleRecurringStillFine}
@@ -1357,10 +1944,21 @@ export default function GTDManager() {
                 onUpdatePendingAction={(field, value) => setPendingAction(prev => prev ? ({ ...prev, [field]: value }) : prev)}
                 onStartBrainDump={startBrainDump}
                 onStartProjectReview={startProjectReview}
+                onStartDailyReview={startDailyReview}
                 onSwitchToChat={() => switchCoachMode("chat", "I can see your task list. Ask me anything — clarify a task, plan your day, or check in on your system.")}
                 onMITSubmit={handleMITSubmit}
+                docsEnabled={docsEnabled}
+                driveConversationExportFolderId={driveConversationExportFolderId}
+                exportSettings={exportSettings}
+                onExportSettingsChange={setExportSettings}
+                exportTemplates={exportTemplates}
+                googleToken={googleToken}
+                rawApiThread={rawApiThread}
+                coachName={coachName}
+                userName={userName}
               />
             </ErrorBoundary>
+            </div>
           </div>
 
           <ErrorBoundary label="Task Detail">
@@ -1368,23 +1966,30 @@ export default function GTDManager() {
               const selTask = tasks.find(t => t.id === selectedTaskId);
               return selTask ? (
                 <>
-                  <ResizeHandle onMouseDown={detailDragDown} direction="h" />
+                  {isMobileViewport && <div style={s.detailBackdrop} onClick={() => setSelectedTaskId(null)} />}
+                  {!isMobileViewport && <ResizeHandle onMouseDown={detailDragDown} direction="h" />}
                   <TaskDetailPanel
                     task={selTask}
                     allTasks={tasks}
+                    colorSettings={colorSettings}
                     currentBucket={currentBucket}
                     locations={locations}
                     efforts={efforts}
                     categories={categories}
                     driveEnabled={driveEnabled}
+                    slidesEnabled={slidesEnabled}
                     googleAccessToken={googleToken}
                     onUpdate={updateTask}
-                    onComplete={(id) => { completeTask(id); setSelectedTaskId(null); }}
+                    onComplete={(id) => { archiveTask(id); setSelectedTaskId(null); }}
                     onDelete={(id) => { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }}
                     onReassignProject={reassignProject}
                     onSkipRecurrence={(id) => { skipRecurrence(id); setSelectedTaskId(null); }}
                     onClose={() => setSelectedTaskId(null)}
                     style={s.detailPanel}
+                    isMobile={isMobileViewport}
+                    contactName={selTask.contactId ? (contacts.find(c => c.id === selTask.contactId)?.displayName || null) : null}
+                    contacts={contacts}
+                    onNavigateToContact={(contactId) => { setCurrentView('contacts'); setSelectedContactId(contactId); }}
                   />
                 </>
               ) : null;

@@ -1,9 +1,10 @@
 import PropTypes from "prop-types";
-import { COLORS, BUCKETS } from "../constants.jsx";
+import { COLORS, BUCKETS, DEFAULT_COLOR_SETTINGS, getEffectiveBuckets } from "../constants.jsx";
 import { BucketItem, SidebarBtn } from "./SidebarComponents.jsx";
 
 function AppSidebar({
   sidebarWidth,
+  colorSettings,
   supabaseReady,
   syncStatus,
   counts,
@@ -11,11 +12,16 @@ function AppSidebar({
   currentView,
   gmailUnreadCount,
   calendarEnabled,
+  contactsEnabled,
   onSelectBucket,
   onSelectFocus,
   focusCount,
   onSelectEmail,
   onSelectCalendar,
+  onSelectAnalytics,
+  onSelectContacts,
+  onSelectHealth,
+  onSelectHabits,
   onToggleSettings,
   onToggleUsage,
   onDailyReview,
@@ -23,13 +29,29 @@ function AppSidebar({
   onWeeklyReview,
   onBrainDump,
   onOpenSearch,
+  isMobile,
+  mobileNavOpen,
+  onCloseMobileNav,
 }) {
+  const focusColor    = colorSettings?.sidebarIconColors?.focus    || DEFAULT_COLOR_SETTINGS.sidebarIconColors.focus;
+  const contactsColor = colorSettings?.sidebarIconColors?.contacts || DEFAULT_COLOR_SETTINGS.sidebarIconColors.contacts;
+  const healthColor   = colorSettings?.sidebarIconColors?.health   || DEFAULT_COLOR_SETTINGS.sidebarIconColors.health;
+  const mobileStyle = isMobile ? {
+    position: "fixed", top: 0, left: 0, bottom: 0, width: 280, zIndex: 1000,
+    transform: mobileNavOpen ? "translateX(0)" : "translateX(-100%)",
+    transition: "transform 0.2s ease",
+    boxShadow: mobileNavOpen ? "2px 0 12px rgba(0,0,0,0.4)" : "none",
+  } : { width: sidebarWidth, flexShrink: 0 };
+
   return (
-    <div style={{ width: sidebarWidth, background: COLORS.surface, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+    <div
+      style={{ ...mobileStyle, background: COLORS.surface, display: "flex", flexDirection: "column" }}
+      onClickCapture={() => { if (isMobile) onCloseMobileNav?.(); }}
+    >
       <div style={{ padding: "18px 16px 14px", borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 300, color: COLORS.text }}>
-            GTD <em style={{ fontStyle: "italic", color: COLORS.inbox }}>Manager</em>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 300, fontStyle: "italic", color: COLORS.text }}>
+            <span style={{ color: COLORS.inbox }}>A</span><span style={{ color: COLORS.inbox }}>.</span><span style={{ color: COLORS.inbox }}>I</span><span style={{ color: COLORS.inbox }}>.</span><span>D</span><span style={{ color: COLORS.inbox }}>.</span><span>A</span><span style={{ color: COLORS.inbox }}>.</span>
           </div>
           {supabaseReady && (
             <div title={syncStatus === "synced" ? "Synced to cloud" : "Offline — changes queued"}
@@ -42,11 +64,11 @@ function AppSidebar({
             </div>
           )}
         </div>
-        <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 3 }}>Knowledge Worker Edition</div>
+        <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 3 }}>AI Daily Assistant</div>
       </div>
 
       <div style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
-        {Object.entries(BUCKETS).map(([key, cfg]) => (
+        {Object.entries(getEffectiveBuckets(colorSettings?.bucketColors)).map(([key, cfg]) => (
           <BucketItem
             key={key}
             bkey={key}
@@ -62,23 +84,31 @@ function AppSidebar({
 
         <div
           onClick={onSelectFocus}
-          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "focus" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "focus" ? "#f0c040" : "transparent"}`, transition: "background 0.1s" }}
+          accessKey="f"
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "focus" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "focus" ? focusColor : "transparent"}`, transition: "background 0.1s" }}
           onMouseEnter={e => { if (currentView !== "focus") { e.currentTarget.style.background = COLORS.surface2; } }}
           onMouseLeave={e => { if (currentView !== "focus") { e.currentTarget.style.background = "transparent"; } }}
         >
-          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#f0c040", flexShrink: 0 }} />
-          <span style={{ flex: 1, fontSize: 13, color: currentView === "focus" ? COLORS.text : COLORS.text2 }}>📋 Today's Focus</span>
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: focusColor, flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "focus" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>📋</span>
+            Today's Focus
+          </span>
           {focusCount > 0 && (
-            <span style={{ fontSize: 11, background: "#f0c04022", color: "#f0c040", padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{focusCount}</span>
+            <span style={{ fontSize: 11, background: focusColor + "22", color: focusColor, padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{focusCount}</span>
           )}
         </div>
 
         <div
           onClick={onSelectEmail}
+          accessKey="e"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "email" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "email" ? COLORS.inbox : "transparent"}`, transition: "background 0.1s" }}
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.inbox, flexShrink: 0 }} />
-          <span style={{ flex: 1, fontSize: 13, color: currentView === "email" ? COLORS.text : COLORS.text2 }}>📧 Email</span>
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "email" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>📧</span>
+            Email
+          </span>
           {gmailUnreadCount != null && gmailUnreadCount > 0 && (
             <span style={{ fontSize: 11, background: COLORS.inbox + "22", color: COLORS.inbox, padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{gmailUnreadCount}</span>
           )}
@@ -86,29 +116,91 @@ function AppSidebar({
 
         <div
           onClick={onSelectCalendar}
+          accessKey="l"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "calendar" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "calendar" ? COLORS.calendar : "transparent"}`, transition: "background 0.1s" }}
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.calendar, flexShrink: 0 }} />
-          <span style={{ flex: 1, fontSize: 13, color: currentView === "calendar" ? COLORS.text : COLORS.text2 }}>📅 Calendar</span>
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "calendar" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>📅</span>
+            Calendar
+          </span>
           {calendarEnabled && <span style={{ fontSize: 9, background: COLORS.calendar + "33", color: COLORS.calendar, padding: "1px 5px", borderRadius: 8, fontWeight: 500 }}>✓</span>}
         </div>
 
         <div
+          onClick={onSelectContacts}
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "contacts" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "contacts" ? contactsColor : "transparent"}`, transition: "background 0.1s" }}
+          onMouseEnter={e => { if (currentView !== "contacts") { e.currentTarget.style.background = COLORS.surface2; } }}
+          onMouseLeave={e => { if (currentView !== "contacts") { e.currentTarget.style.background = "transparent"; } }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: contactsColor, flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "contacts" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>👤</span>
+            Contacts
+          </span>
+          {contactsEnabled && <span style={{ fontSize: 9, background: contactsColor + "33", color: contactsColor, padding: "1px 5px", borderRadius: 8, fontWeight: 500 }}>✓</span>}
+        </div>
+
+        <div
+          onClick={onSelectHealth}
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "health" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "health" ? healthColor : "transparent"}`, transition: "background 0.1s" }}
+          onMouseEnter={e => { if (currentView !== "health") { e.currentTarget.style.background = COLORS.surface2; } }}
+          onMouseLeave={e => { if (currentView !== "health") { e.currentTarget.style.background = "transparent"; } }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "health" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>💊</span>
+            Health
+          </span>
+        </div>
+
+        <div
+          onClick={onSelectHabits}
+          style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 16px', cursor: 'pointer', background: currentView === 'habits' ? COLORS.surface2 : 'transparent', borderLeft: `3px solid ${currentView === 'habits' ? '#a5d6a7' : 'transparent'}`, transition: 'background 0.1s' }}
+          onMouseEnter={e => { if (currentView !== 'habits') { e.currentTarget.style.background = COLORS.surface2; } }}
+          onMouseLeave={e => { if (currentView !== 'habits') { e.currentTarget.style.background = 'transparent'; } }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#a5d6a7', flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: currentView === 'habits' ? COLORS.text : COLORS.text2, display: 'flex', alignItems: 'center' }}>
+            <span style={{ display: 'inline-block', width: '1.4em', textAlign: 'center', flexShrink: 0 }}>🌱</span>
+            Habits
+          </span>
+        </div>
+
+        <div
+          onClick={onSelectAnalytics}
+          accessKey="a"
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "analytics" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "analytics" ? COLORS.accent : "transparent"}`, transition: "background 0.1s" }}
+          onMouseEnter={e => { if (currentView !== "analytics") { e.currentTarget.style.background = COLORS.surface2; } }}
+          onMouseLeave={e => { if (currentView !== "analytics") { e.currentTarget.style.background = "transparent"; } }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.accent, flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 13, color: currentView === "analytics" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>📊</span>
+            Analytics
+          </span>
+        </div>
+
+        <div
           onClick={onOpenSearch}
+          accessKey="k"
           style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: "transparent", borderLeft: "3px solid transparent", transition: "background 0.1s" }}
           onMouseEnter={e => e.currentTarget.style.background = COLORS.surface2}
           onMouseLeave={e => e.currentTarget.style.background = "transparent"}
         >
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: COLORS.text2, flexShrink: 0 }} />
-          <span style={{ flex: 1, fontSize: 13, color: COLORS.text2 }}>🔍 Search</span>
-          <kbd style={{ fontSize: 9, color: COLORS.muted, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "1px 4px" }}>⌘K</kbd>
+          <span style={{ flex: 1, fontSize: 13, color: COLORS.text2, display: "flex", alignItems: "center" }}>
+            <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>🔍</span>
+            Search
+          </span>
+          <kbd style={{ fontSize: 9, color: COLORS.text2, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "1px 4px" }}>⌘K</kbd>
         </div>
       </div>
 
       <div style={{ padding: 10, borderTop: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
-        <SidebarBtn primary onClick={onDailyReview}>{dailyReviewPhase === 'end' ? '🌇 End Day' : '🌅 Start Day'}</SidebarBtn>
-        <SidebarBtn onClick={onWeeklyReview}>📋 Weekly Review</SidebarBtn>
-        <SidebarBtn onClick={onBrainDump}>🧠 Brain Dump</SidebarBtn>
+        <SidebarBtn primary onClick={onDailyReview} accessKey="q">{dailyReviewPhase === 'end' ? '🌇 End Day' : '🌅 Start Day'}</SidebarBtn>
+        <SidebarBtn onClick={onWeeklyReview} accessKey="r">📋 Weekly Review</SidebarBtn>
+        <SidebarBtn onClick={onBrainDump} accessKey="b">🧠 Brain Dump</SidebarBtn>
       </div>
 
       <div style={{ padding: "8px 10px", borderTop: `1px solid ${COLORS.border}`, display: "flex", gap: 6 }}>
@@ -121,18 +213,24 @@ function AppSidebar({
 
 AppSidebar.propTypes = {
   sidebarWidth:    PropTypes.number.isRequired,
+  colorSettings:   PropTypes.object,
   supabaseReady:   PropTypes.bool.isRequired,
   syncStatus:      PropTypes.string.isRequired,
   counts:          PropTypes.object.isRequired,
   currentBucket:   PropTypes.string.isRequired,
   currentView:     PropTypes.string.isRequired,
   gmailUnreadCount: PropTypes.number,
-  calendarEnabled: PropTypes.bool.isRequired,
+  calendarEnabled:  PropTypes.bool.isRequired,
+  contactsEnabled:  PropTypes.bool.isRequired,
   onSelectBucket:  PropTypes.func.isRequired,
   onSelectFocus:   PropTypes.func.isRequired,
   focusCount:      PropTypes.number,
   onSelectEmail:   PropTypes.func.isRequired,
   onSelectCalendar: PropTypes.func.isRequired,
+  onSelectAnalytics:  PropTypes.func.isRequired,
+  onSelectContacts:   PropTypes.func.isRequired,
+  onSelectHealth:     PropTypes.func.isRequired,
+  onSelectHabits:     PropTypes.func.isRequired,
   onToggleSettings: PropTypes.func.isRequired,
   onToggleUsage:   PropTypes.func.isRequired,
   onDailyReview:   PropTypes.func.isRequired,
@@ -140,6 +238,9 @@ AppSidebar.propTypes = {
   onWeeklyReview:  PropTypes.func.isRequired,
   onBrainDump:     PropTypes.func.isRequired,
   onOpenSearch:    PropTypes.func.isRequired,
+  isMobile:         PropTypes.bool,
+  mobileNavOpen:    PropTypes.bool,
+  onCloseMobileNav: PropTypes.func,
 };
 
 export { AppSidebar };

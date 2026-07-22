@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { COLORS } from "../../constants.jsx";
 import { calEventStart, isAllDayEvent } from "./calendarApi.js";
+import { useViewport } from "../../hooks/useViewport.js";
 
 function CalendarNewEventsSection({ events, onReview, onSkip }) {
-  const [open, setOpen] = useState(true);
+  const { isPhone } = useViewport();
+  // Collapsed by default on phone to save vertical space; tablet/desktop keep the
+  // original default-open behavior.
+  const [open, setOpen] = useState(!isPhone);
   return (
     <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
       <div
@@ -46,7 +50,8 @@ function CalendarNewEventsSection({ events, onReview, onSkip }) {
 }
 
 function CalendarPendingTasksSection({ tasks, addConfirmId, addStatus, onRequestAdd, onConfirmAdd, onCancelAdd, onOpenDetail, selectedTaskId, skippedIds, onIgnore }) {
-  const [open, setOpen] = useState(true);
+  const { isPhone } = useViewport();
+  const [open, setOpen] = useState(!isPhone);
   const visibleTasks = tasks.filter(t => addStatus[t.id] !== 'done' && !skippedIds?.has(t.id));
   return (
     <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>

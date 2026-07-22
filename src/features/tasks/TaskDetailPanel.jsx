@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useTaskDetailDrafts } from "./useTaskDetailDrafts.js";
 import PropTypes from "prop-types";
-import { COLORS, BUCKETS, NODE_TYPES } from "../../constants.jsx";
+import { COLORS, BUCKETS, NODE_TYPES, DEFAULT_COLOR_SETTINGS, getEffectiveBuckets, getPriorityColor } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { collectDescendantIds, effortAccuracyColor, effortToMinutes } from "./taskUtils.jsx";
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
 import { ProjectTreePicker } from "./ProjectTreePicker.jsx";
+import { driveListFiles } from "../../api/driveApi.js";
+import { createAndUploadPptx, PPTX_MIME } from '../../api/pptxApi.js';
 
 // Shared style tokens used across the sub-components below.
 const fieldLabel = { fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 3 };
@@ -330,6 +332,38 @@ function DriveAttachments({ taskId, attachments, driveEnabled, googleAccessToken
     onUpdate(taskId, { driveAttachments: (attachments || []).filter(a => a.id !== fileId) });
   }
 
+  const [driveSearchQuery, setDriveSearchQuery] = useState('');
+  const [driveSearchResults, setDriveSearchResults] = useState([]);
+  const [driveSearchLoading, setDriveSearchLoading] = useState(false);
+
+  async function handleDriveSearch(e) {
+    e.preventDefault();
+    const q = driveSearchQuery.trim();
+    if (!q || !googleAccessToken) return;
+    setDriveSearchLoading(true);
+    try {
+      const res = await driveListFiles({
+        token: googleAccessToken,
+        q: `fullText contains '${q.replace(/'/g, "\\\'")}' and trashed=false`,
+        pageSize: 8,
+      });
+      setDriveSearchResults(res.files || []);
+    } catch (err) {
+      console.error('Drive search error', err);
+    } finally {
+      setDriveSearchLoading(false);
+    }
+  }
+
+  function attachSearchResult(file) {
+    const att = { id: file.id, name: file.name, mimeType: file.mimeType, url: file.webViewLink };
+    const existing = attachments || [];
+    if (existing.find(a => a.id === att.id)) return;
+    onUpdate(taskId, { driveAttachments: [...existing, att] });
+    setDriveSearchResults([]);
+    setDriveSearchQuery('');
+  }
+
   if (!driveEnabled) return null;
 
   // Deduplicate by id before rendering — guards against duplicate entries in driveAttachments
@@ -387,6 +421,30 @@ function DriveAttachments({ taskId, attachments, driveEnabled, googleAccessToken
             onClick={openPicker}
             style={{ alignSelf: 'flex-start', padding: '3px 10px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
           >+ Attach Drive file</button>
+          <form onSubmit={handleDriveSearch} style={{ display: 'flex', gap: 5, marginTop: 4 }}>
+            <input
+              value={driveSearchQuery}
+              onChange={e => setDriveSearchQuery(e.target.value)}
+              placeholder="Search Drive…"
+              style={{ flex: 1, padding: '3px 8px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: COLORS.surface2, color: COLORS.text, fontFamily: 'inherit', fontSize: 11, outline: 'none' }}
+            />
+            <button type="submit" disabled={driveSearchLoading} style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+              {driveSearchLoading ? '…' : 'Search'}
+            </button>
+          </form>
+          {driveSearchResults.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4, padding: '6px 8px', background: COLORS.surface3, borderRadius: 6, border: `1px solid ${COLORS.border}` }}>
+              {driveSearchResults.map(file => (
+                <div key={file.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ flex: 1, fontSize: 11, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.name}>{file.name}</span>
+                  <button
+                    onClick={() => attachSearchResult(file)}
+                    style={{ padding: '2px 7px', borderRadius: 4, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 10, cursor: 'pointer', flexShrink: 0 }}
+                  >+ Attach</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -396,19 +454,87 @@ DriveAttachments.propTypes = {
   taskId:            PropTypes.string.isRequired,
   attachments:       PropTypes.array,
   driveEnabled:      PropTypes.bool,
+  slidesEnabled:     PropTypes.bool,
   googleAccessToken: PropTypes.string,
+  onUpdate:          PropTypes.func.isRequired,
+};
+
+// Generates a Google Slides briefing deck from a project task and its subtasks.
+// Shown in TaskDetailPanel only when Slides is connected and the task has children.
+function SlidesGenerator({ task, allTasks, googleAccessToken, onUpdate }) {
+  const [briefingLoading, setBriefingLoading] = useState(false);
+  const [briefingUrl, setBriefingUrl] = useState(null);
+  const [briefingErr, setBriefingErr] = useState(null);
+
+  async function handleGenerateBriefing() {
+    setBriefingLoading(true);
+    setBriefingErr(null);
+    try {
+      // One slide per non-done subtask (title + notes); preceded by a cover slide
+      const subtasks = allTasks.filter(t => (task.childIds || []).includes(t.id) && !t.done);
+      const slides = [
+        { title: task.text, body: task.notes || '' },
+        ...subtasks.map(t => ({ title: t.text, body: t.notes || '' })),
+      ];
+
+      const result = await createAndUploadPptx({
+        token: googleAccessToken,
+        title: task.text,
+        slides,
+      });
+
+      const att = {
+        id: result.fileId,
+        name: result.fileName,
+        mimeType: PPTX_MIME,
+        url: result.webViewLink,
+      };
+      const existing = task.driveAttachments || [];
+      if (!existing.find(a => a.id === att.id)) {
+        onUpdate(task.id, { driveAttachments: [...existing, att] });
+      }
+      setBriefingUrl(result.webViewLink);
+    } catch (err) {
+      console.error('generateBriefing error', err);
+      setBriefingErr(err.message || 'Failed to create presentation');
+    } finally {
+      setBriefingLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div style={fieldLabel}>PPT Briefing</div>
+      <button
+        onClick={handleGenerateBriefing}
+        disabled={briefingLoading}
+        style={{ padding: '4px 12px', borderRadius: 6, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.project, fontFamily: 'inherit', fontSize: 12, cursor: briefingLoading ? 'not-allowed' : 'pointer' }}
+      >{briefingLoading ? 'Generating…' : '📊 Generate PPT Briefing'}</button>
+      {briefingUrl && (
+        <a href={briefingUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: COLORS.next, textDecoration: 'none', marginTop: 4, display: 'block' }}>View presentation ↗</a>
+      )}
+      {briefingErr && (
+        <div style={{ fontSize: 11, color: COLORS.danger || '#c0392b', marginTop: 4 }}>{briefingErr}</div>
+      )}
+    </div>
+  );
+}
+SlidesGenerator.propTypes = {
+  task:              taskShape.isRequired,
+  allTasks:          PropTypes.arrayOf(taskShape).isRequired,
+  googleAccessToken: PropTypes.string.isRequired,
   onUpdate:          PropTypes.func.isRequired,
 };
 
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
-function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, slidesEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style, isMobile, contactName, contacts, onNavigateToContact, colorSettings }) {
   const {
     titleDraft, setTitleDraft, saveTitle,
     notesDraft, setNotesDraft, saveNotes,
   } = useTaskDetailDrafts({ task, onUpdate, onClose });
 
-  const bucketColor = BUCKETS[task.bucket]?.color || COLORS.muted;
+  const bucketColor = getEffectiveBuckets(colorSettings?.bucketColors)[task.bucket]?.color || COLORS.muted;
   const bucketLabel = BUCKETS[task.bucket]?.label || task.bucket;
 
   // Exclude the task and all its descendants from eligible parent projects
@@ -429,7 +555,9 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
         <button
           onClick={onClose}
           title="Close (Esc)"
-          style={{ background: "none", border: "none", color: COLORS.muted, fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+          style={isMobile
+            ? { background: "none", border: "none", color: COLORS.muted, fontSize: 22, cursor: "pointer", width: 44, height: 44, lineHeight: 1 }
+            : { background: "none", border: "none", color: COLORS.muted, fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
         >×</button>
       </div>
 
@@ -469,6 +597,16 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
           onUpdate={onUpdate}
         />
 
+        {/* Slides briefing — shown for project tasks when Slides is connected */}
+        {slidesEnabled && googleAccessToken && (task.bucket === 'project' || (task.childIds && task.childIds.length > 0)) && (
+          <SlidesGenerator
+            task={task}
+            allTasks={allTasks}
+            googleAccessToken={googleAccessToken}
+            onUpdate={onUpdate}
+          />
+        )}
+
         {/* Metadata */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={fieldLabel}>Info</div>
@@ -479,12 +617,37 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             <span style={{ color: bucketColor, fontWeight: 500 }}>{bucketLabel}</span>
           </div>
 
+          {/* Contact link (FR#183) */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Contact</span>
+            {contactName ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
+                <span
+                  onClick={() => onNavigateToContact && onNavigateToContact(task.contactId)}
+                  style={{ color: '#4db6ac', cursor: onNavigateToContact ? 'pointer' : 'default', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title="Go to contact"
+                >{contactName}</span>
+                <span
+                  onClick={() => onUpdate(task.id, { contactId: null })}
+                  title="Remove contact link"
+                  style={{ cursor: 'pointer', color: COLORS.muted, fontSize: 11, flexShrink: 0, userSelect: 'none' }}
+                >✕</span>
+              </div>
+            ) : (
+              <ContactPickerInline
+                contacts={contacts || []}
+                onSelect={(ct) => onUpdate(task.id, { contactId: ct.id })}
+              />
+            )}
+          </div>
+
           {/* Type toggle — nodeType selector, visible in Projects and Next Actions views */}
           {(['project', 'next', 'waiting', 'someday', 'deferred'].includes(currentBucket)) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
               <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Type</span>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                {NODE_TYPES.map(({ value, label, color }) => {
+                {NODE_TYPES.map(({ value, label, color: defaultColor }) => {
+                  const color = colorSettings?.nodeTypeColors?.[value] || defaultColor;
                   const isTask = value === 'task';
                   const isActive = effectiveNodeType === value;
                   const disabled = isTask && hasProjectChildren;
@@ -591,6 +754,16 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
               style={{ ...fieldInput, width: "auto", fontSize: 12, padding: "3px 6px" }}
             />
           </div>
+
+          {/* Deferred count badge — shown when task has been deferred at least once */}
+          {!!task.deferCount && task.deferCount > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+              <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}></span>
+              <span style={{ fontSize: 11, color: COLORS.deferred, background: COLORS.deferredBg, border: `1px solid ${COLORS.deferred}44`, borderRadius: 10, padding: "1px 8px" }}>
+                ⏰ Deferred {task.deferCount} time{task.deferCount !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
 
           {/* Completed date — read-only */}
           {task.completedDate && (
@@ -703,6 +876,16 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
 
       </div>
 
+      {/* Task ID — for debugging coach actions */}
+      <div style={{ padding: '3px 14px 4px', borderTop: `1px solid ${COLORS.border}` }}>
+        <span
+          style={{ fontSize: 10, color: COLORS.muted, fontFamily: 'monospace', userSelect: 'all', cursor: 'text' }}
+          title="Task ID — click to select"
+        >
+          id: {task.id}
+        </span>
+      </div>
+
       {/* Footer actions */}
       <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, flexWrap: 'wrap' }}>
         <button
@@ -727,6 +910,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
 
 TaskDetailPanel.propTypes = {
   task:              taskShape.isRequired,
+  colorSettings:     PropTypes.object,
   allTasks:          PropTypes.arrayOf(taskShape).isRequired,
   locations:         PropTypes.arrayOf(PropTypes.string).isRequired,
   efforts:           PropTypes.arrayOf(PropTypes.string).isRequired,
@@ -741,6 +925,47 @@ TaskDetailPanel.propTypes = {
   onSkipRecurrence:  PropTypes.func,
   onClose:           PropTypes.func.isRequired,
   style:             PropTypes.object,
+  isMobile:          PropTypes.bool,
+  contactName:       PropTypes.string,
+  contacts:          PropTypes.array,
+  onNavigateToContact: PropTypes.func,
 };
+
+// Inline contact picker for TaskDetailPanel (FR#183)
+function ContactPickerInline({ contacts, onSelect }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen]   = useState(false);
+  const filtered = (contacts || [])
+    .filter(c => !query || (c.displayName || '').toLowerCase().includes(query.toLowerCase()))
+    .slice(0, 8);
+  if (!contacts || contacts.length === 0) return null;
+  return (
+    <div style={{ position: 'relative', flex: 1 }}>
+      <input
+        placeholder="Link a contact…"
+        value={query}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        style={{ width: '100%', boxSizing: 'border-box', padding: '3px 6px', background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, color: COLORS.text, fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
+      />
+      {open && filtered.length > 0 && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, zIndex: 50, maxHeight: 200, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+          {filtered.map(ct => (
+            <div
+              key={ct.id}
+              onMouseDown={() => { onSelect(ct); setQuery(''); setOpen(false); }}
+              style={{ padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: COLORS.text }}
+              onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              {ct.displayName || ct.givenName || '(no name)'}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export { TaskDetailPanel };

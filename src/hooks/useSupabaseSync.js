@@ -21,6 +21,9 @@ import { DEFAULT_EFFORTS } from '../features/settings/useAppSettings.js';
  *   setRecurringAcknowledgedMap: Function, setRecurringReviewDays: Function,
  *   setUncategorizedProjectId: Function,
  *   setGmailQueue: Function,
+ *   exportTemplates: object, setExportTemplates: Function,
+ *   contactRelationshipTags: Array, setContactRelationshipTags: Function,
+ *   contactLikesCategories: Array, setContactLikesCategories: Function,
  * }} params
  * @returns {{ syncStatus: string, supabaseReady: boolean }}
  */
@@ -35,9 +38,14 @@ function useSupabaseSync({
   setSkippedCalendarIds, setSeenCalendarEventIds, setRecurringAcknowledgedMap, setRecurringReviewDays,
   setUncategorizedProjectId,
   setGmailQueue,
+  exportTemplates, setExportTemplates,
+  contactRelationshipTags, setContactRelationshipTags,
+  contactLikesCategories, setContactLikesCategories,
 }) {
   // true once the initial Supabase read (or migration) has completed
   const [supabaseReady, setSupabaseReady] = useState(false);
+  // true once user_settings have been loaded or migrated
+  const [settingsReady, setSettingsReady] = useState(false);
   // 'synced' | 'offline'
   const [syncStatus, setSyncStatus] = useState('synced');
   // tracks previous tasks snapshot for write-sync diffing
@@ -100,6 +108,7 @@ function useSupabaseSync({
         if (error && error.code !== 'PGRST116') {
           console.error('Settings load error:', error);
           settingsReadyRef.current = true;
+          setSettingsReady(true);
           return;
         }
         if (data) {
@@ -115,7 +124,11 @@ function useSupabaseSync({
           if (typeof data.recurring_review_days === 'number') setRecurringReviewDays(data.recurring_review_days);
           if (Array.isArray(data.review_node_types)) setReviewNodeTypes(data.review_node_types);
           if (data.uncategorized_project_id) setUncategorizedProjectId(data.uncategorized_project_id);
+          if (data.export_templates && typeof data.export_templates === 'object') setExportTemplates(data.export_templates);
+          if (Array.isArray(data.contact_relationship_tags)) setContactRelationshipTags(data.contact_relationship_tags);
+          if (Array.isArray(data.contact_likes_categories))  setContactLikesCategories(data.contact_likes_categories);
           settingsReadyRef.current = true;
+          setSettingsReady(true);
         } else {
           // Supabase empty — migrate from localStorage
           const localLocations = (() => { try { return JSON.parse(localStorage.getItem('gtd_locations') || 'null') || ['Home', 'Work', 'Phone', 'Computer']; } catch { return ['Home', 'Work', 'Phone', 'Computer']; } })();
@@ -134,6 +147,7 @@ function useSupabaseSync({
           }).then(({ error: e2 }) => {
             if (e2) console.error('Settings migration failed:', e2);
             settingsReadyRef.current = true;
+            setSettingsReady(true);
           });
         }
       });
@@ -202,6 +216,9 @@ function useSupabaseSync({
           recurring_review_days: recurringReviewDays,
           review_node_types: reviewNodeTypes,
           uncategorized_project_id: uncategorizedProjectId,
+          export_templates: exportTemplates,
+          contact_relationship_tags: contactRelationshipTags,
+          contact_likes_categories: contactLikesCategories,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         .then(({ error }) => {
@@ -210,7 +227,7 @@ function useSupabaseSync({
         });
     }, 1500);
     return () => clearTimeout(settingsDebounceRef.current);
-  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, reviewNodeTypes, uncategorizedProjectId, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [locations, efforts, calibrationOverrides, categories, skippedCalendarIds, seenCalendarEventIds, recurringAcknowledgedMap, recurringReviewDays, reviewNodeTypes, uncategorizedProjectId, exportTemplates, contactRelationshipTags, contactLikesCategories, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fallback: keep localStorage in sync for unauthenticated sessions
   useEffect(() => {
@@ -301,7 +318,7 @@ function useSupabaseSync({
     });
   }, [authUser, supabaseReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { syncStatus, supabaseReady };
+  return { syncStatus, supabaseReady, settingsReady };
 }
 
 export { useSupabaseSync };

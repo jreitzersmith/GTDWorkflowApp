@@ -36,7 +36,8 @@ async function driveListFiles({
   pageSize = 20,
   onTokenRefresh,
 } = {}) {
-  const params = new URLSearchParams({ q, fields, pageSize });
+  const params = new URLSearchParams({ q, fields, pageSize,
+    supportsAllDrives: 'true', includeItemsFromAllDrives: 'true' });
   if (pageToken) params.set('pageToken', pageToken);
   const res = await driveRequest(`${DRIVE_BASE}/files?${params}`, { token }, onTokenRefresh);
   if (!res.ok) throw new Error(`Drive list failed: ${res.status} ${await res.text()}`);
@@ -122,6 +123,25 @@ async function driveDownloadFile({ token, fileId, onTokenRefresh } = {}) {
   return res.text();
 }
 
+// Download a non-Google-native file as base64 — used for PDFs sent to Claude as document blocks.
+async function driveDownloadFileAsBase64({ token, fileId, onTokenRefresh } = {}) {
+  const res = await driveRequest(
+    `${DRIVE_BASE}/files/${fileId}?alt=media`,
+    { token },
+    onTokenRefresh,
+  );
+  if (!res.ok) throw new Error(`Drive download failed: ${res.status}`);
+  const buffer = await res.arrayBuffer();
+  // FileReader-free base64 encoding via Uint8Array
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.byteLength; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
 // Export a Google-native file (Doc, Sheet, Slide) to another MIME type.
 // Useful for feeding document content to the AI coach as plain text.
 // Common mimeType values:
@@ -185,6 +205,6 @@ async function driveDeleteFile({ token, fileId, hardDelete = false, onTokenRefre
 export {
   driveListFiles, driveGetFile,
   driveCreateFile, driveUploadFile,
-  driveDownloadFile, driveExportFile,
+  driveDownloadFile, driveDownloadFileAsBase64, driveExportFile,
   driveRenameFile, driveMoveFile, driveDeleteFile,
 };
