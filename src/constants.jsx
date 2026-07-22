@@ -16,6 +16,9 @@ export const COLORS = {
   done: "#5a5c58",
   calendar: "#4a9eca", calendarBg: "#0e1e2c",
   accent: "#5a8fd4",
+  // Centralized destructive-action red — was previously hardcoded as literal
+  // "#d45a5a" (and alpha variants) in ~25 places across Settings/TaskRow/taskUtils.
+  danger: "#d45a5a",
 };
 
 export const BUCKETS = {
@@ -43,6 +46,77 @@ export const NODE_TYPES = [
   { value: 'subproject',  label: 'SubProject',  color: '#5a8fd4' },
   { value: 'task',        label: 'Task',        color: '#5ab878' },
 ];
+
+// ── User-configurable colors ────────────────────────────────────────────────
+// Defaults for the "Colors & Appearance" settings panel. A user override object
+// (useAppSettings' `colorSettings`, persisted to localStorage) is deep-merged
+// over these at load time; every consumer falls back to these values when no
+// override is set, so nothing changes visually until a user actually edits a
+// color. See useAppSettings.js / SettingsManagerComponents.jsx (ColorSettingsManager).
+export const DEFAULT_COLOR_SETTINGS = {
+  // Category/SubCategory container row backgrounds — applies in every view
+  // (Projects included). Row text color is a separate, unaffected setting below.
+  categoryRowBg: "#363832",
+  subcategoryRowBg: "#242620",
+  // Task status text (row title color when a task is flagged Waiting For / Someday)
+  waitingText: "#c04040",
+  somedayText: "#b8960c",
+  // Metadata badges (Location tags, Due date, Time/Effort, Category, Defer date)
+  tagsLocationColor: COLORS.project,
+  timeColor: COLORS.effort,
+  categoryBadgeColor: "#d4a844",
+  dueDateColor: COLORS.waiting,
+  deferDateColor: COLORS.deferred,
+  // Priority tags (Imperative / As Possible / Financial / External) — either one
+  // uniform color for all, or an individual color per priority label.
+  priorityColorMode: "uniform", // 'uniform' | 'individual'
+  priorityUniformColor: COLORS.inbox,
+  priorityColors: {
+    "Imperative":   COLORS.inbox,
+    "As Possible":  "#5a8fd4",
+    "Financial":    "#5ab878",
+    "External":     "#c87ee0",
+  },
+  // GTD bucket/stage colors — sidebar nav, Move-to menus, bucket headers, etc.
+  bucketColors: {
+    inbox: COLORS.inbox, project: COLORS.project, next: COLORS.next,
+    waiting: COLORS.waiting, someday: COLORS.someday, deferred: COLORS.deferred,
+    done: COLORS.done, inboxHistory: COLORS.muted,
+  },
+  // Sidebar "tool" icon accents (Today's Focus, Contacts, Health)
+  sidebarIconColors: {
+    focus: "#f0c040", contacts: "#4db6ac", health: "#e57373",
+  },
+  // Node type accents (Category / SubCategory / Project / SubProject / Task)
+  nodeTypeColors: {
+    category: "#5a8fd4", subcategory: "#5a8fd4", project: "#5a8fd4",
+    subproject: "#5a8fd4", task: "#5ab878",
+  },
+};
+
+// Returns a copy of BUCKETS with each entry's `.color` overridden by
+// colorSettings.bucketColors, when present. Consumers that currently read
+// BUCKETS[key].color directly should read getEffectiveBuckets(overrides)[key].color
+// instead so bucket-color overrides show up everywhere buckets are displayed.
+export function getEffectiveBuckets(bucketColorOverrides) {
+  if (!bucketColorOverrides) return BUCKETS;
+  const out = {};
+  for (const [key, cfg] of Object.entries(BUCKETS)) {
+    out[key] = bucketColorOverrides[key] ? { ...cfg, color: bucketColorOverrides[key] } : cfg;
+  }
+  return out;
+}
+
+// Resolves the display color for a priority label, honoring the uniform/individual
+// mode toggle. Falls back to defaults at every level so a partially-populated
+// colorSettings object (e.g. before the user has touched this panel) still works.
+export function getPriorityColor(priority, colorSettings) {
+  const mode = colorSettings?.priorityColorMode || DEFAULT_COLOR_SETTINGS.priorityColorMode;
+  if (mode === 'individual') {
+    return colorSettings?.priorityColors?.[priority] || DEFAULT_COLOR_SETTINGS.priorityColors[priority] || DEFAULT_COLOR_SETTINGS.priorityUniformColor;
+  }
+  return colorSettings?.priorityUniformColor || DEFAULT_COLOR_SETTINGS.priorityUniformColor;
+}
 
 export const COACH_MODES = {
   chat:          { label: "Chat",           icon: "💬" },

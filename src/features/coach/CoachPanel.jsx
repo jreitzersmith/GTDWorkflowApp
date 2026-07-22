@@ -15,6 +15,7 @@ import { ExportPopover } from "./ExportPopover.jsx";
 
 function CoachPanel({
   coachHeight,
+  colorSettings,
   coachMode,
   messages,
   loading,
@@ -181,6 +182,7 @@ function CoachPanel({
             categories={categories}
             allTasks={tasks}
             onUpdatePendingAction={onUpdatePendingAction}
+            colorSettings={colorSettings}
           />
         )}
         {coachMode === "projectReview" && reviewMode === null && !loading && (
@@ -292,6 +294,7 @@ function CoachPanel({
 
 CoachPanel.propTypes = {
   coachHeight:            PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
+  colorSettings:          PropTypes.object,
   coachMode:              PropTypes.string.isRequired,
   messages:               PropTypes.array.isRequired,
   loading:                PropTypes.bool.isRequired,

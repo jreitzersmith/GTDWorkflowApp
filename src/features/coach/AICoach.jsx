@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
-import { COLORS } from "../../constants.jsx";
+import { COLORS, getEffectiveBuckets, getPriorityColor } from "../../constants.jsx";
 import { formatBubble, normalizeEffort } from "../tasks/taskUtils.jsx";
 import { PRIORITIES } from "../tasks/TaskRow.jsx";
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
@@ -103,17 +103,18 @@ function TypingIndicator({ coachName }) {
   );
 }
 
-function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, locations, categories, allTasks, onUpdatePendingAction }) {
+function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, locations, categories, allTasks, onUpdatePendingAction, colorSettings }) {
   if (!action) return null;
   const { type, title, nextAction, parentName, dueDate, deferUntil, effort, category, priority = [], location = [], taskId, changes } = action;
 
+  const effectiveBuckets = getEffectiveBuckets(colorSettings?.bucketColors);
   const configs = {
-    next:    { color: COLORS.next,    label: "Next Actions", confirmText: "Create ✓" },
-    project: { color: COLORS.project, label: "Project + Next Action", confirmText: "Create ✓" },
-    someday: { color: COLORS.someday, label: "Someday / Maybe", confirmText: "Move ✓" },
-    waiting: { color: COLORS.waiting, label: "Waiting For", confirmText: "Move ✓" },
+    next:    { color: effectiveBuckets.next.color,    label: "Next Actions", confirmText: "Create ✓" },
+    project: { color: effectiveBuckets.project.color, label: "Project + Next Action", confirmText: "Create ✓" },
+    someday: { color: effectiveBuckets.someday.color, label: "Someday / Maybe", confirmText: "Move ✓" },
+    waiting: { color: effectiveBuckets.waiting.color, label: "Waiting For", confirmText: "Move ✓" },
     delete:  { color: COLORS.muted,   label: "Archive (not actionable)", confirmText: "Archive ✓" },
-    add:     { color: COLORS.project, label: "Add to existing project", confirmText: "Add ✓" },
+    add:     { color: effectiveBuckets.project.color, label: "Add to existing project", confirmText: "Add ✓" },
     update:   { color: COLORS.accent,  label: "Update task",              confirmText: "Apply ✓" },
     gmail_send: { color: '#4285F4',       label: "Send email",               confirmText: "Send ✓" },
   };
@@ -310,7 +311,7 @@ function PendingActionBar({ action, onConfirm, onDismiss, onDelete, efforts, loc
                 <div>
                   <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 5 }}>Priority</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {PRIORITIES.map(p => chip(p, priority.includes(p), COLORS.inbox, () => {
+                    {PRIORITIES.map(p => chip(p, priority.includes(p), getPriorityColor(p, colorSettings), () => {
                       const next = priority.includes(p) ? priority.filter(x => x !== p) : [...priority, p];
                       onUpdatePendingAction("priority", next);
                     }))}

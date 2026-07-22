@@ -2,7 +2,7 @@ import { useContext, useState, useRef, useEffect } from "react";
 import { useTaskRowState } from "./useTaskRowState.js";
 import { useViewport } from "../../hooks/useViewport.js";
 import PropTypes from "prop-types";
-import { COLORS, BUCKETS } from "../../constants.jsx";
+import { COLORS, BUCKETS, DEFAULT_COLOR_SETTINGS, getEffectiveBuckets, getPriorityColor } from "../../constants.jsx";
 import { TaskActionsContext, TaskRowContext, taskShape } from "../../contexts.js";
 import {
   countDescendants, effortAccuracyColor, effortToMinutes, isDeferred,
@@ -35,7 +35,14 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
     };
   }, [actionsMenuOpen]);
   const { onComplete, onDelete, onMove, onAskAI, onUpdateTask, onAssignToProject, onSkipRecurrence, onNavigate, onOpenDetail, onToggleCollapse } = useContext(TaskActionsContext);
-  const { currentBucket, allTasks, moveMenu, setMoveMenu, pendingAction, collapsedNodes, selectedTaskId, focusedTaskId, setFocusedTaskId, locations, efforts, tagDisplay, categories } = useContext(TaskRowContext);
+  const { currentBucket, allTasks, moveMenu, setMoveMenu, pendingAction, collapsedNodes, selectedTaskId, focusedTaskId, setFocusedTaskId, locations, efforts, tagDisplay, categories, badgeVisibility, colorSettings } = useContext(TaskRowContext);
+  // Per-type row badge visibility (Tags/Time/Category/Due date) — global toggle set from the
+  // bucket toolbar's Fields control. Defaults to visible if the setting hasn't loaded yet.
+  const showTagsBadge = badgeVisibility?.tags !== false;
+  const showTimeBadge = badgeVisibility?.time !== false;
+  const showCategoryBadge = badgeVisibility?.category !== false;
+  const showDueDateBadge = badgeVisibility?.dueDate !== false;
+  const showDeferDateBadge = badgeVisibility?.deferDate !== false;
   const {
     hover, setHover,
     expanded, setExpanded,
@@ -70,6 +77,12 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
   };
 
   const isContainer = task.nodeType === 'category' || task.nodeType === 'subcategory';
+  // Grey background tint for Category/SubCategory container rows — applies in every view
+  // (Projects included), user-configurable via Settings > Colors & Appearance. Row text
+  // color is a separate, unaffected setting (see the title color line below).
+  const containerRowBg = task.nodeType === 'category'
+    ? (colorSettings?.categoryRowBg || DEFAULT_COLOR_SETTINGS.categoryRowBg)
+    : (colorSettings?.subcategoryRowBg || DEFAULT_COLOR_SETTINGS.subcategoryRowBg);
 
   // Mobile: the status dot is removed to save row width — completing a task is done via
   // press-and-hold on the title/tags area instead. Cancelled if the finger moves (scroll)
@@ -184,7 +197,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
     setAssignTarget("__new__");
   };
 
-  const hasMetadata = taskPriority.length > 0 || taskLocation.length > 0 || taskDueDate || !!taskEffort || !!task.deferUntil || !!task.category;
+  const hasMetadata = (showTagsBadge && (taskPriority.length > 0 || taskLocation.length > 0)) || (showDueDateBadge && !!taskDueDate) || (showTimeBadge && !!taskEffort) || (showDeferDateBadge && !!task.deferUntil) || (showCategoryBadge && !!task.category);
 
   const isFocused = focusedTaskId === task.id;
 
@@ -197,7 +210,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
       style={{ borderLeft: `3px solid ${isFocused ? COLORS.next : highlight ? COLORS.inbox : isSubtask ? COLORS.project + "55" : "transparent"}`, opacity: task.done ? 0.4 : (deferred && currentBucket === "project") ? 0.55 : 1, transition: "all 0.12s", outline: isFocused ? `1px solid ${COLORS.next}22` : "none" }}
     >
       {/* Main task row */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: isFocused ? COLORS.next + "11" : highlight ? COLORS.inboxBg : (selectedTaskId === task.id ? COLORS.surface3 : hover ? COLORS.surface2 : "transparent") }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: `8px 18px 8px ${18 + indent}px`, background: isFocused ? COLORS.next + "11" : highlight ? COLORS.inboxBg : (selectedTaskId === task.id ? COLORS.surface3 : hover ? COLORS.surface2 : isContainer ? containerRowBg : "transparent") }}>
         {/* Bulk-selection checkbox — shown in Inbox when a selection handler is provided */}
         {onSelect && (
           <StyledCheckbox
@@ -268,7 +281,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
           }}
         >
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, color: task.isWaitingFor ? "#c04040" : task.isSomeday ? "#b8960c" : COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 13.5, color: task.isWaitingFor ? (colorSettings?.waitingText || DEFAULT_COLOR_SETTINGS.waitingText) : task.isSomeday ? (colorSettings?.somedayText || DEFAULT_COLOR_SETTINGS.somedayText) : COLORS.text, textDecoration: task.done ? "line-through" : "none", lineHeight: 1.4, display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
             <span
               onClick={(e) => { e.stopPropagation(); onOpenDetail?.(selectedTaskId === task.id ? null : task.id); }}
               title="Open detail panel"
@@ -286,10 +299,10 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
               </span>
             )}
             {projectEffortTotal && (
-              <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, flexShrink: 0 }}>⏱ {projectEffortTotal}</span>
+              <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.effortBg, color: (colorSettings?.timeColor || DEFAULT_COLOR_SETTINGS.timeColor), border: `1px solid ${(colorSettings?.timeColor || DEFAULT_COLOR_SETTINGS.timeColor)}44`, flexShrink: 0 }}>⏱ {projectEffortTotal}</span>
             )}
             {deferred && currentBucket === "project" && (
-              <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44`, flexShrink: 0 }}>⏰ {task.deferUntil}</span>
+              <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.deferredBg, color: (colorSettings?.deferDateColor || DEFAULT_COLOR_SETTINGS.deferDateColor), border: `1px solid ${(colorSettings?.deferDateColor || DEFAULT_COLOR_SETTINGS.deferDateColor)}44`, flexShrink: 0 }}>⏰ {task.deferUntil}</span>
             )}
             {taskAgeDays !== null && (
               <span title={`In this bucket for ~${taskAgeDays} days`} style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: COLORS.surface3, color: ageColor, border: `1px solid ${ageColor}44`, flexShrink: 0 }}>
@@ -305,25 +318,25 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
           {/* Metadata summary chips — below-text mode */}
           {tagDisplay !== "inline" && !expanded && hasMetadata && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
-              {taskLocation.map(loc => (
-                <span key={loc} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.project, border: `1px solid ${COLORS.project}44` }}>{loc}</span>
+              {showTagsBadge && taskLocation.map(loc => (
+                <span key={loc} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: (colorSettings?.tagsLocationColor || DEFAULT_COLOR_SETTINGS.tagsLocationColor), border: `1px solid ${(colorSettings?.tagsLocationColor || DEFAULT_COLOR_SETTINGS.tagsLocationColor)}44` }}>{loc}</span>
               ))}
-              {taskDueDate && (
-                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.waiting, border: `1px solid ${COLORS.waiting}44` }}>📅 {taskDueDate}</span>
+              {showDueDateBadge && taskDueDate && (
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: (colorSettings?.dueDateColor || DEFAULT_COLOR_SETTINGS.dueDateColor), border: `1px solid ${(colorSettings?.dueDateColor || DEFAULT_COLOR_SETTINGS.dueDateColor)}44` }}>📅 {taskDueDate}</span>
               )}
-              {taskPriority.map(p => (
-                <span key={p} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.inbox, border: `1px solid ${COLORS.inbox}44` }}>{p}</span>
+              {showTagsBadge && taskPriority.map(p => (
+                <span key={p} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: getPriorityColor(p, colorSettings), border: `1px solid ${getPriorityColor(p, colorSettings)}44` }}>{p}</span>
               ))}
-              {taskEffort && task.actualEffort ? (
+              {showTimeBadge && taskEffort && task.actualEffort ? (
                 <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: effortAccuracyColor(effortToMinutes(taskEffort), effortToMinutes(task.actualEffort)), border: `1px solid ${effortAccuracyColor(effortToMinutes(taskEffort), effortToMinutes(task.actualEffort))}44` }}>⏱ {taskEffort} → {task.actualEffort}</span>
-              ) : taskEffort ? (
-                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44` }}>⏱ {taskEffort}</span>
+              ) : showTimeBadge && taskEffort ? (
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: (colorSettings?.timeColor || DEFAULT_COLOR_SETTINGS.timeColor), border: `1px solid ${(colorSettings?.timeColor || DEFAULT_COLOR_SETTINGS.timeColor)}44` }}>⏱ {taskEffort}</span>
               ) : null}
-              {task.deferUntil && (
-                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44` }}>⏰ {task.deferUntil}</span>
+              {showDeferDateBadge && task.deferUntil && (
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.deferredBg, color: (colorSettings?.deferDateColor || DEFAULT_COLOR_SETTINGS.deferDateColor), border: `1px solid ${(colorSettings?.deferDateColor || DEFAULT_COLOR_SETTINGS.deferDateColor)}44` }}>⏰ {task.deferUntil}</span>
               )}
-              {task.category && (
-                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: "#d4a84422", color: "#d4a844", border: "1px solid #d4a84444" }}>◆ {task.category}</span>
+              {showCategoryBadge && task.category && (
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: (colorSettings?.categoryBadgeColor || DEFAULT_COLOR_SETTINGS.categoryBadgeColor) + "22", color: (colorSettings?.categoryBadgeColor || DEFAULT_COLOR_SETTINGS.categoryBadgeColor), border: `1px solid ${(colorSettings?.categoryBadgeColor || DEFAULT_COLOR_SETTINGS.categoryBadgeColor)}44` }}>◆ {task.category}</span>
               )}
             </div>
           )}
@@ -343,25 +356,25 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
         {/* Metadata chips — inline mode: own grid column, wraps independently, never overlaps title */}
         {tagDisplay === "inline" && !expanded && hasMetadata && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "flex-end", justifySelf: "end", alignSelf: "start" }}>
-            {taskLocation.map(loc => (
-              <span key={loc} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.project, border: `1px solid ${COLORS.project}44`, whiteSpace: "nowrap" }}>{loc}</span>
+            {showTagsBadge && taskLocation.map(loc => (
+              <span key={loc} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: (colorSettings?.tagsLocationColor || DEFAULT_COLOR_SETTINGS.tagsLocationColor), border: `1px solid ${(colorSettings?.tagsLocationColor || DEFAULT_COLOR_SETTINGS.tagsLocationColor)}44`, whiteSpace: "nowrap" }}>{loc}</span>
             ))}
-            {taskDueDate && (
-              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.waiting, border: `1px solid ${COLORS.waiting}44`, whiteSpace: "nowrap" }}>📅 {taskDueDate}</span>
+            {showDueDateBadge && taskDueDate && (
+              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: (colorSettings?.dueDateColor || DEFAULT_COLOR_SETTINGS.dueDateColor), border: `1px solid ${(colorSettings?.dueDateColor || DEFAULT_COLOR_SETTINGS.dueDateColor)}44`, whiteSpace: "nowrap" }}>📅 {taskDueDate}</span>
             )}
-            {taskPriority.map(p => (
-              <span key={p} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: COLORS.inbox, border: `1px solid ${COLORS.inbox}44`, whiteSpace: "nowrap" }}>{p}</span>
+            {showTagsBadge && taskPriority.map(p => (
+              <span key={p} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.surface3, color: getPriorityColor(p, colorSettings), border: `1px solid ${getPriorityColor(p, colorSettings)}44`, whiteSpace: "nowrap" }}>{p}</span>
             ))}
-            {taskEffort && task.actualEffort ? (
+            {showTimeBadge && taskEffort && task.actualEffort ? (
               <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: effortAccuracyColor(effortToMinutes(taskEffort), effortToMinutes(task.actualEffort)), border: `1px solid ${effortAccuracyColor(effortToMinutes(taskEffort), effortToMinutes(task.actualEffort))}44`, whiteSpace: "nowrap" }}>⏱ {taskEffort} → {task.actualEffort}</span>
-            ) : taskEffort ? (
-              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: COLORS.effort, border: `1px solid ${COLORS.effort}44`, whiteSpace: "nowrap" }}>⏱ {taskEffort}</span>
+            ) : showTimeBadge && taskEffort ? (
+              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.effortBg, color: (colorSettings?.timeColor || DEFAULT_COLOR_SETTINGS.timeColor), border: `1px solid ${(colorSettings?.timeColor || DEFAULT_COLOR_SETTINGS.timeColor)}44`, whiteSpace: "nowrap" }}>⏱ {taskEffort}</span>
             ) : null}
-            {task.deferUntil && (
-              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.deferredBg, color: COLORS.deferred, border: `1px solid ${COLORS.deferred}44`, whiteSpace: "nowrap" }}>⏰ {task.deferUntil}</span>
+            {showDeferDateBadge && task.deferUntil && (
+              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: COLORS.deferredBg, color: (colorSettings?.deferDateColor || DEFAULT_COLOR_SETTINGS.deferDateColor), border: `1px solid ${(colorSettings?.deferDateColor || DEFAULT_COLOR_SETTINGS.deferDateColor)}44`, whiteSpace: "nowrap" }}>⏰ {task.deferUntil}</span>
             )}
-            {task.category && (
-              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: "#d4a84422", color: "#d4a844", border: "1px solid #d4a84444", whiteSpace: "nowrap" }}>◆ {task.category}</span>
+            {showCategoryBadge && task.category && (
+              <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: (colorSettings?.categoryBadgeColor || DEFAULT_COLOR_SETTINGS.categoryBadgeColor) + "22", color: (colorSettings?.categoryBadgeColor || DEFAULT_COLOR_SETTINGS.categoryBadgeColor), border: `1px solid ${(colorSettings?.categoryBadgeColor || DEFAULT_COLOR_SETTINGS.categoryBadgeColor)}44`, whiteSpace: "nowrap" }}>◆ {task.category}</span>
             )}
           </div>
         )}
@@ -405,7 +418,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
                   >↪ Move to…</button>
                   {moveMenu === task.id && (
                     <div style={{ position: "absolute", left: isPhone ? 0 : "auto", right: isPhone ? "auto" : "100%", top: isPhone ? "100%" : 0, marginTop: isPhone ? 4 : 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 8, padding: 4, zIndex: 101, minWidth: 150, maxWidth: isPhone ? "calc(100vw - 64px)" : "none", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
-                      {Object.entries(BUCKETS).filter(([k]) => k !== currentBucket && k !== "done" && k !== "inboxHistory").map(([k, cfg]) => (
+                      {Object.entries(getEffectiveBuckets(colorSettings?.bucketColors)).filter(([k]) => k !== currentBucket && k !== "done" && k !== "inboxHistory").map(([k, cfg]) => (
                         <div
                           key={k}
                           onClick={() => { onMove(task.id, k); setMoveMenu(null); setActionsMenuOpen(false); }}
@@ -419,7 +432,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
                 </div>
                 <button
                   onClick={() => { onDelete(task.id); setActionsMenuOpen(false); }}
-                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "9px 10px", background: "none", border: "none", color: "#d45a5a", fontFamily: "inherit", fontSize: 13, cursor: "pointer", borderRadius: 5 }}
+                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "9px 10px", background: "none", border: "none", color: COLORS.danger, fontFamily: "inherit", fontSize: 13, cursor: "pointer", borderRadius: 5 }}
                 >✕ Delete</button>
               </div>
             )}
@@ -451,7 +464,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
                   <ActionBtn onClick={() => setMoveMenu(moveMenu === task.id ? null : task.id)}>Move ▾</ActionBtn>
                   {moveMenu === task.id && (
                     <div style={{ position: "absolute", right: 0, top: "100%", background: COLORS.surface3, border: `1px solid ${COLORS.border2}`, borderRadius: 8, padding: 4, zIndex: 100, minWidth: 150, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
-                      {Object.entries(BUCKETS).filter(([k]) => k !== currentBucket && k !== "done" && k !== "inboxHistory").map(([k, cfg]) => (
+                      {Object.entries(getEffectiveBuckets(colorSettings?.bucketColors)).filter(([k]) => k !== currentBucket && k !== "done" && k !== "inboxHistory").map(([k, cfg]) => (
                         <div
                           key={k}
                           onClick={() => onMove(task.id, k)}
@@ -465,7 +478,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
                     </div>
                   )}
                 </div>
-                <ActionBtn onClick={() => onDelete(task.id)} color="#d45a5a">✕</ActionBtn>
+                <ActionBtn onClick={() => onDelete(task.id)} color={COLORS.danger}>✕</ActionBtn>
               </>
             )}
           </div>
@@ -608,7 +621,7 @@ function TaskRow({ task, isSubtask, indentOverride, depth = 0, onSelect, isSelec
                   <button
                     key={p}
                     onClick={() => togglePriority(p)}
-                    style={{ padding: "3px 9px", borderRadius: 10, border: `1px solid ${active ? COLORS.inbox : COLORS.border}`, background: active ? COLORS.inbox + "22" : "transparent", color: active ? COLORS.inbox : COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "all 0.1s" }}
+                    style={{ padding: "3px 9px", borderRadius: 10, border: `1px solid ${active ? getPriorityColor(p, colorSettings) : COLORS.border}`, background: active ? getPriorityColor(p, colorSettings) + "22" : "transparent", color: active ? getPriorityColor(p, colorSettings) : COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer", transition: "all 0.1s" }}
                   >
                     {p}
                   </button>

@@ -4,7 +4,7 @@ import ExportTemplateEditor from "./ExportTemplateEditor.jsx";
 import { COLORS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { SettingsSection } from "./SettingsSection.jsx";
-import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager, ContactTagManager, ContactCategoryManager, ContactEmailLinkingModeSetting } from "./SettingsManagerComponents.jsx";
+import { TagDisplaySetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager, ContactTagManager, ContactCategoryManager, ContactEmailLinkingModeSetting, ColorSettingsManager } from "./SettingsManagerComponents.jsx";
 import { DriveFolderPicker } from "./DriveFolderPicker.jsx";
 
 // ── Google Services section config ────────────────────────────────────────────
@@ -82,6 +82,7 @@ function SettingsPanel({
   efforts, onAddEffort, onRenameEffort, onRemoveEffort,
   calibrationOverrides, onSetCalibrationOverride, onClearCalibrationOverride,
   tagDisplay, onSetTagDisplay,
+  colorSettings, onSetColorSettings,
   focusExpandedDefaults, onSetFocusExpandedDefaults,
   shortcutModifier, onSetShortcutModifier,
   nextActionsViewMode, onSetNextActionsViewMode,
@@ -510,6 +511,9 @@ function SettingsPanel({
 
         <SettingsSection label="Tag Display" storageKey="gtd_settings_tag_display">
           <TagDisplaySetting value={tagDisplay} onChange={onSetTagDisplay} />
+        </SettingsSection>
+        <SettingsSection label="Colors & Appearance" storageKey="gtd_settings_colors">
+          <ColorSettingsManager colors={colorSettings} onChange={onSetColorSettings} />
         </SettingsSection>
         <SettingsSection label="Categories" storageKey="gtd_settings_categories">
           <CategoryManager categories={categories} tasks={tasks} onAdd={onAddCategory} onRename={onRenameCategory} onRemove={onRemoveCategory} />

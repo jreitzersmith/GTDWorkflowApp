@@ -1,6 +1,6 @@
 import PropTypes from "prop-types";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { COLORS, BUCKETS } from "../constants.jsx";
+import { COLORS, BUCKETS, getEffectiveBuckets } from "../constants.jsx";
 
 // Buckets included in global search (exclude archive-like and done)
 const SEARCH_BUCKETS = ["inbox", "next", "project", "waiting", "someday", "deferred"];
@@ -114,7 +114,7 @@ function ShortcutMap({ shortcutModifier }) {
   );
 }
 
-function SearchModal({ tasks, onSelect, onClose, shortcutModifier = 'ctrl+alt' }) {
+function SearchModal({ tasks, onSelect, onClose, shortcutModifier = 'ctrl+alt', colorSettings }) {
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef(null);
@@ -215,7 +215,7 @@ function SearchModal({ tasks, onSelect, onClose, shortcutModifier = 'ctrl+alt' }
             </div>
           ) : (
             results.map((task, idx) => {
-              const bucket = BUCKETS[task.bucket];
+              const bucket = getEffectiveBuckets(colorSettings?.bucketColors)[task.bucket];
               const isActive = idx === activeIdx;
               return (
                 <div
@@ -272,6 +272,7 @@ SearchModal.propTypes = {
   tasks:    PropTypes.array.isRequired,
   onSelect: PropTypes.func.isRequired,
   onClose:  PropTypes.func.isRequired,
+  colorSettings: PropTypes.object,
 };
 
 export { SearchModal };

@@ -439,7 +439,7 @@ function effortAccuracyColor(estimatedMin, actualMin) {
   const delta = (actualMin - estimatedMin) / estimatedMin;
   if (delta <= 0)    return "#5ab878"; // under or on time
   if (delta <= 0.25) return "#d4a95a"; // within 25% over
-  return "#d45a5a";                    // significantly over
+  return COLORS.danger;                // significantly over
 }
 
 // Converts a minutes total back to a compact human label (e.g. 150 → "2.5h").

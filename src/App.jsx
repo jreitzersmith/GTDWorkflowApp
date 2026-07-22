@@ -70,7 +70,7 @@ export default function GTDManager() {
   const [tasks, setTasks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_tasks") || "[]"); } catch { return []; }
   });
-  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, categories, setCategories, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId, contactRelationshipTags, setContactRelationshipTags, contactLikesCategories, setContactLikesCategories, contactEmailLinkingMode, setContactEmailLinkingMode, taskCompletionToContactNotes, setTaskCompletionToContactNotes, healthDocSummarizeMode, setHealthDocSummarizeMode} = useAppSettings();
+  const { locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides, tagDisplay, setTagDisplay, badgeVisibility, setBadgeVisibility, categories, setCategories, colorSettings, setColorSettings, calendarReminderMinutes, setCalendarReminderMinutes, nextActionsViewMode, setNextActionsViewMode, reviewNodeTypes, setReviewNodeTypes, focusExpandedDefaults, setFocusExpandedDefaults, shortcutModifier, setShortcutModifier, driveBaseFolderId, setDriveBaseFolderId, driveConversationExportFolderId, setDriveConversationExportFolderId, driveSlideDeckFolderId, setDriveSlideDeckFolderId, driveSpreadsheetFolderId, setDriveSpreadsheetFolderId, driveDocumentFolderId, setDriveDocumentFolderId, driveBaseFolderPath, setDriveBaseFolderPath, driveConversationExportFolderPath, setDriveConversationExportFolderPath, driveSlideDeckFolderPath, setDriveSlideDeckFolderPath, driveSpreadsheetFolderPath, setDriveSpreadsheetFolderPath, driveDocumentFolderPath, setDriveDocumentFolderPath, driveBackupFolderId, setDriveBackupFolderId, driveBackupFolderPath, setDriveBackupFolderPath, exportSettings, setExportSettings, userCity, setUserCity, userHomeAddress, setUserHomeAddress, userWorkAddress, setUserWorkAddress, coachName, setCoachName, userName, setUserName, exportTemplates, setExportTemplates, receiptSheetId, setReceiptSheetId, contactRelationshipTags, setContactRelationshipTags, contactLikesCategories, setContactLikesCategories, contactEmailLinkingMode, setContactEmailLinkingMode, taskCompletionToContactNotes, setTaskCompletionToContactNotes, healthDocSummarizeMode, setHealthDocSummarizeMode} = useAppSettings();
   const { messages, setMessages, chatHistory, setChatHistory, coachMode, setCoachMode, chatInput, setChatInput, loading, setLoading, moveMenu, setMoveMenu, pendingAction, setPendingAction, chatEndRef, chatInputRef, provider, setProvider, localModel, setLocalModel, availableModels, setAvailableModels } = useAICoachState(coachName);
   const { aiUsageStats, setAiUsageStats, sessionUsage, recordUsage } = useAIUsageTracking();
   const { currentView, setCurrentView, emailTab, setEmailTab, gmailQueue, setGmailQueue, gmailUnreadCount, setGmailUnreadCount } = useGmailState();
@@ -1468,7 +1468,9 @@ export default function GTDManager() {
     locations,
     efforts,
     tagDisplay,
+    badgeVisibility,
     categories,
+    colorSettings,
     projectCategoryFilter,
     setProjectCategoryFilter,
     showCompletedInProjects,
@@ -1501,6 +1503,7 @@ export default function GTDManager() {
         )}
         <AppSidebar
           sidebarWidth={sidebarWidth}
+          colorSettings={colorSettings}
           supabaseReady={supabaseReady}
           syncStatus={syncStatus}
           counts={counts}
@@ -1534,7 +1537,7 @@ export default function GTDManager() {
             tasks={tasks}
             onSelect={handleSearchSelect}
             onClose={() => setSearchOpen(false)}
-          
+            colorSettings={colorSettings}
             shortcutModifier={shortcutModifier}
           />
         )}
@@ -1569,6 +1572,8 @@ export default function GTDManager() {
                           onClearCalibrationOverride={clearCalibrationOverride}
                           tagDisplay={tagDisplay}
                           onSetTagDisplay={setTagDisplay}
+                          colorSettings={colorSettings}
+                          onSetColorSettings={setColorSettings}
                           focusExpandedDefaults={focusExpandedDefaults}
                           onSetFocusExpandedDefaults={setFocusExpandedDefaults}
                           shortcutModifier={shortcutModifier}
@@ -1803,6 +1808,7 @@ export default function GTDManager() {
                       ) : currentView === "analytics" ? (
                         <AnalyticsArea
                           tasks={tasks}
+                          colorSettings={colorSettings}
                           contacts={contacts}
                           onNavigateToContact={(id) => { setCurrentView('contacts'); setSelectedContactId(id); }}
                           supabaseReady={supabaseReady}
@@ -1838,6 +1844,8 @@ export default function GTDManager() {
                           onBulkAssign={bulkAssignToProject}
                           categories={categories}
                           locations={locations}
+                          badgeVisibility={badgeVisibility}
+                          setBadgeVisibility={setBadgeVisibility}
                           projectCategoryFilter={projectCategoryFilter}
                           setProjectCategoryFilter={setProjectCategoryFilter}
                           showCompletedInProjects={showCompletedInProjects}
@@ -1864,6 +1872,7 @@ export default function GTDManager() {
             <ErrorBoundary label="AI Coach">
               <CoachPanel
                 coachHeight={effectiveCoachHeight}
+                colorSettings={colorSettings}
                 coachMode={coachMode}
                 messages={messages}
                 loading={loading}
@@ -1962,6 +1971,7 @@ export default function GTDManager() {
                   <TaskDetailPanel
                     task={selTask}
                     allTasks={tasks}
+                    colorSettings={colorSettings}
                     currentBucket={currentBucket}
                     locations={locations}
                     efforts={efforts}

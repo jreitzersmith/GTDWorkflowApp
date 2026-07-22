@@ -1,9 +1,10 @@
 import PropTypes from "prop-types";
-import { COLORS, BUCKETS } from "../constants.jsx";
+import { COLORS, BUCKETS, DEFAULT_COLOR_SETTINGS, getEffectiveBuckets } from "../constants.jsx";
 import { BucketItem, SidebarBtn } from "./SidebarComponents.jsx";
 
 function AppSidebar({
   sidebarWidth,
+  colorSettings,
   supabaseReady,
   syncStatus,
   counts,
@@ -32,6 +33,9 @@ function AppSidebar({
   mobileNavOpen,
   onCloseMobileNav,
 }) {
+  const focusColor    = colorSettings?.sidebarIconColors?.focus    || DEFAULT_COLOR_SETTINGS.sidebarIconColors.focus;
+  const contactsColor = colorSettings?.sidebarIconColors?.contacts || DEFAULT_COLOR_SETTINGS.sidebarIconColors.contacts;
+  const healthColor   = colorSettings?.sidebarIconColors?.health   || DEFAULT_COLOR_SETTINGS.sidebarIconColors.health;
   const mobileStyle = isMobile ? {
     position: "fixed", top: 0, left: 0, bottom: 0, width: 280, zIndex: 1000,
     transform: mobileNavOpen ? "translateX(0)" : "translateX(-100%)",
@@ -64,7 +68,7 @@ function AppSidebar({
       </div>
 
       <div style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
-        {Object.entries(BUCKETS).map(([key, cfg]) => (
+        {Object.entries(getEffectiveBuckets(colorSettings?.bucketColors)).map(([key, cfg]) => (
           <BucketItem
             key={key}
             bkey={key}
@@ -81,17 +85,17 @@ function AppSidebar({
         <div
           onClick={onSelectFocus}
           accessKey="f"
-          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "focus" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "focus" ? "#f0c040" : "transparent"}`, transition: "background 0.1s" }}
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "focus" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "focus" ? focusColor : "transparent"}`, transition: "background 0.1s" }}
           onMouseEnter={e => { if (currentView !== "focus") { e.currentTarget.style.background = COLORS.surface2; } }}
           onMouseLeave={e => { if (currentView !== "focus") { e.currentTarget.style.background = "transparent"; } }}
         >
-          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#f0c040", flexShrink: 0 }} />
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: focusColor, flexShrink: 0 }} />
           <span style={{ flex: 1, fontSize: 13, color: currentView === "focus" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
             <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>📋</span>
             Today's Focus
           </span>
           {focusCount > 0 && (
-            <span style={{ fontSize: 11, background: "#f0c04022", color: "#f0c040", padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{focusCount}</span>
+            <span style={{ fontSize: 11, background: focusColor + "22", color: focusColor, padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{focusCount}</span>
           )}
         </div>
 
@@ -125,25 +129,25 @@ function AppSidebar({
 
         <div
           onClick={onSelectContacts}
-          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "contacts" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "contacts" ? "#4db6ac" : "transparent"}`, transition: "background 0.1s" }}
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "contacts" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "contacts" ? contactsColor : "transparent"}`, transition: "background 0.1s" }}
           onMouseEnter={e => { if (currentView !== "contacts") { e.currentTarget.style.background = COLORS.surface2; } }}
           onMouseLeave={e => { if (currentView !== "contacts") { e.currentTarget.style.background = "transparent"; } }}
         >
-          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#4db6ac", flexShrink: 0 }} />
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: contactsColor, flexShrink: 0 }} />
           <span style={{ flex: 1, fontSize: 13, color: currentView === "contacts" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
             <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>👤</span>
             Contacts
           </span>
-          {contactsEnabled && <span style={{ fontSize: 9, background: "#4db6ac33", color: "#4db6ac", padding: "1px 5px", borderRadius: 8, fontWeight: 500 }}>✓</span>}
+          {contactsEnabled && <span style={{ fontSize: 9, background: contactsColor + "33", color: contactsColor, padding: "1px 5px", borderRadius: 8, fontWeight: 500 }}>✓</span>}
         </div>
 
         <div
           onClick={onSelectHealth}
-          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "health" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "health" ? "#e57373" : "transparent"}`, transition: "background 0.1s" }}
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px", cursor: "pointer", background: currentView === "health" ? COLORS.surface2 : "transparent", borderLeft: `3px solid ${currentView === "health" ? healthColor : "transparent"}`, transition: "background 0.1s" }}
           onMouseEnter={e => { if (currentView !== "health") { e.currentTarget.style.background = COLORS.surface2; } }}
           onMouseLeave={e => { if (currentView !== "health") { e.currentTarget.style.background = "transparent"; } }}
         >
-          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#e57373", flexShrink: 0 }} />
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
           <span style={{ flex: 1, fontSize: 13, color: currentView === "health" ? COLORS.text : COLORS.text2, display: "flex", alignItems: "center" }}>
             <span style={{ display: "inline-block", width: "1.4em", textAlign: "center", flexShrink: 0 }}>💊</span>
             Health
@@ -209,6 +213,7 @@ function AppSidebar({
 
 AppSidebar.propTypes = {
   sidebarWidth:    PropTypes.number.isRequired,
+  colorSettings:   PropTypes.object,
   supabaseReady:   PropTypes.bool.isRequired,
   syncStatus:      PropTypes.string.isRequired,
   counts:          PropTypes.object.isRequired,

@@ -14,7 +14,7 @@ const TABS = [
   { id: 'habits',   label: 'Habits' },
 ];
 
-function AnalyticsArea({ tasks, contacts, onNavigateToContact, supabaseReady }) {
+function AnalyticsArea({ tasks, colorSettings, contacts, onNavigateToContact, supabaseReady }) {
   const [tab, setTab] = useState('tasks');
 
   return (
@@ -46,7 +46,7 @@ function AnalyticsArea({ tasks, contacts, onNavigateToContact, supabaseReady }) 
       </div>
 
       {/* Content */}
-      {tab === 'tasks'    && <TaskAnalyticsView tasks={tasks} />}
+      {tab === 'tasks'    && <TaskAnalyticsView tasks={tasks} colorSettings={colorSettings} />}
       {tab === 'contacts' && <ContactAnalyticsView contacts={contacts || []} onNavigateToContact={onNavigateToContact} />}
       {tab === 'habits'   && <HabitsAnalyticsView supabaseReady={supabaseReady} tasks={tasks} />}
     </div>
@@ -55,6 +55,7 @@ function AnalyticsArea({ tasks, contacts, onNavigateToContact, supabaseReady }) 
 
 AnalyticsArea.propTypes = {
   tasks:               PropTypes.array.isRequired,
+  colorSettings:       PropTypes.object,
   contacts:            PropTypes.array,
   onNavigateToContact: PropTypes.func,
   supabaseReady:       PropTypes.bool,

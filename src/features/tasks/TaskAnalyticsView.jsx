@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { useState } from 'react';
-import { COLORS, BUCKETS } from '../../constants.jsx';
+import { COLORS, BUCKETS, getEffectiveBuckets } from '../../constants.jsx';
 import { effortToMinutes, isDeferred } from './taskUtils.jsx';
 import {
   buildBucketStats, buildWeeklyCompletions, buildEffortAccuracy,
@@ -40,12 +40,12 @@ SectionCard.propTypes = {
 // Active buckets displayed in the bucket chart (excludes archive buckets)
 const ACTIVE_BUCKET_KEYS = ['inbox', 'project', 'next', 'waiting', 'someday', 'deferred'];
 
-function BucketChart({ counts }) {
+function BucketChart({ counts, colorSettings }) {
   const max = Math.max(1, ...ACTIVE_BUCKET_KEYS.map(k => counts[k] || 0));
   return (
     <div>
       {ACTIVE_BUCKET_KEYS.map(key => {
-        const cfg = BUCKETS[key];
+        const cfg = getEffectiveBuckets(colorSettings?.bucketColors)[key];
         const count = counts[key] || 0;
         const pct = Math.round((count / max) * 100);
         return (
@@ -66,7 +66,7 @@ function BucketChart({ counts }) {
   );
 }
 
-BucketChart.propTypes = { counts: PropTypes.object.isRequired };
+BucketChart.propTypes = { counts: PropTypes.object.isRequired, colorSettings: PropTypes.object };
 
 function CompletionChart({ labels, counts }) {
   const max = Math.max(1, ...counts);
@@ -544,7 +544,7 @@ TopDeferrersList.propTypes = {
 
 // --- Main export ---
 
-function TaskAnalyticsView({ tasks }) {
+function TaskAnalyticsView({ tasks, colorSettings }) {
   const [decayThreshold, setDecayThreshold] = useState(90);
   const [configOpen, setConfigOpen] = useState(false);
   const [layout, setLayout] = useState(() => {
@@ -577,7 +577,7 @@ function TaskAnalyticsView({ tasks }) {
   }
 
   const sectionContents = {
-    buckets:           { title: 'Active tasks by bucket',          node: <BucketChart counts={bucketCounts} /> },
+    buckets:           { title: 'Active tasks by bucket',          node: <BucketChart counts={bucketCounts} colorSettings={colorSettings} /> },
     completions:       { title: 'Completions — last 12 weeks',     node: <CompletionChart labels={labels} counts={counts} /> },
     throughput:        { title: 'Throughput — 8-week trend',       node: <ThroughputChart {...throughput} /> },
     project_health:    { title: 'Project health',                  node: <ProjectHealthSection {...projectHealth} /> },
@@ -624,6 +624,7 @@ function TaskAnalyticsView({ tasks }) {
 
 TaskAnalyticsView.propTypes = {
   tasks: PropTypes.array.isRequired,
+  colorSettings: PropTypes.object,
 };
 
 export { TaskAnalyticsView };

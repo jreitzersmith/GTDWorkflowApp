@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { DEFAULT_EXPORT_TEMPLATES } from "../../constants.jsx";
+import { DEFAULT_EXPORT_TEMPLATES, DEFAULT_COLOR_SETTINGS } from "../../constants.jsx";
 
 const DEFAULT_EFFORTS = ["2 min", "5 min", "10 min", "30 min", "1 hour", "2 hours", "6 hours", "1 day", "3 days", "1 week", "1 month"];
 
@@ -19,8 +19,30 @@ function useAppSettings() {
     try { return JSON.parse(localStorage.getItem("gtd_effort_calibration") || "null") || {}; } catch { return {}; }
   });
   const [tagDisplay, setTagDisplay] = useState(() => localStorage.getItem("gtd_tag_display") || "below");
+  // Which row metadata badges are shown across all bucket views. Independent of tagDisplay
+  // (which controls layout — inline/below/hidden); this controls per-type visibility.
+  const [badgeVisibility, setBadgeVisibility] = useState(() => {
+    try { return { tags: true, time: true, category: true, dueDate: true, deferDate: true, ...(JSON.parse(localStorage.getItem("gtd_badge_visibility") || "null") || {}) }; }
+    catch { return { tags: true, time: true, category: true, dueDate: true, deferDate: true }; }
+  });
   const [categories, setCategories] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gtd_categories") || "null") || []; } catch { return []; }
+  });
+  // colorSettings: user overrides for the "Colors & Appearance" settings panel.
+  // Deep-merged over DEFAULT_COLOR_SETTINGS so a partially-populated stored value
+  // (e.g. from before a new color category was added) still resolves sensibly.
+  const [colorSettings, setColorSettings] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("gtd_color_settings") || "null") || {};
+      return {
+        ...DEFAULT_COLOR_SETTINGS,
+        ...stored,
+        priorityColors:   { ...DEFAULT_COLOR_SETTINGS.priorityColors,   ...(stored.priorityColors   || {}) },
+        bucketColors:     { ...DEFAULT_COLOR_SETTINGS.bucketColors,     ...(stored.bucketColors     || {}) },
+        sidebarIconColors:{ ...DEFAULT_COLOR_SETTINGS.sidebarIconColors,...(stored.sidebarIconColors || {}) },
+        nodeTypeColors:   { ...DEFAULT_COLOR_SETTINGS.nodeTypeColors,   ...(stored.nodeTypeColors   || {}) },
+      };
+    } catch { return DEFAULT_COLOR_SETTINGS; }
   });
   // FR#37: calendar reminder interval (minutes, device-local preference)
   const [calendarReminderMinutes, setCalendarReminderMinutes] = useState(() => {
@@ -32,7 +54,9 @@ function useAppSettings() {
   useEffect(() => { localStorage.setItem("gtd_efforts",            JSON.stringify(efforts)); }, [efforts]);
   useEffect(() => { localStorage.setItem("gtd_effort_calibration", JSON.stringify(calibrationOverrides)); }, [calibrationOverrides]);
   useEffect(() => { localStorage.setItem("gtd_tag_display", tagDisplay); }, [tagDisplay]);
+  useEffect(() => { localStorage.setItem("gtd_badge_visibility", JSON.stringify(badgeVisibility)); }, [badgeVisibility]);
   useEffect(() => { localStorage.setItem("gtd_categories",         JSON.stringify(categories)); }, [categories]);
+  useEffect(() => { localStorage.setItem("gtd_color_settings", JSON.stringify(colorSettings)); }, [colorSettings]);
   useEffect(() => { localStorage.setItem("gtd_calendar_reminder_minutes", String(calendarReminderMinutes)); }, [calendarReminderMinutes]);
 
   // Next Actions view mode: 'simple' (all bucket:next tasks) | 'gtd-strict' (one per project — stub, not yet implemented)
@@ -156,7 +180,8 @@ function useAppSettings() {
 
   return {
     locations, setLocations, efforts, setEfforts, calibrationOverrides, setCalibrationOverrides,
-    tagDisplay, setTagDisplay, categories, setCategories,
+    tagDisplay, setTagDisplay, badgeVisibility, setBadgeVisibility, categories, setCategories,
+    colorSettings, setColorSettings,
     calendarReminderMinutes, setCalendarReminderMinutes,
     nextActionsViewMode, setNextActionsViewMode,
     reviewNodeTypes, setReviewNodeTypes,

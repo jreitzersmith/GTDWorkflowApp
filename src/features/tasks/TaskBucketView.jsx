@@ -88,6 +88,8 @@ function TaskBucketView({
   onViewDeferred,
   onBulkAssign,
   categories,
+  badgeVisibility,
+  setBadgeVisibility,
   projectCategoryFilter,
   setProjectCategoryFilter,
   uncategorizedProjectId,
@@ -115,9 +117,11 @@ function TaskBucketView({
   const [projPickerOpen, setProjPickerOpen] = useState(false);
   const [quickSortOpen, setQuickSortOpen] = useState(false);
   const [displayOpen, setDisplayOpen] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
   const projPickerRef = useRef(null);
   const quickSortRef = useRef(null);
   const displayRef = useRef(null);
+  const fieldsRef = useRef(null);
   const taskListRef = useRef(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -149,6 +153,57 @@ function TaskBucketView({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [displayOpen]);
+
+  useEffect(() => {
+    if (!fieldsOpen) return;
+    const handler = e => { if (fieldsRef.current && !fieldsRef.current.contains(e.target)) setFieldsOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [fieldsOpen]);
+
+  const FIELD_OPTIONS = [
+    { key: "tags",      label: "Tags (priority & location)" },
+    { key: "time",      label: "Time / effort" },
+    { key: "category",  label: "Category" },
+    { key: "dueDate",   label: "Due date" },
+    { key: "deferDate", label: "Defer date" },
+  ];
+
+  // The Fields popover markup is identical wherever it's rendered — factored out so it can
+  // appear either inline with the filter (phone, and non-project buckets on tablet/desktop)
+  // or inside the Projects Sort/Display cluster (tablet/desktop, project bucket only).
+  const renderFieldsPopover = () => (
+    <div ref={fieldsRef} style={{ position: "relative" }}>
+      <ToolbarBtn
+        onClick={() => setFieldsOpen(o => !o)}
+        active={fieldsOpen}
+        title="Show / hide row details"
+      >
+        <span style={{ fontSize: 15, verticalAlign: -1 }}>👁</span> {!isPhone && "Fields "}▾
+      </ToolbarBtn>
+      {fieldsOpen && (
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: isPhone ? 0 : "auto", right: isPhone ? "auto" : 0, background: COLORS.surface2, border: `1px solid ${COLORS.border2}`, borderRadius: 6, padding: 4, zIndex: 60, minWidth: 195, maxWidth: isPhone ? "calc(100vw - 32px)" : "none", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+          {FIELD_OPTIONS.map(({ key, label }) => {
+            const on = badgeVisibility?.[key] !== false;
+            return (
+              <button
+                key={key}
+                onClick={() => setBadgeVisibility(prev => ({ ...prev, [key]: !on }))}
+                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "7px 10px", background: "none", border: "none", color: COLORS.text, fontFamily: "inherit", fontSize: 12, cursor: "pointer", borderRadius: 4, whiteSpace: "nowrap" }}
+                onMouseEnter={e => e.currentTarget.style.background = COLORS.surface3}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}
+              >
+                <span style={{ width: 14, height: 14, border: `1px solid ${on ? COLORS.next + "88" : COLORS.border2}`, borderRadius: 3, background: on ? COLORS.next + "22" : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.1s" }}>
+                  {on && <span style={{ color: COLORS.next, fontSize: 10, lineHeight: 1 }}>✓</span>}
+                </span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 
   // Keyboard navigation: arrow keys move focus through visible task rows,
   // Enter opens the detail panel, j/k are vim-style aliases, Left/Right collapse/expand in Projects.
@@ -248,6 +303,13 @@ function TaskBucketView({
             </div>
           )}
 
+          {/* Field visibility toggle — available for every bucket with tasks. Controls which
+              metadata badges (tags/time/category/due date/defer date) show on rows across the
+              whole app. On tablet/desktop, the Projects bucket instead renders this button
+              inside the Sort/Display cluster (between them) — see below — so it's skipped here
+              in that one case to avoid a duplicate. */}
+          {bucketTasks.length > 0 && !(currentBucket === "project" && !isPhone) && renderFieldsPopover()}
+
           {/* Phone-only toggles: secondary controls (category/location, sort, display,
               export, group, age-sort) and the add-project / add-task row. All start
               collapsed to save space; each opens its existing content in its existing spot. */}
@@ -336,6 +398,10 @@ function TaskBucketView({
                 </div>
               )}
             </div>
+
+            {/* Fields toggle — positioned between Sort and Display per feedback, tablet/desktop only
+                (phone renders its own copy inline with the filter, above). */}
+            {!isPhone && renderFieldsPopover()}
 
             {/* Display popover */}
             {(() => {
@@ -693,6 +759,8 @@ TaskBucketView.propTypes = {
   onDragOver:        PropTypes.func.isRequired,
   onDragEnd:         PropTypes.func.isRequired,
   onDrop:            PropTypes.func.isRequired,
+  badgeVisibility:   PropTypes.object,
+  setBadgeVisibility: PropTypes.func,
   deferredDupeWarning: PropTypes.object,
   onViewDeferred:    PropTypes.func.isRequired,
   onBulkAssign:      PropTypes.func.isRequired,

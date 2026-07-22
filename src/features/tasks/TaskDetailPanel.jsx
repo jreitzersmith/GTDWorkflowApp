@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTaskDetailDrafts } from "./useTaskDetailDrafts.js";
 import PropTypes from "prop-types";
-import { COLORS, BUCKETS, NODE_TYPES } from "../../constants.jsx";
+import { COLORS, BUCKETS, NODE_TYPES, DEFAULT_COLOR_SETTINGS, getEffectiveBuckets, getPriorityColor } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import { collectDescendantIds, effortAccuracyColor, effortToMinutes } from "./taskUtils.jsx";
 import { StyledCheckbox } from "../../shared/StyledCheckbox.jsx";
@@ -528,13 +528,13 @@ SlidesGenerator.propTypes = {
 
 // Side panel showing full task detail: editable title and notes, all metadata
 // fields, bucket move, complete/skip/delete actions.
-function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, slidesEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style, isMobile, contactName, contacts, onNavigateToContact }) {
+function TaskDetailPanel({ task, allTasks, locations, efforts, categories, driveEnabled, slidesEnabled, googleAccessToken, currentBucket, onUpdate, onComplete, onDelete, onReassignProject, onSkipRecurrence, onClose, style, isMobile, contactName, contacts, onNavigateToContact, colorSettings }) {
   const {
     titleDraft, setTitleDraft, saveTitle,
     notesDraft, setNotesDraft, saveNotes,
   } = useTaskDetailDrafts({ task, onUpdate, onClose });
 
-  const bucketColor = BUCKETS[task.bucket]?.color || COLORS.muted;
+  const bucketColor = getEffectiveBuckets(colorSettings?.bucketColors)[task.bucket]?.color || COLORS.muted;
   const bucketLabel = BUCKETS[task.bucket]?.label || task.bucket;
 
   // Exclude the task and all its descendants from eligible parent projects
@@ -646,7 +646,8 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
               <span style={{ color: COLORS.text2, width: 64, flexShrink: 0 }}>Type</span>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                {NODE_TYPES.map(({ value, label, color }) => {
+                {NODE_TYPES.map(({ value, label, color: defaultColor }) => {
+                  const color = colorSettings?.nodeTypeColors?.[value] || defaultColor;
                   const isTask = value === 'task';
                   const isActive = effectiveNodeType === value;
                   const disabled = isTask && hasProjectChildren;
@@ -909,6 +910,7 @@ function TaskDetailPanel({ task, allTasks, locations, efforts, categories, drive
 
 TaskDetailPanel.propTypes = {
   task:              taskShape.isRequired,
+  colorSettings:     PropTypes.object,
   allTasks:          PropTypes.arrayOf(taskShape).isRequired,
   locations:         PropTypes.arrayOf(PropTypes.string).isRequired,
   efforts:           PropTypes.arrayOf(PropTypes.string).isRequired,

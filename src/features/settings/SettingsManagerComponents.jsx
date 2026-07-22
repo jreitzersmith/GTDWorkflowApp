@@ -1,11 +1,12 @@
 import { useState } from "react";
 import PropTypes from "prop-types";
-import { COLORS } from "../../constants.jsx";
+import { COLORS, BUCKETS, NODE_TYPES, DEFAULT_COLOR_SETTINGS } from "../../constants.jsx";
 import { taskShape } from "../../contexts.js";
 import {
   effortAccuracyColor, effortToMinutes, minutesToEffortLabel, MIN_CALIBRATION_SAMPLES,
 } from "../tasks/taskUtils.jsx";
 import { toContactTagCase } from "../contacts/contactsUtils.js";
+import { PRIORITIES } from "../tasks/TaskRow.jsx";
 
 // ── TagDisplaySetting ─────────────────────────────────────────────────────────
 // Toggle between "below" (tags on new line) and "inline" (tags next to title).
@@ -102,7 +103,7 @@ function LocationManager({ locations, tasks, onAdd, onRename, onRemove }) {
           const isRemoving = removingName === loc;
 
           return (
-            <div key={loc} style={{ background: COLORS.surface2, border: `1px solid ${isRemoving ? "#d45a5a55" : COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
+            <div key={loc} style={{ background: COLORS.surface2, border: `1px solid ${isRemoving ? COLORS.danger + "55" : COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px" }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.project, flexShrink: 0 }} />
                 {isEditing ? (
@@ -125,7 +126,7 @@ function LocationManager({ locations, tasks, onAdd, onRename, onRemove }) {
                 ) : (
                   <div style={{ display: "flex", gap: 4 }}>
                     <button onClick={() => startEdit(idx)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
-                    <button onClick={() => startRemove(loc)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid #d45a5a44`, background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
+                    <button onClick={() => startRemove(loc)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.danger}44`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
                   </div>
                 )}
               </div>
@@ -135,7 +136,7 @@ function LocationManager({ locations, tasks, onAdd, onRename, onRemove }) {
                   {inUse > 0 ? (
                     <>
                       <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 8 }}>
-                        <strong style={{ color: "#d45a5a" }}>{inUse} task{inUse !== 1 ? "s" : ""}</strong> use this location. Replace with:
+                        <strong style={{ color: COLORS.danger }}>{inUse} task{inUse !== 1 ? "s" : ""}</strong> use this location. Replace with:
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <select
@@ -146,14 +147,14 @@ function LocationManager({ locations, tasks, onAdd, onRename, onRemove }) {
                           <option value="">— remove tag only —</option>
                           {locations.filter(l => l !== loc).map(l => <option key={l} value={l}>{l}</option>)}
                         </select>
-                        <button onClick={confirmRemove} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d45a5a", background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Confirm</button>
+                        <button onClick={confirmRemove} style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${COLORS.danger}`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Confirm</button>
                         <button onClick={() => setRemovingName(null)} style={{ padding: "5px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                       </div>
                     </>
                   ) : (
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <span style={{ flex: 1, fontSize: 12, color: COLORS.text2 }}>Remove <strong>{loc}</strong>? No tasks use it.</span>
-                      <button onClick={confirmRemove} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d45a5a", background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>
+                      <button onClick={confirmRemove} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${COLORS.danger}`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>
                       <button onClick={() => setRemovingName(null)} style={{ padding: "4px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                     </div>
                   )}
@@ -250,7 +251,7 @@ function CategoryManager({ categories, tasks, onAdd, onRename, onRemove }) {
           const isRemoving = removingName === cat;
 
           return (
-            <div key={cat} style={{ background: COLORS.surface2, border: `1px solid ${isRemoving ? "#d45a5a55" : COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
+            <div key={cat} style={{ background: COLORS.surface2, border: `1px solid ${isRemoving ? COLORS.danger + "55" : COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px" }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: CATEGORY_COLOR, flexShrink: 0 }} />
                 {isEditing ? (
@@ -273,7 +274,7 @@ function CategoryManager({ categories, tasks, onAdd, onRename, onRemove }) {
                 ) : (
                   <div style={{ display: "flex", gap: 4 }}>
                     <button onClick={() => startEdit(idx)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
-                    <button onClick={() => startRemove(cat)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid #d45a5a44`, background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
+                    <button onClick={() => startRemove(cat)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.danger}44`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
                   </div>
                 )}
               </div>
@@ -283,7 +284,7 @@ function CategoryManager({ categories, tasks, onAdd, onRename, onRemove }) {
                   {inUse > 0 ? (
                     <>
                       <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 8 }}>
-                        <strong style={{ color: "#d45a5a" }}>{inUse} task{inUse !== 1 ? "s" : ""}</strong> use this category. Replace with:
+                        <strong style={{ color: COLORS.danger }}>{inUse} task{inUse !== 1 ? "s" : ""}</strong> use this category. Replace with:
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <select
@@ -294,14 +295,14 @@ function CategoryManager({ categories, tasks, onAdd, onRename, onRemove }) {
                           <option value="">— remove category only —</option>
                           {categories.filter(c => c !== cat).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
-                        <button onClick={confirmRemove} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d45a5a", background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Confirm</button>
+                        <button onClick={confirmRemove} style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${COLORS.danger}`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Confirm</button>
                         <button onClick={() => setRemovingName(null)} style={{ padding: "5px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                       </div>
                     </>
                   ) : (
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <span style={{ flex: 1, fontSize: 12, color: COLORS.text2 }}>Remove <strong>{cat}</strong>? No tasks use it.</span>
-                      <button onClick={confirmRemove} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d45a5a", background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>
+                      <button onClick={confirmRemove} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${COLORS.danger}`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>
                       <button onClick={() => setRemovingName(null)} style={{ padding: "4px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                     </div>
                   )}
@@ -413,7 +414,7 @@ function EffortManager({ efforts, tasks, onAdd, onRename, onRemove }) {
                 ) : (
                   <div style={{ display: "flex", gap: 4 }}>
                     <button onClick={() => startEdit(idx)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
-                    <button onClick={() => handleRemove(eff)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid #d45a5a44`, background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
+                    <button onClick={() => handleRemove(eff)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.danger}44`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
                   </div>
                 )}
               </div>
@@ -676,7 +677,7 @@ function ContactTagManager({ tags, contacts, onAdd, onRename, onRemove }) {
           const isRemoving = removingName === tag;
 
           return (
-            <div key={tag} style={{ background: COLORS.surface2, border: `1px solid ${isRemoving ? "#d45a5a55" : COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
+            <div key={tag} style={{ background: COLORS.surface2, border: `1px solid ${isRemoving ? COLORS.danger + "55" : COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px" }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: CONTACT_COLOR, flexShrink: 0 }} />
                 {isEditing ? (
@@ -699,7 +700,7 @@ function ContactTagManager({ tags, contacts, onAdd, onRename, onRemove }) {
                 ) : (
                   <div style={{ display: "flex", gap: 4 }}>
                     <button onClick={() => startEdit(tag)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
-                    <button onClick={() => startRemove(tag)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid #d45a5a44`, background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
+                    <button onClick={() => startRemove(tag)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.danger}44`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
                   </div>
                 )}
               </div>
@@ -709,7 +710,7 @@ function ContactTagManager({ tags, contacts, onAdd, onRename, onRemove }) {
                   {inUse > 0 ? (
                     <>
                       <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 8 }}>
-                        <strong style={{ color: "#d45a5a" }}>{inUse} contact{inUse !== 1 ? "s" : ""}</strong> use this tag. Replace with:
+                        <strong style={{ color: COLORS.danger }}>{inUse} contact{inUse !== 1 ? "s" : ""}</strong> use this tag. Replace with:
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <select
@@ -720,14 +721,14 @@ function ContactTagManager({ tags, contacts, onAdd, onRename, onRemove }) {
                           <option value="">— remove tag only —</option>
                           {(tags || []).filter(t => t !== tag).map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
-                        <button onClick={confirmRemove} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d45a5a", background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Confirm</button>
+                        <button onClick={confirmRemove} style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${COLORS.danger}`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Confirm</button>
                         <button onClick={() => setRemovingName(null)} style={{ padding: "5px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                       </div>
                     </>
                   ) : (
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <span style={{ flex: 1, fontSize: 12, color: COLORS.text2 }}>Remove <strong>{tag}</strong>? No contacts use it.</span>
-                      <button onClick={confirmRemove} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d45a5a", background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>
+                      <button onClick={confirmRemove} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${COLORS.danger}`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>
                       <button onClick={() => setRemovingName(null)} style={{ padding: "4px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                     </div>
                   )}
@@ -831,7 +832,7 @@ function ContactCategoryManager({ categories, contacts, onAdd, onRename, onRemov
           const isRemoving = removingName === cat;
 
           return (
-            <div key={cat} style={{ background: COLORS.surface2, border: `1px solid ${isRemoving ? "#d45a5a55" : COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
+            <div key={cat} style={{ background: COLORS.surface2, border: `1px solid ${isRemoving ? COLORS.danger + "55" : COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px" }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: CONTACT_COLOR, flexShrink: 0 }} />
                 {isEditing ? (
@@ -854,7 +855,7 @@ function ContactCategoryManager({ categories, contacts, onAdd, onRename, onRemov
                 ) : (
                   <div style={{ display: "flex", gap: 4 }}>
                     <button onClick={() => startEdit(cat)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text2, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✎ Rename</button>
-                    <button onClick={() => startRemove(cat)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid #d45a5a44`, background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
+                    <button onClick={() => startRemove(cat)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${COLORS.danger}44`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}>✕ Remove</button>
                   </div>
                 )}
               </div>
@@ -864,7 +865,7 @@ function ContactCategoryManager({ categories, contacts, onAdd, onRename, onRemov
                   {inUse > 0 ? (
                     <>
                       <div style={{ fontSize: 12, color: COLORS.text2, marginBottom: 8 }}>
-                        <strong style={{ color: "#d45a5a" }}>{inUse} contact{inUse !== 1 ? "s" : ""}</strong> use this category. Replace with:
+                        <strong style={{ color: COLORS.danger }}>{inUse} contact{inUse !== 1 ? "s" : ""}</strong> use this category. Replace with:
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <select
@@ -875,14 +876,14 @@ function ContactCategoryManager({ categories, contacts, onAdd, onRename, onRemov
                           <option value="">— remove only (keep entries) —</option>
                           {(categories || []).filter(c => c !== cat).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
-                        <button onClick={confirmRemove} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #d45a5a", background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Confirm</button>
+                        <button onClick={confirmRemove} style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${COLORS.danger}`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Confirm</button>
                         <button onClick={() => setRemovingName(null)} style={{ padding: "5px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                       </div>
                     </>
                   ) : (
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <span style={{ flex: 1, fontSize: 12, color: COLORS.text2 }}>Remove <strong>{cat}</strong>? No contacts use it.</span>
-                      <button onClick={confirmRemove} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d45a5a", background: "transparent", color: "#d45a5a", fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>
+                      <button onClick={confirmRemove} style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${COLORS.danger}`, background: "transparent", color: COLORS.danger, fontFamily: "inherit", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Remove</button>
                       <button onClick={() => setRemovingName(null)} style={{ padding: "4px 9px", borderRadius: 6, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.muted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>Cancel</button>
                     </div>
                   )}
@@ -965,4 +966,139 @@ ContactEmailLinkingModeSetting.propTypes = {
 };
 
 
-export { TagDisplaySetting, ContactEmailLinkingModeSetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager, ContactTagManager, ContactCategoryManager };
+
+// ── ColorSettingsManager ───────────────────────────────────────────────────────
+// "Colors & Appearance" settings panel. Every field falls back to
+// DEFAULT_COLOR_SETTINGS until the user picks their own; a null/undefined value
+// in `colors` means "use the default" and the reset (↺) button restores that by
+// writing null back. Grouped to mirror the categories from the Colors settings
+// discussion: container rows, status text, badges, priority tags (uniform or
+// individual), GTD bucket colors, sidebar tool icons, and node types.
+
+const GTD_BUCKET_ORDER = ['inbox', 'project', 'next', 'waiting', 'someday', 'deferred', 'done', 'inboxHistory'];
+
+function ColorGroup({ title, children }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.text2, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>{title}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{children}</div>
+    </div>
+  );
+}
+ColorGroup.propTypes = {
+  title:    PropTypes.string.isRequired,
+  children: PropTypes.node.isRequired,
+};
+
+function ColorField({ label, value, defaultValue, onChange }) {
+  const resolved = value || defaultValue;
+  const isCustom = !!value && value !== defaultValue;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+      <input
+        type="color"
+        value={resolved}
+        onChange={e => onChange(e.target.value)}
+        style={{ width: 26, height: 26, padding: 0, border: `1px solid ${COLORS.border}`, borderRadius: 5, background: 'none', cursor: 'pointer', flexShrink: 0 }}
+      />
+      <span style={{ fontSize: 12, color: COLORS.text2, flex: 1 }}>{label}</span>
+      <input
+        type="text"
+        value={resolved}
+        onChange={e => { const v = e.target.value; if (/^#[0-9a-fA-F]{0,6}$/.test(v)) onChange(v); }}
+        spellCheck={false}
+        style={{ width: 72, background: COLORS.surface2, border: `1px solid ${COLORS.border}`, borderRadius: 5, padding: '3px 6px', color: COLORS.text, fontFamily: 'monospace', fontSize: 11, outline: 'none', flexShrink: 0, boxSizing: 'border-box' }}
+      />
+      <button
+        onClick={() => onChange(null)}
+        disabled={!isCustom}
+        title="Reset to default"
+        style={{ width: 22, height: 22, flexShrink: 0, background: 'none', border: 'none', color: isCustom ? COLORS.text2 : COLORS.muted, cursor: isCustom ? 'pointer' : 'default', opacity: isCustom ? 1 : 0.35, fontSize: 13, padding: 0 }}
+      >↺</button>
+    </div>
+  );
+}
+ColorField.propTypes = {
+  label:        PropTypes.string.isRequired,
+  value:        PropTypes.string,
+  defaultValue: PropTypes.string.isRequired,
+  onChange:     PropTypes.func.isRequired,
+};
+
+function ColorSettingsManager({ colors, onChange }) {
+  const set = (key, val) => onChange({ ...colors, [key]: val || null });
+  const setNested = (group, key, val) => onChange({ ...colors, [group]: { ...(colors[group] || {}), [key]: val || null } });
+  const priorityMode = colors.priorityColorMode || DEFAULT_COLOR_SETTINGS.priorityColorMode;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 480 }}>
+      <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.5 }}>
+        Every color below falls back to the app default until you pick your own — changes apply immediately, and ↺ resets a field to default.
+      </div>
+
+      <ColorGroup title="Container rows (Category / SubCategory)">
+        <ColorField label="Category row background" value={colors.categoryRowBg} defaultValue={DEFAULT_COLOR_SETTINGS.categoryRowBg} onChange={v => set('categoryRowBg', v)} />
+        <ColorField label="SubCategory row background" value={colors.subcategoryRowBg} defaultValue={DEFAULT_COLOR_SETTINGS.subcategoryRowBg} onChange={v => set('subcategoryRowBg', v)} />
+      </ColorGroup>
+
+      <ColorGroup title="Task status text">
+        <ColorField label="Waiting For text" value={colors.waitingText} defaultValue={DEFAULT_COLOR_SETTINGS.waitingText} onChange={v => set('waitingText', v)} />
+        <ColorField label="Someday / Maybe text" value={colors.somedayText} defaultValue={DEFAULT_COLOR_SETTINGS.somedayText} onChange={v => set('somedayText', v)} />
+      </ColorGroup>
+
+      <ColorGroup title="Metadata badges">
+        <ColorField label="Location tags" value={colors.tagsLocationColor} defaultValue={DEFAULT_COLOR_SETTINGS.tagsLocationColor} onChange={v => set('tagsLocationColor', v)} />
+        <ColorField label="Time / Effort" value={colors.timeColor} defaultValue={DEFAULT_COLOR_SETTINGS.timeColor} onChange={v => set('timeColor', v)} />
+        <ColorField label="Category" value={colors.categoryBadgeColor} defaultValue={DEFAULT_COLOR_SETTINGS.categoryBadgeColor} onChange={v => set('categoryBadgeColor', v)} />
+        <ColorField label="Due date" value={colors.dueDateColor} defaultValue={DEFAULT_COLOR_SETTINGS.dueDateColor} onChange={v => set('dueDateColor', v)} />
+        <ColorField label="Defer date" value={colors.deferDateColor} defaultValue={DEFAULT_COLOR_SETTINGS.deferDateColor} onChange={v => set('deferDateColor', v)} />
+      </ColorGroup>
+
+      <ColorGroup title="Priority tags">
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          {['uniform', 'individual'].map(mode => {
+            const active = priorityMode === mode;
+            return (
+              <button
+                key={mode}
+                onClick={() => set('priorityColorMode', mode)}
+                style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${active ? COLORS.project : COLORS.border}`, background: active ? COLORS.project + '22' : 'transparent', color: active ? COLORS.project : COLORS.text2, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}
+              >{mode === 'uniform' ? 'Uniform (all same color)' : 'Individual per priority'}</button>
+            );
+          })}
+        </div>
+        {priorityMode === 'individual' ? (
+          PRIORITIES.map(p => (
+            <ColorField key={p} label={p} value={colors.priorityColors?.[p]} defaultValue={DEFAULT_COLOR_SETTINGS.priorityColors[p]} onChange={v => setNested('priorityColors', p, v)} />
+          ))
+        ) : (
+          <ColorField label="All priorities" value={colors.priorityUniformColor} defaultValue={DEFAULT_COLOR_SETTINGS.priorityUniformColor} onChange={v => set('priorityUniformColor', v)} />
+        )}
+      </ColorGroup>
+
+      <ColorGroup title="GTD bucket / stage colors">
+        {GTD_BUCKET_ORDER.map(key => (
+          <ColorField key={key} label={BUCKETS[key].label} value={colors.bucketColors?.[key]} defaultValue={DEFAULT_COLOR_SETTINGS.bucketColors[key]} onChange={v => setNested('bucketColors', key, v)} />
+        ))}
+      </ColorGroup>
+
+      <ColorGroup title="Sidebar tool icons">
+        <ColorField label="Today's Focus" value={colors.sidebarIconColors?.focus} defaultValue={DEFAULT_COLOR_SETTINGS.sidebarIconColors.focus} onChange={v => setNested('sidebarIconColors', 'focus', v)} />
+        <ColorField label="Contacts" value={colors.sidebarIconColors?.contacts} defaultValue={DEFAULT_COLOR_SETTINGS.sidebarIconColors.contacts} onChange={v => setNested('sidebarIconColors', 'contacts', v)} />
+        <ColorField label="Health" value={colors.sidebarIconColors?.health} defaultValue={DEFAULT_COLOR_SETTINGS.sidebarIconColors.health} onChange={v => setNested('sidebarIconColors', 'health', v)} />
+      </ColorGroup>
+
+      <ColorGroup title="Node types">
+        {NODE_TYPES.map(({ value, label }) => (
+          <ColorField key={value} label={label} value={colors.nodeTypeColors?.[value]} defaultValue={DEFAULT_COLOR_SETTINGS.nodeTypeColors[value]} onChange={v => setNested('nodeTypeColors', value, v)} />
+        ))}
+      </ColorGroup>
+    </div>
+  );
+}
+ColorSettingsManager.propTypes = {
+  colors:   PropTypes.object.isRequired,
+  onChange: PropTypes.func.isRequired,
+};
+
+export { TagDisplaySetting, ContactEmailLinkingModeSetting, LocationManager, CategoryManager, EffortManager, EffortCalibrationManager, ReviewConfigManager, ContactTagManager, ContactCategoryManager, ColorSettingsManager };
